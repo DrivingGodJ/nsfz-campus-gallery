@@ -184,6 +184,13 @@ button.comparison-image{cursor:zoom-in}
 .submission-verification{min-height:65px;max-width:100%;overflow:hidden}
 .submission-verification p{font-size:11px;color:var(--danger-text)}
 .submission-link{margin-left:auto;white-space:nowrap}
+.viewer-header-links{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+.viewer-app .brand{flex-shrink:0;white-space:nowrap}
+.viewer-header-links .submission-link{margin-left:0}
+.github-mark{display:block;width:16px;height:16px;flex-shrink:0;background:currentColor;mask-position:center;mask-repeat:no-repeat;mask-size:contain;-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;-webkit-mask-size:contain}
+@media(max-width:760px){.viewer-app .app-header{gap:8px;padding:0 12px}.viewer-app .brand small{display:none}.viewer-header-links{gap:6px}.github-link{width:38px;padding:9px}.github-label{display:none}}
+@media(max-width:420px){.viewer-app .catalog-label{display:none}}
+@media(max-width:360px){.viewer-app .app-header{gap:6px;padding:0 10px}.viewer-app .brand{gap:6px}.viewer-app .brand-mark{width:30px;height:30px}.viewer-app .brand strong{font-size:16px;letter-spacing:1px}.github-link{width:36px;padding:8px}.viewer-app .app-header>.button{padding:10px}}
 .viewer-app .header-location{margin-left:0}
 .quick-import-note{font-size:10px;line-height:1.8;color:var(--muted-text);margin:0 0 14px}
 .review-heading{display:flex;align-items:center;justify-content:space-between;font-size:13px}

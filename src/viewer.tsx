@@ -13,9 +13,11 @@ import { sortPhotos, type PhotoSort } from './photo-sort';
 import { usePhotoLikes } from './usePhotoLikes';
 import PhotoLikeButton from './PhotoLikeButton';
 import { useAnimatedPresence } from './useAnimatedPresence';
+import githubMark from './assets/github-mark.svg';
 import './styles.css';
 
 const MapView = React.lazy(() => import('./MapView'));
+const GITHUB_MASK = `url(${JSON.stringify(githubMark)})`;
 
 function App() {
   const [content, setContent] = useState<{ campus: Campus; site: Site } | null>(null);
@@ -81,7 +83,17 @@ function App() {
   const galleryOpen = open && !selected;
   const galleryPresence = useAnimatedPresence(galleryOpen);
   return <div className="app viewer-app">
-    <header className="app-header"><Brand /><a className="button secondary submission-link" href="./submit.html">投稿照片</a><div className="header-location"><MapPin size={14} /><span>南京 · 察哈尔路</span></div><button className={'button ' + (galleryOpen ? 'secondary' : 'primary')} onClick={() => { if (selected) { back(); setOpen(true); } else setOpen(!open); }} aria-expanded={galleryOpen}><Images size={16} />照片目录<span className="count">{content?.site.photos.length || 0}</span></button></header>
+    <header className="app-header">
+      <Brand />
+      <nav className="viewer-header-links" aria-label="项目链接">
+        <a className="button secondary github-link" href="https://github.com/DrivingGodJ/nsfz-campus-gallery" target="_blank" rel="noopener noreferrer" aria-label="GitHub 开源项目" title="查看 GitHub 开源项目">
+          <span className="github-mark" aria-hidden="true" style={{ maskImage: GITHUB_MASK, WebkitMaskImage: GITHUB_MASK }} /><span className="github-label">GitHub</span>
+        </a>
+        <a className="button secondary submission-link" href="./submit.html">投稿照片</a>
+      </nav>
+      <div className="header-location"><MapPin size={14} /><span>南京 · 察哈尔路</span></div>
+      <button className={'button ' + (galleryOpen ? 'secondary' : 'primary')} onClick={() => { if (selected) { back(); setOpen(true); } else setOpen(!open); }} aria-label="照片目录" aria-expanded={galleryOpen}><Images size={16} /><span className="catalog-label">照片目录</span><span className="count">{content?.site.photos.length || 0}</span></button>
+    </header>
     {error ? <div className="page-error"><Notice kind="error">{error}</Notice><button className="button primary" onClick={load}>重新加载</button></div> : !content ? <div className="page-loading">正在展开校园地图…</div> :
       <main className={'viewer-main' + (galleryPresence.visible ? ' panel-open' : '')}>
         <PhotoComparison photo={selected} onOpen={() => setLarge(true)}
