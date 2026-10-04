@@ -1,4 +1,5 @@
-import { Vector3, type Camera } from 'three';
+import { Vector3, type Camera, type PerspectiveCamera } from 'three';
+import { bindMapTouchControls } from './map-touch-controls.ts';
 
 // Translate the target too: orbit dolly would otherwise stop at its centre.
 export function travelAlongView(camera: Camera, target: Vector3, distance: number) {
@@ -20,11 +21,21 @@ export function mapGroundViewDistance(camera: Camera) {
   return Math.abs(camera.position.y) / Math.max(.01, Math.abs(direction.y));
 }
 
+export function panMapView(camera: PerspectiveCamera, target: Vector3, dx: number, dy: number, viewportHeight: number) {
+  camera.updateMatrixWorld();
+  const scale = 2 * camera.position.distanceTo(target) * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, viewportHeight);
+  const movement = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(-dx * scale)
+    .add(new Vector3().setFromMatrixColumn(camera.matrixWorld, 1).multiplyScalar(dy * scale));
+  camera.position.add(movement); target.add(movement); camera.updateMatrixWorld();
+}
+
 // Wheel, trackpad pinch, touch pinch and middle-button drag all use the same
-// forward/backward movement. OrbitControls still owns rotation and panning.
+// forward/backward movement. Map overlays share touch input with the canvas.
 export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   enabled: () => boolean;
   travel: (steps: number) => void;
+  pan?: (dx: number, dy: number) => void;
+  multiTouch?: (active: boolean) => void;
   rotation?: {
     // True selects custom rotation; false leaves rotation to OrbitControls.
     start: () => boolean;
@@ -32,8 +43,6 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
     finish: () => void;
   };
 }) {
-  const touches = new Map<number, { x: number; y: number }>();
-  let pinchDistance = 0;
   let middle: { id: number; y: number } | null = null;
   let looking: { id: number; x: number; y: number } | null = null;
   const stopLooking = () => {
@@ -47,26 +56,20 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
       canvas.setPointerCapture(event.pointerId);
     }
   };
-  const separation = () => {
-    if (touches.size !== 2) return 0;
-    const [a, b] = [...touches.values()];
-    return Math.hypot(b.x - a.x, b.y - a.y);
-  };
+  const surface = canvas.closest?.('.map-stage') || canvas;
   const wheel = (event: WheelEvent) => {
+    // Keep normal scrolling inside the photo menu; trackpad pinch anywhere
+    // over the map belongs to the map, even in a fixed photo perspective.
+    if (event.ctrlKey) event.preventDefault();
+    else if ((event.target as Element)?.closest?.('.photo-cluster-picker')) return;
     if (!options.enabled() || !Number.isFinite(event.deltaY)) return;
     event.preventDefault();
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1);
     options.travel(-pixels / 100);
   };
   const down = (event: PointerEvent) => {
-    if (!options.enabled()) return;
-    if (event.pointerType === 'touch') {
-      if (!touches.size) startRotation(event);
-      else stopLooking();
-      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      pinchDistance = separation();
-      canvas.setPointerCapture(event.pointerId);
-    } else if (event.button === 1) {
+    if (event.pointerType === 'touch' || !options.enabled()) return;
+    if (event.button === 1) {
       event.preventDefault();
       middle = { id: event.pointerId, y: event.clientY };
       canvas.setPointerCapture(event.pointerId);
@@ -81,51 +84,42 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
       options.rotation?.look(event.clientX - looking.x, event.clientY - looking.y);
       looking.x = event.clientX; looking.y = event.clientY;
     }
-    const touch = touches.get(event.pointerId);
-    if (touch) {
-      touch.x = event.clientX; touch.y = event.clientY;
-      const nextDistance = separation();
-      if (options.enabled() && pinchDistance > 0 && nextDistance > 0) {
-        event.preventDefault();
-        options.travel(5 * Math.log(nextDistance / pinchDistance));
-      }
-      pinchDistance = nextDistance;
-    } else if (middle?.id === event.pointerId) {
+    if (middle?.id === event.pointerId) {
       const pixels = event.clientY - middle.y;
       middle.y = event.clientY;
       if (options.enabled()) { event.preventDefault(); options.travel(pixels / 100); }
     }
   };
   const finish = (event: PointerEvent) => {
-    const captured = touches.has(event.pointerId) || middle?.id === event.pointerId || looking?.id === event.pointerId;
+    if (event.pointerType === 'touch') return;
+    const captured = middle?.id === event.pointerId || looking?.id === event.pointerId;
     if (looking?.id === event.pointerId) stopLooking();
-    touches.delete(event.pointerId);
-    pinchDistance = separation();
     if (middle?.id === event.pointerId) middle = null;
     if (captured && canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   };
   const clear = () => {
-    const captured = [...touches.keys()];
-    if (looking) captured.push(looking.id);
+    const captured = looking?.id;
     stopLooking();
-    touches.clear(); pinchDistance = 0;
     const pointer = middle; middle = null;
     if (pointer && canvas.hasPointerCapture(pointer.id)) canvas.releasePointerCapture(pointer.id);
-    for (const id of captured) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+    if (captured !== undefined && canvas.hasPointerCapture(captured)) canvas.releasePointerCapture(captured);
   };
+  const unbindTouch = bindMapTouchControls(canvas, { ...options, single: { start: startRotation, move, finish: stopLooking } });
   const captureOptions = { capture: true };
-  canvas.addEventListener('wheel', wheel, { passive: false });
+  surface.addEventListener('wheel', wheel as EventListener, { passive: false });
   // Choose the pivot before OrbitControls starts interpreting this gesture.
   canvas.addEventListener('pointerdown', down, captureOptions);
-  canvas.addEventListener('pointermove', move);
+  const mouseMove = (event: PointerEvent) => { if (event.pointerType !== 'touch') move(event); };
+  canvas.addEventListener('pointermove', mouseMove);
   canvas.addEventListener('pointerup', finish);
   canvas.addEventListener('pointercancel', finish);
   canvas.addEventListener('lostpointercapture', finish);
   canvas.addEventListener('blur', clear);
   return () => {
-    canvas.removeEventListener('wheel', wheel);
+    unbindTouch();
+    surface.removeEventListener('wheel', wheel as EventListener);
     canvas.removeEventListener('pointerdown', down, captureOptions);
-    canvas.removeEventListener('pointermove', move);
+    canvas.removeEventListener('pointermove', mouseMove);
     canvas.removeEventListener('pointerup', finish);
     canvas.removeEventListener('pointercancel', finish);
     canvas.removeEventListener('lostpointercapture', finish);

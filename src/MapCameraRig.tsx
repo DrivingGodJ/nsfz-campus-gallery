@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { Photo, Point } from './types';
 import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-camera';
 import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-controls';
-import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, travelAlongView } from './map-travel-controls';
+import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
@@ -43,6 +43,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
   const objectTarget: [number, number, number] | null = selected ? [selected.position.x, selected.position.height, selected.position.z] : selectedObjectTarget ?? null;
   const objectKey = JSON.stringify(objectTarget);
   const gesturePivot = useRef<THREE.Vector3 | null>(null);
+  const touchOrbit = useRef<{ rotate: boolean; pan: boolean } | null>(null);
   const objectBounds = selected ? null : selectedObjectBounds;
   const live = useRef({ size, boundary, objectTarget, objectBounds, preview, onMoving, onPhotoOrientation });
   live.current = { size, boundary, objectTarget, objectBounds, preview, onMoving, onPhotoOrientation };
@@ -68,6 +69,25 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       if (!control) return;
       travelAlongView(camera, control.target, steps * mapTravelStep(camera));
       control.update(); invalidate();
+    },
+    pan: (dx, dy) => {
+      const control = controls.current;
+      if (!control || !(camera instanceof THREE.PerspectiveCamera)) return;
+      panMapView(camera, control.target, dx, dy, live.current.size.height);
+      control.update(); invalidate();
+    },
+    multiTouch: active => {
+      const control = controls.current;
+      if (!control) return;
+      if (active) {
+        stopOrbitMomentum(camera, control);
+        touchOrbit.current = { rotate: control.enableRotate, pan: control.enablePan };
+        control.enableRotate = false; control.enablePan = false;
+      } else if (touchOrbit.current) {
+        control.enableRotate = touchOrbit.current.rotate; control.enablePan = touchOrbit.current.pan;
+        touchOrbit.current = null;
+      }
+      invalidate();
     },
     rotation: {
       start: () => {

@@ -38,6 +38,10 @@ fieldset.edit-form{border:0;margin:0;min-width:0}.map-loading{display:flex;align
 
 /* Keep the original photo alongside the model in both map and shooting views. */
 .viewer-app,.editor-app.comparing{min-height:0}
+/* Reserve model gestures on the canvas and floating controls. The photo
+   catalog, comparison photo and scrollable photo menu keep native scrolling. */
+.map-stage canvas{touch-action:none!important}
+.map-stage .map-photo,.map-stage .map-tools,.map-stage .location-name,.map-stage .direction-handle,.map-stage .map-bottom{touch-action:none}
 .photo-comparison{position:relative;display:flex;flex:1;min-width:0;min-height:0;height:100%;overflow:hidden;background:var(--paper)}
 .photo-comparison.is-split{display:grid;grid-template-columns:minmax(0,var(--model-share,50fr)) 24px minmax(0,var(--photo-share,50fr));grid-template-rows:minmax(0,1fr)}
 .comparison-model{display:flex;flex:1;position:relative;min-width:0;min-height:0;overflow:hidden}
