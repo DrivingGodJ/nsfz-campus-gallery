@@ -1,0 +1,2414 @@
+{
+  "schemaVersion": 1,
+  "revision": 133,
+  "photos": [
+    {
+      "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
+      "title": "DSC06870",
+      "description": "",
+      "capturedAt": "2026-01-20T09:35:31",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:35:31",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.01,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 160.39631889210457,
+        "z": 52.17614398238132
+      },
+      "placed": true,
+      "heading": 8,
+      "pitch": 15,
+      "width": 4342,
+      "height": 5789,
+      "downloadBytes": 3327998,
+      "files": {
+        "thumbnail": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/thumbnail.webp",
+        "display": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/display.webp",
+        "download": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "07daa633-1b1c-427e-bbd7-37dc23428ee8",
+      "title": "DSC06872",
+      "description": "",
+      "capturedAt": "2026-01-20T09:37:04",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:37:04",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.016666666666666666,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 151.97542210945002,
+        "z": 1.1682903334479136
+      },
+      "placed": true,
+      "heading": 59,
+      "pitch": 0,
+      "width": 3942,
+      "height": 7008,
+      "downloadBytes": 6029574,
+      "files": {
+        "thumbnail": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/thumbnail.webp",
+        "display": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/display.webp",
+        "download": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "5680b7f7-73b1-4563-a7d9-64babbaebb82",
+      "title": "DSC06875",
+      "description": "",
+      "capturedAt": "2026-01-20T09:42:10",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:42:10",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.002,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 22.368708105279197,
+        "z": -85.31652191136224
+      },
+      "placed": true,
+      "heading": 289,
+      "pitch": -8,
+      "width": 7008,
+      "height": 3942,
+      "downloadBytes": 8800580,
+      "files": {
+        "thumbnail": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/thumbnail.webp",
+        "display": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/display.webp",
+        "download": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/download.jpg"
+      },
+      "locationId": "local/footbridge",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "32a56078-7475-4d8e-ac9d-ec107b07ee04",
+      "title": "DSC06877",
+      "description": "",
+      "capturedAt": "2026-01-20T09:43:46",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:43:46",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.001,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -23.29929759781338,
+        "z": -83.70620816950986
+      },
+      "placed": true,
+      "heading": 322,
+      "pitch": 0,
+      "width": 7008,
+      "height": 3942,
+      "downloadBytes": 7187663,
+      "files": {
+        "thumbnail": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/thumbnail.webp",
+        "display": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/display.webp",
+        "download": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "13411ce1-b933-425c-ac78-0a0569842170",
+      "title": "DSC06881",
+      "description": "",
+      "capturedAt": "2026-01-20T09:45:01",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:45:01",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 29,
+        "focalLength35Mm": 29,
+        "aperture": 4,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 125,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -54.54177005128939,
+        "z": -42.84439978960734
+      },
+      "placed": true,
+      "heading": 54,
+      "pitch": -25,
+      "width": 4112,
+      "height": 5482,
+      "downloadBytes": 5268597,
+      "files": {
+        "thumbnail": "media/13411ce1-b933-425c-ac78-0a0569842170/thumbnail.webp",
+        "display": "media/13411ce1-b933-425c-ac78-0a0569842170/display.webp",
+        "download": "media/13411ce1-b933-425c-ac78-0a0569842170/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "6deb58ad-debc-4321-bdfb-d21c2d83fb97",
+      "title": "DSC06885",
+      "description": "",
+      "capturedAt": "2026-01-20T09:48:56",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:48:56",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 27,
+        "focalLength35Mm": 27,
+        "aperture": 5.6,
+        "exposureSeconds": 0.004,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -52.85155477059631,
+        "z": 76.06105026111709
+      },
+      "placed": true,
+      "heading": 114.73661114671108,
+      "pitch": 1.5482809013715066,
+      "width": 6046,
+      "height": 4534,
+      "downloadBytes": 5695980,
+      "files": {
+        "thumbnail": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/thumbnail.webp",
+        "display": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/display.webp",
+        "download": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "39208fcf-95ae-46eb-8007-1b921fe732b0",
+      "title": "DSC06887",
+      "description": "",
+      "capturedAt": "2026-01-20T09:50:48",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:50:48",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 90,
+        "focalLength35Mm": 90,
+        "aperture": 5.6,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -24.948773313205763,
+        "z": 117.6344546350464
+      },
+      "placed": true,
+      "heading": 62.48129388707014,
+      "pitch": 1.4251944526550808,
+      "width": 4672,
+      "height": 6229,
+      "downloadBytes": 6970262,
+      "files": {
+        "thumbnail": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/thumbnail.webp",
+        "display": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/display.webp",
+        "download": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "5bd99665-2443-4ae7-93b2-ab7694285ee4",
+      "title": "DSC06892",
+      "description": "",
+      "capturedAt": "2026-01-20T09:54:02",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:54:02",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.008,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 42.570585811599116,
+        "z": 93.8824969201507
+      },
+      "placed": true,
+      "heading": 53.1115165879462,
+      "pitch": 14.136438435227305,
+      "width": 5612,
+      "height": 4209,
+      "downloadBytes": 6068336,
+      "files": {
+        "thumbnail": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/thumbnail.webp",
+        "display": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/display.webp",
+        "download": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d",
+      "title": "DSC06898",
+      "description": "",
+      "capturedAt": "2026-01-20T09:56:57",
+      "metadata": {
+        "recordedAt": "2026-01-20T09:56:57",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 30,
+        "focalLength35Mm": 30,
+        "aperture": 5.6,
+        "exposureSeconds": 0.008,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 52.07057695185078,
+        "z": 42.104114798739936
+      },
+      "placed": true,
+      "heading": 54.44978744571182,
+      "pitch": -1.6350152709044286,
+      "width": 6229,
+      "height": 4672,
+      "downloadBytes": 9299376,
+      "files": {
+        "thumbnail": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/thumbnail.webp",
+        "display": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/display.webp",
+        "download": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "62c412f5-d3b2-4ae2-bbed-1308ec44ff50",
+      "title": "DSC06903",
+      "description": "",
+      "capturedAt": "2026-01-20T10:01:40",
+      "metadata": {
+        "recordedAt": "2026-01-20T10:01:40",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 75,
+        "focalLength35Mm": 75,
+        "aperture": 5.6,
+        "exposureSeconds": 0.008,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 124.60777911097423,
+        "z": -7.237871412116661
+      },
+      "placed": true,
+      "heading": 274.5943424894888,
+      "pitch": 1.8481125235526896,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 5779374,
+      "files": {
+        "thumbnail": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/thumbnail.webp",
+        "display": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/display.webp",
+        "download": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "56bfa131-0bcd-4cee-9adf-2e7043063dae",
+      "title": "DSC06904",
+      "description": "",
+      "capturedAt": "2026-01-20T10:03:13",
+      "metadata": {
+        "recordedAt": "2026-01-20T10:03:13",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 26,
+        "focalLength35Mm": 26,
+        "aperture": 5.6,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 156.80512039237632,
+        "z": 47.749652944762424
+      },
+      "placed": true,
+      "heading": 15.243630994789953,
+      "pitch": -8.53850688867639,
+      "width": 4672,
+      "height": 6229,
+      "downloadBytes": 4847656,
+      "files": {
+        "thumbnail": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/thumbnail.webp",
+        "display": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/display.webp",
+        "download": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "a0e17620-7437-42cf-92f2-1d7d23e20842",
+      "title": "DSC06905",
+      "description": "",
+      "capturedAt": "2026-01-20T10:04:03",
+      "metadata": {
+        "recordedAt": "2026-01-20T10:04:03",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 26,
+        "focalLength35Mm": 26,
+        "aperture": 6.3,
+        "exposureSeconds": 0.008,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 149.12197418365224,
+        "z": 43.230229596465676
+      },
+      "placed": true,
+      "heading": 321.18165780863035,
+      "pitch": -0.19369055269917496,
+      "width": 7008,
+      "height": 3942,
+      "downloadBytes": 7048020,
+      "files": {
+        "thumbnail": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/thumbnail.webp",
+        "display": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/display.webp",
+        "download": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "691551ff-0730-4879-a53e-678bc812d733",
+      "title": "DSC06910",
+      "description": "",
+      "capturedAt": "2026-01-20T12:14:35",
+      "metadata": {
+        "recordedAt": "2026-01-20T12:14:35",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 92,
+        "focalLength35Mm": 92,
+        "aperture": 5.6,
+        "exposureSeconds": 0.004,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -41.096302368561865,
+        "z": 71.65531119718773
+      },
+      "placed": true,
+      "heading": 85.0489543629817,
+      "pitch": -0.40417355170406283,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 4617650,
+      "files": {
+        "thumbnail": "media/691551ff-0730-4879-a53e-678bc812d733/thumbnail.webp",
+        "display": "media/691551ff-0730-4879-a53e-678bc812d733/display.webp",
+        "download": "media/691551ff-0730-4879-a53e-678bc812d733/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "d922f197-3db1-4e37-8741-ba753ec3233c",
+      "title": "DSC06932",
+      "description": "",
+      "capturedAt": "2026-01-20T17:45:14",
+      "metadata": {
+        "recordedAt": "2026-01-20T17:45:14",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 69,
+        "focalLength35Mm": 69,
+        "aperture": 4,
+        "exposureSeconds": 0.0125,
+        "iso": 1000,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 28.758458377217906,
+        "z": 98.78413050847709
+      },
+      "placed": true,
+      "heading": 258.3259923883113,
+      "pitch": 1.312987466675738,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 7571773,
+      "files": {
+        "thumbnail": "media/d922f197-3db1-4e37-8741-ba753ec3233c/thumbnail.webp",
+        "display": "media/d922f197-3db1-4e37-8741-ba753ec3233c/display.webp",
+        "download": "media/d922f197-3db1-4e37-8741-ba753ec3233c/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "72cbcabe-914c-4ff3-b21a-fc6197bdd416",
+      "title": "DSC06935",
+      "description": "",
+      "capturedAt": "2026-01-20T17:46:07",
+      "metadata": {
+        "recordedAt": "2026-01-20T17:46:07",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 59,
+        "focalLength35Mm": 59,
+        "aperture": 4,
+        "exposureSeconds": 0.016666666666666666,
+        "iso": 2500,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 4.458049081631927,
+        "z": 118.15510899976047
+      },
+      "placed": true,
+      "heading": 354.9789398331227,
+      "pitch": -4.388365052225526,
+      "width": 6999,
+      "height": 3937,
+      "downloadBytes": 4928071,
+      "files": {
+        "thumbnail": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/thumbnail.webp",
+        "display": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/display.webp",
+        "download": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "c28fcc63-542b-4757-830b-eb23432a634f",
+      "title": "DSC06939",
+      "description": "",
+      "capturedAt": "2026-01-20T18:12:28",
+      "metadata": {
+        "recordedAt": "2026-01-20T18:12:28",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 44,
+        "focalLength35Mm": 44,
+        "aperture": 4,
+        "exposureSeconds": 0.02,
+        "iso": 1250,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 17.388830062834316,
+        "z": 70.55987674788426
+      },
+      "placed": true,
+      "heading": 75.93383749480341,
+      "pitch": 1.5596511183277295,
+      "width": 4651,
+      "height": 6202,
+      "downloadBytes": 7107465,
+      "files": {
+        "thumbnail": "media/c28fcc63-542b-4757-830b-eb23432a634f/thumbnail.webp",
+        "display": "media/c28fcc63-542b-4757-830b-eb23432a634f/display.webp",
+        "download": "media/c28fcc63-542b-4757-830b-eb23432a634f/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "926f5f00-e507-474d-8dc6-643f96c53c7c",
+      "title": "DSC06169",
+      "description": "",
+      "capturedAt": "2025-11-29T15:46:47",
+      "metadata": {
+        "recordedAt": "2025-11-29T15:46:47",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.00625,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 67.67852190001041,
+        "z": 72.379652240963
+      },
+      "placed": true,
+      "heading": 256.06732350973937,
+      "pitch": 18.758526026186093,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 12300828,
+      "files": {
+        "thumbnail": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/thumbnail.webp",
+        "display": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/display.webp",
+        "download": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "f2526e97-f7f0-4fa6-a096-679c3d36f300",
+      "title": "DSC06170",
+      "description": "",
+      "capturedAt": "2025-11-29T15:47:53",
+      "metadata": {
+        "recordedAt": "2025-11-29T15:47:53",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.002,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -17.86898884438083,
+        "z": 51.24910087950821
+      },
+      "placed": true,
+      "heading": 300.0825776629565,
+      "pitch": 0.060841496276653695,
+      "width": 7008,
+      "height": 4672,
+      "downloadBytes": 9150054,
+      "files": {
+        "thumbnail": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/thumbnail.webp",
+        "display": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/display.webp",
+        "download": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "737d3945-edc2-40e0-a7ba-f25c464d4561",
+      "title": "DSC06171",
+      "description": "",
+      "capturedAt": "2025-11-29T15:48:04",
+      "metadata": {
+        "recordedAt": "2025-11-29T15:48:04",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.002,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -18.593789567208816,
+        "z": 50.183424495059576
+      },
+      "placed": true,
+      "heading": 298.26234314815247,
+      "pitch": 3.8419667528987227,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 5939494,
+      "files": {
+        "thumbnail": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/thumbnail.webp",
+        "display": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/display.webp",
+        "download": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "d028fbd6-09a9-47ea-a7bc-06641eada0d1",
+      "title": "DSC06174",
+      "description": "",
+      "capturedAt": "2025-11-29T15:49:19",
+      "metadata": {
+        "recordedAt": "2025-11-29T15:49:19",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.003125,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -19.524721490690037,
+        "z": 48.153832558993344
+      },
+      "placed": true,
+      "heading": 308.39759420340124,
+      "pitch": -4.98237468592432,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 7769168,
+      "files": {
+        "thumbnail": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/thumbnail.webp",
+        "display": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/display.webp",
+        "download": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "831757f0-d70a-4ac1-8d8d-f3af0636f728",
+      "title": "DSC06176",
+      "description": "",
+      "capturedAt": "2025-12-05T11:47:55",
+      "metadata": {
+        "recordedAt": "2025-12-05T11:47:55",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.004,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 132.94738217689206,
+        "z": 55.99545417578697
+      },
+      "placed": true,
+      "heading": 183.9177845290501,
+      "pitch": -11.77548476003127,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 11902424,
+      "files": {
+        "thumbnail": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/thumbnail.webp",
+        "display": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/display.webp",
+        "download": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "8a4eeea3-449d-41f4-a6b9-4b29cfce4f23",
+      "title": "DSC06186",
+      "description": "",
+      "capturedAt": "2025-12-06T12:39:09",
+      "metadata": {
+        "recordedAt": "2025-12-06T12:39:09",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.004,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 139.921519116976,
+        "z": 55.222978316074354
+      },
+      "placed": true,
+      "heading": 236.5123888044925,
+      "pitch": -4.315549132770688,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 10899524,
+      "files": {
+        "thumbnail": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/thumbnail.webp",
+        "display": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/display.webp",
+        "download": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "05fe3597-88ac-46f4-a3d2-007df5a1b957",
+      "title": "DSC06195",
+      "description": "",
+      "capturedAt": "2025-12-09T12:21:15",
+      "metadata": {
+        "recordedAt": "2025-12-09T12:21:15",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.003125,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 65.84143869343596,
+        "z": 70.89617568061577
+      },
+      "placed": true,
+      "heading": 255.42899517101034,
+      "pitch": -3.7165575544133405,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 12878268,
+      "files": {
+        "thumbnail": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/thumbnail.webp",
+        "display": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/display.webp",
+        "download": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "a61c941b-14f3-454e-af38-45edb7bdf202",
+      "title": "DSC06197",
+      "description": "",
+      "capturedAt": "2025-12-09T12:21:42",
+      "metadata": {
+        "recordedAt": "2025-12-09T12:21:42",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 65.48160971704453,
+        "z": 71.91030542710428
+      },
+      "placed": true,
+      "heading": 263.356263182941,
+      "pitch": -16.20495723776887,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 11740089,
+      "files": {
+        "thumbnail": "media/a61c941b-14f3-454e-af38-45edb7bdf202/thumbnail.webp",
+        "display": "media/a61c941b-14f3-454e-af38-45edb7bdf202/display.webp",
+        "download": "media/a61c941b-14f3-454e-af38-45edb7bdf202/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "8b793917-d0f6-4953-8480-4337289b2739",
+      "title": "DSC06208",
+      "description": "",
+      "capturedAt": "2025-12-13T14:39:18",
+      "metadata": {
+        "recordedAt": "2025-12-13T14:39:18",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.02,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 148.71727326983333,
+        "z": 53.4763058329662
+      },
+      "placed": true,
+      "heading": 238.43656942699295,
+      "pitch": -9.357806598345881,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 10212657,
+      "files": {
+        "thumbnail": "media/8b793917-d0f6-4953-8480-4337289b2739/thumbnail.webp",
+        "display": "media/8b793917-d0f6-4953-8480-4337289b2739/display.webp",
+        "download": "media/8b793917-d0f6-4953-8480-4337289b2739/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "9d583001-6ff5-4487-8f70-8e59ccc83fa9",
+      "title": "DSC06615",
+      "description": "",
+      "capturedAt": "2025-12-20T12:33:29",
+      "metadata": {
+        "recordedAt": "2025-12-20T12:33:29",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 70-200mm F2.8 GM OSS",
+        "focalLengthMm": 75,
+        "focalLength35Mm": 75,
+        "aperture": 5.6,
+        "exposureSeconds": 0.01,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 122.50318922175384,
+        "z": 18.071978369216318
+      },
+      "placed": true,
+      "heading": 7.39498994905,
+      "pitch": 18.892993036828226,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 14800063,
+      "files": {
+        "thumbnail": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/thumbnail.webp",
+        "display": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/display.webp",
+        "download": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "9084dc2d-a2f2-4d42-8734-4fdbe5a9c563",
+      "title": "DSC06618",
+      "description": "",
+      "capturedAt": "2025-12-20T12:35:33",
+      "metadata": {
+        "recordedAt": "2025-12-20T12:35:33",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 70-200mm F2.8 GM OSS",
+        "focalLengthMm": 200,
+        "focalLength35Mm": 200,
+        "aperture": 16,
+        "exposureSeconds": 0.16666666666666666,
+        "iso": 320,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 162.96278873590794,
+        "z": 39.87828649775446
+      },
+      "placed": true,
+      "heading": 354.1638166466614,
+      "pitch": -0.571093976109494,
+      "width": 4672,
+      "height": 6229,
+      "downloadBytes": 7267683,
+      "files": {
+        "thumbnail": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/thumbnail.webp",
+        "display": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/display.webp",
+        "download": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "51f40733-0225-4555-a676-40aeffb92106",
+      "title": "DSC06620",
+      "description": "",
+      "capturedAt": "2025-12-20T12:36:12",
+      "metadata": {
+        "recordedAt": "2025-12-20T12:36:12",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 70-200mm F2.8 GM OSS",
+        "focalLengthMm": 200,
+        "focalLength35Mm": 200,
+        "aperture": 3.5,
+        "exposureSeconds": 0.003125,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 156.84734259492308,
+        "z": 38.39593762097252
+      },
+      "placed": true,
+      "heading": 255.39791328072806,
+      "pitch": 9.871330151894288,
+      "width": 4672,
+      "height": 6229,
+      "downloadBytes": 8531781,
+      "files": {
+        "thumbnail": "media/51f40733-0225-4555-a676-40aeffb92106/thumbnail.webp",
+        "display": "media/51f40733-0225-4555-a676-40aeffb92106/display.webp",
+        "download": "media/51f40733-0225-4555-a676-40aeffb92106/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "5f450ef0-72b5-4d73-860a-14d812c93b9d",
+      "title": "DSC06150",
+      "description": "",
+      "capturedAt": "2025-11-22T07:42:47",
+      "metadata": {
+        "recordedAt": "2025-11-22T07:42:47",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -67.44703062314719,
+        "z": 54.5567903210887
+      },
+      "placed": true,
+      "heading": 119.29382619651307,
+      "pitch": 1.629224353014914,
+      "width": 6951,
+      "height": 3910,
+      "downloadBytes": 6592417,
+      "files": {
+        "thumbnail": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/thumbnail.webp",
+        "display": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/display.webp",
+        "download": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/download.jpg"
+      },
+      "locationId": "way/855459417",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "ba32ecca-0828-4f5d-8b3b-e9a435f19152",
+      "title": "DSC04015",
+      "description": "",
+      "capturedAt": "2025-11-05T12:13:59",
+      "metadata": {
+        "recordedAt": "2025-11-05T12:13:59",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.004,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 55.950777959985835,
+        "z": 73.57610795546975
+      },
+      "placed": true,
+      "heading": 74.844629864627,
+      "pitch": 57.70345139327783,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 9975564,
+      "files": {
+        "thumbnail": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/thumbnail.webp",
+        "display": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/display.webp",
+        "download": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "0aeb5fae-050d-40a6-90f4-762d786c845b",
+      "title": "DSC04019",
+      "description": "",
+      "capturedAt": "2025-11-10T11:48:45",
+      "metadata": {
+        "recordedAt": "2025-11-10T11:48:45",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 64.98813753754035,
+        "z": 71.16284555156506
+      },
+      "placed": true,
+      "heading": 242.70093173572764,
+      "pitch": 9.70008750026436,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 8256257,
+      "files": {
+        "thumbnail": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/thumbnail.webp",
+        "display": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/display.webp",
+        "download": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "cbfe6584-8662-44e1-9369-1a2b2dd6b194",
+      "title": "DSC04033",
+      "description": "",
+      "capturedAt": "2025-11-10T12:21:36",
+      "metadata": {
+        "recordedAt": "2025-11-10T12:21:36",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.003125,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 120.29580718085558,
+        "z": 30.42679290217528
+      },
+      "placed": true,
+      "heading": 320.5488054182782,
+      "pitch": 3.3982874023309315,
+      "width": 4664,
+      "height": 6996,
+      "downloadBytes": 7550483,
+      "files": {
+        "thumbnail": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/thumbnail.webp",
+        "display": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/display.webp",
+        "download": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "0600b3d2-6358-40b3-b901-f6f04d609c52",
+      "title": "DSC06142",
+      "description": "",
+      "capturedAt": "2025-11-21T15:06:12",
+      "metadata": {
+        "recordedAt": "2025-11-21T15:06:12",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 160,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 150.31540313327739,
+        "z": 53.38332559299015
+      },
+      "placed": true,
+      "heading": 175.4540677779445,
+      "pitch": -22.244219505199762,
+      "width": 4672,
+      "height": 1988,
+      "downloadBytes": 1370819,
+      "files": {
+        "thumbnail": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/thumbnail.webp",
+        "display": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/display.webp",
+        "download": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c",
+      "title": "DSC06143",
+      "description": "",
+      "capturedAt": "2025-11-21T15:06:30",
+      "metadata": {
+        "recordedAt": "2025-11-21T15:06:30",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 160,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 148.9529357418215,
+        "z": 53.29434208625989
+      },
+      "placed": true,
+      "heading": 174.46023448111418,
+      "pitch": -22.561344311918663,
+      "width": 4672,
+      "height": 1988,
+      "downloadBytes": 1379247,
+      "files": {
+        "thumbnail": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/thumbnail.webp",
+        "display": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/display.webp",
+        "download": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "fe448383-e603-49e9-9e86-35fc165cf63b",
+      "title": "DSC06146",
+      "description": "",
+      "capturedAt": "2025-11-21T15:06:53",
+      "metadata": {
+        "recordedAt": "2025-11-21T15:06:53",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 160,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 148.63339635030155,
+        "z": 53.54303553527009
+      },
+      "placed": true,
+      "heading": 170.77835863219025,
+      "pitch": -23.68987640936281,
+      "width": 4672,
+      "height": 1988,
+      "downloadBytes": 1407910,
+      "files": {
+        "thumbnail": "media/fe448383-e603-49e9-9e86-35fc165cf63b/thumbnail.webp",
+        "display": "media/fe448383-e603-49e9-9e86-35fc165cf63b/display.webp",
+        "download": "media/fe448383-e603-49e9-9e86-35fc165cf63b/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "88c65cc9-1f8f-4383-8ffb-f446bdc663dd",
+      "title": "DSC03533",
+      "description": "",
+      "capturedAt": "2025-10-23T12:14:46",
+      "metadata": {
+        "recordedAt": "2025-10-23T12:14:46",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.001,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459409",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": -104.07585549860899,
+        "z": -121.48477791223127
+      },
+      "placed": true,
+      "heading": 87.0921317593801,
+      "pitch": -1.6789644539628121,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 5168645,
+      "files": {
+        "thumbnail": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/thumbnail.webp",
+        "display": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/display.webp",
+        "download": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/download.jpg"
+      },
+      "locationId": "way/855459409",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "eeeb7f00-9aab-4dc1-bb0f-db42fa067465",
+      "title": "DJI_20250820144450_0006_D",
+      "description": "",
+      "capturedAt": "2025-08-20T14:44:50",
+      "metadata": {
+        "recordedAt": "2025-08-20T14:44:50",
+        "cameraMake": "DJI",
+        "cameraModel": "AC002",
+        "lensModel": "2.3 mm f/2.8",
+        "focalLengthMm": 2.34,
+        "focalLength35Mm": 12,
+        "aperture": 2.8,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "aerial": {
+          "latitude": 0,
+          "longitude": 0,
+          "relativeAltitude": 0,
+          "absoluteAltitude": 0
+        }
+      },
+      "buildingId": "way/855459420",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 118.88273412008208,
+        "z": 46.823316187438024
+      },
+      "placed": true,
+      "heading": 249.5437926383455,
+      "pitch": -7.048271690784802,
+      "width": 2989,
+      "height": 2989,
+      "downloadBytes": 2473734,
+      "files": {
+        "thumbnail": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/thumbnail.webp",
+        "display": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/display.webp",
+        "download": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "",
+      "copyright": ""
+    },
+    {
+      "id": "35af56d9-984d-43be-82bb-aaa47ddefb37",
+      "title": "DSC01480",
+      "description": "",
+      "capturedAt": "2025-06-19T17:13:51",
+      "metadata": {
+        "recordedAt": "2025-06-19T17:13:51",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 4,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 250,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -18.401807023493745,
+        "z": -135.56049026470484
+      },
+      "placed": true,
+      "heading": 235.98293974682895,
+      "pitch": -4.892351021199711,
+      "width": 7008,
+      "height": 4672,
+      "downloadBytes": 9536916,
+      "files": {
+        "thumbnail": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/thumbnail.webp",
+        "display": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/display.webp",
+        "download": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/download.jpg"
+      },
+      "locationId": "local/underground-badminton",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "e93e02ac-f00d-4e8d-af01-3c09706f2856",
+      "title": "DSC09912",
+      "description": "",
+      "capturedAt": "2025-06-05T16:46:26",
+      "metadata": {
+        "recordedAt": "2025-06-05T16:46:26",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 85.37442913198859,
+        "z": 36.13746589957353
+      },
+      "placed": true,
+      "heading": 138.27323591957997,
+      "pitch": 7.867862940964929,
+      "width": 4638,
+      "height": 6957,
+      "downloadBytes": 7238430,
+      "files": {
+        "thumbnail": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/thumbnail.webp",
+        "display": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/display.webp",
+        "download": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "da1c1aee-1f3d-4389-a101-e4b35f487666",
+      "title": "DSC09888-已增强-降噪",
+      "description": "",
+      "capturedAt": "2025-06-04T20:09:57",
+      "metadata": {
+        "recordedAt": "2025-06-04T20:09:57",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 3200,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 1,
+      "captureType": "ground",
+      "position": {
+        "x": 107.51117420549399,
+        "z": 55.736458771752766
+      },
+      "placed": true,
+      "heading": 63.59207001652129,
+      "pitch": 46.28360236291192,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 11158990,
+      "files": {
+        "thumbnail": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/thumbnail.webp",
+        "display": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/display.webp",
+        "download": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9",
+      "title": "DSC09890-已增强-降噪",
+      "description": "",
+      "capturedAt": "2025-06-04T20:10:07",
+      "metadata": {
+        "recordedAt": "2025-06-04T20:10:07",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 1600,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 1,
+      "captureType": "ground",
+      "position": {
+        "x": 105.17450787615951,
+        "z": 52.640075960771206
+      },
+      "placed": true,
+      "heading": 344.31020080860276,
+      "pitch": 61.65245567417381,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 9867221,
+      "files": {
+        "thumbnail": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/thumbnail.webp",
+        "display": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/display.webp",
+        "download": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "7a8a54a9-5482-403c-9d3c-002a9fde0115",
+      "title": "DSC09895-已增强-降噪",
+      "description": "",
+      "capturedAt": "2025-06-04T20:10:22",
+      "metadata": {
+        "recordedAt": "2025-06-04T20:10:22",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 2500,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 1,
+      "captureType": "ground",
+      "position": {
+        "x": 111.9063841391396,
+        "z": 55.45682902427974
+      },
+      "placed": true,
+      "heading": 53.847660648937676,
+      "pitch": 48.374458037941956,
+      "width": 7008,
+      "height": 4672,
+      "downloadBytes": 10666957,
+      "files": {
+        "thumbnail": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/thumbnail.webp",
+        "display": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/display.webp",
+        "download": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "e69cd3af-74a7-4f32-8577-4f654b6aba23",
+      "title": "2025 年 04 月 17 日09时40分",
+      "description": "",
+      "capturedAt": "2025-04-17T09:40:59",
+      "metadata": {
+        "recordedAt": "2025-04-17T09:40:59",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 60,
+        "focalLength35Mm": 60,
+        "aperture": 5,
+        "exposureSeconds": 0.01,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 109.40411405775129,
+        "z": 25.566984091166734
+      },
+      "placed": true,
+      "heading": 288.39427926113103,
+      "pitch": 5.305340407000734,
+      "width": 4672,
+      "height": 6229,
+      "downloadBytes": 3677402,
+      "files": {
+        "thumbnail": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/thumbnail.webp",
+        "display": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/display.webp",
+        "download": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "2669769a-31d5-4200-a7e2-9a441c66e533",
+      "title": "2025 年 04 月 17 日10时14分",
+      "description": "",
+      "capturedAt": "2025-04-17T10:14:54",
+      "metadata": {
+        "recordedAt": "2025-04-17T10:14:54",
+        "cameraMake": "Canon",
+        "cameraModel": "Canon EOS 750D",
+        "lensModel": "EF-S18-55mm f/3.5-5.6 IS STM",
+        "focalLengthMm": 30,
+        "aperture": 6.3,
+        "exposureSeconds": 0.01,
+        "iso": 400
+      },
+      "buildingId": "way/855459420",
+      "floor": 3,
+      "captureType": "ground",
+      "position": {
+        "x": 152.47899278823797,
+        "z": 53.545906396574246
+      },
+      "placed": true,
+      "heading": 155.11485591998894,
+      "pitch": -23.27270322875956,
+      "width": 5333,
+      "height": 4000,
+      "downloadBytes": 3132222,
+      "files": {
+        "thumbnail": "media/2669769a-31d5-4200-a7e2-9a441c66e533/thumbnail.webp",
+        "display": "media/2669769a-31d5-4200-a7e2-9a441c66e533/display.webp",
+        "download": "media/2669769a-31d5-4200-a7e2-9a441c66e533/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "",
+      "copyright": ""
+    },
+    {
+      "id": "b49bea6d-af0a-4087-9793-0f1ad8ccc667",
+      "title": "2025 年 04 月 17 日17时08分",
+      "description": "",
+      "capturedAt": "2025-04-17T17:08:08",
+      "metadata": {
+        "recordedAt": "2025-04-17T17:08:08",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 95,
+        "focalLength35Mm": 95,
+        "aperture": 4,
+        "exposureSeconds": 0.01,
+        "iso": 125,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 27.191339902910997,
+        "z": 1.8366107596475665
+      },
+      "placed": true,
+      "heading": 253.78682991453502,
+      "pitch": -0.24399236008739256,
+      "width": 7008,
+      "height": 3942,
+      "downloadBytes": 3435927,
+      "files": {
+        "thumbnail": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/thumbnail.webp",
+        "display": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/display.webp",
+        "download": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "0373aa23-e993-4f57-aba9-a7936fe081a2",
+      "title": "2025 年 04 月 18 日09时42分-2",
+      "description": "",
+      "capturedAt": "2025-04-18T09:42:33",
+      "metadata": {
+        "recordedAt": "2025-04-18T09:42:33",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "local/gymnasium",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": 31.882856075447954,
+        "z": -102.53608993081679
+      },
+      "placed": true,
+      "heading": 215.64729125747704,
+      "pitch": 14.406492473894959,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 3094253,
+      "files": {
+        "thumbnail": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/thumbnail.webp",
+        "display": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/display.webp",
+        "download": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/download.jpg"
+      },
+      "locationId": "local/gymnasium",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "aa553764-213d-4716-b3ad-545c60589bf8",
+      "title": "2025 年 04 月 18 日09时42分",
+      "description": "",
+      "capturedAt": "2025-04-18T09:42:19",
+      "metadata": {
+        "recordedAt": "2025-04-18T09:42:19",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.00625,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "local/gymnasium",
+      "floor": 3,
+      "captureType": "ground",
+      "position": {
+        "x": 29.23425828693831,
+        "z": -102.36258242550053
+      },
+      "placed": true,
+      "heading": 142.85290424263366,
+      "pitch": -1.5675319739188163,
+      "width": 6988,
+      "height": 2974,
+      "downloadBytes": 2978049,
+      "files": {
+        "thumbnail": "media/aa553764-213d-4716-b3ad-545c60589bf8/thumbnail.webp",
+        "display": "media/aa553764-213d-4716-b3ad-545c60589bf8/display.webp",
+        "download": "media/aa553764-213d-4716-b3ad-545c60589bf8/download.jpg"
+      },
+      "locationId": "local/gymnasium",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "719592c1-5539-42c7-b21a-7d9492d273b0",
+      "title": "2025 年 04 月 23 日12时25分",
+      "description": "",
+      "capturedAt": "2025-04-23T12:25:00",
+      "metadata": {
+        "recordedAt": "2025-04-23T12:25:00",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 34,
+        "focalLength35Mm": 34,
+        "aperture": 5.6,
+        "exposureSeconds": 0.005,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/1233313431",
+      "floor": 2,
+      "captureType": "ground",
+      "position": {
+        "x": -46.10852749816313,
+        "z": 98.22720571579251
+      },
+      "placed": true,
+      "heading": 74.9829717112782,
+      "pitch": 2.2082848594649276,
+      "width": 7008,
+      "height": 2982,
+      "downloadBytes": 2791124,
+      "files": {
+        "thumbnail": "media/719592c1-5539-42c7-b21a-7d9492d273b0/thumbnail.webp",
+        "display": "media/719592c1-5539-42c7-b21a-7d9492d273b0/display.webp",
+        "download": "media/719592c1-5539-42c7-b21a-7d9492d273b0/download.jpg"
+      },
+      "locationId": "way/1233313431",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "0441ecc7-6b59-42b9-b9d1-f929f93c2f0e",
+      "title": "2025 年 04 月 25 日12时23分",
+      "description": "",
+      "capturedAt": "2025-04-25T12:23:17",
+      "metadata": {
+        "recordedAt": "2025-04-25T12:23:17",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 39,
+        "focalLength35Mm": 39,
+        "aperture": 5.6,
+        "exposureSeconds": 0.016666666666666666,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 3,
+      "captureType": "ground",
+      "position": {
+        "x": 121.08395362629203,
+        "z": 58.26960195914738
+      },
+      "placed": true,
+      "heading": 165.01304612039655,
+      "pitch": -29.06773336872202,
+      "width": 4672,
+      "height": 4672,
+      "downloadBytes": 3298968,
+      "files": {
+        "thumbnail": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/thumbnail.webp",
+        "display": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/display.webp",
+        "download": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "f420c8e0-41ba-4ead-81a3-1bb806701061",
+      "title": "2025 年 04 月 27 日11时51分",
+      "description": "",
+      "capturedAt": "2025-04-27T11:51:40",
+      "metadata": {
+        "recordedAt": "2025-04-27T11:51:40",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.003125,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 60.918921399883516,
+        "z": 23.913329840170245
+      },
+      "placed": true,
+      "heading": 139.08055205749338,
+      "pitch": 16.01612352798687,
+      "width": 4672,
+      "height": 6229,
+      "downloadBytes": 3342003,
+      "files": {
+        "thumbnail": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/thumbnail.webp",
+        "display": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/display.webp",
+        "download": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "4aed67d1-6342-4523-b749-1c7a2e6ed99b",
+      "title": "2025 年 04 月 27 日12时02分",
+      "description": "",
+      "capturedAt": "2025-04-27T12:02:41",
+      "metadata": {
+        "recordedAt": "2025-04-27T12:02:41",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.0015625,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": -119.51006107664902,
+        "z": 97.40354093334892
+      },
+      "placed": true,
+      "heading": 285.80589356265386,
+      "pitch": 14.387311296760094,
+      "width": 4672,
+      "height": 4672,
+      "downloadBytes": 2905994,
+      "files": {
+        "thumbnail": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/thumbnail.webp",
+        "display": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/display.webp",
+        "download": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "252d968f-08a5-4ec9-9d27-c52017da3348",
+      "title": "2025 年 04 月 28 日17时09分",
+      "description": "",
+      "capturedAt": "2025-04-28T17:09:12",
+      "metadata": {
+        "recordedAt": "2025-04-28T17:09:12",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.003125,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 78.08756676106776,
+        "z": -15.641191304182755
+      },
+      "placed": true,
+      "heading": 80.54299410337376,
+      "pitch": 41.44416335767588,
+      "width": 7008,
+      "height": 3942,
+      "downloadBytes": 3554804,
+      "files": {
+        "thumbnail": "media/252d968f-08a5-4ec9-9d27-c52017da3348/thumbnail.webp",
+        "display": "media/252d968f-08a5-4ec9-9d27-c52017da3348/display.webp",
+        "download": "media/252d968f-08a5-4ec9-9d27-c52017da3348/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "f5acf721-c782-4eb7-a3b2-5e1d17e7dafd",
+      "title": "2025 年 05 月 06 日16时58分",
+      "description": "",
+      "capturedAt": "2025-05-06T16:58:19",
+      "metadata": {
+        "recordedAt": "2025-05-06T16:58:19",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.004,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 3,
+      "captureType": "ground",
+      "position": {
+        "x": 100.19577662317215,
+        "z": 46.84725855924561
+      },
+      "placed": true,
+      "heading": 221.59721246181948,
+      "pitch": -0.4648517469894004,
+      "width": 7008,
+      "height": 3942,
+      "downloadBytes": 3289259,
+      "files": {
+        "thumbnail": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/thumbnail.webp",
+        "display": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/display.webp",
+        "download": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/download.jpg"
+      },
+      "locationId": "way/855459420",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39",
+      "title": "2025 年 05 月 09 日09时46分",
+      "description": "",
+      "capturedAt": "2025-05-09T09:46:53",
+      "metadata": {
+        "recordedAt": "2025-05-09T09:46:53",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 5.6,
+        "exposureSeconds": 0.00625,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 22.794328245471092,
+        "z": 83.84280274987034
+      },
+      "placed": true,
+      "heading": 231.64284419912985,
+      "pitch": 6.8806861990014285,
+      "width": 6979,
+      "height": 4653,
+      "downloadBytes": 3669581,
+      "files": {
+        "thumbnail": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/thumbnail.webp",
+        "display": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/display.webp",
+        "download": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "34868811-15fa-4147-ac2e-f4e1278dc2f4",
+      "title": "2025 年 05 月 20 日17时41分",
+      "description": "",
+      "capturedAt": "2025-05-20T17:41:57",
+      "metadata": {
+        "recordedAt": "2025-05-20T17:41:57",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.004,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 28.877303567830154,
+        "z": 90.31595392351255
+      },
+      "placed": true,
+      "heading": 123.73626652697112,
+      "pitch": 0.8287461272257327,
+      "width": 7008,
+      "height": 2982,
+      "downloadBytes": 2974359,
+      "files": {
+        "thumbnail": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/thumbnail.webp",
+        "display": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/display.webp",
+        "download": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "c61510ee-8301-4106-be76-5aae082a0fb2",
+      "title": "2025 年 05 月 20 日17时42分",
+      "description": "",
+      "capturedAt": "2025-05-20T17:42:24",
+      "metadata": {
+        "recordedAt": "2025-05-20T17:42:24",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.0125,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 47.27968226785169,
+        "z": 93.07535052053771
+      },
+      "placed": true,
+      "heading": 111.90841030691331,
+      "pitch": 8.885510040400158,
+      "width": 4672,
+      "height": 7008,
+      "downloadBytes": 3326811,
+      "files": {
+        "thumbnail": "media/c61510ee-8301-4106-be76-5aae082a0fb2/thumbnail.webp",
+        "display": "media/c61510ee-8301-4106-be76-5aae082a0fb2/display.webp",
+        "download": "media/c61510ee-8301-4106-be76-5aae082a0fb2/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    },
+    {
+      "id": "77bb78cb-1908-4cc8-bd7d-9a7d1215d117",
+      "title": "2025 年 05 月 20 日17时43分",
+      "description": "",
+      "capturedAt": "2025-05-20T17:43:22",
+      "metadata": {
+        "recordedAt": "2025-05-20T17:43:22",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "Viltrox 28mm F4.5 FE",
+        "focalLengthMm": 28,
+        "focalLength35Mm": 28,
+        "aperture": 4.5,
+        "exposureSeconds": 0.03333333333333333,
+        "iso": 100,
+        "author": "DrivingGodJ",
+        "copyright": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "captureType": "ground",
+      "position": {
+        "x": 56.969831603852576,
+        "z": 96.78455410414753
+      },
+      "placed": true,
+      "heading": 25.1865882149757,
+      "pitch": -3.887919975875227,
+      "width": 7008,
+      "height": 2982,
+      "downloadBytes": 2777852,
+      "files": {
+        "thumbnail": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/thumbnail.webp",
+        "display": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/display.webp",
+        "download": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/download.jpg"
+      },
+      "locationId": "",
+      "author": "DrivingGodJ",
+      "copyright": "DGJ"
+    }
+  ],
+  "buildingOverrides": {
+    "way/855459409": {
+      "name": "看台",
+      "floors": 3,
+      "floorHeight": 3.6
+    },
+    "way/855459419": {
+      "name": "图书馆",
+      "floors": 4,
+      "floorHeight": 3.6
+    },
+    "way/855459421": {
+      "name": "鲁迅纪念馆",
+      "floors": 2,
+      "floorHeight": 3.6
+    },
+    "way/1233313431": {
+      "name": "食堂",
+      "floors": 5,
+      "floorHeight": 3.6
+    },
+    "way/1233313435": {
+      "name": "原少航宿舍",
+      "floors": 3,
+      "floorHeight": 3.6
+    },
+    "way/855459420": {
+      "name": "主教学楼",
+      "floors": 5,
+      "floorHeight": 3.6
+    },
+    "way/1233313434": {
+      "name": "宿舍",
+      "floors": 6,
+      "floorHeight": 3.6
+    },
+    "way/1233313436": {
+      "name": "西教学楼",
+      "floors": 5,
+      "floorHeight": 3.6
+    },
+    "way/1233313437": {
+      "name": "西办公楼",
+      "floors": 5,
+      "floorHeight": 3.6
+    },
+    "way/1233313439": {
+      "name": "走廊",
+      "floors": 5,
+      "floorHeight": 3.6
+    },
+    "way/1233313451": {
+      "name": "校史馆",
+      "floors": 1,
+      "floorHeight": 4.5
+    },
+    "way/1277841229": {
+      "name": "小卖部",
+      "floors": 1,
+      "floorHeight": 3.6
+    },
+    "local/gymnasium": {
+      "name": "体育馆",
+      "floors": 4,
+      "floorHeight": 3.6
+    },
+    "local/unknown-west-corner": {
+      "name": "考菲尔德楼",
+      "floors": 3,
+      "floorHeight": 3.6
+    }
+  }
+}

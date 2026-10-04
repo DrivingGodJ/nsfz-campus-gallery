@@ -1,0 +1,161 @@
+import { useEffect, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import * as THREE from 'three';
+import type { Photo } from './types';
+import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-camera';
+import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-controls';
+
+export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
+export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
+// View into campus from the gate: dormitory and cafeteria fronts face the camera.
+export const OVERVIEW_POSITION: [number, number, number] = [-240, 340, -380];
+const OVERVIEW_DISTANCE = 560;
+
+export default function MapCameraRig({ command, selected, preview, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation }: {
+  command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
+  canAdjustPhotoView?: boolean;
+  onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
+  onPhotoOrientation?: (orientation: PhotoOrientation) => void;
+}) {
+  const controls = useRef<OrbitControlsImpl>(null);
+  const motion = useRef(new PhotoCameraTransition());
+  const { camera, invalidate, size, gl, get, setEvents } = useThree();
+  const look = useRef<(PhotoOrientation & { id: string; sourceHeading: number; sourcePitch: number }) | null>(null);
+  const lastPoseKey = useRef('');
+  const lastShotKey = useRef('');
+  const live = useRef({ size, onMoving, onPhotoOrientation });
+  live.current = { size, onMoving, onPhotoOrientation };
+  const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
+  const fitDistance = OVERVIEW_DISTANCE / Math.min(1, size.width / Math.max(1, size.height));
+
+  useEffect(() => {
+    const control = controls.current;
+    if (!control) return;
+    if (!selected && (!preview || !previousFit.current) && !motion.current.moving && !motion.current.inPhotoView) {
+      const offset = camera.position.clone().sub(control.target);
+      offset.multiplyScalar(previousFit.current ? fitDistance / previousFit.current : fitDistance / offset.length());
+      camera.position.copy(control.target).add(offset);
+      control.update(); invalidate();
+    }
+    previousFit.current = fitDistance;
+  }, [fitDistance, camera, invalidate]);
+
+  // Runs before Drei's controls update, so orbit damping cannot fight the animation.
+  useFrame(() => {
+    if (controls.current) controls.current.enabled = !preview && !motion.current.moving;
+  }, -2);
+  useFrame((_, delta) => {
+    const control = controls.current;
+    if (!control || !(camera instanceof THREE.PerspectiveCamera)) return;
+    if (motion.current.tick(camera, control.target, delta)) {
+      if (!motion.current.moving) live.current.onMoving(false);
+      invalidate();
+    }
+    if (preview || motion.current.inPhotoView) return;
+    const target = control.target;
+    const compact = camera.position.distanceTo(target) > 360;
+    if (compact !== lastCompact.current) { lastCompact.current = compact; onCompact(compact); }
+    const center = target.clone().project(camera), north = target.clone().add(new THREE.Vector3(0, 0, -10)).project(camera);
+    const angle = Math.round(Math.atan2((north.x - center.x) * size.width, (north.y - center.y) * size.height) * 180 / Math.PI);
+    if (Number.isFinite(angle) && angle !== lastAzimuth.current) { lastAzimuth.current = angle; onAzimuth(angle); }
+  });
+
+  useEffect(() => {
+    const control = controls.current;
+    if (!control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera) || command.type === 'initial') return;
+    const pose = readCameraPose(camera, control.target);
+    const offset = camera.position.clone().sub(control.target);
+    if (command.type === 'reset') { pose.target.set(0, 0, 0); pose.position.fromArray(OVERVIEW_POSITION).normalize().multiplyScalar(fitDistance); }
+    if (command.type === 'north') { const length = offset.length(); pose.position.copy(pose.target).add(new THREE.Vector3(0, length * .72, length * .7)); }
+    if (command.type === 'top') { pose.target.set(0, 0, 0); pose.position.set(0, fitDistance, .5); }
+    if (command.type === 'in' || command.type === 'out') {
+      offset.multiplyScalar(command.type === 'in' ? .8 : 1.25).clampLength(8, 1400);
+      pose.position.copy(pose.target).add(offset);
+      // Keep repeated manual zoom clicks responsive; only group navigation and
+      // perspective changes need a camera journey.
+      motion.current.focus(camera, control.target, pose, true);
+      control.enabled = true; control.update(); invalidate(); return;
+    }
+    if (command.type === 'cluster' && command.target && command.distance) {
+      pose.target.fromArray(command.target);
+      pose.position.copy(pose.target).add(offset.normalize().multiplyScalar(command.distance));
+    }
+    const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
+    pose.quaternion.copy(oriented.quaternion);
+    control.enabled = false;
+    motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    invalidate();
+  }, [command, camera, invalidate]);
+
+  useEffect(() => {
+    const control = controls.current;
+    if (!selected || !control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
+    const target = new THREE.Vector3(selected.position.x, selected.position.height, selected.position.z);
+    const pose = readCameraPose(camera, control.target);
+    pose.position.add(target.clone().sub(control.target)); pose.target.copy(target);
+    control.enabled = false;
+    motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    invalidate();
+  }, [selected?.id, camera, invalidate]);
+
+  useEffect(() => {
+    const control = controls.current;
+    if (!control || !(camera instanceof THREE.PerspectiveCamera)) return;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    if (preview) {
+      const shotKey = JSON.stringify([preview.id, preview.position, preview.heading, preview.pitch, preview.width, preview.height, canAdjustPhotoView,
+        preview.metadata?.focalLength35Mm, preview.metadata?.focalLengthMm, preview.view]);
+      const poseKey = JSON.stringify([shotKey, size.width, size.height]);
+      if (poseKey === lastPoseKey.current) return;
+      const samePhoto = look.current?.id === preview.id && motion.current.inPhotoView;
+      const resizing = samePhoto && shotKey === lastShotKey.current;
+      if (!canAdjustPhotoView || !look.current || look.current.id !== preview.id || look.current.sourceHeading !== preview.heading || look.current.sourcePitch !== preview.pitch) {
+        look.current = { id: preview.id, sourceHeading: preview.heading, sourcePitch: preview.pitch, heading: preview.heading, pitch: preview.pitch };
+      }
+      lastPoseKey.current = poseKey;
+      lastShotKey.current = shotKey;
+      if (!motion.current.inPhotoView && !motion.current.moving) {
+        // Flush residual orbit momentum before saving the view to return to.
+        control.enableDamping = false; control.update(); control.enableDamping = true;
+      }
+      control.enabled = false;
+      const pose = photoCameraPose({ ...preview, ...look.current }, preview.position.height, size.width / Math.max(1, size.height));
+      if (resizing) motion.current.reframe(camera, pose);
+      else motion.current.enter(camera, control.target, pose, reducedMotion || (samePhoto && !motion.current.moving));
+    } else if (motion.current.inPhotoView) {
+      look.current = null; lastPoseKey.current = ''; lastShotKey.current = '';
+      control.enabled = false;
+      motion.current.leave(camera, control.target, reducedMotion);
+    }
+    onMoving(motion.current.photoTransition && motion.current.moving); invalidate();
+  }, [preview?.id, preview?.position.x, preview?.position.z, preview?.position.height, preview?.heading, preview?.pitch,
+    preview?.width, preview?.height, preview?.metadata?.focalLength35Mm, preview?.metadata?.focalLengthMm,
+    preview?.view?.focalLength35Mm, preview?.view?.cropFactor, canAdjustPhotoView, size.width, size.height, camera, invalidate, onMoving]);
+
+  useEffect(() => {
+    const control = controls.current;
+    if (!preview || !control || !(camera instanceof THREE.PerspectiveCamera)) return;
+    // Both modes suspend map picking; only the editor accepts camera adjustments.
+    const eventsEnabled = get().events.enabled;
+    setEvents({ enabled: false });
+    const unbind = canAdjustPhotoView ? bindPhotoLookControls(gl.domElement, {
+      angles: () => ({ heading: look.current!.heading, pitch: look.current!.pitch }),
+      degreesPerPixel: () => 2 * Math.tan(camera.fov * Math.PI / 360) * 180 / Math.PI / Math.max(1, live.current.size.height),
+      start: () => {
+        motion.current.orient(camera, control.target, look.current!.heading, look.current!.pitch);
+        live.current.onMoving(false); invalidate();
+      },
+      look: orientation => {
+        Object.assign(look.current!, orientation);
+        motion.current.orient(camera, control.target, orientation.heading, orientation.pitch);
+        invalidate();
+      },
+      commit: orientation => live.current.onPhotoOrientation?.(orientation)
+    }) : undefined;
+    return () => { unbind?.(); setEvents({ enabled: eventsEnabled }); };
+  }, [preview?.id, canAdjustPhotoView, camera, gl, get, setEvents, invalidate]);
+
+  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} minDistance={8} maxDistance={1400} minPolarAngle={.01} maxPolarAngle={Math.PI * .48} target={[0, 0, 0]} />;
+}

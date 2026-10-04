@@ -1,0 +1,46 @@
+{
+  "name": "nsfz-campus-gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.mjs",
+    "map:refresh": "node scripts/import-osm.mjs",
+    "likes:manifest": "node scripts/likes-manifest.mjs && node scripts/submissions-manifest.mjs",
+    "likes:types": "wrangler types worker/worker-configuration.d.ts --config worker/wrangler.jsonc",
+    "likes:check": "npm run likes:manifest && npm run likes:types && tsc -p worker/tsconfig.json && wrangler deploy --dry-run --config worker/wrangler.jsonc",
+    "likes:dev": "npm run likes:manifest && wrangler dev --config worker/wrangler.jsonc",
+    "likes:migrate": "node scripts/likes-config-check.mjs && wrangler d1 migrations apply nsfz-photo-likes --remote --config worker/wrangler.jsonc",
+    "likes:deploy": "node scripts/likes-config-check.mjs && npm run likes:manifest && wrangler deploy --config worker/wrangler.jsonc",
+    "likes:deploy:only": "node scripts/likes-config-check.mjs && npm run likes:manifest && node scripts/likes-only-config.mjs && wrangler deploy --config .local/deployment/likes.jsonc",
+    "photos:credits": "node scripts/photo-credits.mjs",
+    "pretest": "node scripts/likes-manifest.mjs && node scripts/submissions-manifest.mjs",
+    "submissions:check": "npm run likes:check",
+    "submissions:deploy": "node scripts/submissions-config-check.mjs && npm run likes:deploy"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
+    "aws4fetch": "^1.0.20",
+    "exifr": "^7.1.3",
+    "lucide-react": "^1.51.0",
+    "polygon-clipping": "^0.15.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sharp": "^0.35.5",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "wrangler": "^4.147.0"
+  }
+}

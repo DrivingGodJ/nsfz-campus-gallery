@@ -1,0 +1,67 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "nsfz-photo-likes",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-04",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://drivinggodj.github.io",
+    "TURNSTILE_HOSTNAMES": "drivinggodj.github.io",
+    "R2_ACCOUNT_ID": "0c0d8a2db6edf18b71de397116d1a5ae",
+    "R2_BUCKET_NAME": "nsfz-photo-submissions",
+    "MAX_STORAGE_BYTES": "9000000000",
+    "MAX_DAILY_SUBMISSIONS": "100",
+    "MAX_DAILY_UPLOAD_BYTES": "1000000000"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nsfz-photo-likes",
+      "database_id": "9792fbef-e23e-4970-bca6-a63f66d157a2",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "LIKES_LIMITER",
+      "namespace_id": "2026100401",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "SUBMISSIONS_LIMITER",
+      "namespace_id": "2026100402",
+      "simple": {
+        "limit": 12,
+        "period": 60
+      }
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  },
+  "r2_buckets": [
+    {
+      "binding": "UPLOADS",
+      "bucket_name": "nsfz-photo-submissions"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "17 * * * *"
+    ]
+  },
+  "account_id": "0c0d8a2db6edf18b71de397116d1a5ae"
+}

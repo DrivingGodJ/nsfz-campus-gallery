@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.local/
+*.tsbuildinfo
+.DS_Store
+.env.local
+.env.*.local
+.dev.vars*
+.wrangler/
+worker/src/photo-ids.json
+worker/worker-configuration.d.ts
+
+worker/src/submission-campus.json
+!worker/.dev.vars.example

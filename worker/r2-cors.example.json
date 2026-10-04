@@ -1,0 +1,7 @@
+[{
+  "AllowedOrigins": ["https://YOUR_ACCOUNT.github.io"],
+  "AllowedMethods": ["PUT"],
+  "AllowedHeaders": ["content-type"],
+  "ExposeHeaders": ["etag"],
+  "MaxAgeSeconds": 600
+}]

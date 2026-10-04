@@ -1,0 +1,6 @@
+# Copy only into a git-ignored private file when connecting real services.
+# Browser code must never receive these values.
+SUBMISSIONS_OWNER_TOKEN=replace-with-a-random-secret-of-at-least-32-characters
+TURNSTILE_SECRET=replace-with-the-production-widget-secret
+R2_ACCESS_KEY_ID=replace-with-a-bucket-scoped-write-key-id
+R2_SECRET_ACCESS_KEY=replace-with-the-bucket-scoped-write-secret
