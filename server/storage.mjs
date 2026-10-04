@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { extractPhotoMetadata, validCaptureTime } from './photo-metadata.mjs';
 import { resolveLocationId } from './campus-corrections.mjs';
 import { automaticPhotoPlacement } from './photo-geolocation.mjs';
-import { createPhotoPreview } from './photo-preview.mjs';
+import { createPhotoPreview, createPhotoDisplay } from './photo-preview.mjs';
 
 export const ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg)$/;
@@ -137,7 +137,7 @@ export function createStore(root) {
         await Promise.all([
           image().resize({ width: 420, height: 420, fit: 'inside', withoutEnlargement: true }).webp({ quality: 78 }).toFile(path.join(directory, 'thumbnail.webp')),
           createPhotoPreview(bytes, path.join(directory, 'preview.webp')),
-          image().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true }).webp({ quality: 88 }).toFile(path.join(directory, 'display.webp')),
+          createPhotoDisplay(bytes, path.join(directory, 'display.webp')),
           image().jpeg({ quality: 95, mozjpeg: true }).toFile(path.join(directory, 'download.jpg'))
         ]);
         const download = await sharp(path.join(directory, 'download.jpg')).metadata();

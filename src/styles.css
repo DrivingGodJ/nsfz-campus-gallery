@@ -225,6 +225,9 @@ img[data-load-state="loading"],img[data-load-state="error"]{visibility:hidden}
 .detail-image:has(img[data-load-state="loading"]),.detail-image:has(img[data-load-state="error"]){min-height:180px}
 .photo-image-status,.comparison-image>.photo-image-status,.detail-image>.photo-image-status{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:18px;border:0;border-radius:0;background:transparent;color:var(--muted);font-size:12px;line-height:1.6;text-align:center;pointer-events:none}
 .lightbox-canvas>.photo-image-status{color:#faf9f4}
+.photo-image-status.has-preview,.comparison-image>.photo-image-status.has-preview,.detail-image>.photo-image-status.has-preview{inset:auto auto 18px 50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);padding:8px 12px;flex-direction:row;gap:7px;border-radius:5px;background:var(--floating,#faf9f4ee);font-size:11px}
+.lightbox-canvas>.photo-image-status.has-preview{background:#17201bdb}
+.photo-image-status.has-preview .photo-image-spinner{width:14px;height:14px}
 .photo-image-spinner{animation:photo-image-spin 1s linear infinite}
 @keyframes photo-image-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.photo-image-spinner{animation:none}}

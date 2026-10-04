@@ -298,10 +298,10 @@ test('photo details, lightbox and draft preview expose enter/return actions and 
     const details = render(PhotoDetails, { photo, campus, site, onOpen() {}, onPhotoPerspective() {} });
     const renditions = { ...photo, files: { thumbnail:'small.webp', preview:'preview.webp', display:'large.webp', download:'full.jpg' } };
     for (const markup of [render(PhotoDetails,{photo:renditions,campus,site,onOpen(){}}),render(PhotoComparison,{photo:renditions,onOpen(){},children:'model'})]) {
-      assert.match(markup, /src="[^"]*preview\.webp\?v=2"/);
+      assert.match(markup, /src="[^"]*small\.webp"/);
       assert.doesNotMatch(markup, /src="[^"]*(large\.webp|full\.jpg)"|rel="preload"[^>]*full\.jpg/);
     }
-    assert.match(render(Lightbox,{photo:renditions,onClose(){}}),/src="[^"]*full\.jpg"/);
+    assert.match(render(Lightbox,{photo:renditions,onClose(){}}),/src="[^"]*preview\.webp\?v=2"/);
     assert.match(details, /进入照片视角/); assert.match(details, /aria-pressed="false"/);
     assert.match(render(Lightbox, { photo, onClose() {}, onPhotoPerspective() {} }), /进入照片视角/);
     assert.match(render(PhotoPerspectiveButton, { photo, active: false, editor: true, onClick() {} }), /体验拍摄视角/);
