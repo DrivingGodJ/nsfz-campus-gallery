@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Camera, Download, Minus, Plus, RotateCcw, X } from 'lucide-react';
 import { asset, captureTimeText, headingText, photoLocation, sizeText, type Campus, type Photo, type Site } from './types';
 import { photoFieldOfView, viewSourceText } from './photo-view';
@@ -61,6 +61,15 @@ export function PhotoDetails({ photo, campus, site, onOpen, showImage = true, ph
 }
 export function Lightbox({ photo, onClose, onPhotoPerspective }: { photo: Photo; onClose: () => void; onPhotoPerspective?: () => void }) {
   const dialog = useRef<HTMLDivElement>(null);
+  const [closing, setClosing] = useState(false);
+  const requestClose = useCallback(() => setClosing(true), []);
+  const closeAction = useRef(onClose);
+  closeAction.current = onClose;
+  useEffect(() => {
+    if (!closing) return;
+    const timer = setTimeout(() => closeAction.current(), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 200);
+    return () => clearTimeout(timer);
+  }, [closing]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -71,7 +80,7 @@ export function Lightbox({ photo, onClose, onPhotoPerspective }: { photo: Photo;
     document.body.style.overflow = 'hidden';
     dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
     const keydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') requestClose();
       if (event.key === 'Tab') {
         const elements = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button, a[href]') || []);
         const first = elements[0], last = elements.at(-1);
@@ -81,10 +90,10 @@ export function Lightbox({ photo, onClose, onPhotoPerspective }: { photo: Photo;
     };
     document.addEventListener('keydown', keydown);
     return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', keydown); before?.focus(); };
-  }, [onClose]);
+  }, [requestClose]);
   const changeZoom = (value: number) => { setZoom(Math.max(1, Math.min(5, value))); if (value <= 1) setPan({ x: 0, y: 0 }); };
-  return <div className="lightbox" ref={dialog} role="dialog" aria-modal="true" aria-label={photo.title + ' 大图'}>
-    <div className="lightbox-top"><div><strong>{photo.title}</strong><span>{photo.width} × {photo.height}</span></div><button className="icon-button inverse" onClick={onClose} aria-label="关闭大图"><X /></button></div>
+  return <div className={'lightbox' + (closing ? ' is-closing' : '')} ref={dialog} role="dialog" aria-modal="true" aria-label={photo.title + ' 大图'}>
+    <div className="lightbox-top"><div><strong>{photo.title}</strong><span>{photo.width} × {photo.height}</span></div><button className="icon-button inverse" onClick={requestClose} aria-label="关闭大图"><X /></button></div>
     <div className="lightbox-canvas" onWheel={e => { changeZoom(zoom - e.deltaY * 0.002); }}
       onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); lastDistance.current = 0; }}
       onPointerMove={e => {

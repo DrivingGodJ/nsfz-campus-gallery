@@ -42,8 +42,21 @@ fieldset.edit-form{border:0;margin:0;min-width:0}.map-loading{display:flex;align
    catalog, comparison photo and scrollable photo menu keep native scrolling. */
 .map-stage canvas{touch-action:none!important}
 .map-stage .map-photo,.map-stage .map-tools,.map-stage .location-name,.map-stage .direction-handle,.map-stage .map-bottom{touch-action:none}
-.photo-comparison{position:relative;display:flex;flex:1;min-width:0;min-height:0;height:100%;overflow:hidden;background:var(--paper)}
+.photo-comparison{position:relative;display:grid;grid-template-columns:minmax(0,100fr) 0px minmax(0,0fr);grid-template-rows:minmax(0,1fr);flex:1;min-width:0;min-height:0;height:100%;overflow:hidden;background:var(--paper);transition:grid-template-columns .32s cubic-bezier(.22,.61,.36,1),grid-template-rows .32s cubic-bezier(.22,.61,.36,1),height .32s cubic-bezier(.22,.61,.36,1)}
 .photo-comparison.is-split{display:grid;grid-template-columns:minmax(0,var(--model-share,50fr)) 24px minmax(0,var(--photo-share,50fr));grid-template-rows:minmax(0,1fr)}
+.photo-comparison.is-resizing{transition:none}
+.photo-comparison:not(.is-split) .comparison-photo{opacity:0;transform:translateX(18px);pointer-events:none}
+.photo-comparison:not(.is-split) .comparison-divider{opacity:0;pointer-events:none}
+.comparison-photo{transition:opacity .24s ease,transform .32s cubic-bezier(.22,.61,.36,1)}
+.comparison-divider{overflow:hidden;transition:opacity .24s ease}
+.comparison-image img{animation:photo-image-enter .24s ease both}
+@keyframes photo-image-enter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.viewer-panel{transition:width .32s cubic-bezier(.22,.61,.36,1),flex-basis .32s cubic-bezier(.22,.61,.36,1),opacity .24s ease,transform .32s cubic-bezier(.22,.61,.36,1)}
+.viewer-main:not(.panel-open)>.viewer-panel{width:0;flex-basis:0;opacity:0;overflow:hidden;pointer-events:none;border:0}
+.lightbox{animation:lightbox-enter .24s ease both}
+.lightbox.is-closing{animation:lightbox-exit .2s ease both;pointer-events:none}
+@keyframes lightbox-enter{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
+@keyframes lightbox-exit{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.985)}}
 .comparison-model{display:flex;flex:1;position:relative;min-width:0;min-height:0;overflow:hidden}
 .comparison-divider{position:relative;display:flex;align-items:center;justify-content:center;touch-action:none;user-select:none;cursor:col-resize;background:var(--paper);border-inline:1px solid var(--line);z-index:25;outline-offset:-3px}
 .comparison-divider>span{width:4px;height:54px;border-radius:3px;background:var(--subtle-border,#b9c4ac)}
@@ -73,6 +86,7 @@ button.comparison-image{cursor:zoom-in}
 .editor-main.comparing>.library-panel,.editor-main.comparing>.edit-panel{display:none}
 .editor-main.comparing>.editor-map{flex:1;min-width:0;min-height:0}
 @media(max-width:760px){
+  .viewer-main:not(.panel-open)>.viewer-panel{width:100%;flex-basis:auto;transform:translateY(100%)}
   .viewer-main>.photo-comparison{height:100%;width:100%}
   .viewer-main.panel-open>.photo-comparison{height:54%}
   .comparison-heading{padding:10px 12px;gap:6px}
@@ -90,6 +104,8 @@ button.comparison-image{cursor:zoom-in}
   .edit-comparison-button{width:calc(100% - 28px);margin:10px 14px 0;font-size:11px}
 }
 @media(max-width:760px) and (min-height:520px){
+  .photo-comparison{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,100fr) 0px minmax(0,0fr)}
+  .photo-comparison:not(.is-split) .comparison-photo{transform:translateY(18px)}
   .photo-comparison.is-split{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,var(--model-share,35fr)) 24px minmax(0,var(--photo-share,65fr))}
   .comparison-divider{cursor:row-resize;border-inline:0;border-block:1px solid var(--line)}
   .comparison-divider>span{width:54px;height:4px}

@@ -63,6 +63,19 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     previousFit.current = fitDistance;
   }, [fitDistance, camera, invalidate]);
 
+  useEffect(() => {
+    const surface = gl.domElement.closest?.('.map-stage') || gl.domElement;
+    const interrupt = () => {
+      const control = controls.current;
+      if (!control || live.current.preview || !motion.current.cancelFocus()) return;
+      stopOrbitMomentum(camera, control);
+      control.enabled = true; invalidate();
+    };
+    surface.addEventListener('pointerdown', interrupt, true);
+    surface.addEventListener('wheel', interrupt, true);
+    return () => { surface.removeEventListener('pointerdown', interrupt, true); surface.removeEventListener('wheel', interrupt, true); };
+  }, [camera, gl, invalidate]);
+
   useEffect(() => bindMapTravelControls(gl.domElement, {
     enabled: () => !!controls.current?.enabled && !live.current.preview && !motion.current.photoTransition,
     travel: steps => {
@@ -161,9 +174,10 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     if (command.type === 'in' || command.type === 'out') {
       const movement = aboveGroundMovement(camera.position, camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(mapTravelStep(camera) * (command.type === 'in' ? 1 : -1)));
       pose.position.add(movement); pose.target.add(movement);
-      // Button presses can interrupt an ordinary map journey immediately.
-      motion.current.focus(camera, control.target, pose, true);
-      control.enabled = true; control.update(); invalidate(); return;
+      // Retarget from the current frame, so repeated or opposite presses stay continuous.
+      control.enabled = false;
+      motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, .35);
+      invalidate(); return;
     }
     if (command.type === 'cluster' && command.target && command.distance) {
       pose.target.fromArray(command.target);

@@ -31,8 +31,13 @@ export class PhotoCameraTransition {
   get inPhotoView() { return this.photoView; }
   get photoTransition() { return this.returnPose !== null; }
 
-  focus(camera: THREE.PerspectiveCamera, target: THREE.Vector3, pose: CameraPose, reducedMotion = false) {
-    if (!this.photoView && !this.returnPose) this.move(camera, target, pose, reducedMotion, .7);
+  focus(camera: THREE.PerspectiveCamera, target: THREE.Vector3, pose: CameraPose, reducedMotion = false, duration = .7) {
+    if (!this.photoView && !this.returnPose) this.move(camera, target, pose, reducedMotion, duration);
+  }
+  cancelFocus() {
+    if (!this.animation || this.photoView || this.returnPose) return false;
+    this.animation = null;
+    return true;
   }
 
   enter(camera: THREE.PerspectiveCamera, target: THREE.Vector3, pose: CameraPose, reducedMotion = false) {
