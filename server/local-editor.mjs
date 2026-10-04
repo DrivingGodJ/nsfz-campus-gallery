@@ -3,6 +3,8 @@ import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import { createReviewService } from './submission-review.mjs';
 import { createStore, ID_PATTERN, MAX_UPLOAD, UserError } from './storage.mjs';
+import { importPhotoPackage } from './package-import.mjs';
+import { MAX_PACKAGE_BYTES } from './photo-package.mjs';
 
 async function body(req, maximum) {
   const chunks = [];
@@ -63,6 +65,7 @@ export function localEditorPlugin() {
             throw new UserError('审核操作不存在。',404);
           }
           if (resource === 'state' && req.method === 'GET') return send(200, { ...await store.state(), reviewImports: await review.imports() });
+          if (resource === 'import-package' && req.method === 'POST') return send(201, await importPhotoPackage(store, await body(req, MAX_PACKAGE_BYTES)));
           if (resource === 'import' && req.method === 'POST') {
             const draft = await store.importPhoto(await body(req, MAX_UPLOAD));
             let filename = '';

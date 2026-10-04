@@ -7,6 +7,9 @@
     "nodejs_compat"
   ],
   "workers_dev": true,
+  "routes": [
+    { "pattern": "likes.drivinggodj.dpdns.org", "custom_domain": true }
+  ],
   "vars": {
     "ALLOWED_ORIGINS": "https://drivinggodj.github.io",
     "TURNSTILE_HOSTNAMES": "drivinggodj.github.io",

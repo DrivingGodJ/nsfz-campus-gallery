@@ -14,7 +14,7 @@ export default function ReviewInbox({api, onImport, onReject, onError, busy, rel
   useEffect(()=>{const timer=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const configure=async(mode:'local'|'cloud')=>{try{await api('review/config','PUT',{mode,url,ownerToken:secret});setSecret('');setSettings(false);await load();}catch(e){onError((e as Error).message);}};
   return <><div className="review-heading"><strong>待审核投稿</strong><button className="icon-button" aria-label="刷新投稿列表" disabled={loading||busy} onClick={()=>void load()}><RefreshCw size={16}/></button></div>
-    <p className="library-help">{config?.mode==='cloud'?'正在连接线上投稿服务。':'本地体验：投稿和审核都在这台电脑，尚未开放线上投稿。'}审核通过后加入内容库，公开发布仍需更新网站。</p>
+    <p className="library-help">{config?.mode==='cloud'?'正在连接线上投稿服务。':'邮件投稿请在“照片”页导入 ZIP 包；这里保留原有服务的审核队列。'}审核通过后加入内容库，公开发布仍需更新网站。</p>
     <button className="text-button" onClick={()=>setSettings(!settings)}><Settings2 size={14}/>审核服务设置</button>
     {settings && <form className="review-settings" onSubmit={e=>{e.preventDefault();void configure('cloud');}}><label>线上投稿服务地址<input type="url" value={url} placeholder="https://服务名称.workers.dev" onChange={e=>setURL(e.target.value)} required/></label><label>审核密钥<input type="password" autoComplete="off" value={secret} onChange={e=>setSecret(e.target.value)} required minLength={32}/></label><p className="field-help">仅保存在此电脑的本地配置，不会上传到公开网站。</p><button className="button primary" type="submit">连接线上服务</button><button className="button secondary" type="button" onClick={()=>void configure('local')}>使用本地体验</button></form>}
     {loading && <p className="library-help" role="status">正在读取投稿…</p>}

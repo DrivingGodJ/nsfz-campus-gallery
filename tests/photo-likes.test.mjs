@@ -104,3 +104,13 @@ test('three catalog sorts preserve original data, filters, stable ties and missi
   assert.deepEqual(sortPhotos([photos[0], photos[2]], 'uploaded', photos).map(p => p.id), ['c', 'a']);
   assert.equal(JSON.stringify(photos), before);
 });
+
+test('unreachable likes are explained; external aborts and server quota errors retain their meaning', async () => {
+  const id = crypto.randomUUID(), visitor = crypto.randomUUID();
+  await assert.rejects(createLikesClient('/api/likes', visitor, async () => { throw new TypeError('Failed to fetch'); }).read([id]), /当前网络无法连接点赞服务/);
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(createLikesClient('/api/likes', visitor, async (url, options) => {
+    assert.equal(options.signal.aborted, true); throw new DOMException('Aborted', 'AbortError');
+  }).read([id], controller.signal), error => error.name === 'AbortError');
+  await assert.rejects(createLikesClient('/api/likes', visitor, async () => Response.json({ error: '点赞服务已达到今日限额' }, { status: 503 })).read([id]), /今日限额/);
+});

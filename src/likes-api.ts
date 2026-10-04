@@ -24,10 +24,23 @@ function isLike(value: unknown): value is PhotoLike {
 export function createLikesClient(baseURL: string, visitorId: string, transport: typeof fetch = fetch) {
   const endpoint = baseURL.replace(/\/+$/, '');
   async function request(path: string, method: string, body: unknown, signal?: AbortSignal) {
-    const response = await transport(endpoint + path, { method, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), cache: 'no-store', credentials: 'omit',
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000) });
-    return readServiceResponse(response);
+    // Use a controller rather than AbortSignal.any, which older Safari versions lack.
+    const controller = new AbortController();
+    const abort = () => controller.abort(signal?.reason);
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      let response;
+      try {
+        response = await transport(endpoint + path, { method, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body), cache: 'no-store', credentials: 'omit', signal: controller.signal });
+      } catch (reason) {
+        if (signal?.aborted) throw reason;
+        throw new Error('当前网络无法连接点赞服务，点赞结果尚未确认。请检查网络后重试。');
+      }
+      return await readServiceResponse(response);
+    } finally { clearTimeout(timeout); signal?.removeEventListener('abort', abort); }
   }
   return {
     async read(photoIds: string[], signal?: AbortSignal): Promise<PhotoLikes> {

@@ -228,3 +228,6 @@ img[data-load-state="loading"],img[data-load-state="error"]{visibility:hidden}
 .photo-image-spinner{animation:photo-image-spin 1s linear infinite}
 @keyframes photo-image-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.photo-image-spinner{animation:none}}
+
+.package-result{padding:16px 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
+.package-result .field-help{margin:0;overflow-wrap:anywhere}
