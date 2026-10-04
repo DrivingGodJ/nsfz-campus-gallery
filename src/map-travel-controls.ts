@@ -113,9 +113,10 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
     if (pointer && canvas.hasPointerCapture(pointer.id)) canvas.releasePointerCapture(pointer.id);
     for (const id of captured) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
   };
+  const captureOptions = { capture: true };
   canvas.addEventListener('wheel', wheel, { passive: false });
   // Choose the pivot before OrbitControls starts interpreting this gesture.
-  canvas.addEventListener('pointerdown', down, true);
+  canvas.addEventListener('pointerdown', down, captureOptions);
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', finish);
   canvas.addEventListener('pointercancel', finish);
@@ -123,7 +124,7 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   canvas.addEventListener('blur', clear);
   return () => {
     canvas.removeEventListener('wheel', wheel);
-    canvas.removeEventListener('pointerdown', down, true);
+    canvas.removeEventListener('pointerdown', down, captureOptions);
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', finish);
     canvas.removeEventListener('pointercancel', finish);
