@@ -31,6 +31,35 @@ test('import preserves local source, corrects orientation, and keeps draft out o
     await assert.rejects(fs.access(path.join(f.root, 'public/media', draft.id)));
   } finally { await f.cleanup(); }
 });
+test('large images get a distinct high-quality preview, which publishes and exports without altering the download', async () => {
+  const f = await fixture();
+  try {
+    const bytes = await sharp({ create: { width: 6000, height: 4000, channels: 3, background: '#47694e' } }).jpeg().toBuffer();
+    const draft = await f.store.importPhoto(bytes);
+    const directory = path.join(f.root, '.local/draft-media', draft.id);
+    for (const [name, size] of [['thumbnail.webp',[420,280]],['preview.webp',[1440,960]],['display.webp',[2400,1600]],['download.jpg',[6000,4000]]]) {
+      const metadata = await sharp(path.join(directory,name)).metadata();
+      assert.deepEqual([metadata.width,metadata.height],size); assert.equal(metadata.exif,undefined);
+    }
+    const download = await fs.readFile(path.join(directory,'download.jpg'));
+    await f.store.updateDraft(draft.id,{ ...draft,placed:true });
+    const published = await f.store.publish(draft.id,0);
+    assert.equal(ASSET_PATTERN.test(published.files.preview),true);
+    const output = path.join(f.root,'export'); await exportStaticContent(f.root,output);
+    assert.deepEqual(await fs.readFile(path.join(output,published.files.download)),download);
+    assert.deepEqual(await fs.readFile(path.join(output,published.files.preview)),await fs.readFile(path.join(directory,'preview.webp')));
+    const site = (await f.store.state()).site;
+    delete site.photos[0].files.preview;
+    await fs.rm(path.join(f.root,'public/media',draft.id,'preview.webp'));
+    await fs.writeFile(path.join(f.root,'public/data/site.json'),JSON.stringify(site));
+    const filled = await f.store.backfillPhotoPreviews();
+    assert.equal(filled.generated,1); assert.equal((await f.store.state()).site.revision,2);
+    assert.deepEqual(await fs.readFile(path.join(f.root,'public',published.files.download)),download);
+    assert.deepEqual(await fs.readFile(path.join(f.root,'.local/originals',draft.id,'source.jpeg')),bytes);
+    assert.equal((await f.store.backfillPhotoPreviews()).generated,0);
+    assert.equal((await f.store.state()).site.revision,2,'Repeating migration does not rewrite the content library');
+  } finally { await f.cleanup(); }
+});
 test('unplaced and out-of-range photos cannot publish; saved assets cannot be redirected', async () => {
   const f = await fixture();
   try {

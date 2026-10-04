@@ -8,6 +8,7 @@ import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-
 import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-controls';
 import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
+import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
 export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
@@ -117,6 +118,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
         const control = controls.current!;
         if (gesturePivot.current) orbitMapObject(camera, control.target, gesturePivot.current, dx, dy, live.current.size.height);
         else turnMapView(camera, control.target, dx, dy, live.current.size.height);
+        keepMapCameraAboveGround(camera, control.target);
         control.update(); invalidate();
       },
       finish: () => { gesturePivot.current = null; if (controls.current) controls.current.enableRotate = true; }
@@ -134,7 +136,11 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       if (!motion.current.moving) live.current.onMoving(false);
       invalidate();
     }
-    if (preview || motion.current.inPhotoView) return;
+    if (preview || motion.current.inPhotoView || motion.current.photoTransition) return;
+    if (keepMapCameraAboveGround(camera, control.target)) {
+      stopOrbitMomentum(camera, control);
+      invalidate();
+    }
     const target = control.target;
     const compact = mapGroundViewDistance(camera) > 360;
     if (compact !== lastCompact.current) { lastCompact.current = compact; onCompact(compact); }
@@ -153,7 +159,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     if (command.type === 'north') { const length = offset.length(); pose.position.copy(pose.target).add(new THREE.Vector3(0, length * .72, length * .7)); }
     if (command.type === 'top') { pose.target.set(0, 0, 0); pose.position.set(0, fitDistance, .5); }
     if (command.type === 'in' || command.type === 'out') {
-      const movement = camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(mapTravelStep(camera) * (command.type === 'in' ? 1 : -1));
+      const movement = aboveGroundMovement(camera.position, camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(mapTravelStep(camera) * (command.type === 'in' ? 1 : -1)));
       pose.position.add(movement); pose.target.add(movement);
       // Button presses can interrupt an ordinary map journey immediately.
       motion.current.focus(camera, control.target, pose, true);
@@ -163,6 +169,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       pose.target.fromArray(command.target);
       pose.position.copy(pose.target).add(offset.normalize().multiplyScalar(command.distance));
     }
+    pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
     const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
     pose.quaternion.copy(oriented.quaternion);
     control.enabled = false;
@@ -177,6 +184,11 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     const target = new THREE.Vector3(...objectTarget);
     const pose = readCameraPose(camera, control.target);
     pose.position.add(target.clone().sub(control.target)); pose.target.copy(target);
+    if (pose.position.y < MAP_CAMERA_GROUND_HEIGHT) {
+      pose.position.y = MAP_CAMERA_GROUND_HEIGHT;
+      const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
+      pose.quaternion.copy(oriented.quaternion);
+    }
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     invalidate();

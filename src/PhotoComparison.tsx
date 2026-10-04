@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { asset, type Photo } from './types';
+import { photoPreviewFile } from './photo-image';
 
 export default function PhotoComparison({ children, photo, imageSource, navigation, actions, information, onOpen }: {
   children: ReactNode; photo?: Photo | null; imageSource?: string;
@@ -44,9 +45,9 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
       <section className="comparison-photo" aria-label="原照片">
         <div className="comparison-heading"><div><span className="eyebrow">原照片</span><strong>{photo.title}</strong></div>{navigation}</div>
         {onOpen ? <button className="comparison-image" onClick={onOpen} aria-label={'全屏查看照片：' + photo.title}>
-          <img src={imageSource || asset(photo.files.display)} alt={photo.title} draggable={false} />
+          <img src={imageSource || asset(photoPreviewFile(photo))} alt={photo.title} draggable={false} decoding="async" />
           <span><Maximize2 size={15} />全屏照片</span>
-        </button> : <div className="comparison-image"><img src={imageSource || asset(photo.files.display)} alt={photo.title} draggable={false} /></div>}
+        </button> : <div className="comparison-image"><img src={imageSource || asset(photoPreviewFile(photo))} alt={photo.title} draggable={false} decoding="async" /></div>}
         {actions && <div className="comparison-actions">{actions}</div>}
         {information && <details className="comparison-information"><summary>照片资料与同地点照片</summary><div className="comparison-information-content">{information}</div></details>}
       </section>

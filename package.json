@@ -16,6 +16,7 @@
     "likes:migrate": "node scripts/likes-config-check.mjs && wrangler d1 migrations apply nsfz-photo-likes --remote --config worker/wrangler.jsonc",
     "likes:deploy": "node scripts/likes-config-check.mjs && npm run likes:manifest && wrangler deploy --config worker/wrangler.jsonc",
     "likes:deploy:only": "node scripts/likes-config-check.mjs && npm run likes:manifest && node scripts/likes-only-config.mjs && wrangler deploy --config .local/deployment/likes.jsonc",
+    "photos:previews": "node scripts/photo-previews.mjs",
     "photos:credits": "node scripts/photo-credits.mjs",
     "pretest": "node scripts/likes-manifest.mjs && node scripts/submissions-manifest.mjs",
     "submissions:check": "npm run likes:check",

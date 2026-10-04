@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 133,
+  "revision": 134,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -37,7 +37,8 @@
       "files": {
         "thumbnail": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/thumbnail.webp",
         "display": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/display.webp",
-        "download": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/download.jpg"
+        "download": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/download.jpg",
+        "preview": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -78,7 +79,8 @@
       "files": {
         "thumbnail": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/thumbnail.webp",
         "display": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/display.webp",
-        "download": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/download.jpg"
+        "download": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/download.jpg",
+        "preview": "media/07daa633-1b1c-427e-bbd7-37dc23428ee8/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -119,7 +121,8 @@
       "files": {
         "thumbnail": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/thumbnail.webp",
         "display": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/display.webp",
-        "download": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/download.jpg"
+        "download": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/download.jpg",
+        "preview": "media/5680b7f7-73b1-4563-a7d9-64babbaebb82/preview.webp"
       },
       "locationId": "local/footbridge",
       "author": "DrivingGodJ",
@@ -160,7 +163,8 @@
       "files": {
         "thumbnail": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/thumbnail.webp",
         "display": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/display.webp",
-        "download": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/download.jpg"
+        "download": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/download.jpg",
+        "preview": "media/32a56078-7475-4d8e-ac9d-ec107b07ee04/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -201,7 +205,8 @@
       "files": {
         "thumbnail": "media/13411ce1-b933-425c-ac78-0a0569842170/thumbnail.webp",
         "display": "media/13411ce1-b933-425c-ac78-0a0569842170/display.webp",
-        "download": "media/13411ce1-b933-425c-ac78-0a0569842170/download.jpg"
+        "download": "media/13411ce1-b933-425c-ac78-0a0569842170/download.jpg",
+        "preview": "media/13411ce1-b933-425c-ac78-0a0569842170/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -242,7 +247,8 @@
       "files": {
         "thumbnail": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/thumbnail.webp",
         "display": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/display.webp",
-        "download": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/download.jpg"
+        "download": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/download.jpg",
+        "preview": "media/6deb58ad-debc-4321-bdfb-d21c2d83fb97/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -283,7 +289,8 @@
       "files": {
         "thumbnail": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/thumbnail.webp",
         "display": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/display.webp",
-        "download": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/download.jpg"
+        "download": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/download.jpg",
+        "preview": "media/39208fcf-95ae-46eb-8007-1b921fe732b0/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -324,7 +331,8 @@
       "files": {
         "thumbnail": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/thumbnail.webp",
         "display": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/display.webp",
-        "download": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/download.jpg"
+        "download": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/download.jpg",
+        "preview": "media/5bd99665-2443-4ae7-93b2-ab7694285ee4/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -365,7 +373,8 @@
       "files": {
         "thumbnail": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/thumbnail.webp",
         "display": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/display.webp",
-        "download": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/download.jpg"
+        "download": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/download.jpg",
+        "preview": "media/e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -406,7 +415,8 @@
       "files": {
         "thumbnail": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/thumbnail.webp",
         "display": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/display.webp",
-        "download": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/download.jpg"
+        "download": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/download.jpg",
+        "preview": "media/62c412f5-d3b2-4ae2-bbed-1308ec44ff50/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -447,7 +457,8 @@
       "files": {
         "thumbnail": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/thumbnail.webp",
         "display": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/display.webp",
-        "download": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/download.jpg"
+        "download": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/download.jpg",
+        "preview": "media/56bfa131-0bcd-4cee-9adf-2e7043063dae/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -488,7 +499,8 @@
       "files": {
         "thumbnail": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/thumbnail.webp",
         "display": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/display.webp",
-        "download": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/download.jpg"
+        "download": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/download.jpg",
+        "preview": "media/a0e17620-7437-42cf-92f2-1d7d23e20842/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -529,7 +541,8 @@
       "files": {
         "thumbnail": "media/691551ff-0730-4879-a53e-678bc812d733/thumbnail.webp",
         "display": "media/691551ff-0730-4879-a53e-678bc812d733/display.webp",
-        "download": "media/691551ff-0730-4879-a53e-678bc812d733/download.jpg"
+        "download": "media/691551ff-0730-4879-a53e-678bc812d733/download.jpg",
+        "preview": "media/691551ff-0730-4879-a53e-678bc812d733/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -570,7 +583,8 @@
       "files": {
         "thumbnail": "media/d922f197-3db1-4e37-8741-ba753ec3233c/thumbnail.webp",
         "display": "media/d922f197-3db1-4e37-8741-ba753ec3233c/display.webp",
-        "download": "media/d922f197-3db1-4e37-8741-ba753ec3233c/download.jpg"
+        "download": "media/d922f197-3db1-4e37-8741-ba753ec3233c/download.jpg",
+        "preview": "media/d922f197-3db1-4e37-8741-ba753ec3233c/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -611,7 +625,8 @@
       "files": {
         "thumbnail": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/thumbnail.webp",
         "display": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/display.webp",
-        "download": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/download.jpg"
+        "download": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/download.jpg",
+        "preview": "media/72cbcabe-914c-4ff3-b21a-fc6197bdd416/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -652,7 +667,8 @@
       "files": {
         "thumbnail": "media/c28fcc63-542b-4757-830b-eb23432a634f/thumbnail.webp",
         "display": "media/c28fcc63-542b-4757-830b-eb23432a634f/display.webp",
-        "download": "media/c28fcc63-542b-4757-830b-eb23432a634f/download.jpg"
+        "download": "media/c28fcc63-542b-4757-830b-eb23432a634f/download.jpg",
+        "preview": "media/c28fcc63-542b-4757-830b-eb23432a634f/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -693,7 +709,8 @@
       "files": {
         "thumbnail": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/thumbnail.webp",
         "display": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/display.webp",
-        "download": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/download.jpg"
+        "download": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/download.jpg",
+        "preview": "media/926f5f00-e507-474d-8dc6-643f96c53c7c/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -734,7 +751,8 @@
       "files": {
         "thumbnail": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/thumbnail.webp",
         "display": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/display.webp",
-        "download": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/download.jpg"
+        "download": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/download.jpg",
+        "preview": "media/f2526e97-f7f0-4fa6-a096-679c3d36f300/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -775,7 +793,8 @@
       "files": {
         "thumbnail": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/thumbnail.webp",
         "display": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/display.webp",
-        "download": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/download.jpg"
+        "download": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/download.jpg",
+        "preview": "media/737d3945-edc2-40e0-a7ba-f25c464d4561/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -816,7 +835,8 @@
       "files": {
         "thumbnail": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/thumbnail.webp",
         "display": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/display.webp",
-        "download": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/download.jpg"
+        "download": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/download.jpg",
+        "preview": "media/d028fbd6-09a9-47ea-a7bc-06641eada0d1/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -857,7 +877,8 @@
       "files": {
         "thumbnail": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/thumbnail.webp",
         "display": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/display.webp",
-        "download": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/download.jpg"
+        "download": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/download.jpg",
+        "preview": "media/831757f0-d70a-4ac1-8d8d-f3af0636f728/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -898,7 +919,8 @@
       "files": {
         "thumbnail": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/thumbnail.webp",
         "display": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/display.webp",
-        "download": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/download.jpg"
+        "download": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/download.jpg",
+        "preview": "media/8a4eeea3-449d-41f4-a6b9-4b29cfce4f23/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -939,7 +961,8 @@
       "files": {
         "thumbnail": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/thumbnail.webp",
         "display": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/display.webp",
-        "download": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/download.jpg"
+        "download": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/download.jpg",
+        "preview": "media/05fe3597-88ac-46f4-a3d2-007df5a1b957/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -980,7 +1003,8 @@
       "files": {
         "thumbnail": "media/a61c941b-14f3-454e-af38-45edb7bdf202/thumbnail.webp",
         "display": "media/a61c941b-14f3-454e-af38-45edb7bdf202/display.webp",
-        "download": "media/a61c941b-14f3-454e-af38-45edb7bdf202/download.jpg"
+        "download": "media/a61c941b-14f3-454e-af38-45edb7bdf202/download.jpg",
+        "preview": "media/a61c941b-14f3-454e-af38-45edb7bdf202/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1021,7 +1045,8 @@
       "files": {
         "thumbnail": "media/8b793917-d0f6-4953-8480-4337289b2739/thumbnail.webp",
         "display": "media/8b793917-d0f6-4953-8480-4337289b2739/display.webp",
-        "download": "media/8b793917-d0f6-4953-8480-4337289b2739/download.jpg"
+        "download": "media/8b793917-d0f6-4953-8480-4337289b2739/download.jpg",
+        "preview": "media/8b793917-d0f6-4953-8480-4337289b2739/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1062,7 +1087,8 @@
       "files": {
         "thumbnail": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/thumbnail.webp",
         "display": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/display.webp",
-        "download": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/download.jpg"
+        "download": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/download.jpg",
+        "preview": "media/9d583001-6ff5-4487-8f70-8e59ccc83fa9/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -1103,7 +1129,8 @@
       "files": {
         "thumbnail": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/thumbnail.webp",
         "display": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/display.webp",
-        "download": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/download.jpg"
+        "download": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/download.jpg",
+        "preview": "media/9084dc2d-a2f2-4d42-8734-4fdbe5a9c563/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -1144,7 +1171,8 @@
       "files": {
         "thumbnail": "media/51f40733-0225-4555-a676-40aeffb92106/thumbnail.webp",
         "display": "media/51f40733-0225-4555-a676-40aeffb92106/display.webp",
-        "download": "media/51f40733-0225-4555-a676-40aeffb92106/download.jpg"
+        "download": "media/51f40733-0225-4555-a676-40aeffb92106/download.jpg",
+        "preview": "media/51f40733-0225-4555-a676-40aeffb92106/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -1185,7 +1213,8 @@
       "files": {
         "thumbnail": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/thumbnail.webp",
         "display": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/display.webp",
-        "download": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/download.jpg"
+        "download": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/download.jpg",
+        "preview": "media/5f450ef0-72b5-4d73-860a-14d812c93b9d/preview.webp"
       },
       "locationId": "way/855459417",
       "author": "DrivingGodJ",
@@ -1226,7 +1255,8 @@
       "files": {
         "thumbnail": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/thumbnail.webp",
         "display": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/display.webp",
-        "download": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/download.jpg"
+        "download": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/download.jpg",
+        "preview": "media/ba32ecca-0828-4f5d-8b3b-e9a435f19152/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -1267,7 +1297,8 @@
       "files": {
         "thumbnail": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/thumbnail.webp",
         "display": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/display.webp",
-        "download": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/download.jpg"
+        "download": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/download.jpg",
+        "preview": "media/0aeb5fae-050d-40a6-90f4-762d786c845b/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1308,7 +1339,8 @@
       "files": {
         "thumbnail": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/thumbnail.webp",
         "display": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/display.webp",
-        "download": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/download.jpg"
+        "download": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/download.jpg",
+        "preview": "media/cbfe6584-8662-44e1-9369-1a2b2dd6b194/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1349,7 +1381,8 @@
       "files": {
         "thumbnail": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/thumbnail.webp",
         "display": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/display.webp",
-        "download": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/download.jpg"
+        "download": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/download.jpg",
+        "preview": "media/0600b3d2-6358-40b3-b901-f6f04d609c52/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1390,7 +1423,8 @@
       "files": {
         "thumbnail": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/thumbnail.webp",
         "display": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/display.webp",
-        "download": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/download.jpg"
+        "download": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/download.jpg",
+        "preview": "media/c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1431,7 +1465,8 @@
       "files": {
         "thumbnail": "media/fe448383-e603-49e9-9e86-35fc165cf63b/thumbnail.webp",
         "display": "media/fe448383-e603-49e9-9e86-35fc165cf63b/display.webp",
-        "download": "media/fe448383-e603-49e9-9e86-35fc165cf63b/download.jpg"
+        "download": "media/fe448383-e603-49e9-9e86-35fc165cf63b/download.jpg",
+        "preview": "media/fe448383-e603-49e9-9e86-35fc165cf63b/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1472,7 +1507,8 @@
       "files": {
         "thumbnail": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/thumbnail.webp",
         "display": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/display.webp",
-        "download": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/download.jpg"
+        "download": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/download.jpg",
+        "preview": "media/88c65cc9-1f8f-4383-8ffb-f446bdc663dd/preview.webp"
       },
       "locationId": "way/855459409",
       "author": "DrivingGodJ",
@@ -1516,7 +1552,8 @@
       "files": {
         "thumbnail": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/thumbnail.webp",
         "display": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/display.webp",
-        "download": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/download.jpg"
+        "download": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/download.jpg",
+        "preview": "media/eeeb7f00-9aab-4dc1-bb0f-db42fa067465/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "",
@@ -1557,7 +1594,8 @@
       "files": {
         "thumbnail": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/thumbnail.webp",
         "display": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/display.webp",
-        "download": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/download.jpg"
+        "download": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/download.jpg",
+        "preview": "media/35af56d9-984d-43be-82bb-aaa47ddefb37/preview.webp"
       },
       "locationId": "local/underground-badminton",
       "author": "DrivingGodJ",
@@ -1598,7 +1636,8 @@
       "files": {
         "thumbnail": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/thumbnail.webp",
         "display": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/display.webp",
-        "download": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/download.jpg"
+        "download": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/download.jpg",
+        "preview": "media/e93e02ac-f00d-4e8d-af01-3c09706f2856/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -1639,7 +1678,8 @@
       "files": {
         "thumbnail": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/thumbnail.webp",
         "display": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/display.webp",
-        "download": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/download.jpg"
+        "download": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/download.jpg",
+        "preview": "media/da1c1aee-1f3d-4389-a101-e4b35f487666/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1680,7 +1720,8 @@
       "files": {
         "thumbnail": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/thumbnail.webp",
         "display": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/display.webp",
-        "download": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/download.jpg"
+        "download": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/download.jpg",
+        "preview": "media/18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1721,7 +1762,8 @@
       "files": {
         "thumbnail": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/thumbnail.webp",
         "display": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/display.webp",
-        "download": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/download.jpg"
+        "download": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/download.jpg",
+        "preview": "media/7a8a54a9-5482-403c-9d3c-002a9fde0115/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -1762,7 +1804,8 @@
       "files": {
         "thumbnail": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/thumbnail.webp",
         "display": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/display.webp",
-        "download": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/download.jpg"
+        "download": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/download.jpg",
+        "preview": "media/e69cd3af-74a7-4f32-8577-4f654b6aba23/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -1799,7 +1842,8 @@
       "files": {
         "thumbnail": "media/2669769a-31d5-4200-a7e2-9a441c66e533/thumbnail.webp",
         "display": "media/2669769a-31d5-4200-a7e2-9a441c66e533/display.webp",
-        "download": "media/2669769a-31d5-4200-a7e2-9a441c66e533/download.jpg"
+        "download": "media/2669769a-31d5-4200-a7e2-9a441c66e533/download.jpg",
+        "preview": "media/2669769a-31d5-4200-a7e2-9a441c66e533/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "",
@@ -1840,7 +1884,8 @@
       "files": {
         "thumbnail": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/thumbnail.webp",
         "display": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/display.webp",
-        "download": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/download.jpg"
+        "download": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/download.jpg",
+        "preview": "media/b49bea6d-af0a-4087-9793-0f1ad8ccc667/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -1881,7 +1926,8 @@
       "files": {
         "thumbnail": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/thumbnail.webp",
         "display": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/display.webp",
-        "download": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/download.jpg"
+        "download": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/download.jpg",
+        "preview": "media/0373aa23-e993-4f57-aba9-a7936fe081a2/preview.webp"
       },
       "locationId": "local/gymnasium",
       "author": "DrivingGodJ",
@@ -1922,7 +1968,8 @@
       "files": {
         "thumbnail": "media/aa553764-213d-4716-b3ad-545c60589bf8/thumbnail.webp",
         "display": "media/aa553764-213d-4716-b3ad-545c60589bf8/display.webp",
-        "download": "media/aa553764-213d-4716-b3ad-545c60589bf8/download.jpg"
+        "download": "media/aa553764-213d-4716-b3ad-545c60589bf8/download.jpg",
+        "preview": "media/aa553764-213d-4716-b3ad-545c60589bf8/preview.webp"
       },
       "locationId": "local/gymnasium",
       "author": "DrivingGodJ",
@@ -1963,7 +2010,8 @@
       "files": {
         "thumbnail": "media/719592c1-5539-42c7-b21a-7d9492d273b0/thumbnail.webp",
         "display": "media/719592c1-5539-42c7-b21a-7d9492d273b0/display.webp",
-        "download": "media/719592c1-5539-42c7-b21a-7d9492d273b0/download.jpg"
+        "download": "media/719592c1-5539-42c7-b21a-7d9492d273b0/download.jpg",
+        "preview": "media/719592c1-5539-42c7-b21a-7d9492d273b0/preview.webp"
       },
       "locationId": "way/1233313431",
       "author": "DrivingGodJ",
@@ -2004,7 +2052,8 @@
       "files": {
         "thumbnail": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/thumbnail.webp",
         "display": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/display.webp",
-        "download": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/download.jpg"
+        "download": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/download.jpg",
+        "preview": "media/0441ecc7-6b59-42b9-b9d1-f929f93c2f0e/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -2045,7 +2094,8 @@
       "files": {
         "thumbnail": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/thumbnail.webp",
         "display": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/display.webp",
-        "download": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/download.jpg"
+        "download": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/download.jpg",
+        "preview": "media/f420c8e0-41ba-4ead-81a3-1bb806701061/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -2086,7 +2136,8 @@
       "files": {
         "thumbnail": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/thumbnail.webp",
         "display": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/display.webp",
-        "download": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/download.jpg"
+        "download": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/download.jpg",
+        "preview": "media/4aed67d1-6342-4523-b749-1c7a2e6ed99b/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -2127,7 +2178,8 @@
       "files": {
         "thumbnail": "media/252d968f-08a5-4ec9-9d27-c52017da3348/thumbnail.webp",
         "display": "media/252d968f-08a5-4ec9-9d27-c52017da3348/display.webp",
-        "download": "media/252d968f-08a5-4ec9-9d27-c52017da3348/download.jpg"
+        "download": "media/252d968f-08a5-4ec9-9d27-c52017da3348/download.jpg",
+        "preview": "media/252d968f-08a5-4ec9-9d27-c52017da3348/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -2168,7 +2220,8 @@
       "files": {
         "thumbnail": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/thumbnail.webp",
         "display": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/display.webp",
-        "download": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/download.jpg"
+        "download": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/download.jpg",
+        "preview": "media/f5acf721-c782-4eb7-a3b2-5e1d17e7dafd/preview.webp"
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
@@ -2209,7 +2262,8 @@
       "files": {
         "thumbnail": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/thumbnail.webp",
         "display": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/display.webp",
-        "download": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/download.jpg"
+        "download": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/download.jpg",
+        "preview": "media/59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -2250,7 +2304,8 @@
       "files": {
         "thumbnail": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/thumbnail.webp",
         "display": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/display.webp",
-        "download": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/download.jpg"
+        "download": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/download.jpg",
+        "preview": "media/34868811-15fa-4147-ac2e-f4e1278dc2f4/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -2291,7 +2346,8 @@
       "files": {
         "thumbnail": "media/c61510ee-8301-4106-be76-5aae082a0fb2/thumbnail.webp",
         "display": "media/c61510ee-8301-4106-be76-5aae082a0fb2/display.webp",
-        "download": "media/c61510ee-8301-4106-be76-5aae082a0fb2/download.jpg"
+        "download": "media/c61510ee-8301-4106-be76-5aae082a0fb2/download.jpg",
+        "preview": "media/c61510ee-8301-4106-be76-5aae082a0fb2/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",
@@ -2332,7 +2388,8 @@
       "files": {
         "thumbnail": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/thumbnail.webp",
         "display": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/display.webp",
-        "download": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/download.jpg"
+        "download": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/download.jpg",
+        "preview": "media/77bb78cb-1908-4cc8-bd7d-9a7d1215d117/preview.webp"
       },
       "locationId": "",
       "author": "DrivingGodJ",

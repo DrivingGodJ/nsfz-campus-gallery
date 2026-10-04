@@ -42,7 +42,7 @@ export type Photo = {
   width: number; height: number; downloadBytes: number;
   metadata?: PhotoMetadata;
   view?: { focalLength35Mm?: number; cropFactor?: number };
-  files: { thumbnail: string; display: string; download: string };
+  files: { thumbnail: string; preview?: string; display: string; download: string };
 };
 export type BuildingOverride = { name: string; floors: number; floorHeight: number; partFloors?: Record<string, number> };
 export type Site = { schemaVersion: number; revision: number; photos: Photo[]; buildingOverrides: Record<string, BuildingOverride> };

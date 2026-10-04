@@ -1,4 +1,4 @@
-import { MapSeason, MapTheme, useSystemTheme, useMapColor } from './MapTheme';
+import { MapSeason, MapTheme, MapTime, useSystemTheme, useMapColor } from './MapTheme';
 import { Component, Suspense, useEffect, useMemo, useRef, useState, useCallback, type ReactNode, type RefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Edges, Html, Line } from '@react-three/drei';
@@ -29,11 +29,15 @@ import MapCameraRig, { OVERVIEW_POSITION, type MapCommand, type MapPhoto } from 
 import { photoPerspectiveIssue } from './photo-perspective';
 import { PhotoPerspectiveOverlay } from './PhotoPerspective';
 import type { PhotoOrientation } from './photo-look-controls';
+import type { PhotoTime } from './photo-time';
+import { activeMapTime, TIME_LIGHTING } from './time-palette';
+import { mapInteractionHelp, useInputMode } from './input-mode';
 
 type Props = {
   campus: Campus; site: Site; photos: Photo[]; selectedPhoto?: Photo | null; onSelectPhoto?: (photo: Photo) => void;
   selectedLocation?: string; floor?: number; onLocation?: (id: string) => void; onClearLocation?: () => void; featuresSelectable?: boolean; selectableLocationIds?: string[];
   season?: PhotoSeason | '';
+  time?: PhotoTime | '';
   placing?: boolean; onPlace?: (point: { x: number; z: number }) => void; editPhoto?: Photo | null; onHeading?: (heading: number) => void;
   photoPreview?: boolean; photoPerspective?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoOrientation) => void;
 };
@@ -144,7 +148,10 @@ class CanvasBoundary extends Component<{ children: ReactNode }, { failed: boolea
 }
 export default function MapView(props: Props) {
   const theme = useSystemTheme();
-  const mapColor = useMapColor(theme, props.season || '');
+  const mapColor = useMapColor(theme, props.season || '', props.time || '');
+  const activeTime = activeMapTime(props.time || '');
+  const lighting = TIME_LIGHTING[activeTime || 'day'];
+  const inputMode = useInputMode();
   const { campus, site, floor, placing, onPlace } = props;
   const [selectionDismissed, setSelectionDismissed] = useState(false);
   useEffect(() => setSelectionDismissed(false), [props.selectedLocation, floor, props.selectedPhoto?.id, props.editPhoto?.id]);
@@ -199,10 +206,10 @@ export default function MapView(props: Props) {
     const target = new THREE.Vector3();
     if (e.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(editPhoto?.position.height || 0)), target)) onPlace({ x: target.x, z: target.z });
   };
-  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} style={{ background: mapColor('#eeeee5') }} aria-label="察哈尔路校区三维地图">
-    <MapTheme.Provider value={theme}><MapSeason.Provider value={props.season || ''}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
+  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} data-time={props.time || 'all'} data-input={inputMode} style={{ background: mapColor('#eeeee5') }} aria-label="察哈尔路校区三维地图">
+    <MapTheme.Provider value={theme}><MapSeason.Provider value={props.season || ''}><MapTime.Provider value={props.time || ''}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
       <color attach="background" args={[mapColor('#eeeee5')]} />
-      <ambientLight intensity={1.5} /><directionalLight position={[140, 300, 160]} intensity={2.3} />
+      <ambientLight intensity={lighting.ambient} /><directionalLight position={lighting.position} color={lighting.color} intensity={lighting.intensity} />
       <LocationSelection.Provider value={{ selectedId: selectedLocation, onSelect: viewingPhoto ? undefined : onLocation, placing, featuresSelectable: props.featuresSelectable, selectableIds }}><Suspense fallback={null}><group onClick={clickBackground}>
         {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={-.08} unlit />)}
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}
@@ -215,11 +222,11 @@ export default function MapView(props: Props) {
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
       </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} /></Suspense></LocationSelection.Provider>
-    </Canvas></CanvasBoundary></MapSeason.Provider></MapTheme.Provider>
+    </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('north')} aria-label="地图朝北" title="地图朝北"><Navigation size={17} /></button><button className="icon-button" onClick={() => run('top')} aria-label="切换俯视图" title="俯视图"><Focus size={18} /></button><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {!viewingPhoto && picker && <PhotoClusterPicker photos={picker.photos} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />}
     {preview && <PhotoPerspectiveOverlay photo={preview} />}
-    <div className="map-bottom"><span className="map-help">{preview ? editPhoto ? '拖动画面调角度 · 松手同步照片参数' : '画框对应照片范围 · Esc 返回地图' : placing ? '点击地图，标记拍摄位置' : '拖动旋转 · 滚动前进后退 · 右键平移'}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>
+    <div className="map-bottom"><span className="map-help">{mapInteractionHelp(inputMode, preview ? editPhoto ? 'editing' : 'preview' : placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>
   </div>;
 }

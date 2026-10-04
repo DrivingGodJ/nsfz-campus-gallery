@@ -5,9 +5,10 @@ import sharp from 'sharp';
 import { extractPhotoMetadata, validCaptureTime } from './photo-metadata.mjs';
 import { resolveLocationId } from './campus-corrections.mjs';
 import { automaticPhotoPlacement } from './photo-geolocation.mjs';
+import { createPhotoPreview } from './photo-preview.mjs';
 
 export const ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|display\.webp|download\.jpg)$/;
+export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg)$/;
 export const MAX_UPLOAD = 40 * 1024 * 1024;
 const emptySite = () => ({ schemaVersion: 1, revision: 0, photos: [], buildingOverrides: {} });
 export class UserError extends Error {
@@ -135,6 +136,7 @@ export function createStore(root) {
         const image = () => sharp(bytes, { limitInputPixels: 70000000 }).rotate().toColourspace('srgb');
         await Promise.all([
           image().resize({ width: 420, height: 420, fit: 'inside', withoutEnlargement: true }).webp({ quality: 78 }).toFile(path.join(directory, 'thumbnail.webp')),
+          createPhotoPreview(bytes, path.join(directory, 'preview.webp')),
           image().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true }).webp({ quality: 88 }).toFile(path.join(directory, 'display.webp')),
           image().jpeg({ quality: 95, mozjpeg: true }).toFile(path.join(directory, 'download.jpg'))
         ]);
@@ -147,7 +149,7 @@ export function createStore(root) {
         const draft = { id, title: '未命名照片', description: '', capturedAt: photoMetadata.recordedAt || '', metadata: photoMetadata, buildingId: '', floor: 0,
           author: photoMetadata.author || '', copyright: photoMetadata.copyright || '', uploadedAt: new Date().toISOString(),
           ...automaticPhotoPlacement(photoMetadata, map), heading: 0, pitch: 0, width: download.width, height: download.height,
-          downloadBytes: stats.size, files: { thumbnail: 'media/' + id + '/thumbnail.webp', display: 'media/' + id + '/display.webp', download: 'media/' + id + '/download.jpg' } };
+          downloadBytes: stats.size, files: { thumbnail: 'media/' + id + '/thumbnail.webp', preview: 'media/' + id + '/preview.webp', display: 'media/' + id + '/display.webp', download: 'media/' + id + '/download.jpg' } };
         const drafts = await readJSON(draftsFile, []);
         await writeJSON(draftsFile, [...drafts, draft]);
         return draft;
@@ -171,9 +173,13 @@ export function createStore(root) {
       const draft = drafts.find(p => p.id === id);
       if (!draft) throw new UserError('草稿不存在。', 404);
       const photo = validatePhoto(draft, draft, map);
+      if (!photo.files.preview) {
+        await createPhotoPreview(path.join(localRoot, 'draft-media', id, 'download.jpg'), path.join(localRoot, 'draft-media', id, 'preview.webp'));
+        photo.files = { ...photo.files, preview: 'media/' + id + '/preview.webp' };
+      }
       const destination = path.join(publicRoot, 'media', id);
       await fs.mkdir(destination, { recursive: true });
-      for (const name of ['thumbnail.webp', 'display.webp', 'download.jpg']) {
+      for (const name of ['thumbnail.webp', 'preview.webp', 'display.webp', 'download.jpg']) {
         await fs.copyFile(path.join(localRoot, 'draft-media', id, name), path.join(destination, name));
       }
       await saveSite(site, { ...site, photos: [...site.photos.filter(p => p.id !== id), photo] });
@@ -240,6 +246,34 @@ export function createStore(root) {
       if (JSON.stringify(photos) !== JSON.stringify(site.photos)) await saveSite(site, { ...site, photos });
       if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
       return { found, missing };
+    }),
+    backfillPhotoPreviews: () => serial(async () => {
+      const { site, drafts } = await state();
+      let generated = 0;
+      const fill = async (photo, draft) => {
+        if (!ID_PATTERN.test(photo.id)) throw new UserError('照片编号无效。');
+        const preview = 'media/' + photo.id + '/preview.webp';
+        const directory = draft ? path.join(localRoot, 'draft-media', photo.id) : path.join(publicRoot, 'media', photo.id);
+        const destination = path.join(directory, 'preview.webp');
+        try { await fs.access(destination); }
+        catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          const temp = destination + '.' + crypto.randomUUID() + '.tmp';
+          try {
+            await createPhotoPreview(path.join(directory, 'download.jpg'), temp);
+            await fs.rename(temp, destination); generated++;
+          } finally { await fs.rm(temp, { force: true }); }
+        }
+        return { ...photo, files: { ...photo.files, preview } };
+      };
+      const photos = [], nextDrafts = [];
+      for (const photo of site.photos) photos.push(await fill(photo, false));
+      for (const photo of drafts) nextDrafts.push(await fill(photo, true));
+      const latest = await state();
+      if (JSON.stringify(latest.site) !== JSON.stringify(site) || JSON.stringify(latest.drafts) !== JSON.stringify(drafts)) throw new UserError('内容库刚刚有新修改，请重新运行预览图补全。', 409);
+      if (JSON.stringify(photos) !== JSON.stringify(site.photos)) await saveSite(site, { ...site, photos });
+      if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
+      return { generated, photos: photos.length, drafts: nextDrafts.length };
     }),
     updateBuildings: (overrides, expected) => serial(async () => {
       const { site, map } = await state();

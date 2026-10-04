@@ -157,7 +157,7 @@ function Editor() {
   const editingInfo = editingBuilding && state ? buildingInfo(editingBuilding, state.site) : null;
   const draft = state?.drafts.some(p => p.id === photo?.id);
   const photoView = photo && photoFieldOfView(photo);
-  const imageSource = (p: Photo, type: 'thumbnail' | 'display') => state?.drafts.some(d => d.id === p.id) ? '/__local/draft-media/' + p.id + '/' + type + '.webp' : asset(p.files[type]);
+  const imageSource = (p: Photo, type: 'thumbnail' | 'preview') => { const rendition = type === 'preview' && !p.files.preview ? 'thumbnail' : type; return state?.drafts.some(d => d.id === p.id) ? '/__local/draft-media/' + p.id + '/' + rendition + '.webp' : asset(p.files[rendition]!); };
   return <div className={'app editor-app' + (comparing && mode === 'photos' && photo ? ' comparing' : '')}>
     <header className="app-header"><Brand editor /><span className="local-badge">本地编辑</span><div className="header-actions"><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}</div></header>
     {error && <Notice kind="error">{error}<button className="text-button" onClick={() => setError('')}>关闭</button></Notice>}
@@ -172,7 +172,7 @@ function Editor() {
             {state.drafts.length + state.site.photos.length === 0 && <p className="library-help">原始照片保存在本地。公开网站使用处理后的展示图和高清 JPEG。</p>}
           </> : <><p className="library-help">OSM 提供轮廓与部分层数。名称、楼层数和层高可以在这里校准。</p>{state.map.buildings.map((b, i) => <button className={'building-row' + (buildingId === b.id ? ' active' : '')} key={b.id} onClick={() => pickBuilding(b.id)}><Building2 size={15} /><span>{buildingInfo(b, state.site, i).name}<small>{buildingFloorText(buildingInfo(b, state.site, i))} · 层高 {buildingInfo(b, state.site, i).floorHeight} m</small></span></button>)}</>}
         </aside>
-        <div className="editor-map"><PhotoComparison photo={comparing && mode === 'photos' ? photo : null} imageSource={photo ? imageSource(photo, 'display') : undefined}
+        <div className="editor-map"><PhotoComparison photo={comparing && mode === 'photos' ? photo : null} imageSource={photo ? imageSource(photo, 'preview') : undefined}
           navigation={<button className="button secondary" onClick={() => {
             setPreviewing(false); setComparing(false);
             requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.edit-comparison-button')?.focus({ preventScroll: true }));
@@ -183,7 +183,7 @@ function Editor() {
         </PhotoComparison>
         </div>
         <aside className="edit-panel" aria-label={mode === 'photos' ? '照片标注' : mode === 'reviews' ? '投稿审核' : '建筑资料'}>
-          {mode === 'photos' && photo ? <><div className="edit-heading"><p className="eyebrow">{draft ? '照片草稿' : '照片资料'}</p><span className={'save-status ' + (dirty ? 'unsaved' : '')}>{dirty ? '修改暂存在此浏览器' : draft ? '待保存到内容库' : '已保存'}</span></div><img className="edit-preview" src={imageSource(photo, 'display')} alt={photo.title} /><button className="button secondary edit-comparison-button" onClick={() => { setPlacing(false); setComparing(true); }}><Columns2 size={16} />照片与模型同屏</button>
+          {mode === 'photos' && photo ? <><div className="edit-heading"><p className="eyebrow">{draft ? '照片草稿' : '照片资料'}</p><span className={'save-status ' + (dirty ? 'unsaved' : '')}>{dirty ? '修改暂存在此浏览器' : draft ? '待保存到内容库' : '已保存'}</span></div><img className="edit-preview" src={imageSource(photo, 'preview')} alt={photo.title} /><button className="button secondary edit-comparison-button" onClick={() => { setPlacing(false); setComparing(true); }}><Columns2 size={16} />照片与模型同屏</button>
             <fieldset className="edit-form" disabled={!!busy}><label>照片标题<input value={photo.title} maxLength={160} onChange={e => change({ title: e.target.value })} /></label><label>文字描述<textarea value={photo.description} rows={3} maxLength={10000} placeholder="写下这张照片的故事…" onChange={e => change({ description: e.target.value })} /></label>
               <div className="field-pair"><label>拍摄日期<input type="date" value={photo.capturedAt.slice(0, 10)} onChange={e => { const time = photo.capturedAt.split('T')[1]; change({ capturedAt: e.target.value ? e.target.value + (time ? 'T' + time : '') : '' }); }} /></label><label>拍摄时间<input type="time" step={1} disabled={!photo.capturedAt} value={photo.capturedAt.split('T')[1] || ''} onChange={e => change({ capturedAt: photo.capturedAt.slice(0, 10) + (e.target.value ? 'T' + e.target.value : '') })} /></label></div>
               <div className="form-divider">作者与版权</div><label>作者<input name="author" value={photo.author || ''} maxLength={200} placeholder="原片未提供，可留空" onChange={e => change({ author: e.target.value })} /></label><label>版权信息<textarea name="copyright" value={photo.copyright || ''} rows={2} maxLength={3000} placeholder="原片未提供，可留空" onChange={e => change({ copyright: e.target.value })} /></label><p className="field-help">自动读取原片的作者与版权元数据；没有记录时留空，不推断作者或使用许可。</p>

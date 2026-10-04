@@ -5,6 +5,7 @@ import { photoFieldOfView, viewSourceText } from './photo-view';
 import { altitudeLabel, campusLocations, isAerialPhoto } from './locations';
 import { PhotoPerspectiveButton } from './PhotoPerspective';
 import { photoPerspectiveIssue } from './photo-perspective';
+import { photoPreviewFile } from './photo-image';
 
 export function Brand({ editor = false }: { editor?: boolean }) {
   return <a className="brand" href={editor ? './editor.html' : './'} aria-label={editor ? '附中影像本地编辑器' : '附中影像首页'}>
@@ -45,7 +46,7 @@ export function PhotoDetails({ photo, campus, site, onOpen, showImage = true, ph
   const view = photoFieldOfView(photo);
   const layer = campusLocations(campus, site).find(location => location.id === (photo.locationId ?? photo.buildingId))?.levelText || '室外';
   return <article className="photo-details">
-    {showImage && <button className="detail-image" onClick={onOpen} aria-label={'查看大图：' + photo.title}><img src={asset(photo.files.display)} alt={photo.title} /><span>查看大图 <Plus size={14} /></span></button>}
+    {showImage && <button className="detail-image" onClick={onOpen} aria-label={'查看大图：' + photo.title}><img src={asset(photoPreviewFile(photo))} alt={photo.title} decoding="async" /><span>查看大图 <Plus size={14} /></span></button>}
     <div className="detail-copy"><p className="eyebrow">{photoLocation(photo, campus, site)}</p><h2>{photo.title}</h2>
       {photo.capturedAt && <time className="muted capture-time" dateTime={photo.capturedAt}>{captureTimeText(photo.capturedAt)}</time>}
       {onPhotoPerspective && <PhotoPerspectiveButton photo={photo} active={photoPerspective} onClick={onPhotoPerspective} />}

@@ -10,21 +10,25 @@ const fixture = () => {
   return { camera, target };
 };
 
-test('forward travel crosses the original target, stays unbounded and preserves the orbit offset, direction and lens', () => {
-  const { camera, target } = fixture(), start = camera.position.clone(), direction = camera.getWorldDirection(new THREE.Vector3());
+test('forward travel slides above ground, stays unbounded and preserves direction, lens and orbit offset', () => {
+  const { camera, target } = fixture(), start = camera.position.clone();
   const offset = camera.position.clone().sub(target), quaternion = camera.quaternion.clone();
-  let travelled = 0;
   for (let n = 0; n < 180; n++) {
     const distance = mapTravelStep(camera);
-    assert.ok(distance >= 2, 'Travel must never slow to a stop at the ground');
-    travelled += distance; travelAlongView(camera, target, distance);
+    assert.ok(distance >= 2);
+    travelAlongView(camera, target, distance);
+    assert.ok(camera.position.y >= 1.6, 'Every forward step stays above the surface');
   }
-  assert.ok(travelled > 1400, 'Travel is not restricted by the old maximum orbit radius');
-  assert.ok(camera.position.clone().sub(start).dot(direction) > offset.length(), 'Camera passes its former focal point');
+  close(camera.position.y, 1.6);
+  const grounded = camera.position.clone();
+  travelAlongView(camera, target, 20000);
+  assert.ok(Math.hypot(camera.position.x - grounded.x, camera.position.z - grounded.z) > 10000, 'Ground clearance does not introduce a horizontal distance limit');
+  close(camera.position.y, 1.6);
   close(camera.position.clone().sub(target).distanceTo(offset), 0);
   close(camera.quaternion.angleTo(quaternion), 0, 1e-7); assert.equal(camera.fov, 43);
-  travelAlongView(camera, target, -travelled);
-  close(camera.position.distanceTo(start), 0); close(target.length(), 0);
+  travelAlongView(camera, target, -100);
+  assert.ok(camera.position.y > 1.6, 'Backward travel can leave the ground');
+  assert.ok(camera.position.distanceTo(start) > 10000);
 });
 
 test('forward travel follows a new heading and near-ground markers use actual view distance instead of orbit radius', () => {
@@ -32,11 +36,11 @@ test('forward travel follows a new heading and near-ground markers use actual vi
   assert.ok(mapGroundViewDistance(camera) > 360);
   travelAlongView(camera, target, 400);
   assert.ok(mapGroundViewDistance(camera) < 360);
-  camera.position.set(0, 0, 0); target.set(1, 0, 0); camera.lookAt(target);
+  camera.position.set(0, 1.6, 0); target.set(1, 1.6, 0); camera.lookAt(target);
   assert.equal(mapTravelStep(camera), 2);
   travelAlongView(camera, target, 10);
-  close(camera.position.distanceTo(new THREE.Vector3(10, 0, 0)), 0);
-  close(target.distanceTo(new THREE.Vector3(11, 0, 0)), 0);
+  close(camera.position.distanceTo(new THREE.Vector3(10, 1.6, 0)), 0);
+  close(target.distanceTo(new THREE.Vector3(11, 1.6, 0)), 0);
   const before = camera.position.clone();
   for (const value of [NaN, Infinity, -Infinity, 0]) travelAlongView(camera, target, value);
   close(camera.position.distanceTo(before), 0);

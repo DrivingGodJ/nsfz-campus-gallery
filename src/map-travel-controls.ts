@@ -1,18 +1,19 @@
 import { Vector3, type Camera, type PerspectiveCamera } from 'three';
 import { bindMapTouchControls } from './map-touch-controls.ts';
+import { aboveGroundMovement, keepMapCameraAboveGround } from './map-camera-ground.ts';
 
 // Translate the target too: orbit dolly would otherwise stop at its centre.
 export function travelAlongView(camera: Camera, target: Vector3, distance: number) {
   if (!Number.isFinite(distance) || !distance) return;
-  const movement = camera.getWorldDirection(new Vector3()).multiplyScalar(distance);
+  const movement = aboveGroundMovement(camera.position, camera.getWorldDirection(new Vector3()).multiplyScalar(distance));
   camera.position.add(movement);
   target.add(movement);
+  keepMapCameraAboveGround(camera, target);
   camera.updateMatrixWorld();
 }
 
 export function mapTravelStep(camera: Camera) {
-  // Slow down near ground level, but always retain a positive step so the
-  // camera can cross the ground and its former focal point without stopping.
+  // Forward distance stays unlimited; at ground level it slides along the surface.
   return Math.max(2, Math.min(120, Math.abs(camera.position.y) * .3));
 }
 
@@ -26,7 +27,8 @@ export function panMapView(camera: PerspectiveCamera, target: Vector3, dx: numbe
   const scale = 2 * camera.position.distanceTo(target) * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, viewportHeight);
   const movement = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(-dx * scale)
     .add(new Vector3().setFromMatrixColumn(camera.matrixWorld, 1).multiplyScalar(dy * scale));
-  camera.position.add(movement); target.add(movement); camera.updateMatrixWorld();
+  aboveGroundMovement(camera.position, movement);
+  camera.position.add(movement); target.add(movement); keepMapCameraAboveGround(camera, target); camera.updateMatrixWorld();
 }
 
 // Wheel, trackpad pinch, touch pinch and middle-button drag all use the same

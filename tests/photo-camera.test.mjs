@@ -292,9 +292,16 @@ test('photo details, lightbox and draft preview expose enter/return actions and 
   try {
     const { PhotoPerspectiveButton, PhotoPerspectiveOverlay } = await environment.server.ssrLoadModule('/src/PhotoPerspective.tsx');
     const { PhotoDetails, Lightbox } = await environment.server.ssrLoadModule('/src/components.tsx');
+    const { default: PhotoComparison } = await environment.server.ssrLoadModule('/src/PhotoComparison.tsx');
     const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url))), site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
     const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
     const details = render(PhotoDetails, { photo, campus, site, onOpen() {}, onPhotoPerspective() {} });
+    const renditions = { ...photo, files: { thumbnail:'small.webp', preview:'preview.webp', display:'large.webp', download:'full.jpg' } };
+    for (const markup of [render(PhotoDetails,{photo:renditions,campus,site,onOpen(){}}),render(PhotoComparison,{photo:renditions,onOpen(){},children:'model'})]) {
+      assert.match(markup, /src="[^"]*preview\.webp"/);
+      assert.doesNotMatch(markup, /src="[^"]*(large\.webp|full\.jpg)"|rel="preload"[^>]*full\.jpg/);
+    }
+    assert.match(render(Lightbox,{photo:renditions,onClose(){}}),/src="[^"]*full\.jpg"/);
     assert.match(details, /进入照片视角/); assert.match(details, /aria-pressed="false"/);
     assert.match(render(Lightbox, { photo, onClose() {}, onPhotoPerspective() {} }), /进入照片视角/);
     assert.match(render(PhotoPerspectiveButton, { photo, active: false, editor: true, onClick() {} }), /体验拍摄视角/);
@@ -349,7 +356,9 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     vectorClose(control.target, new THREE.Vector3()); close(camera.position.length(), distance);
     original = readCameraPose(camera, control.target);
     for (let n = 0; n < 180; n++) wheelEvent(canvas, -100);
-    assert.ok(camera.position.clone().sub(original.position).dot(direction) > 1400, 'Real map wheel keeps travelling beyond its original centre');
+    assert.ok(camera.position.y >= 1.6, 'Repeated real wheel input stays above ground');
+    const grounded = camera.position.clone(); wheelEvent(canvas, -100000);
+    assert.ok(Math.hypot(camera.position.x - grounded.x, camera.position.z - grounded.z) > 1000, 'Real wheel retains unlimited horizontal travel');
     close(camera.position.distanceTo(control.target), distance);
     original = readCameraPose(camera, control.target);
     const preview = { ...photo, position: { ...photo.position, height: 1.6 }, pitch: 60 };
@@ -429,6 +438,17 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     vectorClose(camera.getWorldDirection(new THREE.Vector3()), fixedDirection);
     vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
     assert.equal(control.enabled, false, 'Saved photo display keeps the camera fixed throughout');
+    await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...viewerProps, preview: { ...edited, position: { ...edited.position, height: -5 } } }))); });
+    await advance(); vectorClose(camera.position, new THREE.Vector3(20, -5, -10));
+    await advance(); vectorClose(camera.position, new THREE.Vector3(20, -5, -10));
+    await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, viewerProps))); });
+    await act(async () => { state.advance(timeline += .01, false); });
+    assert.ok(camera.position.y < 0, 'The return animation may pass below the ground without teleporting');
+    await advance(); await advance(); vectorClose(camera.position, original.position);
+    camera.position.y = -4; control.target.y -= 10;
+    await act(async () => { state.advance(timeline += 1 / 60, false); });
+    close(camera.position.y, 1.6);
+
   } finally {
     if (root) await act(async () => root.unmount());
     globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;

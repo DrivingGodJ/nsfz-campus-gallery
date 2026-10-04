@@ -46,7 +46,7 @@ export function localEditorPlugin() {
           const segments = url.pathname.slice('/__local/'.length).split('/');
           const [resource, id, name] = segments;
           if (resource === 'draft-media' && req.method === 'GET') {
-            if (!ID_PATTERN.test(id || '') || !['thumbnail.webp', 'display.webp'].includes(name) || segments.length !== 3) throw new UserError('文件不存在。', 404);
+            if (!ID_PATTERN.test(id || '') || !['thumbnail.webp', 'preview.webp', 'display.webp'].includes(name) || segments.length !== 3) throw new UserError('文件不存在。', 404);
             const bytes = await fs.readFile(path.join(store.localRoot, 'draft-media', id, name));
             res.setHeader('Content-Type', 'image/webp'); res.setHeader('Cache-Control', 'no-store'); return res.end(bytes);
           }
