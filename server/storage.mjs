@@ -247,20 +247,30 @@ export function createStore(root) {
       if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
       return { found, missing };
     }),
-    backfillPhotoPreviews: () => serial(async () => {
+    backfillPhotoPreviews: ({ refresh = false } = {}) => serial(async () => {
       const { site, drafts } = await state();
       let generated = 0;
+      const backup = refresh ? path.join(localRoot, 'backups', 'previews-' + Date.now() + '-' + crypto.randomUUID()) : null;
       const fill = async (photo, draft) => {
         if (!ID_PATTERN.test(photo.id)) throw new UserError('照片编号无效。');
         const preview = 'media/' + photo.id + '/preview.webp';
         const directory = draft ? path.join(localRoot, 'draft-media', photo.id) : path.join(publicRoot, 'media', photo.id);
         const destination = path.join(directory, 'preview.webp');
+        let exists = true;
         try { await fs.access(destination); }
         catch (error) {
           if (error.code !== 'ENOENT') throw error;
+          exists = false;
+        }
+        if (!exists || refresh) {
           const temp = destination + '.' + crypto.randomUUID() + '.tmp';
           try {
             await createPhotoPreview(path.join(directory, 'download.jpg'), temp);
+            if (exists && backup) {
+              const previous = path.join(backup, draft ? 'drafts' : 'published', photo.id, 'preview.webp');
+              await fs.mkdir(path.dirname(previous), { recursive: true });
+              await fs.copyFile(destination, previous);
+            }
             await fs.rename(temp, destination); generated++;
           } finally { await fs.rm(temp, { force: true }); }
         }
@@ -273,7 +283,7 @@ export function createStore(root) {
       if (JSON.stringify(latest.site) !== JSON.stringify(site) || JSON.stringify(latest.drafts) !== JSON.stringify(drafts)) throw new UserError('内容库刚刚有新修改，请重新运行预览图补全。', 409);
       if (JSON.stringify(photos) !== JSON.stringify(site.photos)) await saveSite(site, { ...site, photos });
       if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
-      return { generated, photos: photos.length, drafts: nextDrafts.length };
+      return { generated, photos: photos.length, drafts: nextDrafts.length, backup };
     }),
     updateBuildings: (overrides, expected) => serial(async () => {
       const { site, map } = await state();

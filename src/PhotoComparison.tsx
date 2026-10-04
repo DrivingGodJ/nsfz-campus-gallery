@@ -3,6 +3,7 @@ import { Maximize2 } from 'lucide-react';
 import { asset, type Photo } from './types';
 import { photoPreviewFile } from './photo-image';
 import { useAnimatedPresence } from './useAnimatedPresence';
+import PhotoImage from './PhotoImage';
 
 export default function PhotoComparison({ children, photo, imageSource, navigation, actions, information, onOpen }: {
   children: ReactNode; photo?: Photo | null; imageSource?: string;
@@ -53,9 +54,9 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
       <section className="comparison-photo" aria-label="原照片" aria-hidden={!photo} inert={!photo}>
         <div className="comparison-heading"><div><span className="eyebrow">原照片</span><strong>{displayedPhoto.title}</strong></div>{displayed.navigation}</div>
         {displayed.onOpen ? <button className="comparison-image" onClick={displayed.onOpen} aria-label={'全屏查看照片：' + displayedPhoto.title}>
-          <img key={displayedPhoto.id} src={displayed.imageSource || asset(photoPreviewFile(displayedPhoto))} alt={displayedPhoto.title} draggable={false} decoding="async" />
+          <PhotoImage src={displayed.imageSource || asset(photoPreviewFile(displayedPhoto))} alt={displayedPhoto.title} />
           <span><Maximize2 size={15} />全屏照片</span>
-        </button> : <div className="comparison-image"><img key={displayedPhoto.id} src={displayed.imageSource || asset(photoPreviewFile(displayedPhoto))} alt={displayedPhoto.title} draggable={false} decoding="async" /></div>}
+        </button> : <div className="comparison-image"><PhotoImage src={displayed.imageSource || asset(photoPreviewFile(displayedPhoto))} alt={displayedPhoto.title} /></div>}
         {displayed.actions && <div className="comparison-actions">{displayed.actions}</div>}
         {displayed.information && <details className="comparison-information"><summary>照片资料与同地点照片</summary><div className="comparison-information-content">{displayed.information}</div></details>}
       </section>

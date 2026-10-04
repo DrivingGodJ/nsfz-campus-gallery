@@ -37,7 +37,7 @@ test('large images get a distinct high-quality preview, which publishes and expo
     const bytes = await sharp({ create: { width: 6000, height: 4000, channels: 3, background: '#47694e' } }).jpeg().toBuffer();
     const draft = await f.store.importPhoto(bytes);
     const directory = path.join(f.root, '.local/draft-media', draft.id);
-    for (const [name, size] of [['thumbnail.webp',[420,280]],['preview.webp',[1440,960]],['display.webp',[2400,1600]],['download.jpg',[6000,4000]]]) {
+    for (const [name, size] of [['thumbnail.webp',[420,280]],['preview.webp',[1280,853]],['display.webp',[2400,1600]],['download.jpg',[6000,4000]]]) {
       const metadata = await sharp(path.join(directory,name)).metadata();
       assert.deepEqual([metadata.width,metadata.height],size); assert.equal(metadata.exif,undefined);
     }
@@ -58,6 +58,16 @@ test('large images get a distinct high-quality preview, which publishes and expo
     assert.deepEqual(await fs.readFile(path.join(f.root,'.local/originals',draft.id,'source.jpeg')),bytes);
     assert.equal((await f.store.backfillPhotoPreviews()).generated,0);
     assert.equal((await f.store.state()).site.revision,2,'Repeating migration does not rewrite the content library');
+    const previewPath = path.join(f.root,'public',published.files.preview);
+    const previousPreview = await sharp(download).resize({width:1440}).webp({quality:86}).toBuffer();
+    await fs.writeFile(previewPath,previousPreview);
+    const refreshed = await f.store.backfillPhotoPreviews({refresh:true});
+    assert.equal(refreshed.generated,1);
+    assert.deepEqual(await fs.readFile(path.join(refreshed.backup,'published',draft.id,'preview.webp')),previousPreview);
+    assert.equal((await sharp(previewPath).metadata()).width,1280);
+    assert.deepEqual(await fs.readFile(path.join(f.root,'public',published.files.download)),download);
+    assert.deepEqual(await fs.readFile(path.join(f.root,'.local/originals',draft.id,'source.jpeg')),bytes);
+    assert.equal((await f.store.state()).site.revision,2,'Recompression does not change photo annotations');
   } finally { await f.cleanup(); }
 });
 test('unplaced and out-of-range photos cannot publish; saved assets cannot be redirected', async () => {

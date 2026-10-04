@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Edges, Html, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import { ArrowDown, ArrowUp, Crosshair, Focus, Layers, Navigation } from 'lucide-react';
+import { ArrowDown, ArrowUp, Crosshair, Layers } from 'lucide-react';
 import { buildingInfo, type Campus, type Photo, type Point, type Shape, type Site } from './types';
 import CampusStructures from './CampusStructures';
 import SportsGround from './SportsGround';
@@ -223,7 +223,7 @@ export default function MapView(props: Props) {
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
       </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} /></Suspense></LocationSelection.Provider>
     </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
-    {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('north')} aria-label="地图朝北" title="地图朝北"><Navigation size={17} /></button><button className="icon-button" onClick={() => run('top')} aria-label="切换俯视图" title="俯视图"><Focus size={18} /></button><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
+    {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {!viewingPhoto && picker && <PhotoClusterPicker photos={picker.photos} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />}
     {preview && <PhotoPerspectiveOverlay photo={preview} />}

@@ -7,6 +7,7 @@ import { assignPhotoLocation, campusFilterLocations, photoLocationId, isAerialPh
 import LocationOptions from './LocationOptions';
 import PhotoPositionFields from './PhotoPositionFields';
 import PhotoComparison from './PhotoComparison';
+import PhotoImage from './PhotoImage';
 import { PhotoPerspectiveButton } from './PhotoPerspective';
 import Turnstile from './Turnstile';
 import { extractPhotoMetadata } from '../server/photo-metadata.mjs';
@@ -83,7 +84,7 @@ function Submit() {
       <button className="button primary full-width" onClick={()=>input.current?.click()} disabled={!!busy||!content}><ImagePlus size={17}/>{photo?'选择另一张照片':'选择照片'}</button><input ref={input} type="file" className="visually-hidden" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e=>{if(e.target.files?.[0])void choose(e.target.files[0]);}} aria-label="选择投稿照片"/>
       <p className="field-help">JPEG / PNG / WebP / AVIF · 单张最多 40 MB。刷新后重新选择同一原片可恢复标注。</p>
       {!configured && (local || serviceURL && siteKey) && <button className="button secondary" onClick={()=>{setError('');void client.config().then(result=>{setConfigured(result.enabled);if(!result.enabled)setError('投稿服务尚未准备好，请稍后再来。');}).catch(e=>setError(e.message));}}>重新连接投稿服务</button>}
-      {photo && content && <><img className="submission-preview" src={image} alt={photo.title}/><button className="button secondary" onClick={()=>{setComparing(true);setPlacing(false);}}><Columns2 size={16}/>照片与模型同屏</button>
+      {photo && content && <><div className="photo-image-container"><PhotoImage className="submission-preview" src={image} alt={photo.title}/></div><button className="button secondary" onClick={()=>{setComparing(true);setPlacing(false);}}><Columns2 size={16}/>照片与模型同屏</button>
       <fieldset className="submission-fields" disabled={!!busy||submitted}><label>照片标题<input maxLength={160} value={photo.title} onChange={e=>change({title:e.target.value})}/></label><label>文字描述<textarea maxLength={10000} value={photo.description} onChange={e=>change({description:e.target.value})}/></label>
         <label>拍摄日期与时间<input type="datetime-local" step={1} value={photo.capturedAt.includes('T')?photo.capturedAt:photo.capturedAt?photo.capturedAt+'T00:00':''} onChange={e=>change({capturedAt:e.target.value})}/></label>
         <label>作者<input maxLength={200} value={photo.author || ''} placeholder="原片未提供，可留空" onChange={e=>change({author:e.target.value})}/></label><label>版权信息<textarea maxLength={3000} value={photo.copyright || ''} placeholder="原片未提供，可留空" onChange={e=>change({copyright:e.target.value})}/></label>
