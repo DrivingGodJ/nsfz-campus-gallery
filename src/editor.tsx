@@ -81,7 +81,7 @@ function Editor() {
     const imported: Photo[] = [], failed: string[] = [];
     for (let i = 0; i < files.length; i++) {
       setBusy('正在导入 ' + (i + 1) + ' / ' + files.length);
-      try { const result = await api(/\.zip$/i.test(files[i].name) ? 'import-package' : 'import', 'POST', undefined, files[i]); imported.push(result.photo); }
+      try { const result = await api(/\.zip$/i.test(files[i].name) ? 'import-package' : 'import', 'POST', undefined, files[i]); imported.push(...(result.photos || [result.photo])); }
       catch (e) { failed.push(files[i].name + '：' + (e as Error).message); }
     }
     await refresh(); if (imported.length) selectPhoto(imported[0]); setBusy('');

@@ -176,6 +176,21 @@ button.comparison-image{cursor:zoom-in}
 .submission-form{background:var(--paper);border-left:1px solid var(--line);overflow:auto;min-height:0}
 .submission-form h1{font-family:"Songti SC",serif;font-size:23px;font-weight:600;line-height:1.5}
 .submission-fields{display:flex;flex-direction:column;gap:16px;border:0;padding:0;min-width:0}
+.submission-guidelines{padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:8px 0 16px}
+.submission-guidelines h2,.submission-queue h2,.submission-current-heading{font-size:14px;margin:0 0 8px;font-weight:600}
+.submission-guidelines ul{margin:0;padding-left:19px;font-size:12px;line-height:1.8;color:var(--text)}
+.submission-guidelines li+li{margin-top:5px}
+.submission-queue{margin:6px 0 18px}
+.submission-queue-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.submission-queue-heading>span{font-size:11px;color:var(--muted-text)}
+.submission-queue-list{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.submission-queue-row{display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--line);padding:3px 6px}
+.submission-queue-row:last-child{border-bottom:0}.submission-queue-row.active{background:var(--active-surface)}
+.submission-queue-select{flex:1;min-width:0;text-align:left;border:0;background:transparent;color:var(--ink);padding:9px 4px;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.submission-queue-select>span{font-size:12px;overflow-wrap:anywhere}.submission-queue-select>small{font-size:10px;color:var(--muted-text)}
+.submission-queue-row .icon-button{flex-shrink:0;width:36px;height:36px}
+.submission-agreement{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:8px!important;font-size:12px!important;line-height:1.7}
+.submission-agreement input{flex-shrink:0;width:17px;height:17px;margin:2px 0;padding:0;accent-color:var(--green)}
 .submission-preview{width:100%;height:220px;object-fit:contain;border-radius:5px;background:var(--map-background)}
 .submission-receipts{padding-top:14px;border-top:1px solid var(--line);font-size:11px}
 .submission-receipts summary{cursor:pointer;padding:6px 0}

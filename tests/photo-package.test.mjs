@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import sharp from 'sharp';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
-import { createPhotoPackage, readPhotoPackage, submissionMailto, MAX_PACKAGE_BYTES } from '../server/photo-package.mjs';
+import { createPhotoPackage, createPhotoBatchPackage, readPhotoPackage, readPhotoPackages, submissionMailto, MAX_PACKAGE_BYTES, MAX_PACKAGE_PHOTOS, MAX_PACKAGE_ORIGINAL_BYTES } from '../server/photo-package.mjs';
 import { importPhotoPackage } from '../server/package-import.mjs';
 import { createStore } from '../server/storage.mjs';
 
@@ -82,5 +82,55 @@ test('unsafe archives, damaged originals and invalid annotations cannot create d
     const corrupt = { ...entries, 'original.jpg': entries['original.jpg'].slice() };
     corrupt['original.jpg'][0] ^= 1;
     await assert.rejects(readPhotoPackage(zipSync(corrupt, { level: 0 })), /校验失败/);
+  } finally { await f.cleanup(); }
+});
+
+test('one email package keeps multiple originals and their independent annotations and imports all drafts', async () => {
+  const f = await fixture();
+  try {
+    const secondBytes = await sharp({ create: { width: 80, height: 40, channels: 3, background: '#ddeeff' } }).png().toBuffer();
+    const second = new File([secondBytes], '校园花园.png', { type: 'image/png' });
+    const pack = await createPhotoBatchPackage([{ file: f.file, photo: annotation }, { file: second, photo: { ...annotation, title: '校园花园', heading: 250, position: { x: 8, z: 12 } } }]);
+    const decoded = await readPhotoPackages(pack.bytes);
+    assert.equal(decoded.photos.length, 2);
+    assert.deepEqual(Buffer.from(decoded.photos[0].original), f.bytes);
+    assert.deepEqual(Buffer.from(decoded.photos[1].original), secondBytes);
+    assert.equal(decoded.photos[1].annotation.heading, 250);
+    assert.deepEqual(decoded.photos[1].annotation.position, { x: 8, z: 12 });
+    const mail = new URL(submissionMailto(pack.manifest, pack.filename));
+    assert.equal(mail.pathname, 'drivinggodj@icloud.com');
+    assert.match(mail.searchParams.get('subject'), /2 张校园照片/);
+    assert.match(mail.searchParams.get('body'), /一个 ZIP/);
+    assert.ok(mail.searchParams.get('body').includes('校园花园'));
+    const result = await importPhotoPackage(f.store, pack.bytes);
+    assert.equal(result.photos.length, 2);
+    assert.equal(result.photo.id, result.photos[0].id);
+    assert.equal(result.photos[1].title, '校园花园');
+    assert.equal(result.photos[1].heading, 250);
+    assert.equal((await f.store.state()).drafts.length, 2);
+    assert.equal((await f.store.state()).site.photos.length, 0);
+  } finally { await f.cleanup(); }
+});
+
+test('a bad later photo cannot leave a half-imported batch and batch size is checked before reading files', async () => {
+  const f = await fixture();
+  try {
+    const entries = [{ file: f.file, photo: annotation }, { file: f.file, photo: { ...annotation, title: '第二张' } }];
+    const pack = await createPhotoBatchPackage(entries);
+    const files = unzipSync(pack.bytes);
+    const broken = { ...files, 'originals/02.jpg': files['originals/02.jpg'].slice() };
+    broken['originals/02.jpg'][0] ^= 1;
+    await assert.rejects(importPhotoPackage(f.store, zipSync(broken, { level: 0 })), /校验失败/);
+    const manifest = JSON.parse(strFromU8(files['manifest.json']));
+    manifest.photos[1].annotation.locationId = 'unknown';
+    await assert.rejects(importPhotoPackage(f.store, zipSync({ ...files, 'manifest.json': strToU8(JSON.stringify(manifest)) }, { level: 0 })));
+    assert.equal((await f.store.state()).drafts.length, 0);
+    const invalidImage = await createPhotoBatchPackage([entries[0], { file: new File(['not a photo'], 'bad.jpg', { type: 'image/jpeg' }), photo: annotation }]);
+    await assert.rejects(importPhotoPackage(f.store, invalidImage.bytes));
+    assert.equal((await f.store.state()).drafts.length, 0);
+    await assert.rejects(createPhotoBatchPackage([]), /1 到 20/);
+    await assert.rejects(createPhotoBatchPackage(Array(MAX_PACKAGE_PHOTOS + 1).fill(entries[0])), /1 到 20/);
+    const fakeFile = { size: MAX_PACKAGE_ORIGINAL_BYTES / 3 + 1, arrayBuffer() { throw new Error('should not read'); } };
+    await assert.rejects(createPhotoBatchPackage(Array(3).fill({ file: fakeFile, photo: annotation })), /100 MB/);
   } finally { await f.cleanup(); }
 });

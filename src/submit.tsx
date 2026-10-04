@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowLeft, Crosshair, ImagePlus, Mail, Columns2, Download, Share2 } from 'lucide-react';
+import { ArrowLeft, Crosshair, ImagePlus, Mail, Columns2, Download, Share2, X } from 'lucide-react';
 import { Brand, Notice } from './components';
 import { loadContent, headingText, type Campus, type Site, type Photo } from './types';
 import { assignPhotoLocation, campusFilterLocations, photoLocationId, isAerialPhoto } from './locations';
@@ -11,55 +11,75 @@ import PhotoImage from './PhotoImage';
 import { PhotoPerspectiveButton } from './PhotoPerspective';
 import { extractPhotoMetadata } from '../server/photo-metadata.mjs';
 import { automaticPhotoPlacement } from '../server/photo-geolocation.mjs';
-import { createPhotoPackage, submissionMailto, SUBMISSION_EMAIL, type PhotoPackage } from '../server/photo-package.mjs';
+import { createPhotoBatchPackage, submissionMailto, SUBMISSION_EMAIL, MAX_PACKAGE_PHOTOS, MAX_PACKAGE_ORIGINAL_BYTES, type PhotoPackage } from '../server/photo-package.mjs';
 import './styles.css';
 const MapView=React.lazy(()=>import('./MapView'));
 const CACHE='nsfz:submission:draft';
+type SubmissionEntry = { file: File; photo: Photo; image: string };
+const fileKey=(file:File)=>JSON.stringify([file.name,file.size,file.lastModified]);
 function Submit() {
-  const [content,setContent]=useState<{campus:Campus;site:Site}|null>(null),[photo,setPhoto]=useState<Photo|null>(null),[file,setFile]=useState<File|null>(null),[image,setImage]=useState('');
+  const [content,setContent]=useState<{campus:Campus;site:Site}|null>(null),[entries,setEntries]=useState<SubmissionEntry[]>([]),[activeID,setActiveID]=useState(''),[accepted,setAccepted]=useState(false);
+  const current=entries.find(entry=>entry.photo.id===activeID),photo=current?.photo || null,image=current?.image || '';
+  const entriesRef=useRef(entries);entriesRef.current=entries;
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(''),[placing,setPlacing]=useState(false),[comparing,setComparing]=useState(false),[perspective,setPerspective]=useState(false);
   const [pack,setPack]=useState<PhotoPackage|null>(null),[packageURL,setPackageURL]=useState(''),[downloaded,setDownloaded]=useState(false),[shareFile,setShareFile]=useState<File|null>(null);
   const input=useRef<HTMLInputElement>(null);
   useEffect(()=>{void loadContent().then(setContent).catch(e=>setError(e.message));},[]);
-  useEffect(()=>()=>{if(image)URL.revokeObjectURL(image);},[image]);
+  useEffect(()=>()=>{entriesRef.current.forEach(entry=>URL.revokeObjectURL(entry.image));},[]);
   useEffect(()=>()=>{if(packageURL)URL.revokeObjectURL(packageURL);},[packageURL]);
-  useEffect(()=>{const handler=(e:BeforeUnloadEvent)=>{if(photo&&!downloaded){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',handler);return()=>window.removeEventListener('beforeunload',handler);},[photo,downloaded]);
+  useEffect(()=>{const handler=(e:BeforeUnloadEvent)=>{if(entries.length&&!downloaded){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',handler);return()=>window.removeEventListener('beforeunload',handler);},[entries.length,downloaded]);
   const clearPackage=()=>{setPack(null);setPackageURL('');setShareFile(null);setDownloaded(false);setMessage('');};
-  const persist=(next:Photo)=>{try{localStorage.setItem(CACHE,JSON.stringify({photo:next,filename:file?.name,size:file?.size,lastModified:file?.lastModified}));}catch{setError('浏览器暂存空间不足。请及时生成并下载照片包，当前内容仍在页面中。');}};
-  const change=(update:Partial<Photo>)=>{if(!photo || busy)return;const next={...photo,...update};setPhoto(next);clearPackage();persist(next);};
-  const choose=async(source:File)=>{
-    if(!content || busy)return;setError('');setMessage('');
-    if(!source.size || source.size>40*1024*1024){setError('单张照片最多 40 MB，请先缩小原片。');return;}
-    if(!['image/jpeg','image/png','image/webp','image/avif'].includes(source.type)){setError('网页投稿支持 JPEG、PNG、WebP、AVIF。其他原片可用本地工具导入。');return;}
-    setBusy('正在读取照片资料');const sourceURL=URL.createObjectURL(source);
+  const persist=(next:SubmissionEntry[])=>{try{localStorage.setItem(CACHE,JSON.stringify({entries:next.map(entry=>({photo:entry.photo,filename:entry.file.name,size:entry.file.size,lastModified:entry.file.lastModified}))}));}catch{setError('浏览器暂存空间不足。请及时生成并下载照片包，当前内容仍在页面中。');}};
+  const change=(update:Partial<Photo>)=>{if(!photo || busy)return;const next=entries.map(entry=>entry.photo.id===photo.id?{...entry,photo:{...photo,...update}}:entry);setEntries(next);clearPackage();persist(next);};
+  const activate=(entry:SubmissionEntry)=>{setActiveID(entry.photo.id);setPlacing(!entry.photo.placed);setComparing(false);setPerspective(false);};
+  const remove=(id:string)=>{if(busy)return;const next=entries.filter(entry=>entry.photo.id!==id);const removed=entries.find(entry=>entry.photo.id===id);if(removed)URL.revokeObjectURL(removed.image);setEntries(next);clearPackage();persist(next);if(activeID===id){if(next[0])activate(next[0]);else{setActiveID('');setComparing(false);setPerspective(false);setPlacing(false);}}};
+  const readPhoto=async(source:File):Promise<SubmissionEntry>=>{
+    if(!source.size || source.size>40*1024*1024)throw new Error('单张照片最多 40 MB，请先缩小原片。');
+    if(!['image/jpeg','image/png','image/webp','image/avif'].includes(source.type))throw new Error('网页投稿支持 JPEG、PNG、WebP、AVIF。');
+    const sourceURL=URL.createObjectURL(source);
     try {
       const dimensions=await new Promise<{width:number;height:number}>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve({width:img.naturalWidth,height:img.naturalHeight});img.onerror=()=>reject(new Error('照片无法预览，请换成 JPEG 或 PNG。'));img.src=sourceURL;});
       if(dimensions.width*dimensions.height>70000000)throw new Error('照片像素过大，请缩小到 7000 万像素以内。');
       const metadata=await extractPhotoMetadata(source);
-      let next:Photo={id:crypto.randomUUID(),title:source.name.replace(/\.[^.]+$/,''),description:'',capturedAt:metadata.recordedAt || '',author:metadata.author || '',copyright:metadata.copyright || '',metadata,buildingId:'',locationId:'',floor:0,...automaticPhotoPlacement(metadata,content.campus),heading:0,pitch:0,...dimensions,downloadBytes:source.size,files:{thumbnail:'',display:'',download:''}};
-      let cached;try{cached=JSON.parse(localStorage.getItem(CACHE)||'null');}catch{}
+      let next:Photo={id:crypto.randomUUID(),title:source.name.replace(/\.[^.]+$/,''),description:'',capturedAt:metadata.recordedAt || '',author:metadata.author || '',copyright:metadata.copyright || '',metadata,buildingId:'',locationId:'',floor:0,...automaticPhotoPlacement(metadata,content!.campus),heading:0,pitch:0,...dimensions,downloadBytes:source.size,files:{thumbnail:'',display:'',download:''}};
+      let cached;try{const draft=JSON.parse(localStorage.getItem(CACHE)||'null');cached=draft?.entries?.find((entry:{filename:string;size:number;lastModified:number})=>entry.filename===source.name&&entry.size===source.size&&entry.lastModified===source.lastModified)||draft;}catch{}
       if(cached?.filename===source.name && cached.size===source.size && cached.lastModified===source.lastModified && cached.photo) {
-        next={...next,...cached.photo,metadata,id:next.id,files:next.files,width:next.width,height:next.height};setMessage('已恢复这张照片上次暂存的标注。');
+        next={...next,...cached.photo,metadata,id:next.id,files:next.files,width:next.width,height:next.height};
       }
-      setFile(source);setPhoto(next);setImage(sourceURL);setPack(null);setPackageURL('');setShareFile(null);setDownloaded(false);setPlacing(!next.placed);setComparing(false);setPerspective(false);
-      try{localStorage.setItem(CACHE,JSON.stringify({photo:next,filename:source.name,size:source.size,lastModified:source.lastModified}));}catch{}
-    }catch(e){URL.revokeObjectURL(sourceURL);setError((e as Error).message);}finally{setBusy('');if(input.current)input.current.value='';}
+      return {file:source,photo:next,image:sourceURL};
+    }catch(e){URL.revokeObjectURL(sourceURL);throw e;}
+  };
+  const choose=async(sources:File[])=>{
+    if(!content || busy || !sources.length)return;setError('');clearPackage();setBusy('正在读取照片资料');
+    const next=[...entries],failed:string[]=[];let first:SubmissionEntry|undefined;
+    try {
+      for(const [index,source] of sources.entries()){
+        setBusy('正在读取照片 '+(index+1)+' / '+sources.length);
+        if(next.some(entry=>fileKey(entry.file)===fileKey(source)))continue;
+        if(next.length>=MAX_PACKAGE_PHOTOS){failed.push('一个照片包最多 20 张，剩余照片未加入。');break;}
+        if(next.reduce((total,entry)=>total+entry.file.size,0)+source.size>MAX_PACKAGE_ORIGINAL_BYTES){failed.push(source.name+'：加入后总大小超过 100 MB。');continue;}
+        try{const entry=await readPhoto(source);next.push(entry);first??=entry;}catch(e){failed.push(source.name+'：'+(e as Error).message);}
+      }
+      setEntries(next);if(first)activate(first);persist(next);
+      if(failed.length)setError(failed.join('\n'));
+    }finally{setBusy('');if(input.current)input.current.value='';}
   };
   const submit=async()=>{
-    if(!photo || !file || busy)return;setError('');setMessage('');setBusy('正在生成照片包…');
+    if(!canSubmit || !accepted || busy)return;setError('');setMessage('');setBusy('正在生成 '+entries.length+' 张照片的投稿包…');
     try {
-      const result=await createPhotoPackage(file,photo,content?.campus);
+      const result=await createPhotoBatchPackage(entries,content?.campus);
       const attachment=new File([result.bytes],result.filename,{type:'application/zip'});
       setPack(result);setPackageURL(URL.createObjectURL(attachment));setDownloaded(false);setPlacing(false);
       let shareable=false;try{shareable=!!navigator.canShare?.({files:[attachment]});}catch{}
       setShareFile(shareable?attachment:null);
-      setMessage('照片包已生成。请下载后作为邮件附件投稿；目前还没有发送邮件。');
+      setMessage(entries.length+' 张照片已合成一个照片包。请把 ZIP 附在一封邮件中投稿；目前还没有发送邮件。');
     }catch(e){setError((e as Error).message);}finally{setBusy('');}
   };
   const share=async()=>{if(!shareFile)return;try{await navigator.share({files:[shareFile],title:'附中影像照片投稿',text:'请选择邮件，发送到 '+SUBMISSION_EMAIL});setDownloaded(true);setMessage('照片包已交给分享应用。请在邮件中确认收件人并发送。');}catch(e){if((e as Error).name!=='AbortError')setError('无法分享照片包，请下载后手动添加到邮件附件。');}};
   const location=photo&&content?photoLocationId(photo,content.campus):'',locationIds=content?campusFilterLocations(content.campus,content.site).map(l=>l.id):[];
-  const allowed=!location || locationIds.includes(location);
-  const canSubmit=!!photo?.placed&&!!photo.title.trim()&&allowed&&(!isAerialPhoto(photo)||!!photo.altitude);
+  const ready=(item:Photo)=>{const id=content?photoLocationId(item,content.campus):'';return !!item.placed&&!!item.title.trim()&&(!id||locationIds.includes(id))&&(!isAerialPhoto(item)||!!item.altitude);};
+  const readyCount=entries.filter(entry=>ready(entry.photo)).length;
+  const canSubmit=entries.length>0&&readyCount===entries.length;
   return <div className="app submission-app"><header className="app-header"><Brand/><span className="local-badge">投稿照片</span><div className="header-actions"><a className="button secondary" href="./"><ArrowLeft size={15}/>返回校园</a></div></header>
     {error && <Notice kind="error">{error}<button className="text-button" onClick={()=>setError('')}>关闭</button></Notice>}
     {message && <Notice kind="success">{message}</Notice>}
@@ -68,10 +88,17 @@ function Submit() {
       {content ? <React.Suspense fallback={<div className="page-loading">正在绘制校园…</div>}><MapView campus={content.campus} site={content.site} photos={[]} editPhoto={photo} selectedLocation={location || ''} floor={photo?.floor} selectableLocationIds={locationIds} featuresSelectable photoPreview={comparing} photoPerspective={perspective} onExitPhotoPerspective={()=>setPerspective(false)} onPhotoOrientation={change} onHeading={heading=>change({heading})} placing={placing&&!busy} onPlace={position=>{change({position,placed:true});setPlacing(false);}} onLocation={id=>{if(photo && locationIds.includes(id))change(assignPhotoLocation(photo,id,content.campus,content.site));}}/></React.Suspense>:<div className="page-loading">正在打开校园…</div>}
       {photo && !comparing && <button className={'button placement-button '+(placing?'primary':'secondary')} onClick={()=>setPlacing(!placing)} disabled={!!busy}><Crosshair size={15}/>{placing?'点击地图标记位置':photo.placed?'重新标记拍摄位置':'标记拍摄位置'}</button>}
     </PhotoComparison></div>
-    <aside className="submission-form"><div className="edit-form"><h1>分享一张校园照片</h1><p className="field-help">选择照片，标记位置并体验拍摄视角，生成照片包后通过邮件投稿。原片和标注在你的设备上打包，审核通过后公开展示处理后的照片。</p>
-      <button className="button primary full-width" onClick={()=>input.current?.click()} disabled={!!busy||!content}><ImagePlus size={17}/>{photo?'选择另一张照片':'选择照片'}</button><input ref={input} type="file" className="visually-hidden" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e=>{if(e.target.files?.[0])void choose(e.target.files[0]);}} aria-label="选择投稿照片"/>
-      <p className="field-help">JPEG / PNG / WebP / AVIF · 单张最多 40 MB。刷新后重新选择同一原片可恢复标注。</p>
-      {photo && content && <><div className="photo-image-container"><PhotoImage className="submission-preview" src={image} alt={photo.title}/></div><button className="button secondary" onClick={()=>{setComparing(true);setPlacing(false);}}><Columns2 size={16}/>照片与模型同屏</button>
+    <aside className="submission-form"><div className="edit-form"><h1>分享你的校园照片</h1><p className="field-help">一次选择多张照片，逐张标记位置和拍摄视角，最后统一打包，用一封邮件投稿。原片与标注在你的设备上打包，审核通过后公开展示处理后的照片。</p>
+      <section className="submission-guidelines" aria-labelledby="submission-guidelines-heading"><h2 id="submission-guidelines-heading">照片投稿准则</h2><ul>
+        <li>优先投稿校园景观、建筑、公共空间及四季校园环境的照片。</li>
+        <li>尽量避免以人物、物品或动物为主体的照片。</li>
+        <li>禁止上传同学的大头照、面部特写，以及侵犯隐私权、肖像权或其他权益的照片。请勿泄露个人信息。</li>
+        <li>请提交自己拍摄或已获授权的照片。所有投稿均需审核，符合准则后才会公开展示。</li>
+      </ul></section>
+      <button className="button primary full-width" onClick={()=>input.current?.click()} disabled={!!busy||!content||entries.length>=MAX_PACKAGE_PHOTOS}><ImagePlus size={17}/>{entries.length?'继续添加照片':'选择照片（可多选）'}</button><input ref={input} type="file" className="visually-hidden" multiple accept="image/jpeg,image/png,image/webp,image/avif" onChange={e=>void choose(Array.from(e.target.files || []))} aria-label="选择投稿照片"/>
+      <p className="field-help">JPEG / PNG / WebP / AVIF · 单张最多 40 MB · 每包最多 20 张、原片合计 100 MB。刷新后重新选择这些原片可恢复标注。</p>
+      {entries.length>0 && <section className="submission-queue" aria-label="待投稿照片"><div className="submission-queue-heading"><h2>待投稿照片 · {entries.length} 张</h2><span role="status">已标注 {readyCount} / {entries.length}</span></div><p className="field-help">点击照片名称逐张标注，最后生成一个照片包。</p><div className="submission-queue-list">{entries.map((entry,index)=><div className={'submission-queue-row'+(entry.photo.id===activeID?' active':'')} key={entry.photo.id}><button className="submission-queue-select" onClick={()=>activate(entry)} disabled={!!busy} aria-pressed={entry.photo.id===activeID}><span>{index+1}. {entry.photo.title}</span><small>{ready(entry.photo)?'已标注':'待标注'} · {(entry.file.size/1024/1024).toFixed(1)} MB</small></button><button className="icon-button" aria-label={'移除照片：'+entry.photo.title} onClick={()=>remove(entry.photo.id)} disabled={!!busy}><X size={15}/></button></div>)}</div></section>}
+      {photo && content && <><h2 className="submission-current-heading">正在标注第 {entries.findIndex(entry=>entry.photo.id===activeID)+1} 张照片</h2><div className="photo-image-container"><PhotoImage className="submission-preview" src={image} alt={photo.title}/></div><button className="button secondary" onClick={()=>{setComparing(true);setPlacing(false);}}><Columns2 size={16}/>照片与模型同屏</button>
       <fieldset className="submission-fields" disabled={!!busy}><label>照片标题<input maxLength={160} value={photo.title} onChange={e=>change({title:e.target.value})}/></label><label>文字描述<textarea maxLength={10000} value={photo.description} onChange={e=>change({description:e.target.value})}/></label>
         <label>拍摄日期与时间<input type="datetime-local" step={1} value={photo.capturedAt.includes('T')?photo.capturedAt:photo.capturedAt?photo.capturedAt+'T00:00':''} onChange={e=>change({capturedAt:e.target.value})}/></label>
         <label>作者<input maxLength={200} value={photo.author || ''} placeholder="原片未提供，可留空" onChange={e=>change({author:e.target.value})}/></label><label>版权信息<textarea maxLength={3000} value={photo.copyright || ''} placeholder="原片未提供，可留空" onChange={e=>change({copyright:e.target.value})}/></label>
@@ -82,12 +109,13 @@ function Submit() {
         <label>等效 35 mm 焦距 / mm<input type="number" min={1} max={10000} step={.1} value={photo.view?.focalLength35Mm ?? photo.metadata?.focalLength35Mm ?? ''} placeholder="原片无焦距时，可手动填写" onChange={e=>change({view:{...photo.view,focalLength35Mm:e.target.value?Number(e.target.value):undefined}})}/></label>
         <PhotoPerspectiveButton photo={photo} active={perspective} editor onClick={()=>{setPerspective(!perspective);setComparing(true);setPlacing(false);}}/>
       </fieldset>
-      <p className="field-help">投稿表示你有权提供此照片，并同意审核通过后在本站展示。缺少作者或版权元数据时保持留空。</p>
-      {!pack && <><button className="button primary full-width" onClick={()=>void submit()} disabled={!!busy||!canSubmit}><Download size={16}/>生成投稿照片包</button>{!canSubmit && <p className="field-help">请先填写标题、标记拍摄位置；航拍照片还需确认高度。</p>}</>}
-      {pack && <section className="package-result" aria-label="邮件投稿"><strong>照片包已生成 · {(pack.bytes.length/1024/1024).toFixed(1)} MB</strong><p className="field-help">包含原片、拍摄位置、楼层、方向和照片资料。修改标注后需要重新生成。</p>
+      <p className="field-help">缺少作者或版权元数据时保持留空。每张照片的地点、楼层和视角会独立保存。</p>
+      <label className="submission-agreement"><input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} disabled={!!busy}/>我已阅读投稿准则，确认这些照片符合准则且有权提供，并同意审核通过后在本站展示。</label>
+      {!pack && <><button className="button primary full-width" onClick={()=>void submit()} disabled={!!busy||!canSubmit||!accepted}><Download size={16}/>生成投稿照片包（{entries.length} 张）</button>{!canSubmit && <p className="field-help">还有 {entries.length-readyCount} 张照片待标注。请逐张填写标题、标记位置；航拍照片还需确认高度。</p>}{!accepted && <p className="field-help">生成前请阅读并确认投稿准则。</p>}</>}
+      {pack && <section className="package-result" aria-label="邮件投稿"><strong>{entries.length} 张照片已统一打包 · {(pack.bytes.length/1024/1024).toFixed(1)} MB</strong><p className="field-help">包含每张原片及独立的拍摄位置、楼层、方向和照片资料。修改标注或照片列表后需要重新生成。</p>
         <a className="button primary full-width" href={packageURL} download={pack.filename} onClick={()=>setDownloaded(true)}><Download size={16}/>1. 下载照片包</a>
-        <a className="button secondary full-width" href={submissionMailto(pack.manifest,pack.filename)}><Mail size={16}/>2. 打开邮件投稿</a>
-        <p className="field-help">收件人：<a href={'mailto:'+SUBMISSION_EMAIL}>{SUBMISSION_EMAIL}</a><br/>请手动把下载的 ZIP 包添加为附件，再发送邮件。网页无法确认邮件是否发送，审核结果由管理员邮件回复。</p>
+        <a className="button secondary full-width" href={submissionMailto(pack.manifest,pack.filename)}><Mail size={16}/>2. 用一封邮件投稿</a>
+        <p className="field-help">收件人：<a href={'mailto:'+SUBMISSION_EMAIL}>{SUBMISSION_EMAIL}</a><br/>把这一个 ZIP 包添加为附件即可，不需要每张照片单独发邮件。网页无法确认邮件是否发送，审核结果由管理员邮件回复。</p>
         {shareFile && <button className="button secondary full-width" onClick={()=>void share()}><Share2 size={16}/>分享照片包到邮件</button>}
         <p className="field-help">若未打开邮件应用，请用常用邮箱发到上面的地址。附件过大时，可使用邮箱的超大附件功能。</p>
       </section>}
