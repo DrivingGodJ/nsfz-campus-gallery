@@ -21,6 +21,7 @@ import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from '.
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
 import { groundSurfaces } from './ground-geometry';
 import { photoMapHeight } from './locations';
+import { mapLocationTarget } from './location-geometry';
 import PhotoMarkers from './PhotoMarkers';
 import PhotoClusterPicker from './PhotoClusterPicker';
 import type { PhotoCluster } from './photo-clusters';
@@ -173,16 +174,7 @@ export default function MapView(props: Props) {
   const viewingPhoto = !!preview || moving;
   // Selection cuts above its floor; preview restores the building throughout the camera transition.
   const cutawayFloor = props.photoPreview || viewingPhoto ? undefined : floor;
-  const selectedObject = useMemo(() => {
-    const index = campus.buildings.findIndex(building => building.id === selectedLocation);
-    if (index < 0) return null;
-    const info = buildingInfo(campus.buildings[index], site, index);
-    const height = cutawayFloor ? Math.min(info.height, cutawayFloor * info.floorHeight) : info.height;
-    const points = info.sections.flatMap(section => section.outer);
-    return { target: [info.center[0], height / 2 + .12, info.center[1]] as [number, number, number],
-      bounds: { min: [Math.min(...points.map(p => p[0])), .12, Math.min(...points.map(p => p[1]))] as [number, number, number],
-        max: [Math.max(...points.map(p => p[0])), height + .12, Math.max(...points.map(p => p[1]))] as [number, number, number] } };
-  }, [campus, site, selectedLocation, cutawayFloor]);
+  const selectedObject = useMemo(() => mapLocationTarget(campus, site, selectedLocation, cutawayFloor), [campus, site, selectedLocation, cutawayFloor]);
   const labelPortal = useRef<HTMLDivElement>(null!);
   useEffect(() => {
     if (!props.photoPerspective) return;

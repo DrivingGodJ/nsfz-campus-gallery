@@ -4,11 +4,11 @@ import { Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Campus, Feature, Shape, Site } from './types';
 import { featureSurfaceHeight } from './locations';
-import { passageFootprint, undergroundLayout } from './underground-geometry';
+import { undergroundLayout } from './underground-geometry';
+import { featureFootprints } from './location-geometry';
 import { bridgeLayout } from './bridge-geometry';
 import { archedBridgeGeometry } from './bridge-mesh';
-import { curvedStairTreads } from './structure-geometry';
-import { gardenFootprints, pergolaLayout } from './garden-geometry';
+import { pergolaLayout } from './garden-geometry';
 
 export const LocationSelection = createContext<{ selectedId?: string; onSelect?: (id: string) => void; placing?: boolean; featuresSelectable?: boolean; selectableIds?: ReadonlySet<string> }>({});
 
@@ -34,14 +34,7 @@ function FeatureTarget({ feature, campus, site, alignedFootprints, labelPortal }
   const archTarget = useMemo(() => feature.type === 'bridge' && feature.archRise ? archedBridgeGeometry(feature, height + .25) : null, [feature, height]);
   const archOutline = useMemo(() => archTarget ? bridgeLayout(feature, height).railChains : [], [feature, height, archTarget]);
   useEffect(() => () => archTarget?.dispose(), [archTarget]);
-  const footprints = useMemo((): Shape[] => {
-    if (alignedFootprints) return alignedFootprints;
-    if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return gardenFootprints(feature, campus.features);
-    if (feature.type === 'bridge') return bridgeLayout(feature, height).footprint;
-    if (feature.type === 'tunnelEntrance' && feature.curvedStair) return [{ outer: curvedStairTreads({ ...feature.curvedStair, steps: 1 })[0].ring, holes: [] }];
-    if (feature.outer) return [{ outer: feature.outer, holes: feature.holes || [] }];
-    return feature.points?.length ? [passageFootprint(feature.points, feature.width || 4)] : [];
-  }, [feature, height, alignedFootprints, campus.features]);
+  const footprints = useMemo(() => featureFootprints(feature, campus.features, height, alignedFootprints), [feature, height, alignedFootprints, campus.features]);
   const shapes = useMemo(() => footprints.map(data => {
     const shape = new THREE.Shape(data.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
     shape.holes = data.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));

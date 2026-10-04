@@ -16,6 +16,7 @@ import { photoMapHeight } from '../src/locations.ts';
 import { bindPhotoLookControls } from '../src/photo-look-controls.ts';
 import { mapTravelStep } from '../src/map-travel-controls.ts';
 import { mapGroundOrbitTarget } from '../src/map-orbit.ts';
+import { mapLocationTarget } from '../src/location-geometry.ts';
 
 const photo = { id: 'preview-fixture', title: '校园视角', captureType: 'ground', floor: 1, buildingId: '', placed: true,
   position: { x: 10, z: -25 }, heading: 125, pitch: -18, width: 6000, height: 4000, metadata: { focalLength35Mm: 35 },
@@ -116,6 +117,22 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
     vectorClose(camera.position, position); assert.equal(control.enableRotate, true, 'Ending an in-place gesture restores other gestures');
     await render({});
     assert.equal(canvas.hasPointerCapture(1), false);
+
+    const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
+    const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
+    for (const id of ['way/855459418', 'way/855459407', 'way/855459417', 'local/specimen-forest', 'local/underground-corridor', 'local/underpass']) {
+      const focus = mapLocationTarget(campus, site, id), offset = camera.position.clone().sub(control.target), fov = camera.fov;
+      position = camera.position.clone();
+      await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds });
+      vectorClose(camera.position, position); // Selection starts a journey rather than teleporting.
+      await advance();
+      vectorClose(control.target, new THREE.Vector3(...focus.target));
+      vectorClose(camera.position.clone().sub(control.target), offset);
+      const projected = new THREE.Vector3(...focus.target).project(camera);
+      close(projected.x, 0); close(projected.y, 0); assert.equal(camera.fov, fov);
+      down(); move(); up(); await advance();
+      close(camera.position.distanceTo(new THREE.Vector3(...focus.target)), offset.length());
+    }
   } finally {
     await act(async () => { root?.unmount(); });
     await environment.close(); globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
