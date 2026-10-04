@@ -15,6 +15,7 @@ import { directionVector, photoFieldOfView } from '../src/photo-view.ts';
 import { photoMapHeight } from '../src/locations.ts';
 import { bindPhotoLookControls } from '../src/photo-look-controls.ts';
 import { mapTravelStep } from '../src/map-travel-controls.ts';
+import { mapGroundOrbitTarget } from '../src/map-orbit.ts';
 
 const photo = { id: 'preview-fixture', title: '校园视角', captureType: 'ground', floor: 1, buildingId: '', placed: true,
   position: { x: 10, z: -25 }, heading: 125, pitch: -18, width: 6000, height: 4000, metadata: { focalLength35Mm: 35 },
@@ -47,6 +48,79 @@ const pointerEvent = (canvas, type, values = {}) => {
 const wheelEvent = (canvas, deltaY) => {
   const event = new Event('wheel', { cancelable: true }); Object.assign(event, { deltaY, deltaMode: 0 }); canvas.dispatchEvent(event); return event;
 };
+
+test('real map gestures anchor the ground, turn in place outside campus, prefer visible selections and release offscreen selections', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const canvas = testCanvas();
+  const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let root;
+  try {
+    const { default: Rig } = await environment.server.ssrLoadModule('/src/MapCameraRig.tsx');
+    globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
+    root = createRoot(canvas);
+    await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
+    const props = { command: { type: 'initial', sequence: 0 }, boundary: [[-300, -300], [300, -300], [300, 300], [-300, 300]], selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving() {} };
+    let store;
+    const render = async additions => { await act(async () => { store = root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, ...additions }))); }); };
+    await render({});
+    const state = store.getState(), camera = state.camera, control = state.controls;
+    let timeline = 0;
+    const advance = async () => { await act(async () => { for (let n = 0; n < 120; n++) state.advance(timeline += 1 / 60, false); }); };
+    const down = () => pointerEvent(canvas, 'pointerdown', { pointerType: 'touch', pageX: 100, pageY: 100 });
+    const move = (x = 140, y = 100) => {
+      const values = { pointerType: 'touch', clientX: x, clientY: y, pageX: x, pageY: y };
+      pointerEvent(canvas, 'pointermove', values); pointerEvent(canvas.ownerDocument, 'pointermove', values);
+    };
+    const up = () => { pointerEvent(canvas, 'pointerup', { pointerType: 'touch' }); pointerEvent(canvas.ownerDocument, 'pointerup', { pointerType: 'touch' }); };
+    wheelEvent(canvas, -100); wheelEvent(canvas, -100); wheelEvent(canvas, -100);
+    let position = camera.position.clone(), quaternion = camera.quaternion.clone();
+    const ground = mapGroundOrbitTarget(camera, props.boundary), radius = position.distanceTo(ground);
+    assert.ok(control.target.distanceTo(ground) > 1, 'Forward travel has moved the old orbit target');
+    down(); vectorClose(camera.position, position); close(camera.quaternion.angleTo(quaternion), 0, 1e-7);
+    vectorClose(control.target, ground);
+    move(); up(); await advance(); vectorClose(control.target, ground); close(camera.position.distanceTo(ground), radius);
+    assert.ok(camera.position.distanceTo(position) > 1, 'Single-finger drag orbits the new ground point');
+
+    camera.position.set(450, 60, 300); control.target.set(600, 0, 300); camera.lookAt(control.target); control.update();
+    position = camera.position.clone(); quaternion = camera.quaternion.clone();
+    assert.equal(mapGroundOrbitTarget(camera, props.boundary), null);
+    down(); vectorClose(camera.position, position); close(camera.quaternion.angleTo(quaternion), 0, 1e-7);
+    move(160, 220); vectorClose(camera.position, position);
+    assert.ok(camera.quaternion.angleTo(quaternion) > .05, 'Look responds before a render frame');
+    up(); await advance(); vectorClose(camera.position, position);
+
+    const building = [25, 15, -20];
+    await render({ selectedObjectTarget: building }); await advance();
+    const pivot = new THREE.Vector3(...building), buildingRadius = camera.position.distanceTo(pivot);
+    vectorClose(control.target, pivot); position = camera.position.clone(); quaternion = camera.quaternion.clone();
+    down(); vectorClose(camera.position, position); close(camera.quaternion.angleTo(quaternion), 0, 1e-7);
+    move(); up(); await advance(); close(camera.position.distanceTo(pivot), buildingRadius);
+    assert.ok(camera.position.distanceTo(position) > 1, 'Visible building overrides the ground pivot');
+
+    // The building remains selected, but is now behind a camera looking away.
+    camera.position.set(0, 60, 100); control.target.set(0, 0, 200); camera.lookAt(control.target); control.update();
+    const fallbackGround = mapGroundOrbitTarget(camera, props.boundary);
+    down(); vectorClose(control.target, fallbackGround); move(); up(); await advance();
+    vectorClose(control.target, fallbackGround);
+    assert.ok(control.target.distanceTo(pivot) > 1, 'Offscreen selection does not capture the next orbit');
+
+    const selected = { ...photo, position: { ...photo.position, height: 9 } };
+    await render({ selected, selectedObjectTarget: building }); await advance();
+    const photoPivot = new THREE.Vector3(10, 9, -25), photoRadius = camera.position.distanceTo(photoPivot);
+    vectorClose(control.target, photoPivot);
+    down(); move(); up(); await advance(); close(camera.position.distanceTo(photoPivot), photoRadius);
+    assert.ok(Math.abs(control.target.y - 9) < 1e-7, 'Selected photo location overrides its building and the ground');
+    camera.position.set(450, 60, 300); control.target.set(600, 0, 300); camera.lookAt(control.target); control.update();
+    position = camera.position.clone(); down(); move(); up(); await advance();
+    vectorClose(camera.position, position); assert.equal(control.enableRotate, true, 'Ending an in-place gesture restores other gestures');
+    await render({});
+    assert.equal(canvas.hasPointerCapture(1), false);
+  } finally {
+    await act(async () => { root?.unmount(); });
+    await environment.close(); globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
+  }
+});
 
 test('pointer and touch look controls respond immediately, capture one pointer, clamp pitch and clean up after cancel or exit', () => {
   const canvas = testCanvas(), commits = [];
@@ -231,7 +305,7 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
     root = createRoot(canvas);
     await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
-    const props = { command: { type: 'initial', sequence: 0 }, selected: null, preview: null, canAdjustPhotoView: true, onCompact() {}, onAzimuth() {}, onMoving() {}, onPhotoOrientation: orientation => committed.push(orientation) };
+    const props = { command: { type: 'initial', sequence: 0 }, boundary: [[-300, -300], [300, -300], [300, 300], [-300, 300]], selected: null, preview: null, canAdjustPhotoView: true, onCompact() {}, onAzimuth() {}, onMoving() {}, onPhotoOrientation: orientation => committed.push(orientation) };
     let store;
     await act(async () => { store = root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, props))); });
     const state = store.getState(), camera = state.camera, control = state.controls;

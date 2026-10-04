@@ -3,10 +3,11 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import type { Photo } from './types';
+import type { Photo, Point } from './types';
 import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-camera';
 import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-controls';
 import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, travelAlongView } from './map-travel-controls';
+import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
 export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
@@ -24,7 +25,10 @@ function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
   camera.updateMatrixWorld();
 }
 
-export default function MapCameraRig({ command, selected, preview, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation }: {
+export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation }: {
+  boundary: Point[];
+  selectedObjectTarget?: [number, number, number] | null;
+  selectedObjectBounds?: MapObjectBounds | null;
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
   canAdjustPhotoView?: boolean;
   onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
@@ -36,8 +40,12 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
   const look = useRef<(PhotoOrientation & { id: string; sourceHeading: number; sourcePitch: number }) | null>(null);
   const lastPoseKey = useRef('');
   const lastShotKey = useRef('');
-  const live = useRef({ size, preview, onMoving, onPhotoOrientation });
-  live.current = { size, preview, onMoving, onPhotoOrientation };
+  const objectTarget: [number, number, number] | null = selected ? [selected.position.x, selected.position.height, selected.position.z] : selectedObjectTarget ?? null;
+  const objectKey = JSON.stringify(objectTarget);
+  const gesturePivot = useRef<THREE.Vector3 | null>(null);
+  const objectBounds = selected ? null : selectedObjectBounds;
+  const live = useRef({ size, boundary, objectTarget, objectBounds, preview, onMoving, onPhotoOrientation });
+  live.current = { size, boundary, objectTarget, objectBounds, preview, onMoving, onPhotoOrientation };
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
   const fitDistance = OVERVIEW_DISTANCE / Math.min(1, size.width / Math.max(1, size.height));
 
@@ -60,6 +68,38 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
       if (!control) return;
       travelAlongView(camera, control.target, steps * mapTravelStep(camera));
       control.update(); invalidate();
+    },
+    rotation: {
+      start: () => {
+        const control = controls.current!;
+        stopOrbitMomentum(camera, control);
+        gesturePivot.current = live.current.objectTarget ? new THREE.Vector3(...live.current.objectTarget) : null;
+        if (gesturePivot.current && !mapObjectInView(camera, gesturePivot.current, live.current.objectBounds)) gesturePivot.current = null;
+        if (gesturePivot.current) {
+          control.enableRotate = false; control.maxPolarAngle = Math.PI - .01;
+          return true;
+        }
+        const target = mapGroundOrbitTarget(camera, live.current.boundary);
+        control.enableRotate = !!target;
+        if (target) {
+          control.target.copy(target);
+          const polar = Math.acos(THREE.MathUtils.clamp((camera.position.y - target.y) / camera.position.distanceTo(target), -1, 1));
+          control.maxPolarAngle = Math.max(Math.PI * .48, polar);
+          control.update(); invalidate();
+        } else {
+          // Looking outside campus may include the sky; don't clamp it back
+          // toward the ground when the regular controls update next frame.
+          control.maxPolarAngle = Math.PI - .01;
+        }
+        return !target;
+      },
+      look: (dx, dy) => {
+        const control = controls.current!;
+        if (gesturePivot.current) orbitMapObject(camera, control.target, gesturePivot.current, dx, dy, live.current.size.height);
+        else turnMapView(camera, control.target, dx, dy, live.current.size.height);
+        control.update(); invalidate();
+      },
+      finish: () => { gesturePivot.current = null; if (controls.current) controls.current.enableRotate = true; }
     }
   }), [camera, gl, invalidate]);
 
@@ -112,15 +152,15 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
 
   useEffect(() => {
     const control = controls.current;
-    if (!selected || !control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
+    if (!objectTarget || !control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
     stopOrbitMomentum(camera, control);
-    const target = new THREE.Vector3(selected.position.x, selected.position.height, selected.position.z);
+    const target = new THREE.Vector3(...objectTarget);
     const pose = readCameraPose(camera, control.target);
     pose.position.add(target.clone().sub(control.target)); pose.target.copy(target);
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     invalidate();
-  }, [selected?.id, camera, invalidate]);
+  }, [selected?.id, objectKey, camera, invalidate]);
 
   useEffect(() => {
     const control = controls.current;

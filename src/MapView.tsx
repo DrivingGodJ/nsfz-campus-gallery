@@ -173,6 +173,16 @@ export default function MapView(props: Props) {
   const viewingPhoto = !!preview || moving;
   // Selection cuts above its floor; preview restores the building throughout the camera transition.
   const cutawayFloor = props.photoPreview || viewingPhoto ? undefined : floor;
+  const selectedObject = useMemo(() => {
+    const index = campus.buildings.findIndex(building => building.id === selectedLocation);
+    if (index < 0) return null;
+    const info = buildingInfo(campus.buildings[index], site, index);
+    const height = cutawayFloor ? Math.min(info.height, cutawayFloor * info.floorHeight) : info.height;
+    const points = info.sections.flatMap(section => section.outer);
+    return { target: [info.center[0], height / 2 + .12, info.center[1]] as [number, number, number],
+      bounds: { min: [Math.min(...points.map(p => p[0])), .12, Math.min(...points.map(p => p[1]))] as [number, number, number],
+        max: [Math.max(...points.map(p => p[0])), height + .12, Math.max(...points.map(p => p[1]))] as [number, number, number] } };
+  }, [campus, site, selectedLocation, cutawayFloor]);
   const labelPortal = useRef<HTMLDivElement>(null!);
   useEffect(() => {
     if (!props.photoPerspective) return;
@@ -212,7 +222,7 @@ export default function MapView(props: Props) {
         {!viewingPhoto && <PhotoMarkers photos={photos} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
-      </group><MapCameraRig command={command} selected={selectedPhoto} preview={preview} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} /></Suspense></LocationSelection.Provider>
+      </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} /></Suspense></LocationSelection.Provider>
     </Canvas></CanvasBoundary></MapSeason.Provider></MapTheme.Provider>
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('north')} aria-label="地图朝北" title="地图朝北"><Navigation size={17} /></button><button className="icon-button" onClick={() => run('top')} aria-label="切换俯视图" title="俯视图"><Focus size={18} /></button><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}

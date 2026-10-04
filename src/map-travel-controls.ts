@@ -25,10 +25,28 @@ export function mapGroundViewDistance(camera: Camera) {
 export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   enabled: () => boolean;
   travel: (steps: number) => void;
+  rotation?: {
+    // True selects custom rotation; false leaves rotation to OrbitControls.
+    start: () => boolean;
+    look: (dx: number, dy: number) => void;
+    finish: () => void;
+  };
 }) {
   const touches = new Map<number, { x: number; y: number }>();
   let pinchDistance = 0;
   let middle: { id: number; y: number } | null = null;
+  let looking: { id: number; x: number; y: number } | null = null;
+  const stopLooking = () => {
+    if (!looking) return;
+    looking = null;
+    options.rotation?.finish();
+  };
+  const startRotation = (event: PointerEvent) => {
+    if (options.rotation?.start()) {
+      looking = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      canvas.setPointerCapture(event.pointerId);
+    }
+  };
   const separation = () => {
     if (touches.size !== 2) return 0;
     const [a, b] = [...touches.values()];
@@ -43,6 +61,8 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   const down = (event: PointerEvent) => {
     if (!options.enabled()) return;
     if (event.pointerType === 'touch') {
+      if (!touches.size) startRotation(event);
+      else stopLooking();
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       pinchDistance = separation();
       canvas.setPointerCapture(event.pointerId);
@@ -50,9 +70,17 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
       event.preventDefault();
       middle = { id: event.pointerId, y: event.clientY };
       canvas.setPointerCapture(event.pointerId);
+    } else {
+      const modified = event.ctrlKey || event.metaKey || event.shiftKey;
+      if (event.button === 0 && !modified || event.button === 2 && modified) startRotation(event);
     }
   };
   const move = (event: PointerEvent) => {
+    if (looking?.id === event.pointerId && options.enabled()) {
+      event.preventDefault();
+      options.rotation?.look(event.clientX - looking.x, event.clientY - looking.y);
+      looking.x = event.clientX; looking.y = event.clientY;
+    }
     const touch = touches.get(event.pointerId);
     if (touch) {
       touch.x = event.clientX; touch.y = event.clientY;
@@ -69,7 +97,8 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
     }
   };
   const finish = (event: PointerEvent) => {
-    const captured = touches.has(event.pointerId) || middle?.id === event.pointerId;
+    const captured = touches.has(event.pointerId) || middle?.id === event.pointerId || looking?.id === event.pointerId;
+    if (looking?.id === event.pointerId) stopLooking();
     touches.delete(event.pointerId);
     pinchDistance = separation();
     if (middle?.id === event.pointerId) middle = null;
@@ -77,13 +106,16 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   };
   const clear = () => {
     const captured = [...touches.keys()];
+    if (looking) captured.push(looking.id);
+    stopLooking();
     touches.clear(); pinchDistance = 0;
     const pointer = middle; middle = null;
     if (pointer && canvas.hasPointerCapture(pointer.id)) canvas.releasePointerCapture(pointer.id);
     for (const id of captured) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
   };
   canvas.addEventListener('wheel', wheel, { passive: false });
-  canvas.addEventListener('pointerdown', down);
+  // Choose the pivot before OrbitControls starts interpreting this gesture.
+  canvas.addEventListener('pointerdown', down, true);
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', finish);
   canvas.addEventListener('pointercancel', finish);
@@ -91,7 +123,7 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   canvas.addEventListener('blur', clear);
   return () => {
     canvas.removeEventListener('wheel', wheel);
-    canvas.removeEventListener('pointerdown', down);
+    canvas.removeEventListener('pointerdown', down, true);
     canvas.removeEventListener('pointermove', move);
     canvas.removeEventListener('pointerup', finish);
     canvas.removeEventListener('pointercancel', finish);
