@@ -6,12 +6,23 @@ import * as THREE from 'three';
 import type { Photo } from './types';
 import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-camera';
 import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-controls';
+import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, travelAlongView } from './map-travel-controls';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
 export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
 // View into campus from the gate: dormitory and cafeteria fronts face the camera.
 export const OVERVIEW_POSITION: [number, number, number] = [-240, 340, -380];
 const OVERVIEW_DISTANCE = 560;
+
+function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
+  const position = camera.position.clone(), quaternion = camera.quaternion.clone(), target = control.target.clone();
+  const damping = control.enableDamping;
+  // Consume pending drag inertia without moving the current view. Otherwise
+  // it resumes after a camera journey and shifts the restored position.
+  control.enableDamping = false; control.update(); control.enableDamping = damping;
+  camera.position.copy(position); camera.quaternion.copy(quaternion); control.target.copy(target);
+  camera.updateMatrixWorld();
+}
 
 export default function MapCameraRig({ command, selected, preview, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation }: {
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
@@ -25,8 +36,8 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
   const look = useRef<(PhotoOrientation & { id: string; sourceHeading: number; sourcePitch: number }) | null>(null);
   const lastPoseKey = useRef('');
   const lastShotKey = useRef('');
-  const live = useRef({ size, onMoving, onPhotoOrientation });
-  live.current = { size, onMoving, onPhotoOrientation };
+  const live = useRef({ size, preview, onMoving, onPhotoOrientation });
+  live.current = { size, preview, onMoving, onPhotoOrientation };
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
   const fitDistance = OVERVIEW_DISTANCE / Math.min(1, size.width / Math.max(1, size.height));
 
@@ -42,6 +53,16 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
     previousFit.current = fitDistance;
   }, [fitDistance, camera, invalidate]);
 
+  useEffect(() => bindMapTravelControls(gl.domElement, {
+    enabled: () => !!controls.current?.enabled && !live.current.preview && !motion.current.photoTransition,
+    travel: steps => {
+      const control = controls.current;
+      if (!control) return;
+      travelAlongView(camera, control.target, steps * mapTravelStep(camera));
+      control.update(); invalidate();
+    }
+  }), [camera, gl, invalidate]);
+
   // Runs before Drei's controls update, so orbit damping cannot fight the animation.
   useFrame(() => {
     if (controls.current) controls.current.enabled = !preview && !motion.current.moving;
@@ -55,7 +76,7 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
     }
     if (preview || motion.current.inPhotoView) return;
     const target = control.target;
-    const compact = camera.position.distanceTo(target) > 360;
+    const compact = mapGroundViewDistance(camera) > 360;
     if (compact !== lastCompact.current) { lastCompact.current = compact; onCompact(compact); }
     const center = target.clone().project(camera), north = target.clone().add(new THREE.Vector3(0, 0, -10)).project(camera);
     const angle = Math.round(Math.atan2((north.x - center.x) * size.width, (north.y - center.y) * size.height) * 180 / Math.PI);
@@ -65,16 +86,16 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
   useEffect(() => {
     const control = controls.current;
     if (!control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera) || command.type === 'initial') return;
+    stopOrbitMomentum(camera, control);
     const pose = readCameraPose(camera, control.target);
     const offset = camera.position.clone().sub(control.target);
     if (command.type === 'reset') { pose.target.set(0, 0, 0); pose.position.fromArray(OVERVIEW_POSITION).normalize().multiplyScalar(fitDistance); }
     if (command.type === 'north') { const length = offset.length(); pose.position.copy(pose.target).add(new THREE.Vector3(0, length * .72, length * .7)); }
     if (command.type === 'top') { pose.target.set(0, 0, 0); pose.position.set(0, fitDistance, .5); }
     if (command.type === 'in' || command.type === 'out') {
-      offset.multiplyScalar(command.type === 'in' ? .8 : 1.25).clampLength(8, 1400);
-      pose.position.copy(pose.target).add(offset);
-      // Keep repeated manual zoom clicks responsive; only group navigation and
-      // perspective changes need a camera journey.
+      const movement = camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(mapTravelStep(camera) * (command.type === 'in' ? 1 : -1));
+      pose.position.add(movement); pose.target.add(movement);
+      // Button presses can interrupt an ordinary map journey immediately.
       motion.current.focus(camera, control.target, pose, true);
       control.enabled = true; control.update(); invalidate(); return;
     }
@@ -92,6 +113,7 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
   useEffect(() => {
     const control = controls.current;
     if (!selected || !control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
+    stopOrbitMomentum(camera, control);
     const target = new THREE.Vector3(selected.position.x, selected.position.height, selected.position.z);
     const pose = readCameraPose(camera, control.target);
     pose.position.add(target.clone().sub(control.target)); pose.target.copy(target);
@@ -118,7 +140,7 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
       lastShotKey.current = shotKey;
       if (!motion.current.inPhotoView && !motion.current.moving) {
         // Flush residual orbit momentum before saving the view to return to.
-        control.enableDamping = false; control.update(); control.enableDamping = true;
+        stopOrbitMomentum(camera, control);
       }
       control.enabled = false;
       const pose = photoCameraPose({ ...preview, ...look.current }, preview.position.height, size.width / Math.max(1, size.height));
@@ -157,5 +179,5 @@ export default function MapCameraRig({ command, selected, preview, canAdjustPhot
     return () => { unbind?.(); setEvents({ enabled: eventsEnabled }); };
   }, [preview?.id, canAdjustPhotoView, camera, gl, get, setEvents, invalidate]);
 
-  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} minDistance={8} maxDistance={1400} minPolarAngle={.01} maxPolarAngle={Math.PI * .48} target={[0, 0, 0]} />;
+  return <OrbitControls ref={controls} makeDefault enableZoom={false} enableDamping dampingFactor={.08} minPolarAngle={.01} maxPolarAngle={Math.PI * .48} target={[0, 0, 0]} />;
 }

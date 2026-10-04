@@ -14,6 +14,7 @@ import { photoFrameSize, photoPerspectiveIssue } from '../src/photo-perspective.
 import { directionVector, photoFieldOfView } from '../src/photo-view.ts';
 import { photoMapHeight } from '../src/locations.ts';
 import { bindPhotoLookControls } from '../src/photo-look-controls.ts';
+import { mapTravelStep } from '../src/map-travel-controls.ts';
 
 const photo = { id: 'preview-fixture', title: '校园视角', captureType: 'ground', floor: 1, buildingId: '', placed: true,
   position: { x: 10, z: -25 }, heading: 125, pitch: -18, width: 6000, height: 4000, metadata: { focalLength35Mm: 35 },
@@ -42,6 +43,9 @@ const pointerEvent = (canvas, type, values = {}) => {
   const event = new Event(type, { cancelable: true });
   Object.assign(event, { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 100, pointerType: 'mouse', ...values });
   canvas.dispatchEvent(event); return event;
+};
+const wheelEvent = (canvas, deltaY) => {
+  const event = new Event('wheel', { cancelable: true }); Object.assign(event, { deltaY, deltaMode: 0 }); canvas.dispatchEvent(event); return event;
 };
 
 test('pointer and touch look controls respond immediately, capture one pointer, clamp pitch and clean up after cancel or exit', () => {
@@ -231,22 +235,42 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     let store;
     await act(async () => { store = root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, props))); });
     const state = store.getState(), camera = state.camera, control = state.controls;
-    assert.ok(control); const original = readCameraPose(camera, control.target);
+    let timeline = 0;
+    const advance = async () => { await act(async () => { for (let n = 0; n < 60; n++) state.advance(timeline += 1 / 60, false); }); };
+    assert.ok(control); let original = readCameraPose(camera, control.target);
     const distance = camera.position.distanceTo(control.target);
+    const direction = camera.getWorldDirection(new THREE.Vector3()), backward = mapTravelStep(camera);
     await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, command: { type: 'out', sequence: 1 } }))); });
-    close(camera.position.distanceTo(control.target), distance * 1.25); assert.equal(control.enabled, true);
+    vectorClose(camera.position, original.position.clone().addScaledVector(direction, -backward));
+    vectorClose(control.target, original.target.clone().addScaledVector(direction, -backward));
+    close(camera.position.distanceTo(control.target), distance); assert.equal(control.enabled, true);
+    const forward = mapTravelStep(camera);
     await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, command: { type: 'in', sequence: 2 } }))); });
-    vectorClose(camera.position, original.position); assert.equal(control.enabled, true);
+    vectorClose(camera.position, original.position.clone().addScaledVector(direction, forward - backward)); assert.equal(control.enabled, true);
+    assert.equal(control.enableZoom, false, 'Orbit dolly cannot fight forward travel');
+    assert.equal(control.maxDistance, Infinity);
+    pointerEvent(canvas, 'pointerdown', { button: 2 });
+    pointerEvent(canvas.ownerDocument, 'pointermove', { button: 2, clientX: 140 });
+    pointerEvent(canvas.ownerDocument, 'pointerup', { button: 2, clientX: 140 });
+    assert.ok(control.target.length() > 1, 'The map gesture has pending pan momentum');
+    await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, command: { type: 'reset', sequence: 3 } }))); });
+    await advance(); await advance();
+    vectorClose(control.target, new THREE.Vector3()); close(camera.position.length(), distance);
+    original = readCameraPose(camera, control.target);
+    for (let n = 0; n < 180; n++) wheelEvent(canvas, -100);
+    assert.ok(camera.position.clone().sub(original.position).dot(direction) > 1400, 'Real map wheel keeps travelling beyond its original centre');
+    close(camera.position.distanceTo(control.target), distance);
+    original = readCameraPose(camera, control.target);
     const preview = { ...photo, position: { ...photo.position, height: 1.6 }, pitch: 60 };
     await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, preview }))); });
     assert.equal(control.enabled, false);
+    assert.equal(wheelEvent(canvas, -100).defaultPrevented, false, 'Map travel is suspended during photo entry');
     assert.equal(store.getState().events.enabled, false, 'Photo dragging skips scene raycasting');
     pointerEvent(canvas, 'pointerdown');
     vectorClose(camera.position, new THREE.Vector3(10, 1.6, -25));
     vectorClose(camera.getWorldDirection(new THREE.Vector3()), new THREE.Vector3(...directionVector(125, 60)));
     pointerEvent(canvas, 'pointerup');
-    const advance = async (start) => { await act(async () => { for (let n = 1; n <= 60; n++) state.advance(start + n / 60, false); }); };
-    await advance(0); vectorClose(camera.position, new THREE.Vector3(10, 1.6, -25));
+    await advance(); vectorClose(camera.position, new THREE.Vector3(10, 1.6, -25));
     vectorClose(camera.getWorldDirection(new THREE.Vector3()), new THREE.Vector3(...directionVector(125, 60)));
     assert.equal(control.enabled, false, 'The old orbital polar limit must not reset an upward or ground-level shot');
     const source = JSON.stringify(preview), sensitivity = 2 * Math.tan(camera.fov * Math.PI / 360) * 180 / Math.PI / 600;
@@ -262,13 +286,13 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     assert.equal(JSON.stringify(preview), source, 'Looking around never changes the saved photo record');
     const edited = { ...preview, position: { x: 20, z: -10, height: 9 }, heading: 270, pitch: -30, view: { focalLength35Mm: 85 } };
     await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, preview: edited }))); });
-    await advance(1); vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
+    await advance(); vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
     close(camera.fov, photoCameraPose(edited, 9, 1.5).fov);
     pointerEvent(canvas, 'pointerdown', { pointerType: 'touch' }); pointerEvent(canvas, 'pointermove', { clientX: 140, clientY: 110, pointerType: 'touch' });
     pointerEvent(canvas, 'pointerup', { clientX: 140, clientY: 110, pointerType: 'touch' });
     const resizedDirection = camera.getWorldDirection(new THREE.Vector3());
     await act(async () => { state.setSize(360, 650); });
-    await advance(2); vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
+    await advance(); vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
     close(camera.fov, photoCameraPose(edited, 9, 360 / 650).fov);
     vectorClose(camera.getWorldDirection(new THREE.Vector3()), resizedDirection);
 
@@ -277,6 +301,12 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     vectorClose(camera.getWorldDirection(new THREE.Vector3()), fixedDirection);
     assert.equal(canvas.tabIndex, -1, 'The display mode removes editor drag and keyboard bindings');
     const attemptAdjustment = () => {
+      wheelEvent(canvas, -100);
+      pointerEvent(canvas, 'pointerdown', { pointerType: 'touch' });
+      pointerEvent(canvas, 'pointerdown', { pointerId: 2, pointerType: 'touch', clientX: 200 });
+      pointerEvent(canvas, 'pointermove', { pointerId: 2, pointerType: 'touch', clientX: 300 });
+      pointerEvent(canvas, 'pointerup', { pointerId: 2, pointerType: 'touch' });
+      pointerEvent(canvas, 'pointerup', { pointerType: 'touch' });
       for (const pointerType of ['mouse', 'touch']) {
         pointerEvent(canvas, 'pointerdown', { pointerType });
         pointerEvent(canvas, 'pointermove', { pointerType, clientX: 200, clientY: 250 });
@@ -290,9 +320,9 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
 
     await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, props))); });
-    assert.equal(control.enabled, false); await advance(3);
+    assert.equal(control.enabled, false); wheelEvent(canvas, -100); await advance();
     vectorClose(camera.position, original.position); vectorClose(control.target, original.target); close(camera.fov, 43); close(camera.near, .5);
-    await advance(4); assert.equal(control.enabled, true);
+    await advance(); assert.equal(control.enabled, true);
     assert.equal(store.getState().events.enabled, true, 'Returning restores map selection');
     assert.equal(canvas.tabIndex, -1, 'The map regains its original keyboard behavior');
 
@@ -302,9 +332,9 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     attemptAdjustment();
     vectorClose(camera.position, entering.position);
     close(camera.quaternion.angleTo(entering.quaternion), 0, 1e-7);
-    await advance(5);
+    await advance();
     vectorClose(camera.getWorldDirection(new THREE.Vector3()), fixedDirection);
-    attemptAdjustment(); await advance(6);
+    attemptAdjustment(); await advance();
     vectorClose(camera.getWorldDirection(new THREE.Vector3()), fixedDirection);
     vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
     assert.equal(control.enabled, false, 'Saved photo display keeps the camera fixed throughout');
