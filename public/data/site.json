@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 134,
+  "revision": 139,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -21,8 +21,8 @@
         "author": "DrivingGodJ",
         "copyright": "DGJ"
       },
-      "buildingId": "",
-      "floor": 0,
+      "buildingId": "way/855459420",
+      "floor": 1,
       "captureType": "ground",
       "position": {
         "x": 160.39631889210457,
@@ -40,7 +40,7 @@
         "download": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/download.jpg",
         "preview": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/preview.webp"
       },
-      "locationId": "",
+      "locationId": "way/855459420",
       "author": "DrivingGodJ",
       "copyright": "DGJ"
     },
@@ -2394,6 +2394,120 @@
       "locationId": "",
       "author": "DrivingGodJ",
       "copyright": "DGJ"
+    },
+    {
+      "id": "0747e1af-1233-4c61-946b-64f2327e31b5",
+      "title": "Image_1726828215487.",
+      "description": "无",
+      "capturedAt": "2024-09-20T22:48:29",
+      "metadata": {},
+      "buildingId": "way/1233313451",
+      "floor": 1,
+      "author": "",
+      "copyright": "",
+      "uploadedAt": "2026-10-04T16:52:40.817Z",
+      "captureType": "ground",
+      "position": {
+        "x": 1,
+        "z": -5
+      },
+      "placed": true,
+      "heading": 169.1536255011747,
+      "pitch": 10.43419351363744,
+      "width": 2133,
+      "height": 1600,
+      "downloadBytes": 598605,
+      "files": {
+        "thumbnail": "media/0747e1af-1233-4c61-946b-64f2327e31b5/thumbnail.webp",
+        "preview": "media/0747e1af-1233-4c61-946b-64f2327e31b5/preview.webp",
+        "display": "media/0747e1af-1233-4c61-946b-64f2327e31b5/display.webp",
+        "download": "media/0747e1af-1233-4c61-946b-64f2327e31b5/download.jpg"
+      },
+      "locationId": "way/1233313451",
+      "view": {
+        "focalLength35Mm": 35
+      }
+    },
+    {
+      "id": "8d529fdf-7f3a-4186-85aa-9ec6acf7f6a1",
+      "title": "东区四楼",
+      "description": "（个人感觉一个很有青春感和电影感的画面，构图思路为九宫格中每个框内站神态各异的同学···也许适合毕业季？）",
+      "capturedAt": "2026-09-12T13:00:32",
+      "metadata": {
+        "recordedAt": "2026-09-12T13:00:32",
+        "utcOffset": "+08:00",
+        "cameraMake": "Apple",
+        "cameraModel": "iPhone 14 Pro Max",
+        "lensModel": "iPhone 14 Pro Max back triple camera 2.22mm f/2.2",
+        "focalLengthMm": 2.22,
+        "focalLength35Mm": 14,
+        "aperture": 2.2,
+        "exposureSeconds": 0.0035714285714285713,
+        "iso": 40
+      },
+      "buildingId": "way/855459420",
+      "floor": 4,
+      "author": "020250719tr",
+      "copyright": "",
+      "uploadedAt": "2026-10-04T16:52:41.494Z",
+      "captureType": "ground",
+      "position": {
+        "x": 110.35370713537127,
+        "z": 45.230894597912126
+      },
+      "placed": true,
+      "heading": 170.1847451407889,
+      "pitch": -9.445333227875954,
+      "width": 2200,
+      "height": 1238,
+      "downloadBytes": 1068854,
+      "files": {
+        "thumbnail": "media/8d529fdf-7f3a-4186-85aa-9ec6acf7f6a1/thumbnail.webp",
+        "preview": "media/8d529fdf-7f3a-4186-85aa-9ec6acf7f6a1/preview.webp",
+        "display": "media/8d529fdf-7f3a-4186-85aa-9ec6acf7f6a1/display.webp",
+        "download": "media/8d529fdf-7f3a-4186-85aa-9ec6acf7f6a1/download.jpg"
+      },
+      "locationId": "way/855459420"
+    },
+    {
+      "id": "441637b4-598c-409a-8c83-e197c82b3dee",
+      "title": "步行者活动",
+      "description": "",
+      "capturedAt": "2025-11-15T08:59:20",
+      "metadata": {
+        "recordedAt": "2025-11-15T08:59:20",
+        "utcOffset": "+09:00",
+        "cameraMake": "NIKON CORPORATION",
+        "cameraModel": "NIKON D7500",
+        "focalLengthMm": 18,
+        "focalLength35Mm": 27,
+        "aperture": 5,
+        "exposureSeconds": 0.01,
+        "iso": 100
+      },
+      "buildingId": "",
+      "floor": 0,
+      "author": "2025级24班lx",
+      "copyright": "",
+      "uploadedAt": "2026-10-04T16:52:45.020Z",
+      "captureType": "ground",
+      "position": {
+        "x": -77.85670676772838,
+        "z": -98.97347320321786
+      },
+      "placed": true,
+      "heading": 81.98561616100926,
+      "pitch": 0.1555610510728359,
+      "width": 5568,
+      "height": 3712,
+      "downloadBytes": 3401180,
+      "files": {
+        "thumbnail": "media/441637b4-598c-409a-8c83-e197c82b3dee/thumbnail.webp",
+        "preview": "media/441637b4-598c-409a-8c83-e197c82b3dee/preview.webp",
+        "display": "media/441637b4-598c-409a-8c83-e197c82b3dee/display.webp",
+        "download": "media/441637b4-598c-409a-8c83-e197c82b3dee/download.jpg"
+      },
+      "locationId": "way/855459407"
     }
   ],
   "buildingOverrides": {
