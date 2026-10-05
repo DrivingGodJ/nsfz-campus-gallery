@@ -3,13 +3,13 @@ import { ArrowLeft, Camera } from 'lucide-react';
 import type { Photo } from './types';
 import { photoFrameSize, photoPerspectiveIssue } from './photo-perspective';
 
-export function PhotoPerspectiveButton({ photo, active, editor = false, compact = false, onClick }: { photo: Photo; active: boolean; editor?: boolean; compact?: boolean; onClick: () => void }) {
+export function PhotoPerspectiveButton({ photo, active, editor = false, compact = false, disabled = false, onClick }: { photo: Photo; active: boolean; editor?: boolean; compact?: boolean; disabled?: boolean; onClick: () => void }) {
   const issue = photoPerspectiveIssue(photo);
   return <div className="photo-perspective-action">
-    <button type="button" className={'button full-width ' + (active ? 'secondary' : 'primary')} aria-pressed={active} onClick={onClick} disabled={!active && !!issue} title={issue || undefined}>
-      {active ? <ArrowLeft size={16} /> : <Camera size={16} />}{active ? '返回地图视角' : editor ? '体验拍摄视角' : '进入照片视角'}
+    <button type="button" className={'button full-width ' + (active ? 'secondary' : 'primary')} aria-pressed={active} onClick={onClick} disabled={disabled || (!active && !!issue)} title={issue || undefined}>
+      {active ? <ArrowLeft size={16} /> : <Camera size={16} />}{active ? '返回地图视角' : editor ? '照片视角 · 调整角度' : '进入照片视角'}
     </button>
-    {(!compact || issue) && <p className="field-help">{issue || (editor ? '拖动预览画面调整角度，松手后同步朝向和仰俯角；也可调整楼层与焦距。' : '从拍摄位置查看校园，镜头与照片保存的方向一致。')}</p>}
+    {(!compact || issue) && <p className="field-help">{issue || (editor ? '进入照片视角后，对照原图拖动模型，校准方向和仰俯角；松手后角度会同步到这张照片。' : '从拍摄位置查看校园，镜头与照片保存的方向一致。')}</p>}
   </div>;
 }
 

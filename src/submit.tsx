@@ -24,6 +24,7 @@ function Submit() {
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(''),[placing,setPlacing]=useState(false),[comparing,setComparing]=useState(false),[perspective,setPerspective]=useState(false);
   const [pack,setPack]=useState<PhotoPackage|null>(null),[packageURL,setPackageURL]=useState(''),[downloaded,setDownloaded]=useState(false),[shareFile,setShareFile]=useState<File|null>(null);
   const input=useRef<HTMLInputElement>(null);
+  const mapElement=useRef<HTMLDivElement>(null);
   useEffect(()=>{void loadContent().then(setContent).catch(e=>setError(e.message));},[]);
   useEffect(()=>()=>{entriesRef.current.forEach(entry=>URL.revokeObjectURL(entry.image));},[]);
   useEffect(()=>()=>{if(packageURL)URL.revokeObjectURL(packageURL);},[packageURL]);
@@ -32,6 +33,13 @@ function Submit() {
   const persist=(next:SubmissionEntry[])=>{try{localStorage.setItem(CACHE,JSON.stringify({entries:next.map(entry=>({photo:entry.photo,filename:entry.file.name,size:entry.file.size,lastModified:entry.file.lastModified}))}));}catch{setError('浏览器暂存空间不足。请及时生成并下载照片包，当前内容仍在页面中。');}};
   const change=(update:Partial<Photo>)=>{if(!photo || busy)return;const next=entries.map(entry=>entry.photo.id===photo.id?{...entry,photo:{...photo,...update}}:entry);setEntries(next);clearPackage();persist(next);};
   const activate=(entry:SubmissionEntry)=>{setActiveID(entry.photo.id);setPlacing(!entry.photo.placed);setComparing(false);setPerspective(false);};
+  const togglePerspective=()=>{
+    if(busy)return;
+    setPlacing(false);
+    if(perspective){setPerspective(false);return;}
+    setComparing(true);setPerspective(true);
+    requestAnimationFrame(()=>mapElement.current?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));
+  };
   const remove=(id:string)=>{if(busy)return;const next=entries.filter(entry=>entry.photo.id!==id);const removed=entries.find(entry=>entry.photo.id===id);if(removed)URL.revokeObjectURL(removed.image);setEntries(next);clearPackage();persist(next);if(activeID===id){if(next[0])activate(next[0]);else{setActiveID('');setComparing(false);setPerspective(false);setPlacing(false);}}};
   const readPhoto=async(source:File):Promise<SubmissionEntry>=>{
     if(!source.size || source.size>40*1024*1024)throw new Error('单张照片最多 40 MB，请先缩小原片。');
@@ -84,11 +92,13 @@ function Submit() {
     {error && <Notice kind="error">{error}<button className="text-button" onClick={()=>setError('')}>关闭</button></Notice>}
     {message && <Notice kind="success">{message}</Notice>}
     {busy && <div className="busy-bar" role="status">{busy}</div>}
-    <main className={'submission-main'+(comparing?' comparing':'')}><div className="submission-map"><PhotoComparison photo={comparing?photo:null} imageSource={image} navigation={<button className="button secondary" onClick={()=>{setComparing(false);setPerspective(false);}}>继续标注</button>} actions={photo && <PhotoPerspectiveButton photo={photo} active={perspective} compact editor onClick={()=>{setPerspective(!perspective);setPlacing(false);}}/>}>
+    <main className={'submission-main'+(comparing?' comparing':'')}><div className="submission-map" ref={mapElement}><PhotoComparison photo={comparing?photo:null} imageSource={image} navigation={<button className="button secondary" onClick={()=>{setComparing(false);setPerspective(false);}}>继续标注</button>} actions={photo && <PhotoPerspectiveButton photo={photo} active={perspective} compact editor disabled={!!busy} onClick={togglePerspective}/>}>
       {content ? <React.Suspense fallback={<div className="page-loading">正在绘制校园…</div>}><MapView campus={content.campus} site={content.site} photos={[]} editPhoto={photo} selectedLocation={location || ''} floor={photo?.floor} selectableLocationIds={locationIds} featuresSelectable photoPreview={comparing} photoPerspective={perspective} onExitPhotoPerspective={()=>setPerspective(false)} onPhotoOrientation={change} onHeading={heading=>change({heading})} placing={placing&&!busy} onPlace={position=>{change({position,placed:true});setPlacing(false);}} onLocation={id=>{if(photo && locationIds.includes(id))change(assignPhotoLocation(photo,id,content.campus,content.site));}}/></React.Suspense>:<div className="page-loading">正在打开校园…</div>}
       {photo && !comparing && <button className={'button placement-button '+(placing?'primary':'secondary')} onClick={()=>setPlacing(!placing)} disabled={!!busy}><Crosshair size={15}/>{placing?'点击地图标记位置':photo.placed?'重新标记拍摄位置':'标记拍摄位置'}</button>}
     </PhotoComparison></div>
-    <aside className="submission-form"><div className="edit-form"><h1>分享你的校园照片</h1><p className="field-help">一次选择多张照片，逐张标记位置和拍摄视角，最后统一打包，用一封邮件投稿。原片与标注在你的设备上打包，审核通过后公开展示处理后的照片。</p>
+    <aside className="submission-form">
+      {photo && !comparing && <section className="submission-view-guide" aria-label="校准照片视角"><strong>投稿前，请对照原图校准拍摄角度</strong><PhotoPerspectiveButton photo={photo} active={perspective} editor disabled={!!busy} onClick={togglePerspective}/></section>}
+      <div className="edit-form"><h1>分享你的校园照片</h1><p className="field-help">一次选择多张照片，逐张标记位置和拍摄视角，最后统一打包，用一封邮件投稿。原片与标注在你的设备上打包，审核通过后公开展示处理后的照片。</p>
       <section className="submission-guidelines" aria-labelledby="submission-guidelines-heading"><h2 id="submission-guidelines-heading">照片投稿准则</h2><ul>
         <li>优先投稿校园景观、建筑、公共空间及四季校园环境的照片。</li>
         <li>尽量避免以人物、物品或动物为主体的照片。</li>
@@ -107,7 +117,6 @@ function Submit() {
         <details className="precision"><summary>精确水平位置</summary><div className="field-pair"><label>东西 / m<input type="number" step={.1} value={Number(photo.position.x.toFixed(1))} onChange={e=>change({position:{...photo.position,x:Number(e.target.value)},placed:true})}/></label><label>南北 / m<input type="number" step={.1} value={Number(photo.position.z.toFixed(1))} onChange={e=>change({position:{...photo.position,z:Number(e.target.value)},placed:true})}/></label></div></details>
         <label>水平朝向<span className="range-value">{headingText(photo.heading)}</span><input type="range" min={0} max={359} value={photo.heading} onChange={e=>change({heading:Number(e.target.value)})}/></label><label>仰俯角<span className="range-value">{photo.pitch.toFixed(1)}°</span><input type="range" min={-90} max={90} value={photo.pitch} onChange={e=>change({pitch:Number(e.target.value)})}/></label>
         <label>等效 35 mm 焦距 / mm<input type="number" min={1} max={10000} step={.1} value={photo.view?.focalLength35Mm ?? photo.metadata?.focalLength35Mm ?? ''} placeholder="原片无焦距时，可手动填写" onChange={e=>change({view:{...photo.view,focalLength35Mm:e.target.value?Number(e.target.value):undefined}})}/></label>
-        <PhotoPerspectiveButton photo={photo} active={perspective} editor onClick={()=>{setPerspective(!perspective);setComparing(true);setPlacing(false);}}/>
       </fieldset>
       <p className="field-help">缺少作者或版权元数据时保持留空。每张照片的地点、楼层和视角会独立保存。</p>
       <label className="submission-agreement"><input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)} disabled={!!busy}/>我已阅读投稿准则，确认这些照片符合准则且有权提供，并同意审核通过后在本站展示。</label>

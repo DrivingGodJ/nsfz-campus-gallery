@@ -72,13 +72,13 @@ fieldset.edit-form{border:0;margin:0;min-width:0}.map-loading{display:flex;align
 button.comparison-image{cursor:zoom-in}
 .comparison-image img{display:block;width:100%;height:100%;object-fit:contain;user-select:none;pointer-events:none}
 .comparison-image>span{position:absolute;right:18px;bottom:18px;display:flex;align-items:center;gap:7px;padding:9px 11px;font-size:11px;border:1px solid var(--line);border-radius:5px;background:var(--floating,#faf9f4ee)}
-.comparison-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;padding:12px 18px;border-top:1px solid var(--line)}
+.comparison-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;padding:12px 18px;border-bottom:1px solid var(--line)}
 .comparison-actions .photo-perspective-action{margin:0;min-width:0}
 .comparison-actions .photo-perspective-action .button{min-height:44px}
 .comparison-actions .field-help{margin:5px 0 0}
 .comparison-hint{font-size:11px;line-height:1.6;color:var(--muted);max-width:24ch}
-.comparison-information{flex:0 1 auto;max-height:45%;overflow:auto;min-height:42px;border-top:1px solid var(--line);scrollbar-width:thin}
-.comparison-information summary{cursor:pointer;padding:13px 18px;font-size:12px;line-height:1.5;color:var(--muted);background:var(--paper);position:sticky;top:0;z-index:1}
+.comparison-information{flex:0 1 auto;max-height:45%;overflow:auto;min-height:48px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.comparison-information summary{cursor:pointer;min-height:48px;padding:13px 18px;font-size:13px;font-weight:550;line-height:1.5;color:var(--ink);background:var(--paper);position:sticky;top:0;z-index:1;touch-action:manipulation}
 .comparison-information-content .detail-copy{padding:14px 18px 22px}
 .comparison-information-content .detail-copy h2{font-size:19px}
 .edit-comparison-button{width:calc(100% - 40px);margin:12px 20px 0}
@@ -98,7 +98,7 @@ button.comparison-image{cursor:zoom-in}
   .comparison-actions{padding:8px 12px;gap:8px}
   .comparison-actions .photo-perspective-action .button{font-size:12px;min-height:40px;padding:9px 12px}
   .comparison-hint{display:none}
-  .comparison-information summary{padding:10px 12px;font-size:11px}
+  .comparison-information summary{padding:12px;font-size:13px}
   .comparison-information-content .detail-copy{padding:12px}
   .editor-main.comparing>.editor-map{grid-column:auto;grid-row:auto;min-height:0}
   .edit-comparison-button{width:calc(100% - 28px);margin:10px 14px 0;font-size:11px}
@@ -174,6 +174,10 @@ button.comparison-image{cursor:zoom-in}
 .submission-main{display:grid;grid-template-columns:minmax(0,1fr) 380px;flex:1;min-height:0}
 .submission-map{position:relative;display:flex;min-width:0;min-height:0}
 .submission-form{background:var(--paper);border-left:1px solid var(--line);overflow:auto;min-height:0}
+.submission-view-guide{position:sticky;top:0;z-index:2;padding:16px 20px;background:var(--paper);border-bottom:1px solid var(--line)}
+.submission-view-guide>strong{display:block;margin-bottom:10px;font-size:13px;line-height:1.6}
+.submission-view-guide .photo-perspective-action{margin:0}
+.submission-view-guide .button{min-height:48px}
 .submission-form h1{font-family:"Songti SC",serif;font-size:23px;font-weight:600;line-height:1.5}
 .submission-fields{display:flex;flex-direction:column;gap:16px;border:0;padding:0;min-width:0}
 .submission-guidelines{padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:8px 0 16px}

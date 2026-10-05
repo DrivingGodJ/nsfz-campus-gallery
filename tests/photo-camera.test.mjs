@@ -304,7 +304,7 @@ test('photo details, lightbox and draft preview expose enter/return actions and 
     assert.match(render(Lightbox,{photo:renditions,onClose(){}}),/src="[^"]*preview\.webp\?v=2"/);
     assert.match(details, /进入照片视角/); assert.match(details, /aria-pressed="false"/);
     assert.match(render(Lightbox, { photo, onClose() {}, onPhotoPerspective() {} }), /进入照片视角/);
-    assert.match(render(PhotoPerspectiveButton, { photo, active: false, editor: true, onClick() {} }), /体验拍摄视角/);
+    assert.match(render(PhotoPerspectiveButton, { photo, active: false, editor: true, onClick() {} }), /照片视角 · 调整角度/);
     const unavailable = render(PhotoPerspectiveButton, { photo: { ...photo, placed: false }, active: false, editor: true, onClick() {} });
     assert.match(unavailable, /disabled=""/); assert.match(unavailable, /先在地图标记/);
     const active = render(PhotoPerspectiveButton, { photo, active: true, onClick() {} });
