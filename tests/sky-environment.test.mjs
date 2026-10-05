@@ -37,7 +37,7 @@ test('the camera-centred dome fits the clipping range at both near and distant v
 
 test('photo previews use their own capture clock without changing or erasing the map filter', () => {
   const mapTime = 'dusk';
-  for (const [clock, period] of [['06:00', 'dawn'], ['12:00', 'day'], ['18:00', 'dusk'], ['23:00', 'night']]) {
+  for (const [clock, period] of [['06:00', 'dawn'], ['12:00', 'day'], ['18:59', 'dusk'], ['19:00', 'night'], ['23:00', 'night']]) {
     const photo = { capturedAt: '2026-10-05T' + clock + ':00+08:00' };
     const original = JSON.stringify(photo);
     assert.equal(photoSkyTime(mapTime, photo), period);

@@ -6,7 +6,7 @@ import { photosInSeason } from '../src/photo-season.ts';
 import { mapInteractionHelp } from '../src/input-mode.ts';
 
 test('capture clock classification handles every boundary, midnight, missing times and invalid dates', () => {
-  for (const [clock, expected] of [['00:00','night'],['04:59','night'],['05:00','dawn'],['07:59','dawn'],['08:00','day'],['16:59','day'],['17:00','dusk'],['19:59','dusk'],['20:00','night'],['23:59','night']]) {
+  for (const [clock, expected] of [['00:00','night'],['04:59','night'],['05:00','dawn'],['07:59','dawn'],['08:00','day'],['16:59','day'],['17:00','dusk'],['18:59','dusk'],['19:00','night'],['19:59','night'],['20:00','night'],['23:59','night']]) {
     assert.equal(photoTime({ capturedAt: '2026-10-04T' + clock }), expected);
     assert.equal(photoTime({ capturedAt: '2026-10-04T' + clock + ':00+08:00' }), expected, 'Recorded clock does not shift with timezone');
   }
@@ -14,7 +14,7 @@ test('capture clock classification handles every boundary, midnight, missing tim
 });
 
 test('time and season filters compose, preserve originals and retain missing times in the full list', () => {
-  const photos = [{ id:1,capturedAt:'2026-10-04T05:00' },{ id:2,capturedAt:'2026-10-04T22:00' },{ id:3,capturedAt:'2026-01-04T22:00' },{ id:4,capturedAt:'2026-10-04' }];
+  const photos = [{ id:1,capturedAt:'2026-10-04T05:00' },{ id:2,capturedAt:'2026-10-04T19:00' },{ id:3,capturedAt:'2026-01-04T22:00' },{ id:4,capturedAt:'2026-10-04' }];
   const before = JSON.stringify(photos);
   assert.deepEqual(photosInTime(photosInSeason(photos,'autumn'),'night').map(p=>p.id),[2]);
   assert.deepEqual(photosInTime(photos,'unknown').map(p=>p.id),[4]);
