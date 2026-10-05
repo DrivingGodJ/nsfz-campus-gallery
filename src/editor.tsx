@@ -6,10 +6,12 @@ import { asset, buildingInfo, type BuildingOverride, type EditorState, type Phot
 import { buildingFloorText } from './building-model';
 import { assignPhotoLocation, campusFilterLocations, photoLocationId, isAerialPhoto } from './locations';
 import PhotoCalibrationFields from './PhotoCalibrationFields';
-import { PhotoPerspectiveButton } from './PhotoPerspective';
+import { PhotoHalfOverlayButton, PhotoPerspectiveButton } from './PhotoPerspective';
 import PhotoComparison from './PhotoComparison';
 import PhotoImage from './PhotoImage';
-import { photoPreviewFile } from './photo-image';
+import { photoDepthFile, photoPreviewFile } from './photo-image';
+import PhotoDepthField from './PhotoDepthField';
+import { validateDepthUpload } from './photo-depth-upload';
 import ReviewInbox from './ReviewInbox';
 import PublishPanel from './PublishPanel';
 import type { Submission } from './submission-types';
@@ -36,10 +38,13 @@ function Editor() {
   const locationAllowed = !locationId || selectableLocationIds.includes(locationId);
   const [dirty, setDirty] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [halfOverlay, setHalfOverlay] = useState(false);
+  useEffect(() => setHalfOverlay(false), [photo?.id]);
   const [previewing, setPreviewing] = useState(false);
+  useEffect(() => { if (!previewing) setHalfOverlay(false); }, [previewing]);
   const [comparing, setComparing] = useState(false);
   const exitPreview = useCallback(() => {
-    setPreviewing(false);
+    setPreviewing(false); setHalfOverlay(false);
     requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.photo-perspective-action button')?.focus({ preventScroll: true }));
   }, []);
   const [mode, setMode] = useState<'photos' | 'buildings' | 'reviews'>(location.hash === '#review' ? 'reviews' : 'photos');
@@ -63,7 +68,7 @@ function Editor() {
     setPreviewing(false); setComparing(false);
     let cached: Photo | null = null;
     try { cached = JSON.parse(localStorage.getItem('nsfz:edit:' + p.id) || 'null'); } catch {}
-    setPhoto(cached ? { ...p, ...cached, id: p.id, files: p.files } : p); setDirty(!!cached); setPlacing(!p.placed); setReviewID(''); setMode('photos'); setError(''); setMessage('');
+    setPhoto(cached ? { ...p, ...cached, id: p.id, files: p.files, depthUpdatedAt: p.depthUpdatedAt } : p); setDirty(!!cached); setPlacing(!p.placed); setReviewID(''); setMode('photos'); setError(''); setMessage('');
   }, []);
   useEffect(() => { if (initial.current) return; initial.current = true; refresh().then(next => { const first = next.drafts[0] || next.site.photos[0]; if (first) selectPhoto(first); if (location.hash === '#review') setMode('reviews'); }).catch(e => setError(e.message)); }, [selectPhoto]);
   useEffect(() => {
@@ -94,6 +99,24 @@ function Editor() {
       setMessage('已导入 ' + imported.length + ' 张照片。' + (automatic ? '其中 ' + automatic + ' 张航拍已自动定位。' : '') + '补充资料后保存到内容库。');
     }
     if (input.current) input.current.value = '';
+  };
+  const changeDepth = async (file: File | null) => {
+    if (!photo || !state || busy) return;
+    const id = photo.id;
+    setBusy(file ? '正在保存配套深度图' : '正在移除配套深度图'); setError('');
+    try {
+      if (file) { const url = await validateDepthUpload(file, photo); URL.revokeObjectURL(url); }
+      const { photo: saved } = await api('photo/' + id + '/depth?revision=' + state.site.revision, file ? 'PUT' : 'DELETE', undefined, file || undefined);
+      await refresh();
+      setPhoto(current => {
+        if (!current || current.id !== id) return current;
+        const next = { ...current, files: saved.files, depthUpdatedAt: saved.depthUpdatedAt };
+        if (dirty) localStorage.setItem('nsfz:edit:' + id, JSON.stringify(next));
+        return next;
+      });
+      setMessage(file ? '配套深度图已保存，可以进入照片视角体验叠加。' : '配套深度图已移除，照片叠加使用渐隐过渡。');
+    } catch (error) { setError((error as Error).message); await refresh(); }
+    finally { setBusy(''); }
   };
   const save = async () => {
     if (!photo || !state || busy) return;
@@ -163,10 +186,11 @@ function Editor() {
     if (previewing) exitPreview();
     else { setPlacing(false); setComparing(true); setPreviewing(true); }
   };
+  const toggleHalfOverlay = () => { if (busy) return; setHalfOverlay(value => !value); setPlacing(false); setComparing(true); setPreviewing(true); };
   const editingBuilding = state?.map.buildings.find(b => b.id === buildingId);
   const editingInfo = editingBuilding && state ? buildingInfo(editingBuilding, state.site) : null;
   const draft = state?.drafts.some(p => p.id === photo?.id);
-  const imageSource = (p: Photo, type: 'thumbnail' | 'preview') => { const rendition = type === 'preview' && !p.files.preview ? 'thumbnail' : type; return state?.drafts.some(d => d.id === p.id) ? '/__local/draft-media/' + p.id + '/' + rendition + '.webp' : asset(type === 'preview' ? photoPreviewFile(p) : p.files.thumbnail); };
+  const imageSource = (p: Photo, type: 'thumbnail' | 'preview' | 'depth') => { const rendition = type === 'preview' && !p.files.preview ? 'thumbnail' : type; return state?.drafts.some(d => d.id === p.id) ? '/__local/draft-media/' + p.id + '/' + rendition + '.webp?v=' + encodeURIComponent(p.depthUpdatedAt || '1') : asset(type === 'depth' ? photoDepthFile(p)! : type === 'preview' ? photoPreviewFile(p) : p.files.thumbnail); };
   return <div className={'app editor-app' + (comparing && mode === 'photos' && photo ? ' comparing' : '')}>
     <header className="app-header"><Brand editor href={desktop ? './editor.html?desktop=1' : undefined} /><span className="local-badge">{desktop ? '本地审核' : '本地编辑'}</span><div className="header-actions"><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}<PublishPanel api={api} unsaved={dirty} onRunningChange={setPublishing} /></div></header>
     {error && <Notice kind="error">{error}<button className="text-button" onClick={() => setError('')}>关闭</button></Notice>}
@@ -186,17 +210,19 @@ function Editor() {
             setPreviewing(false); setComparing(false);
             requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.edit-comparison-button')?.focus({ preventScroll: true }));
           }}><ArrowLeft size={15} />返回位置标注</button>}
+          footerActions={photo && previewing && <PhotoHalfOverlayButton photo={photo} active={halfOverlay} disabled={!!busy} onClick={toggleHalfOverlay} />}
           actions={photo && <><PhotoPerspectiveButton photo={photo} active={previewing} compact editor disabled={!!busy} onClick={() => { if (previewing) exitPreview(); else { setPlacing(false); setPreviewing(true); } }} /><span className="comparison-hint">{previewing ? '拖动模型或修改参数，实时对齐原照片' : '原照片与校园模型同屏对照'}</span></>}>
-          <React.Suspense fallback={<div className="map-stage map-loading">正在绘制校园地图…</div>}><MapView campus={state.map} site={state.site} photos={state.site.photos.filter(p => p.id !== photo?.id)} selectedLocation={mode === 'buildings' ? buildingId : locationId} floor={mode === 'photos' ? photo?.floor : 0} featuresSelectable={mode === 'photos'} selectableLocationIds={mode === 'photos' ? selectableLocationIds : undefined} photoPreview={comparing && mode === 'photos'} photoPerspective={previewing && mode === 'photos'} onExitPhotoPerspective={exitPreview} onPhotoOrientation={orientation => { if (!busy) change(orientation); }} placing={placing && mode === 'photos' && !busy} editPhoto={mode === 'photos' ? photo : null} onHeading={heading => { if (!busy) change({ heading }); }} onPlace={point => { if (photo && !busy) { change({ position: { ...photo.position, ...point }, placed: true }); setPlacing(false); setMessage('拍摄位置已标记，可以继续补充照片资料。'); } }} onLocation={id => { if (mode === 'buildings') { if (!busy) pickBuilding(id); } else if (photo) selectAssociation(id); }} onSelectPhoto={selectPhoto} /></React.Suspense>
+          <React.Suspense fallback={<div className="map-stage map-loading">正在绘制校园地图…</div>}><MapView campus={state.map} site={state.site} photos={state.site.photos.filter(p => p.id !== photo?.id)} selectedLocation={mode === 'buildings' ? buildingId : locationId} floor={mode === 'photos' ? photo?.floor : 0} featuresSelectable={mode === 'photos'} selectableLocationIds={mode === 'photos' ? selectableLocationIds : undefined} photoPreview={comparing && mode === 'photos'} photoPerspective={previewing && mode === 'photos'} onExitPhotoPerspective={exitPreview} onPhotoOrientation={orientation => { if (!busy) change(orientation); }} placing={placing && mode === 'photos' && !busy} editPhoto={mode === 'photos' ? photo : null} onHeading={heading => { if (!busy) change({ heading }); }} onPlace={point => { if (photo && !busy) { change({ position: { ...photo.position, ...point }, placed: true }); setPlacing(false); setMessage('拍摄位置已标记，可以继续补充照片资料。'); } }} onLocation={id => { if (mode === 'buildings') { if (!busy) pickBuilding(id); } else if (photo) selectAssociation(id); }} onSelectPhoto={selectPhoto} photoImageSource={photo ? imageSource(photo, 'preview') : undefined} photoDepthSource={photo?.files.depth ? imageSource(photo, 'depth') : undefined} photoOverlayMode={halfOverlay ? 'translucent' : 'off'} /></React.Suspense>
           {mode === 'photos' && photo && !comparing && <button className={'button placement-button ' + (placing ? 'primary' : 'secondary')} onClick={() => { setPreviewing(false); setPlacing(!placing); }}><Crosshair size={17} />{placing ? '正在定位 · 点击地图' : photo.placed ? '重新标记拍摄位置' : '标记拍摄位置'}</button>}
         </PhotoComparison>
         </div>
         <aside className="edit-panel" aria-label={mode === 'photos' ? '照片标注' : mode === 'reviews' ? '投稿审核' : '建筑资料'}>
-          {mode === 'photos' && photo ? <><div className="edit-heading"><p className="eyebrow">{draft ? '照片草稿' : '照片资料'}</p><span className={'save-status ' + (dirty ? 'unsaved' : '')}>{dirty ? '修改暂存在此浏览器' : draft ? '待保存到内容库' : '已保存'}</span></div><div className="edit-preview-action"><PhotoPerspectiveButton photo={photo} active={previewing} editor disabled={!!busy} onClick={togglePerspective} /></div><div className="photo-image-container"><PhotoImage className="edit-preview" src={imageSource(photo, 'preview')} alt={photo.title} /></div><button className="button secondary edit-comparison-button" disabled={!!busy} onClick={() => { setPlacing(false); setComparing(true); }}><Columns2 size={16} />照片与模型同屏</button>
+          {mode === 'photos' && photo ? <><div className="edit-heading"><p className="eyebrow">{draft ? '照片草稿' : '照片资料'}</p><span className={'save-status ' + (dirty ? 'unsaved' : '')}>{dirty ? '修改暂存在此浏览器' : draft ? '待保存到内容库' : '已保存'}</span></div><div className="edit-preview-action"><PhotoPerspectiveButton photo={photo} active={previewing} editor disabled={!!busy} onClick={togglePerspective} />{previewing && <PhotoHalfOverlayButton photo={photo} active={halfOverlay} disabled={!!busy} onClick={toggleHalfOverlay} />}</div><div className="photo-image-container"><PhotoImage className="edit-preview" src={imageSource(photo, 'preview')} alt={photo.title} /></div><button className="button secondary edit-comparison-button" disabled={!!busy} onClick={() => { setPlacing(false); setComparing(true); }}><Columns2 size={16} />照片与模型同屏</button>
             <fieldset className="edit-form" disabled={!!busy}><PhotoCalibrationFields photo={photo} campus={state.map} site={state.site} previewing={previewing} onChange={change} onLocation={selectAssociation} /><div className="form-divider">照片资料</div><label>照片标题<input value={photo.title} maxLength={160} onChange={e => change({ title: e.target.value })} /></label><label>文字描述<textarea value={photo.description} rows={3} maxLength={10000} placeholder="写下这张照片的故事…" onChange={e => change({ description: e.target.value })} /></label>
               <div className="field-pair"><label>拍摄日期<input type="date" value={photo.capturedAt.slice(0, 10)} onChange={e => { const time = photo.capturedAt.split('T')[1]; change({ capturedAt: e.target.value ? e.target.value + (time ? 'T' + time : '') : '' }); }} /></label><label>拍摄时间<input type="time" step={1} disabled={!photo.capturedAt} value={photo.capturedAt.split('T')[1] || ''} onChange={e => change({ capturedAt: photo.capturedAt.slice(0, 10) + (e.target.value ? 'T' + e.target.value : '') })} /></label></div>
               <div className="form-divider">作者与版权</div><label>作者<input name="author" value={photo.author || ''} maxLength={200} placeholder="原片未提供，可留空" onChange={e => change({ author: e.target.value })} /></label><label>版权信息<textarea name="copyright" value={photo.copyright || ''} rows={2} maxLength={3000} placeholder="原片未提供，可留空" onChange={e => change({ copyright: e.target.value })} /></label><p className="field-help">自动读取原片的作者与版权元数据；没有记录时留空，不推断作者或使用许可。</p>
               <PhotoMetadataView photo={photo} editor />
+              <PhotoDepthField attached={photo.files.depth ? '已附配套深度图' : undefined} disabled={!!busy} onChoose={file => void changeDepth(file)} onRemove={() => void changeDepth(null)} />
               {!photo.placed && <p className="placement-help">先点击“标记拍摄位置”，再点击地图。</p>}
               <button className="button primary full-width" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>{activeReviewID && <><label>退回原因<textarea maxLength={1000} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="可留空；投稿人能通过投稿凭证查看" /></label><button className="button secondary full-width" onClick={rejectReview}>退回这份投稿</button></>}<button className="text-button remove-button" onClick={remove} disabled={!!busy}><Trash2 size={14} />移出内容库</button>
             </fieldset>

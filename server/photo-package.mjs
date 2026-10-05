@@ -1,6 +1,7 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 
 export const SUBMISSION_EMAIL = 'drivinggodj@icloud.com';
+export const MAX_DEPTH_BYTES = 10 * 1024 * 1024;
 export const MAX_PHOTO_BYTES = 40 * 1024 * 1024;
 export const MAX_PACKAGE_PHOTOS = 20;
 export const MAX_PACKAGE_ORIGINAL_BYTES = 100 * 1024 * 1024;
@@ -32,36 +33,45 @@ function validateSubmission(file, photo, campus) {
   if (photo.captureType === 'aerial' && (!photo.altitude || !finite(photo.altitude.meters, -12000, 100000) || !['takeoff', 'seaLevel'].includes(photo.altitude.reference))) throw new Error('请检查航拍高度与基准。');
   if (photo.view?.focalLength35Mm !== undefined && !finite(photo.view.focalLength35Mm, 1, 10000)) throw new Error('等效焦距需在 1 到 10000 mm 之间。');
 }
-export async function createPhotoPackage(file, photo, campus) {
+async function encodeDepth(file, path) {
+  if (!file) return null;
+  if (!file.size || file.size > MAX_DEPTH_BYTES || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('请选择 10 MB 以内的 PNG、JPEG 或 WebP 深度图。');
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return { bytes, record: { path: path + extensions[file.type], filename: file.name, size: bytes.length, type: file.type, sha256: await sha256(bytes) } };
+}
+export async function createPhotoPackage(file, photo, campus, depthFile) {
   validateSubmission(file, photo, campus);
   const original = new Uint8Array(await file.arrayBuffer());
+  const depth = await encodeDepth(depthFile, 'depth.');
   const manifest = { schemaVersion: 1, kind: 'nsfz-photo-submission', id: crypto.randomUUID(), createdAt: new Date().toISOString(),
     original: { path: 'original.' + extensions[file.type], filename: file.name, size: original.length, type: file.type, sha256: await sha256(original) },
-    annotation: packageAnnotation(photo) };
+    annotation: packageAnnotation(photo), ...(depth ? { depth: depth.record } : {}) };
   const encoded = strToU8(JSON.stringify(manifest, null, 2));
   if (encoded.length > 64 * 1024) throw new Error('照片资料过长，请缩短描述后重试。');
   const title = photo.title.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim().slice(0, 60) || '校园照片';
   // Originals are already compressed. Store them unchanged, without expensive recompression.
-  const bytes = zipSync({ 'manifest.json': encoded, [manifest.original.path]: original,
-    '说明.txt': strToU8('附中影像照片投稿\n请把整个 ZIP 包作为附件发送到 ' + SUBMISSION_EMAIL + '。\n包内包含原片和位置、楼层、拍摄视角等标注，请勿拆分或修改。\n管理员：在本地编辑器的照片页导入 ZIP，核对后保存到内容库，再发布网站。\n生成或下载照片包不代表邮件已经发送或审核通过。\n') }, { level: 0 });
+  const bytes = zipSync({ 'manifest.json': encoded, [manifest.original.path]: original, ...(depth ? { [depth.record.path]: depth.bytes } : {}),
+    '说明.txt': strToU8('附中影像照片投稿\n请把整个 ZIP 包作为附件发送到 ' + SUBMISSION_EMAIL + '。\n包内包含原片、配套深度图（如有）和位置、楼层、拍摄视角等标注，请勿拆分或修改。\n管理员：在本地编辑器的照片页导入 ZIP，核对后保存到内容库，再发布网站。\n生成或下载照片包不代表邮件已经发送或审核通过。\n') }, { level: 0 });
   return { bytes, manifest, filename: '校园投稿-' + title + '-' + manifest.id.slice(0, 8) + '.zip' };
 }
 export async function createPhotoBatchPackage(entries, campus) {
   if (!Array.isArray(entries) || !entries.length || entries.length > MAX_PACKAGE_PHOTOS) throw new Error('一个照片包请加入 1 到 20 张照片。');
-  if (entries.reduce((total, entry) => total + entry.file.size, 0) > MAX_PACKAGE_ORIGINAL_BYTES) throw new Error('一个照片包的原片总大小不能超过 100 MB，请减少照片后再生成。');
+  if (entries.reduce((total, entry) => total + (entry.file.size + (entry.depthFile?.size || 0)), 0) > MAX_PACKAGE_ORIGINAL_BYTES) throw new Error('一个照片包的原片和深度图总大小不能超过 100 MB，请减少照片后再生成。');
   entries.forEach(({ file, photo }) => validateSubmission(file, photo, campus));
   const files = {}, photos = [];
-  for (const [index, { file, photo }] of entries.entries()) {
+  for (const [index, { file, photo, depthFile }] of entries.entries()) {
     const original = new Uint8Array(await file.arrayBuffer());
+    const depth = await encodeDepth(depthFile, 'depths/' + String(index + 1).padStart(2, '0') + '.');
     const path = 'originals/' + String(index + 1).padStart(2, '0') + '.' + extensions[file.type];
-    const record = { id: crypto.randomUUID(), original: { path, filename: file.name, size: original.length, type: file.type, sha256: await sha256(original) }, annotation: packageAnnotation(photo) };
+    const record = { id: crypto.randomUUID(), original: { path, filename: file.name, size: original.length, type: file.type, sha256: await sha256(original) }, annotation: packageAnnotation(photo), ...(depth ? { depth: depth.record } : {}) };
     if (strToU8(JSON.stringify(record)).length > 64 * 1024) throw new Error('照片资料过长，请缩短描述后重试。');
     files[path] = original;
+    if (depth) files[depth.record.path] = depth.bytes;
     photos.push(record);
   }
   const manifest = { schemaVersion: 2, kind: 'nsfz-photo-submission', id: crypto.randomUUID(), createdAt: new Date().toISOString(), photos };
   files['manifest.json'] = strToU8(JSON.stringify(manifest));
-  files['说明.txt'] = strToU8('附中影像批量照片投稿\n共 ' + photos.length + ' 张照片。请将整个 ZIP 包作为一封邮件的附件发送到 ' + SUBMISSION_EMAIL + '，不必逐张发送。\n包内包含每张原片及独立标注，请勿拆分或修改。\n管理员：在本地编辑器的照片页导入整个 ZIP，逐张核对并审核。\n生成或下载照片包不代表邮件已经发送或审核通过。\n');
+  files['说明.txt'] = strToU8('附中影像批量照片投稿\n共 ' + photos.length + ' 张照片。请将整个 ZIP 包作为一封邮件的附件发送到 ' + SUBMISSION_EMAIL + '，不必逐张发送。\n包内包含每张原片、配套深度图（如有）及独立标注，请勿拆分或修改。\n管理员：在本地编辑器的照片页导入整个 ZIP，逐张核对并审核。\n生成或下载照片包不代表邮件已经发送或审核通过。\n');
   return { bytes: zipSync(files, { level: 0 }), manifest, filename: '校园投稿-' + photos.length + '张照片-' + manifest.id.slice(0, 8) + '.zip' };
 }
 export function submissionMailto(manifest, filename) {
@@ -79,9 +89,9 @@ export async function readPhotoPackages(bytes) {
   let files;
   try {
     files = unzipSync(bytes, { filter(info) {
-      if (names.has(info.name) || names.size >= MAX_PACKAGE_PHOTOS + 2 || !/^(manifest\.json|说明\.txt|original\.(jpg|png|webp|avif)|originals\/(0[1-9]|1[0-9]|20)\.(jpg|png|webp|avif))$/.test(info.name)) throw new Error('投稿包文件不正确。');
+      if (names.has(info.name) || names.size >= MAX_PACKAGE_PHOTOS * 2 + 2 || !/^(manifest\.json|说明\.txt|original\.(jpg|png|webp|avif)|originals\/(0[1-9]|1[0-9]|20)\.(jpg|png|webp|avif)|depth\.(jpg|png|webp)|depths\/(0[1-9]|1[0-9]|20)\.(jpg|png|webp))$/.test(info.name)) throw new Error('投稿包文件不正确。');
       names.add(info.name);
-      const maximum = info.name.startsWith('original') ? MAX_PHOTO_BYTES : info.name === 'manifest.json' ? MAX_MANIFEST_BYTES : 64 * 1024;
+      const maximum = info.name.startsWith('depth') ? MAX_DEPTH_BYTES : info.name.startsWith('original') ? MAX_PHOTO_BYTES : info.name === 'manifest.json' ? MAX_MANIFEST_BYTES : 64 * 1024;
       // Accept only this site's stored archive format. No untrusted ZIP inflation or filesystem extraction.
       if (info.compression !== 0 || info.size !== info.originalSize || info.originalSize > maximum || info.originalSize < 1) throw new Error('请导入本站直接生成的完整投稿包。');
       return true;
@@ -109,7 +119,20 @@ export async function readPhotoPackages(bytes) {
     if (total > MAX_PACKAGE_ORIGINAL_BYTES) throw new Error('投稿包原片总大小最多 100 MB。');
     if (await sha256(original) !== source.sha256) throw new Error('投稿包原片校验失败，请重新下载原包。');
     expected.add(source.path);
-    photos.push({ manifest: record, original, annotation: packageAnnotation(record.annotation) });
+    let depth;
+    if (record.depth !== undefined) {
+      const paired = record.depth;
+      const depthPrefix = manifest.schemaVersion === 1 ? 'depth.' : 'depths/' + String(index + 1).padStart(2, '0') + '.';
+      if (!paired || !['image/png', 'image/jpeg', 'image/webp'].includes(paired.type) || paired.path !== depthPrefix + extensions[paired.type]
+        || typeof paired.filename !== 'string' || !paired.filename || paired.filename.length > 1000 || !/^[a-f0-9]{64}$/.test(paired.sha256)) throw new Error('投稿包深度图资料格式不正确。');
+      depth = files[paired.path];
+      if (!depth || depth.length !== paired.size || depth.length > MAX_DEPTH_BYTES) throw new Error('投稿包深度图缺失或大小不一致。');
+      if (await sha256(depth) !== paired.sha256) throw new Error('投稿包深度图校验失败，请重新下载原包。');
+      total += depth.length;
+      if (total > MAX_PACKAGE_ORIGINAL_BYTES) throw new Error('投稿包原片和深度图总大小最多 100 MB。');
+      expected.add(paired.path);
+    }
+    photos.push({ manifest: record, original, annotation: packageAnnotation(record.annotation), ...(depth ? { depth } : {}) });
   }
   if (names.size !== expected.size || [...names].some(name => !expected.has(name))) throw new Error('投稿包文件不正确。');
   return { manifest, photos };

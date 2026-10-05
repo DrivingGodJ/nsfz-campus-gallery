@@ -7,7 +7,7 @@ import { UserError, writeJSON } from './storage.mjs';
 export const PUBLIC_SITE = 'https://drivinggodj.github.io/nsfz-campus-gallery/';
 export const LIKES_API = 'https://likes.drivinggodj.dpdns.org/api/likes';
 const REPOSITORY = 'DrivingGodJ/nsfz-campus-gallery';
-const CONTENT = /^(public\/data\/site\.json|public\/media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg))$/;
+const CONTENT = /^(public\/data\/site\.json|public\/media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg|depth\.webp))$/;
 export const contentPath = value => CONTENT.test(value);
 export function changedPaths(porcelain) {
   const entries = porcelain.split('\0'), result = [];

@@ -33,7 +33,7 @@ fieldset.edit-form{border:0;margin:0;min-width:0}.map-loading{display:flex;align
   }
 }
 
-.photo-perspective-action{margin:16px 0}.photo-perspective-action .field-help{margin-top:8px;line-height:1.7}.edit-form .photo-perspective-action{margin:0}.photo-perspective-overlay{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden}.photo-perspective-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:1px solid var(--thumb-border,#faf9f4);box-shadow:0 0 0 100vmax #17201b30}.map-stage.photo-perspective .building-label,.map-stage.photo-perspective .structure-label{display:none}.lightbox-bottom{flex-wrap:wrap}.lightbox-bottom .zoom-controls{margin-right:auto}
+.photo-perspective-action{margin:16px 0}.photo-perspective-action .field-help{margin-top:8px;line-height:1.7}.edit-form .photo-perspective-action{margin:0}.photo-perspective-overlay{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden}.photo-perspective-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:1px solid var(--thumb-border,#faf9f4);box-shadow:0 0 0 100vmax #17201b30}.photo-perspective-frame img{display:block;width:100%;height:100%;object-fit:cover;user-select:none;pointer-events:none;animation:photo-image-enter .24s ease both}.photo-perspective-frame .depth-transition-layer{position:absolute;inset:0;display:block;width:100%;height:100%}.map-stage.photo-perspective .building-label,.map-stage.photo-perspective .structure-label{display:none}.lightbox-bottom{flex-wrap:wrap}.lightbox-bottom .zoom-controls{margin-right:auto}
 @media(max-width:760px){.photo-perspective-action .button{white-space:normal}.lightbox-bottom .button{flex-grow:1}}
 
 /* Keep the original photo alongside the model in both map and shooting views. */
@@ -307,7 +307,7 @@ img[data-load-state="loading"],img[data-load-state="error"]{visibility:hidden}
 .photo-image-status.has-preview .photo-image-spinner{width:14px;height:14px}
 .photo-image-spinner{animation:photo-image-spin 1s linear infinite}
 @keyframes photo-image-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.photo-image-spinner{animation:none}}
+@media(prefers-reduced-motion:reduce){.photo-image-spinner{animation:none}.photo-perspective-frame img{animation:none}}
 
 .package-result{padding:16px 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px}
 .package-result .field-help{margin:0;overflow-wrap:anywhere}
@@ -321,6 +321,39 @@ img[data-load-state="loading"],img[data-load-state="error"]{visibility:hidden}
 .publish-progress ol{list-style:none;padding:0;margin:22px 0;display:grid;grid-template-columns:repeat(3,1fr);gap:14px 10px}.publish-progress li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted-text)}.publish-progress li>span{border:1px solid var(--line);border-radius:50%;width:23px;height:23px;display:grid;place-items:center;font-size:11px}.publish-progress li.current{font-weight:600;color:var(--green)}.publish-progress li.done>span{background:var(--green);color:var(--paper);border-color:var(--green)}.publish-progress p{font-size:13px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;display:flex;align-items:flex-start;gap:8px}.publish-progress p svg{flex-shrink:0;margin-top:4px}.publish-progress.failed p{color:var(--danger-text,#904b32)}
 .publish-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;margin-top:24px}.publish-actions .text-button{margin-right:auto;font-size:12px}.publish-footnote{margin:18px 0 0;font-size:11px;line-height:1.8;color:var(--muted-text)}
 @media(max-width:760px){.publish-dialog{padding:22px 18px}.publish-heading h1{font-size:20px}.publish-open{min-width:50px}.publish-progress ol{grid-template-columns:repeat(2,1fr)}}
+
+.photo-perspective-frame .photo-overlay-still{position:absolute;inset:0;animation:none;opacity:0}
+.photo-overlay-status{position:absolute;z-index:31;bottom:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:7px;max-width:calc(100% - 32px);margin:0;padding:10px 14px;border-radius:8px;background:var(--floating,#faf9f4ee);font-size:12px;line-height:1.6;color:var(--ink);pointer-events:none}
+.comparison-overlay-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px 18px 8px;flex-shrink:0;border-top:1px solid var(--line)}
+.comparison-overlay-actions>.button{min-height:44px;padding:10px 8px;font-size:12px}
+.comparison-overlay-actions.is-single>.button,.comparison-overlay-actions>.button:only-child{grid-column:1/-1}
+.comparison-overlay-actions>.field-help{grid-column:1/-1;margin:0;font-size:11px;line-height:1.6}
+.comparison-actions{border-bottom:0;padding-block:8px 12px}
+.photo-half-overlay-button[aria-pressed=true]{border-color:var(--green);background:var(--active-surface);color:var(--green)}
+.edit-preview-action>.photo-half-overlay-button,.submission-view-guide>.photo-half-overlay-button{width:100%;min-height:44px;margin-top:8px}
+.viewer-app{position:relative}
+.viewer-app>.viewer-main.viewer-cards{position:absolute;inset:0;z-index:0}
+.viewer-app>.app-header{position:relative;z-index:35}
+.viewer-app.photo-immersive>.app-header{opacity:0;transform:translateY(-12px);visibility:hidden;pointer-events:none}
+.viewer-app.photo-immersive .comparison-photo,.viewer-app.photo-immersive .viewer-panel{visibility:hidden;pointer-events:none}
+.immersive-actions{position:absolute;z-index:40;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));max-width:calc(100% - 28px);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 28px #172b2926;opacity:0;transform:translate(-50%,9px);visibility:hidden;transition:opacity .24s,transform .24s,visibility .24s;display:flex;align-items:center;justify-content:center;gap:12px;flex-shrink:0;min-height:68px;padding:10px 14px;background:var(--floating,var(--paper));backdrop-filter:blur(12px)}
+.immersive-actions .button{min-height:44px;min-width:140px}
+.photo-depth-field{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:10px}
+.photo-depth-field>strong{display:block;font-size:13px;margin-bottom:10px}.photo-depth-field small{font-size:11px;font-weight:400;color:var(--muted);margin-left:4px}
+.photo-depth-actions{display:flex;gap:6px;align-items:center}.photo-depth-filename{display:block;margin:8px 0;overflow-wrap:anywhere;font-size:12px;color:var(--muted)}
+.photo-depth-field .field-help{margin:8px 0 0}
+@media(max-width:760px){.comparison-overlay-actions{padding:10px 14px 6px;gap:7px}.comparison-overlay-actions>.button{font-size:11px}.comparison-actions{padding-inline:14px}.immersive-actions{width:calc(100% - 28px);gap:8px;padding-inline:10px}.immersive-actions .button{flex:1;min-width:0}}
+
+.immersive-actions.is-visible{opacity:1;transform:translate(-50%,0);visibility:visible}
+.viewer-app>.app-header,.viewer-app .comparison-photo,.viewer-app .viewer-panel,.viewer-app .map-tools,.viewer-app .map-caption,.viewer-app .map-bottom{transition:opacity .24s,transform .24s}
+.viewer-app.immersive-preparing>.app-header{opacity:0;transform:translateY(-12px);pointer-events:none}
+.viewer-app.immersive-preparing .comparison-photo,.viewer-app.immersive-preparing .viewer-panel{opacity:0;transform:translateY(18px);pointer-events:none}
+.viewer-app.immersive-preparing .map-tools,.viewer-app.immersive-preparing .map-caption,.viewer-app.immersive-preparing .map-bottom,.viewer-app.immersive-preparing .building-label,.viewer-app.immersive-preparing .map-photo{opacity:0;pointer-events:none}
+.viewer-app.immersive-restoring>.app-header,.viewer-app.immersive-restoring .comparison-photo,.viewer-app.immersive-restoring .viewer-panel{animation:immersive-interface-return .26s both}
+@keyframes immersive-interface-return{from{opacity:0;translate:0 10px}to{opacity:1;translate:0 0}}
+@media(prefers-reduced-motion:reduce){.immersive-actions,.viewer-app>.app-header,.viewer-app .comparison-photo,.viewer-app .viewer-panel{transition-duration:.04s}.viewer-app.immersive-restoring>.app-header,.viewer-app.immersive-restoring .comparison-photo,.viewer-app.immersive-restoring .viewer-panel{animation-duration:.04s}}
+
+@media(max-width:760px){.viewer-cards .photo-comparison.is-overlay .map-tools{top:calc(var(--map-free-top,0%) + 12px)}.viewer-cards .map-caption{top:calc(var(--map-free-top,0%) + 16px)}}
 
 /* Keep every photo field available beside the live camera view. */
 .photo-calibration-fields{display:flex;flex-direction:column;gap:16px;min-width:0}

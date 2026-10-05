@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { createReviewService } from './submission-review.mjs';
 import { createStore, ID_PATTERN, MAX_UPLOAD, UserError } from './storage.mjs';
 import { importPhotoPackage } from './package-import.mjs';
-import { MAX_PACKAGE_BYTES } from './photo-package.mjs';
+import { MAX_DEPTH_BYTES, MAX_PACKAGE_BYTES } from './photo-package.mjs';
 import { createPublicationService } from './local-publication.mjs';
 
 async function body(req, maximum) {
@@ -50,7 +50,7 @@ export function localEditorPlugin() {
           const segments = url.pathname.slice('/__local/'.length).split('/');
           const [resource, id, name] = segments;
           if (resource === 'draft-media' && req.method === 'GET') {
-            if (!ID_PATTERN.test(id || '') || !['thumbnail.webp', 'preview.webp', 'display.webp'].includes(name) || segments.length !== 3) throw new UserError('文件不存在。', 404);
+            if (!ID_PATTERN.test(id || '') || !['thumbnail.webp', 'preview.webp', 'display.webp', 'depth.webp'].includes(name) || segments.length !== 3) throw new UserError('文件不存在。', 404);
             const bytes = await fs.readFile(path.join(store.localRoot, 'draft-media', id, name));
             res.setHeader('Content-Type', 'image/webp'); res.setHeader('Cache-Control', 'no-store'); return res.end(bytes);
           }
@@ -85,6 +85,11 @@ export function localEditorPlugin() {
           if (resource === 'buildings' && req.method === 'PUT') {
             const input = JSON.parse((await body(req, 1024 * 1024)).toString());
             await store.updateBuildings(input.overrides, input.revision); return send(200, { ok: true });
+          }
+          if (resource === 'photo' && name === 'depth' && segments.length === 3 && ID_PATTERN.test(id || '')) {
+            const revisionValue = url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : undefined;
+            if (req.method === 'PUT') return send(200, { photo: await store.setPhotoDepth(id, await body(req, MAX_DEPTH_BYTES), revisionValue) });
+            if (req.method === 'DELETE') return send(200, { photo: await store.setPhotoDepth(id, null, revisionValue) });
           }
           if (!ID_PATTERN.test(id || '') || segments.length !== 2) throw new UserError('请求地址不正确。', 404);
           const input = req.method === 'GET' ? {} : JSON.parse((await body(req, 1024 * 1024)).toString() || '{}');

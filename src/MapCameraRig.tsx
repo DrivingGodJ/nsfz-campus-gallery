@@ -27,12 +27,12 @@ function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
   camera.updateMatrixWorld();
 }
 
-export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
+export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
   boundary: Point[];
   selectedObjectTarget?: [number, number, number] | null;
   selectedObjectBounds?: MapObjectBounds | null;
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
-  canAdjustPhotoView?: boolean;
+  canAdjustPhotoView?: boolean; smoothPhotoFraming?: boolean;
   visibleViewport?: MapViewport;
   onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
   onPhotoOrientation?: (orientation: PhotoOrientation) => void;
@@ -260,7 +260,8 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       }
       control.enabled = false;
       const pose = photoCameraPose({ ...preview, ...look.current }, preview.position.height, size.width / Math.max(1, size.height), visibleViewport);
-      if (resizing) motion.current.reframe(camera, pose);
+      if (resizing && smoothPhotoFraming) motion.current.enter(camera, control.target, pose, reducedMotion);
+      else if (resizing) motion.current.reframe(camera, pose);
       else motion.current.enter(camera, control.target, pose, reducedMotion || (samePhoto && !motion.current.moving));
     } else if (motion.current.inPhotoView) {
       look.current = null; lastPoseKey.current = ''; lastShotKey.current = '';
@@ -270,7 +271,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     onMoving(motion.current.photoTransition && motion.current.moving); invalidate();
   }, [preview?.id, preview?.position.x, preview?.position.z, preview?.position.height, preview?.heading, preview?.pitch,
     preview?.width, preview?.height, preview?.metadata?.focalLength35Mm, preview?.metadata?.focalLengthMm,
-    preview?.view?.focalLength35Mm, preview?.view?.cropFactor, canAdjustPhotoView, size.width, size.height, viewportKey, camera, invalidate, onMoving]);
+    preview?.view?.focalLength35Mm, preview?.view?.cropFactor, canAdjustPhotoView, smoothPhotoFraming, size.width, size.height, viewportKey, camera, invalidate, onMoving]);
 
   useEffect(() => {
     const control = controls.current;

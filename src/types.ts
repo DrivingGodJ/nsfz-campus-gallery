@@ -34,7 +34,7 @@ export type PhotoMetadata = {
   aerial?: { latitude?: number; longitude?: number; relativeAltitude?: number; absoluteAltitude?: number };
 };
 export type Photo = {
-  author?: string; copyright?: string; uploadedAt?: string;
+  author?: string; copyright?: string; uploadedAt?: string; depthUpdatedAt?: string;
   id: string; title: string; description: string; capturedAt: string; buildingId: string; locationId?: string; floor: number;
   captureType?: 'ground' | 'aerial';
   altitude?: { meters: number; reference: 'takeoff' | 'seaLevel' };
@@ -43,7 +43,7 @@ export type Photo = {
   width: number; height: number; downloadBytes: number;
   metadata?: PhotoMetadata;
   view?: { focalLength35Mm?: number; cropFactor?: number };
-  files: { thumbnail: string; preview?: string; display: string; download: string };
+  files: { thumbnail: string; preview?: string; depth?: string; display: string; download: string };
 };
 export type BuildingOverride = { name: string; floors: number; floorHeight: number; partFloors?: Record<string, number> };
 export type Site = { schemaVersion: number; revision: number; photos: Photo[]; buildingOverrides: Record<string, BuildingOverride> };

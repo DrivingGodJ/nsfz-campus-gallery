@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Camera } from 'lucide-react';
-import type { Photo } from './types';
-import { photoFrameSize, photoPerspectiveIssue } from './photo-perspective';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeft, Camera, Layers } from 'lucide-react';
+import { type Photo } from './types';
+import { photoAspect, photoFrameSize, photoPerspectiveIssue } from './photo-perspective';
 import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 
 export function PhotoPerspectiveButton({ photo, active, editor = false, compact = false, disabled = false, onClick }: { photo: Photo; active: boolean; editor?: boolean; compact?: boolean; disabled?: boolean; onClick: () => void }) {
@@ -14,7 +14,14 @@ export function PhotoPerspectiveButton({ photo, active, editor = false, compact 
   </div>;
 }
 
-export function PhotoPerspectiveOverlay({ photo, viewport = FULL_MAP_VIEWPORT }: { photo: Photo; viewport?: MapViewport }) {
+export function PhotoHalfOverlayButton({ photo, active, disabled = false, onClick }: { photo: Photo; active: boolean; disabled?: boolean; onClick: () => void }) {
+  const issue = photoPerspectiveIssue(photo);
+  return <button type="button" className="button secondary photo-half-overlay-button" aria-pressed={active} disabled={disabled || (!active && !!issue)} title={issue || undefined} onClick={onClick}>
+    <Layers size={16} />{active ? '取消半透明叠加' : '半透明照片叠加'}
+  </button>;
+}
+
+export function PhotoPerspectiveOverlay({ photo, viewport = FULL_MAP_VIEWPORT, children }: { photo: Photo; viewport?: MapViewport; children?: ReactNode }) {
   const container = useRef<HTMLDivElement>(null);
   const [aspect, setAspect] = useState(1);
   useEffect(() => {
@@ -26,8 +33,10 @@ export function PhotoPerspectiveOverlay({ photo, viewport = FULL_MAP_VIEWPORT }:
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
-  const frame = photoFrameSize(photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5, aspect);
+  const frame = photoFrameSize(photoAspect(photo), aspect);
   return <div ref={container} className="photo-perspective-overlay" style={{ left: viewport.left * 100 + '%', top: viewport.top * 100 + '%', width: viewport.width * 100 + '%', height: viewport.height * 100 + '%', right: 'auto', bottom: 'auto' }}>
-    <div className="photo-perspective-frame" style={{ width: frame.width * 100 + '%', height: frame.height * 100 + '%' }} aria-hidden="true" />
+    <div className="photo-perspective-frame" style={{ width: frame.width * 100 + '%', height: frame.height * 100 + '%' }} aria-hidden="true">
+      {children}
+    </div>
   </div>;
 }

@@ -8,6 +8,8 @@ import { contentPath, changedPaths, photoChanges, createPublicationService, runC
 test('publication includes only the public content library and approved renditions', () => {
   assert.ok(contentPath('public/data/site.json'));
   assert.ok(contentPath('public/media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/thumbnail.webp'));
+  assert.ok(contentPath('public/media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.webp'));
+  assert.equal(contentPath('public/media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.png'), false);
   for (const file of ['.local/originals/source.jpg', '.env.production.local', 'src/editor.tsx', 'public/media/../credentials', 'public/media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/source.jpg']) assert.equal(contentPath(file), false);
   assert.deepEqual(changedPaths(' M public/data/site.json\0R  src/new.ts\0src/old.ts\0'), ['public/data/site.json', 'src/new.ts', 'src/old.ts']);
   assert.deepEqual(photoChanges({ photos: [{ id: 'a', title: 'old' }, { id: 'removed' }], buildingOverrides: {} }, { photos: [{ id: 'a', title: 'new' }, { id: 'new' }], buildingOverrides: {} }), { added: 1, updated: 1, removed: 1, buildingChanged: false });
@@ -72,6 +74,17 @@ test('reviewed photos publish through checks, exact GitHub run, live verificatio
   assert.equal(requests[0][0].split('?')[0], 'https://drivinggodj.github.io/nsfz-campus-gallery/data/site.json');
   assert.ok(requests.some(([url, method]) => url === LIKES_API + '/read' && method === 'POST'));
   assert.ok(!commands.flat().some(value => String(value).includes('private-draft')));
+});
+
+test('paired depth maps publish with the photo library and are checked online', async t => {
+  const depth = 'public/media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.webp';
+  const { service, root, commands, requests } = await fixture(t, { dirty: ' M public/data/site.json\0?? ' + depth + '\0' });
+  await fs.mkdir(path.dirname(path.join(root, depth)), { recursive: true });
+  await fs.writeFile(path.join(root, depth), 'paired-depth');
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.deepEqual(commands.find(row => row[0] === 'git' && row[1] === 'add'), ['git', 'add', '--', 'public/data/site.json', depth]);
+  assert.ok(requests.some(([url, method]) => method === 'HEAD' && url.includes('/media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.webp')));
 });
 
 test('unrelated program changes and wrong branches cannot be committed by the review app', async t => {

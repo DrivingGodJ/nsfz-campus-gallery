@@ -7,9 +7,10 @@ import { extractPhotoMetadata, validCaptureTime } from './photo-metadata.mjs';
 import { resolveLocationId } from './campus-corrections.mjs';
 import { automaticPhotoPlacement } from './photo-geolocation.mjs';
 import { createPhotoPreview, createPhotoDisplay } from './photo-preview.mjs';
+import { PHOTO_DEPTH_FILE, normalizePhotoDepth } from './photo-depth.mjs';
 
 export const ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg)$/;
+export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|depth\.webp|display\.webp|download\.jpg)$/;
 export const MAX_UPLOAD = 40 * 1024 * 1024;
 const emptySite = () => ({ schemaVersion: 1, revision: 0, photos: [], buildingOverrides: {} });
 export class UserError extends Error {
@@ -180,7 +181,7 @@ export function createStore(root) {
       }
       const destination = path.join(publicRoot, 'media', id);
       await fs.mkdir(destination, { recursive: true });
-      for (const name of ['thumbnail.webp', 'preview.webp', 'display.webp', 'download.jpg']) {
+      for (const name of ['thumbnail.webp', 'preview.webp', 'display.webp', 'download.jpg', ...(draft.files.depth ? [PHOTO_DEPTH_FILE] : [])]) {
         await fs.copyFile(path.join(localRoot, 'draft-media', id, name), path.join(destination, name));
       }
       await saveSite(site, { ...site, photos: [...site.photos.filter(p => p.id !== id), photo] });
@@ -285,6 +286,36 @@ export function createStore(root) {
       if (JSON.stringify(photos) !== JSON.stringify(site.photos)) await saveSite(site, { ...site, photos });
       if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
       return { generated, photos: photos.length, drafts: nextDrafts.length, backup };
+    }),
+    setPhotoDepth: (id, bytes, expected) => serial(async () => {
+      if (!ID_PATTERN.test(id || '')) throw new UserError('照片编号无效。');
+      const { site, drafts } = await state();
+      const draft = drafts.find(p => p.id === id), existing = draft || site.photos.find(p => p.id === id);
+      if (!existing) throw new UserError('照片不存在。', 404);
+      if (!draft) revision(site, expected);
+      let normalized;
+      if (bytes !== null) {
+        try { normalized = await normalizePhotoDepth(bytes, existing); }
+        catch (error) { throw new UserError(error.message); }
+      }
+      const directory = draft ? path.join(localRoot, 'draft-media', id) : path.join(publicRoot, 'media', id);
+      const destination = path.join(directory, PHOTO_DEPTH_FILE);
+      // Keep every replaced/deleted map recoverable alongside the JSON backup.
+      try {
+        const backup = path.join(localRoot, 'backups', 'depths', id, crypto.randomUUID() + '.webp');
+        await fs.mkdir(path.dirname(backup), { recursive: true });
+        await fs.copyFile(destination, backup);
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      const { depth: _oldDepth, ...files } = existing.files;
+      const next = { ...existing, depthUpdatedAt: crypto.randomUUID(), files: { ...files, ...(normalized ? { depth: 'media/' + id + '/' + PHOTO_DEPTH_FILE } : {}) } };
+      if (normalized) {
+        const temp = destination + '.' + crypto.randomUUID() + '.tmp';
+        try { await fs.writeFile(temp, normalized); await fs.rename(temp, destination); }
+        finally { await fs.rm(temp, { force: true }); }
+      }
+      if (draft) await writeJSON(draftsFile, drafts.map(p => p.id === id ? next : p));
+      else await saveSite(site, { ...site, photos: site.photos.map(p => p.id === id ? next : p) });
+      return next;
     }),
     updateBuildings: (overrides, expected) => serial(async () => {
       const { site, map } = await state();

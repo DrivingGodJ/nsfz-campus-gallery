@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowLeft, Camera, Heart, Images, MapPin, X } from 'lucide-react';
+import { ArrowLeft, Camera, Download, Heart, Images, MapPin, X } from 'lucide-react';
 import { Brand, EmptyPhotos, Lightbox, Notice, PhotoDetails } from './components';
 import { asset, buildingInfo, loadContent, photoLocation, type Campus, type Photo, type Site } from './types';
 import { AERIAL_LOCATION_FILTER, campusFilterLocations, campusLocations, isAerialPhoto, photoLocationId, photosAtLocation, samePhotoSpot } from './locations';
 import LocationOptions from './LocationOptions';
 import PhotoComparison from './PhotoComparison';
-import { PhotoPerspectiveButton } from './PhotoPerspective';
+import { PhotoHalfOverlayButton, PhotoPerspectiveButton } from './PhotoPerspective';
 import { SEASONS, photosInSeason, photoSeasonLabel, type PhotoSeason } from './photo-season';
 import { PHOTO_TIMES, photosInTime, type PhotoTime } from './photo-time';
 import { sortPhotos, type PhotoSort } from './photo-sort';
@@ -15,6 +15,8 @@ import PhotoLikeButton from './PhotoLikeButton';
 import { useAnimatedPresence } from './useAnimatedPresence';
 import CardHandle from './CardHandle';
 import { useViewerCards } from './useViewerCards';
+import { FULL_MAP_VIEWPORT } from './map-card-viewport';
+import { photoPerspectiveIssue } from './photo-perspective';
 import githubMark from './assets/github-mark.svg';
 import './styles.css';
 
@@ -32,12 +34,41 @@ function App() {
   const [season, setSeason] = useState<PhotoSeason | ''>('');
   const [time, setTime] = useState<PhotoTime | ''>('');
   const [photoPerspective, setPhotoPerspective] = useState(false);
+  const [halfOverlay, setHalfOverlay] = useState(false);
+  const [immersive, setImmersive] = useState<'preparing' | 'entering' | 'shown' | 'exiting' | 'restoring' | null>(null);
+  const returnView = useRef({ perspective: false, half: false });
+  const enterImmersive = () => {
+    if (!selected || photoPerspectiveIssue(selected)) return;
+    returnView.current = { perspective: photoPerspective, half: halfOverlay };
+    setLarge(false); setImmersive('preparing');
+  };
+  const requestImmersiveExit = useCallback(() => setImmersive(phase => phase === 'preparing' ? 'restoring' : phase === 'restoring' ? phase : phase ? 'exiting' : null), []);
+  useEffect(() => {
+    if (immersive !== 'preparing' && immersive !== 'restoring') return;
+    const handle = window.setTimeout(() => {
+      if (immersive === 'preparing') { setHalfOverlay(false); setPhotoPerspective(true); setImmersive('entering'); }
+      else setImmersive(null);
+    }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 40 : 260);
+    return () => window.clearTimeout(handle);
+  }, [immersive]);
+  useEffect(() => {
+    if (immersive !== 'preparing') return;
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); requestImmersiveExit(); } };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [immersive, requestImmersiveExit]);
+  const immersiveActive = immersive === 'entering' || immersive === 'shown' || immersive === 'exiting';
+  const finishImmersiveExit = useCallback(() => {
+    setImmersive('restoring'); setPhotoPerspective(returnView.current.perspective); setHalfOverlay(returnView.current.half);
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.comparison-overlay-actions .primary')?.focus({ preventScroll: true }));
+  }, []);
+  const toggleHalfOverlay = () => { setHalfOverlay(value => !value); setPhotoPerspective(true); setLarge(false); };
   const [sort, setSort] = useState<PhotoSort>('likes');
   const photoLikes = usePhotoLikes(content?.site.photos);
   const filterLocations = useMemo(() => content ? campusFilterLocations(content.campus, content.site) : [], [content]);
   const selectableLocationIds = useMemo(() => filterLocations.map(item => item.id), [filterLocations]);
   const setPhotoSelection = useCallback((photo: Photo | null) => {
-    setPhotoPerspective(false);
+    setPhotoPerspective(false); setHalfOverlay(false); setImmersive(null);
     setLarge(false);
     setSelected(photo);
     const buildingLocation = photo && !isAerialPhoto(photo) && photo.floor > 0
@@ -48,7 +79,7 @@ function App() {
     if (photo) setOpen(false);
   }, [content?.campus, filterLocations]);
   const exitPhotoPerspective = useCallback(() => {
-    setPhotoPerspective(false);
+    setPhotoPerspective(false); setHalfOverlay(false);
     requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.photo-perspective-action button')?.focus({ preventScroll: true }));
   }, []);
   const togglePhotoPerspective = () => {
@@ -91,7 +122,7 @@ function App() {
   const galleryOpen = open && !selected;
   const galleryPresence = useAnimatedPresence(galleryOpen);
   const cards = useViewerCards(!!content, galleryOpen, !!selected);
-  return <div className="app viewer-app">
+  return <div className={'app viewer-app' + (immersiveActive ? ' photo-immersive' : '') + (immersive ? ' immersive-' + immersive : '')}>
     <header className="app-header">
       <Brand />
       <nav className="viewer-header-links" aria-label="项目链接">
@@ -105,11 +136,11 @@ function App() {
     </header>
     {error ? <div className="page-error"><Notice kind="error">{error}</Notice><button className="button primary" onClick={load}>重新加载</button></div> : !content ? <div className="page-loading">正在展开校园地图…</div> :
       <main ref={cards.container} className={'viewer-main viewer-cards' + (galleryPresence.visible ? ' panel-open' : '')}>
-        <PhotoComparison photo={selected} onOpen={() => setLarge(true)} card={cards.photo}
+        <PhotoComparison photo={selected} onOpen={enterImmersive} openLabel="沉浸看照片" openHelp="沉浸式看照片中可下载原图" openDisabled={selected ? photoPerspectiveIssue(selected) : undefined} footerActions={selected && photoPerspective && <PhotoHalfOverlayButton photo={selected} active={halfOverlay} onClick={toggleHalfOverlay} />} card={cards.photo}
           navigation={<><button className="text-button" onClick={() => { back(); setOpen(true); }}><ArrowLeft size={15} />目录</button><button className="icon-button" onClick={() => { back(); setOpen(false); }} aria-label="关闭照片对照"><X size={18} /></button></>}
           actions={selected && <div className="photo-browse-actions"><PhotoPerspectiveButton photo={selected} active={photoPerspective} compact onClick={togglePhotoPerspective} /><PhotoLikeButton value={photoLikes.likes[selected.id]} pending={photoLikes.pending.has(selected.id)} disabled={!photoLikes.canLike} message={photoLikes.message} onClick={() => void photoLikes.toggle(selected.id)} />{photoLikes.message && <p className="likes-status" role="status">{photoLikes.message}{photoLikes.phase === 'error' && <button className="text-button" onClick={() => void photoLikes.refresh()}>重试</button>}</p>}</div>}
           information={selected && <><PhotoDetails photo={selected} campus={content.campus} site={content.site} showImage={false} onOpen={() => setLarge(true)} />{nearby.length > 0 && <div className="nearby"><h3>同一拍摄点的照片</h3><div className="gallery-grid">{nearby.map(p => <button key={p.id} className="gallery-card" onClick={() => select(p)}><img src={asset(p.files.thumbnail)} alt="" /><strong>{p.title}</strong></button>)}</div></div>}</>}>
-          <React.Suspense fallback={<div className="map-stage map-loading">正在绘制校园地图…</div>}><MapView campus={content.campus} site={content.site} photos={filteredPhotos} selectedPhoto={selected} onSelectPhoto={select} selectedLocation={selected ? photoLocationId(selected, content.campus) : location === AERIAL_LOCATION_FILTER ? '' : location} floor={floor} season={season} time={time} selectableLocationIds={selectableLocationIds} visibleViewport={cards.viewport} photoPerspective={photoPerspective} onExitPhotoPerspective={exitPhotoPerspective} onLocation={selectLocation} onClearLocation={() => { if (selected) back(); else { setLocation(''); setFloor(0); } }} /></React.Suspense>
+          <React.Suspense fallback={<div className="map-stage map-loading">正在绘制校园地图…</div>}><MapView campus={content.campus} site={content.site} photos={filteredPhotos} selectedPhoto={selected} onSelectPhoto={select} selectedLocation={selected ? photoLocationId(selected, content.campus) : location === AERIAL_LOCATION_FILTER ? '' : location} floor={floor} season={season} time={time} selectableLocationIds={selectableLocationIds} visibleViewport={immersiveActive ? FULL_MAP_VIEWPORT : cards.viewport} photoPerspective={photoPerspective} smoothPhotoFraming={!!immersive} photoOverlayMode={immersiveActive ? immersive as 'entering' | 'shown' | 'exiting' : halfOverlay ? 'translucent' : 'off'} photoImageSource={immersiveActive && selected ? asset(selected.files.display) : undefined} onPhotoOverlayEntered={() => setImmersive(phase => phase === 'entering' ? 'shown' : phase)} onPhotoOverlayExited={finishImmersiveExit} onExitPhotoPerspective={immersiveActive ? requestImmersiveExit : exitPhotoPerspective} onLocation={selectLocation} onClearLocation={() => { if (selected) back(); else { setLocation(''); setFloor(0); } }} /></React.Suspense>
         </PhotoComparison>
         {galleryPresence.present && <aside className="viewer-panel" style={cards.gallery.style} aria-label="照片目录" aria-hidden={!galleryOpen} inert={!galleryOpen}><CardHandle label="调整照片目录卡片大小" sizing={cards.gallery.sizing} /><div className="catalog-scroll"><div className="panel-heading"><div><p className="eyebrow">察哈尔路 · 校园影像</p><h1>照片目录</h1></div><button className="icon-button" onClick={() => setOpen(false)} aria-label="收起照片目录"><X size={18} /></button></div>
             <div className="filters"><label>地点<select aria-label="按地点筛选照片" value={location} onChange={e => { setLocation(e.target.value); setFloor(0); }}><option value="">全部地点</option><option value={AERIAL_LOCATION_FILTER}>航拍</option><LocationOptions campus={content.campus} site={content.site} /></select></label><label>{chosen ? '楼层' : '层面'}<select value={floor} disabled={!chosen} onChange={e => setFloor(Number(e.target.value))}><option value="0">{location === AERIAL_LOCATION_FILTER ? '不按楼层筛选' : chosenLocation && !chosen ? chosenLocation.levelText : '全部楼层'}</option>{chosen && Array.from({ length: buildingInfo(chosen, content.site).floors }, (_, i) => <option key={i} value={i + 1}>{i + 1} 楼{i + 1 > buildingInfo(chosen, content.site).baseFloors ? '（局部）' : ''}</option>)}</select></label><label className="season-filter">季节<select aria-label="按季节筛选照片" title="按拍摄月份分类：春季 3–5 月，夏季 6–8 月，秋季 9–11 月，冬季 12–2 月" value={season} onChange={e => setSeason(e.target.value as PhotoSeason | '')}><option value="">全部季节</option>{SEASONS.map(item => <option key={item.id} value={item.id}>{item.label}（{photosInSeason(locationPhotos, item.id).length}）</option>)}</select></label><label className="time-filter">拍摄时段<select aria-label="按拍摄时段筛选照片" title="按相机记录的拍摄时刻分类；选择后地图呈现对应光线" value={time} onChange={e => setTime(e.target.value as PhotoTime | '')}><option value="">全部时段（跟随系统外观）</option>{PHOTO_TIMES.map(item => <option key={item.id} value={item.id}>{item.label}{item.hours ? ' · ' + item.hours : ''}（{photosInTime(seasonPhotos, item.id).length}）</option>)}</select></label><label className="sort-filter">排列顺序<select aria-label="照片排列顺序" value={sort} onChange={e => setSort(e.target.value as PhotoSort)}><option value="likes" disabled={photoLikes.phase !== 'ready'}>点赞最多</option><option value="uploaded">上传顺序（最新在前）</option><option value="captured">拍摄时间（最近在前）</option></select></label></div>{photoLikes.message && <p className="likes-status catalog-likes-status" role="status">{photoLikes.message}{photoLikes.phase === 'error' && <button className="text-button" onClick={() => void photoLikes.refresh()}>重试</button>}</p>}{sort === 'likes' && photoLikes.phase !== 'ready' && <p className="likes-status catalog-likes-status">点赞数暂不可用，先按上传顺序展示。</p>}<p className="filter-results" aria-live="polite">{photos.length} 张照片{location === AERIAL_LOCATION_FILTER ? ' · 航拍' : ''}{season ? ' · ' + SEASONS.find(item => item.id === season)!.label : ''}{time ? ' · ' + PHOTO_TIMES.find(item => item.id === time)!.label : ''}</p>
@@ -117,6 +148,10 @@ function App() {
             <div className="archive-note"><span>{campusLocations(content.campus, content.site).length} 个拍摄地点</span><span>{content.site.photos.length} 张校园照片</span><p>照片留住片刻，地图记住位置。</p></div>
         </div></aside>}
       </main>}
+    {immersiveActive && selected && <footer className={'immersive-actions' + (immersive === 'shown' ? ' is-visible' : '')} aria-label="沉浸照片操作" aria-hidden={immersive !== 'shown'} inert={immersive !== 'shown'}>
+      <button className="button secondary" onClick={requestImmersiveExit}><ArrowLeft size={16} />返回校园</button>
+      <a className="button primary" href={asset(selected.files.download)} download={selected.title.replace(/[\\/:*?"<>|]/g, '_') + '.jpg'}><Download size={16} />下载原图</a>
+    </footer>}
     {large && selected && <Lightbox photo={selected} onClose={closeLarge} onPhotoPerspective={() => { setLarge(false); if (!photoPerspective) togglePhotoPerspective(); }} />}
   </div>;
 }
