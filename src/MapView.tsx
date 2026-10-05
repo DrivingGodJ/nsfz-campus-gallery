@@ -30,7 +30,9 @@ import { photoPerspectiveIssue } from './photo-perspective';
 import { PhotoPerspectiveOverlay } from './PhotoPerspective';
 import type { PhotoOrientation } from './photo-look-controls';
 import type { PhotoTime } from './photo-time';
-import { activeMapTime, TIME_LIGHTING } from './time-palette';
+import { TIME_LIGHTING } from './time-palette';
+import SkyEnvironment from './SkyEnvironment';
+import { skyTime } from './sky-environment';
 import { mapInteractionHelp, useInputMode } from './input-mode';
 import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 
@@ -152,8 +154,7 @@ export default function MapView(props: Props) {
   const viewport = props.visibleViewport || FULL_MAP_VIEWPORT;
   const theme = useSystemTheme();
   const mapColor = useMapColor(theme, props.season || '', props.time || '');
-  const activeTime = activeMapTime(props.time || '');
-  const lighting = TIME_LIGHTING[activeTime || 'day'];
+  const lighting = TIME_LIGHTING[skyTime(theme, props.time || '')];
   const inputMode = useInputMode();
   const { campus, site, floor, placing, onPlace } = props;
   const [selectionDismissed, setSelectionDismissed] = useState(false);
@@ -212,6 +213,7 @@ export default function MapView(props: Props) {
   return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} data-time={props.time || 'all'} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
     <MapTheme.Provider value={theme}><MapSeason.Provider value={props.season || ''}><MapTime.Provider value={props.time || ''}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
       <color attach="background" args={[mapColor('#eeeee5')]} />
+      <SkyEnvironment theme={theme} season={props.season || ''} time={props.time || ''} />
       <ambientLight intensity={lighting.ambient} /><directionalLight position={lighting.position} color={lighting.color} intensity={lighting.intensity} />
       <LocationSelection.Provider value={{ selectedId: selectedLocation, onSelect: viewingPhoto ? undefined : onLocation, placing, featuresSelectable: props.featuresSelectable, selectableIds }}><Suspense fallback={null}><group onClick={clickBackground}>
         {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={-.08} unlit />)}
