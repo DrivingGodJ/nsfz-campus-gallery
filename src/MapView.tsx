@@ -1,5 +1,5 @@
 import { MapSeason, MapTheme, MapTime, useSystemTheme, useMapColor } from './MapTheme';
-import { Component, Suspense, useEffect, useMemo, useRef, useState, useCallback, type ReactNode, type RefObject } from 'react';
+import { Component, Suspense, useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Edges, Html, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -32,6 +32,7 @@ import type { PhotoOrientation } from './photo-look-controls';
 import type { PhotoTime } from './photo-time';
 import { activeMapTime, TIME_LIGHTING } from './time-palette';
 import { mapInteractionHelp, useInputMode } from './input-mode';
+import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 
 type Props = {
   campus: Campus; site: Site; photos: Photo[]; selectedPhoto?: Photo | null; onSelectPhoto?: (photo: Photo) => void;
@@ -40,6 +41,7 @@ type Props = {
   time?: PhotoTime | '';
   placing?: boolean; onPlace?: (point: { x: number; z: number }) => void; editPhoto?: Photo | null; onHeading?: (heading: number) => void;
   photoPreview?: boolean; photoPerspective?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoOrientation) => void;
+  visibleViewport?: MapViewport;
 };
 function makeShape(data: Shape) {
   const shape = new THREE.Shape(data.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
@@ -147,6 +149,7 @@ class CanvasBoundary extends Component<{ children: ReactNode }, { failed: boolea
   render() { return this.state.failed ? <div className="map-fallback"><strong>这台设备暂时无法显示 3D 地图</strong><p>你仍可以从照片目录查看大图和下载。</p></div> : this.props.children; }
 }
 export default function MapView(props: Props) {
+  const viewport = props.visibleViewport || FULL_MAP_VIEWPORT;
   const theme = useSystemTheme();
   const mapColor = useMapColor(theme, props.season || '', props.time || '');
   const activeTime = activeMapTime(props.time || '');
@@ -206,7 +209,7 @@ export default function MapView(props: Props) {
     const target = new THREE.Vector3();
     if (e.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(editPhoto?.position.height || 0)), target)) onPlace({ x: target.x, z: target.z });
   };
-  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} data-time={props.time || 'all'} data-input={inputMode} style={{ background: mapColor('#eeeee5') }} aria-label="察哈尔路校区三维地图">
+  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} data-time={props.time || 'all'} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
     <MapTheme.Provider value={theme}><MapSeason.Provider value={props.season || ''}><MapTime.Provider value={props.time || ''}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
       <color attach="background" args={[mapColor('#eeeee5')]} />
       <ambientLight intensity={lighting.ambient} /><directionalLight position={lighting.position} color={lighting.color} intensity={lighting.intensity} />
@@ -221,12 +224,12 @@ export default function MapView(props: Props) {
         {!viewingPhoto && <PhotoMarkers photos={photos} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
-      </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} /></Suspense></LocationSelection.Provider>
+      </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} /></Suspense></LocationSelection.Provider>
     </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {!viewingPhoto && picker && <PhotoClusterPicker photos={picker.photos} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />}
-    {preview && <PhotoPerspectiveOverlay photo={preview} />}
+    {preview && <PhotoPerspectiveOverlay photo={preview} viewport={viewport} />}
     <div className="map-bottom"><span className="map-help">{mapInteractionHelp(inputMode, preview ? editPhoto ? 'editing' : 'preview' : placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>
   </div>;
 }

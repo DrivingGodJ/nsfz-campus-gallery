@@ -17,6 +17,7 @@ import { bindPhotoLookControls } from '../src/photo-look-controls.ts';
 import { mapTravelStep } from '../src/map-travel-controls.ts';
 import { mapGroundOrbitTarget } from '../src/map-orbit.ts';
 import { mapLocationTarget } from '../src/location-geometry.ts';
+import { FULL_MAP_VIEWPORT } from '../src/map-card-viewport.ts';
 
 const photo = { id: 'preview-fixture', title: '校园视角', captureType: 'ground', floor: 1, buildingId: '', placed: true,
   position: { x: 10, z: -25 }, heading: 125, pitch: -18, width: 6000, height: 4000, metadata: { focalLength35Mm: 35 },
@@ -49,6 +50,25 @@ const pointerEvent = (canvas, type, values = {}) => {
 const wheelEvent = (canvas, deltaY) => {
   const event = new Event('wheel', { cancelable: true }); Object.assign(event, { deltaY, deltaMode: 0 }); canvas.dispatchEvent(event); return event;
 };
+
+test('photo camera centres its true shooting ray in the exposed canvas and restores projection smoothly', () => {
+  for (const viewport of [{ left: 0, top: 0, width: 1, height: .35 }, { left: 0, top: 0, width: .55, height: 1 }]) {
+    const { camera, target } = overview(), original = readCameraPose(camera, target), motion = new PhotoCameraTransition();
+    const pose = photoCameraPose(photo, 9, camera.aspect, viewport);
+    motion.enter(camera, target, pose);
+    close(camera.fov, original.fov); assert.equal(camera.view?.enabled || false, false);
+    motion.tick(camera, target, .05);
+    assert.ok(camera.view.enabled && camera.view.offsetX / camera.view.fullWidth >= 0 && camera.view.offsetY / camera.view.fullHeight >= 0);
+    finish(motion, camera, target);
+    const rayPoint = new THREE.Vector3(...directionVector(photo.heading, photo.pitch)).multiplyScalar(20).add(camera.position).project(camera);
+    close(rayPoint.x, 2 * (viewport.left + viewport.width / 2) - 1);
+    close(rayPoint.y, 1 - 2 * (viewport.top + viewport.height / 2));
+    motion.leave(camera, target); assert.equal(camera.view.enabled, true, 'The return starts from the current projection');
+    finish(motion, camera, target);
+    vectorClose(camera.position, original.position); close(camera.quaternion.angleTo(original.quaternion), 0, 1e-7);
+    close(camera.fov, original.fov); assert.equal(camera.view.enabled, false);
+  }
+});
 
 test('real map gestures anchor the ground, turn in place outside campus, prefer visible selections and release offscreen selections', async () => {
   const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
@@ -468,6 +488,52 @@ test('real camera rig suspends orbit controls during photo transitions, responds
   } finally {
     if (root) await act(async () => root.unmount());
     globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
+    await environment.close();
+  }
+});
+
+test('overlay cards leave the map lens unchanged and keep selected objects centred in the exposed area', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const canvas = testCanvas();
+  const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let root;
+  try {
+    const { default: Rig } = await environment.server.ssrLoadModule('/src/MapCameraRig.tsx');
+    globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
+    root = createRoot(canvas);
+    await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
+    const props = { command: { type: 'initial', sequence: 0 }, boundary: [[-300,-300],[300,-300],[300,300],[-300,300]], selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving() {} };
+    let store, timeline = 0;
+    const render = async changes => { await act(async () => { store = root.render(React.createElement(Rig, { ...props, ...changes })); }); };
+    await render({});
+    const state = store.getState(), camera = state.camera, control = state.controls;
+    const advance = async (frames = 65) => { await act(async () => { for(let n=0;n<frames;n++) state.advance(timeline += 1/60,false); }); };
+    const before = readCameraPose(camera,control.target);
+    await render({ visibleViewport: { left: .4, top: 0, width: .6, height: 1 } }); await advance();
+    vectorClose(camera.position,before.position); close(camera.quaternion.angleTo(before.quaternion),0,1e-7); close(camera.fov,before.fov);
+    const selected = { ...photo, position: { ...photo.position, height: 1.6 } };
+    const point = new THREE.Vector3(selected.position.x,selected.position.height,selected.position.z);
+    const bottomCard = { left: 0, top: 0, width: 1, height: .35 };
+    await render({selected,visibleViewport:bottomCard}); await advance();
+    const focused = camera.position.clone(), distance = camera.position.distanceTo(point);
+    let projected = point.clone().project(camera); close(projected.x,0); close(projected.y,.65); close(camera.fov,before.fov);
+    const sideCard = { left: 0, top: 0, width: .55, height: 1 };
+    await render({selected,visibleViewport:sideCard}); await advance();
+    vectorClose(camera.position,focused); close(camera.position.distanceTo(point),distance);
+    projected = point.clone().project(camera); close(projected.x,-.45); close(projected.y,0); close(camera.fov,before.fov);
+    const preview = {...selected,pitch:-20};
+    await render({selected,preview,visibleViewport:sideCard}); await advance();
+    const next = {...selected,id:'next-photo',position:{x:40,z:20,height:9}};
+    await render({selected:next,visibleViewport:bottomCard}); await advance(140);
+    projected = new THREE.Vector3(40,9,20).project(camera); close(projected.x,0); close(projected.y,.65);
+    close(camera.fov,before.fov); assert.equal(camera.view.enabled,false,'Leaving preview clears the optical projection offset');
+    const last = readCameraPose(camera,control.target);
+    await render({visibleViewport:FULL_MAP_VIEWPORT}); await advance();
+    vectorClose(camera.position,last.position); close(camera.quaternion.angleTo(last.quaternion),0,1e-7); close(camera.fov,last.fov);
+  } finally {
+    if(root)await act(async()=>root.unmount());
+    globalThis.window=previousWindow;globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;
     await environment.close();
   }
 });

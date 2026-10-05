@@ -5,10 +5,12 @@ import { photoPreviewFile } from './photo-image';
 import { useAnimatedPresence } from './useAnimatedPresence';
 import PhotoImage from './PhotoImage';
 import PhotoInformation from './PhotoInformation';
+import CardHandle, { type CardSizing } from './CardHandle';
 
-export default function PhotoComparison({ children, photo, imageSource, navigation, actions, information, onOpen }: {
+export default function PhotoComparison({ children, photo, imageSource, navigation, actions, information, onOpen, card }: {
   children: ReactNode; photo?: Photo | null; imageSource?: string;
   navigation?: ReactNode; actions?: ReactNode; information?: ReactNode; onOpen?: () => void;
+  card?: { style: CSSProperties; sizing: CardSizing };
 }) {
   const presence = useAnimatedPresence(!!photo);
   const retained = useRef({ photo, imageSource, navigation, actions, information, onOpen });
@@ -29,10 +31,10 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
     return () => query.removeEventListener('change', update);
   }, []);
   const resize = (value: number) => (stacked ? setStackedShare : setWideShare)(Math.min(70, Math.max(30, value)));
-  return <div ref={container} className={'photo-comparison' + (presence.visible ? ' is-split' : '') + (displayedPhoto && !photo ? ' is-closing' : '') + (resizing ? ' is-resizing' : '')}
+  return <div ref={container} className={'photo-comparison' + (card ? ' is-overlay' : '') + (presence.visible ? ' is-split' : '') + (displayedPhoto && !photo ? ' is-closing' : '') + (resizing ? ' is-resizing' : '')}
     style={{ '--model-share': share + 'fr', '--photo-share': (100 - share) + 'fr' } as CSSProperties}>
     <section className="comparison-model" aria-label="校园模型">{children}</section>
-    {displayedPhoto && <><div className="comparison-divider" role="separator" tabIndex={photo ? 0 : -1} aria-hidden={!photo} inert={!photo} aria-label="调整模型与照片区域大小"
+    {displayedPhoto && <>{!card && <div className="comparison-divider" role="separator" tabIndex={photo ? 0 : -1} aria-hidden={!photo} inert={!photo} aria-label="调整模型与照片区域大小"
       aria-orientation={stacked ? 'horizontal' : 'vertical'} aria-valuemin={30} aria-valuemax={70} aria-valuenow={share}
       aria-valuetext={'模型 ' + Math.round(share) + '%，照片 ' + Math.round(100 - share) + '%'}
       onPointerDown={e => {
@@ -51,8 +53,9 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
         if (e.key === decrease || e.key === increase || e.key === 'Home') {
           e.preventDefault(); resize(e.key === 'Home' ? stacked ? 35 : 50 : share + (e.key === increase ? 2 : -2));
         }
-      }}><span aria-hidden="true" /></div>
-      <section className="comparison-photo" aria-label="原照片" aria-hidden={!photo} inert={!photo}>
+      }}><span aria-hidden="true" /></div>}
+      <section className="comparison-photo" style={card?.style} aria-label="原照片" aria-hidden={!photo} inert={!photo}>
+        {card && <CardHandle label="调整照片预览卡片大小" sizing={card.sizing} />}
         <div className="comparison-heading"><div><span className="eyebrow">原照片</span><strong>{displayedPhoto.title}</strong></div>{displayed.navigation}</div>
         {displayed.actions && <div className="comparison-actions">{displayed.actions}</div>}
         {displayed.information && <PhotoInformation photoId={displayedPhoto.id}>{displayed.information}</PhotoInformation>}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Camera } from 'lucide-react';
 import type { Photo } from './types';
 import { photoFrameSize, photoPerspectiveIssue } from './photo-perspective';
+import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 
 export function PhotoPerspectiveButton({ photo, active, editor = false, compact = false, disabled = false, onClick }: { photo: Photo; active: boolean; editor?: boolean; compact?: boolean; disabled?: boolean; onClick: () => void }) {
   const issue = photoPerspectiveIssue(photo);
@@ -13,7 +14,7 @@ export function PhotoPerspectiveButton({ photo, active, editor = false, compact 
   </div>;
 }
 
-export function PhotoPerspectiveOverlay({ photo }: { photo: Photo }) {
+export function PhotoPerspectiveOverlay({ photo, viewport = FULL_MAP_VIEWPORT }: { photo: Photo; viewport?: MapViewport }) {
   const container = useRef<HTMLDivElement>(null);
   const [aspect, setAspect] = useState(1);
   useEffect(() => {
@@ -26,7 +27,7 @@ export function PhotoPerspectiveOverlay({ photo }: { photo: Photo }) {
     return () => observer.disconnect();
   }, []);
   const frame = photoFrameSize(photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5, aspect);
-  return <div ref={container} className="photo-perspective-overlay">
+  return <div ref={container} className="photo-perspective-overlay" style={{ left: viewport.left * 100 + '%', top: viewport.top * 100 + '%', width: viewport.width * 100 + '%', height: viewport.height * 100 + '%', right: 'auto', bottom: 'auto' }}>
     <div className="photo-perspective-frame" style={{ width: frame.width * 100 + '%', height: frame.height * 100 + '%' }} aria-hidden="true" />
   </div>;
 }

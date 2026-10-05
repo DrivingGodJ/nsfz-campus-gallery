@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -9,6 +9,7 @@ import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-contr
 import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
 import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
+import { FULL_MAP_VIEWPORT, frameMapTarget, type MapViewport } from './map-card-viewport';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
 export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
@@ -26,12 +27,13 @@ function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
   camera.updateMatrixWorld();
 }
 
-export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation }: {
+export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation }: {
   boundary: Point[];
   selectedObjectTarget?: [number, number, number] | null;
   selectedObjectBounds?: MapObjectBounds | null;
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
   canAdjustPhotoView?: boolean;
+  visibleViewport?: MapViewport;
   onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
   onPhotoOrientation?: (orientation: PhotoOrientation) => void;
 }) {
@@ -46,8 +48,10 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
   const gesturePivot = useRef<THREE.Vector3 | null>(null);
   const touchOrbit = useRef<{ rotate: boolean; pan: boolean } | null>(null);
   const objectBounds = selected ? null : selectedObjectBounds;
-  const live = useRef({ size, boundary, objectTarget, objectBounds, preview, onMoving, onPhotoOrientation });
-  live.current = { size, boundary, objectTarget, objectBounds, preview, onMoving, onPhotoOrientation };
+  const viewportKey = JSON.stringify(visibleViewport);
+  const live = useRef({ size, boundary, objectTarget, objectBounds, objectKey, visibleViewport, preview, onMoving, onPhotoOrientation });
+  live.current = { size, boundary, objectTarget, objectBounds, objectKey, visibleViewport, preview, onMoving, onPhotoOrientation };
+  const pendingFocus = useRef(false), focusedObjectKey = useRef('');
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
   const fitDistance = OVERVIEW_DISTANCE / Math.min(1, size.width / Math.max(1, size.height));
 
@@ -58,10 +62,32 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       const offset = camera.position.clone().sub(control.target);
       offset.multiplyScalar(previousFit.current ? fitDistance / previousFit.current : fitDistance / offset.length());
       camera.position.copy(control.target).add(offset);
+      if (camera instanceof THREE.PerspectiveCamera) {
+        const pose = frameMapTarget(readCameraPose(camera, control.target), control.target, camera.aspect, live.current.visibleViewport);
+        camera.quaternion.copy(pose.quaternion); control.target.copy(pose.target);
+      }
       control.update(); invalidate();
     }
     previousFit.current = fitDistance;
   }, [fitDistance, camera, invalidate]);
+
+  const focusSelectedObject = useCallback(() => {
+    const control = controls.current, current = live.current;
+    if (!control || !current.objectTarget || current.preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
+    stopOrbitMomentum(camera, control);
+    const target = new THREE.Vector3(...current.objectTarget);
+    let pose = readCameraPose(camera, control.target);
+    // Resizing a card only turns the gaze; don't repeatedly translate the camera.
+    if (focusedObjectKey.current !== current.objectKey) pose.position.add(target.clone().sub(control.target));
+    pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
+    pose = frameMapTarget(pose, target, camera.aspect, current.visibleViewport);
+    const polar = Math.acos(THREE.MathUtils.clamp((pose.position.y - pose.target.y) / pose.position.distanceTo(pose.target), -1, 1));
+    control.maxPolarAngle = Math.max(Math.PI * .48, polar);
+    focusedObjectKey.current = current.objectKey; pendingFocus.current = false;
+    control.enabled = false;
+    motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    invalidate();
+  }, [camera, invalidate]);
 
   useEffect(() => {
     const surface = gl.domElement.closest?.('.map-stage') || gl.domElement;
@@ -150,6 +176,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       invalidate();
     }
     if (preview || motion.current.inPhotoView || motion.current.photoTransition) return;
+    if (pendingFocus.current) focusSelectedObject();
     if (keepMapCameraAboveGround(camera, control.target)) {
       stopOrbitMomentum(camera, control);
       invalidate();
@@ -166,7 +193,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     const control = controls.current;
     if (!control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera) || command.type === 'initial') return;
     stopOrbitMomentum(camera, control);
-    const pose = readCameraPose(camera, control.target);
+    let pose = readCameraPose(camera, control.target);
     const offset = camera.position.clone().sub(control.target);
     if (command.type === 'reset') { pose.target.set(0, 0, 0); pose.position.fromArray(OVERVIEW_POSITION).normalize().multiplyScalar(fitDistance); }
     if (command.type === 'north') { const length = offset.length(); pose.position.copy(pose.target).add(new THREE.Vector3(0, length * .72, length * .7)); }
@@ -186,27 +213,17 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
     const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
     pose.quaternion.copy(oriented.quaternion);
+    if (command.type === 'reset' || command.type === 'cluster') pose = frameMapTarget(pose, pose.target, camera.aspect, live.current.visibleViewport);
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     invalidate();
   }, [command, camera, invalidate]);
 
   useEffect(() => {
-    const control = controls.current;
-    if (!objectTarget || !control || preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
-    stopOrbitMomentum(camera, control);
-    const target = new THREE.Vector3(...objectTarget);
-    const pose = readCameraPose(camera, control.target);
-    pose.position.add(target.clone().sub(control.target)); pose.target.copy(target);
-    if (pose.position.y < MAP_CAMERA_GROUND_HEIGHT) {
-      pose.position.y = MAP_CAMERA_GROUND_HEIGHT;
-      const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
-      pose.quaternion.copy(oriented.quaternion);
-    }
-    control.enabled = false;
-    motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
-    invalidate();
-  }, [selected?.id, objectKey, camera, invalidate]);
+    pendingFocus.current = !!objectTarget;
+    if (!objectTarget) { focusedObjectKey.current = ''; return; }
+    focusSelectedObject();
+  }, [selected?.id, objectKey, viewportKey, focusSelectedObject]);
 
   useEffect(() => {
     const control = controls.current;
@@ -215,7 +232,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     if (preview) {
       const shotKey = JSON.stringify([preview.id, preview.position, preview.heading, preview.pitch, preview.width, preview.height, canAdjustPhotoView,
         preview.metadata?.focalLength35Mm, preview.metadata?.focalLengthMm, preview.view]);
-      const poseKey = JSON.stringify([shotKey, size.width, size.height]);
+      const poseKey = JSON.stringify([shotKey, size.width, size.height, viewportKey]);
       if (poseKey === lastPoseKey.current) return;
       const samePhoto = look.current?.id === preview.id && motion.current.inPhotoView;
       const resizing = samePhoto && shotKey === lastShotKey.current;
@@ -229,7 +246,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
         stopOrbitMomentum(camera, control);
       }
       control.enabled = false;
-      const pose = photoCameraPose({ ...preview, ...look.current }, preview.position.height, size.width / Math.max(1, size.height));
+      const pose = photoCameraPose({ ...preview, ...look.current }, preview.position.height, size.width / Math.max(1, size.height), visibleViewport);
       if (resizing) motion.current.reframe(camera, pose);
       else motion.current.enter(camera, control.target, pose, reducedMotion || (samePhoto && !motion.current.moving));
     } else if (motion.current.inPhotoView) {
@@ -240,7 +257,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     onMoving(motion.current.photoTransition && motion.current.moving); invalidate();
   }, [preview?.id, preview?.position.x, preview?.position.z, preview?.position.height, preview?.heading, preview?.pitch,
     preview?.width, preview?.height, preview?.metadata?.focalLength35Mm, preview?.metadata?.focalLengthMm,
-    preview?.view?.focalLength35Mm, preview?.view?.cropFactor, canAdjustPhotoView, size.width, size.height, camera, invalidate, onMoving]);
+    preview?.view?.focalLength35Mm, preview?.view?.cropFactor, canAdjustPhotoView, size.width, size.height, viewportKey, camera, invalidate, onMoving]);
 
   useEffect(() => {
     const control = controls.current;

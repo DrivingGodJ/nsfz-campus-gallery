@@ -92,6 +92,31 @@ button.comparison-image{cursor:zoom-in}
 .comparison-information-scroll-hint>span{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:550;color:var(--ink)}
 .comparison-information-content .detail-copy{padding:14px 18px 22px}
 .comparison-information-content .detail-copy h2{font-size:19px}
+
+/* Viewer cards cover a stable, full-size canvas instead of resizing it. */
+.viewer-main.viewer-cards{display:block;overflow:hidden}
+.viewer-main.viewer-cards>.photo-comparison.is-overlay{position:absolute;inset:0;display:block;width:100%;height:100%;transition:none;background:transparent}
+.photo-comparison.is-overlay .comparison-model{position:absolute;inset:0}
+.photo-comparison.is-overlay .comparison-photo,.viewer-main.viewer-cards>.viewer-panel{position:absolute;z-index:24;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 28px #172b2926;background:var(--paper);overflow:hidden}
+.viewer-main.viewer-cards>.viewer-panel{display:flex;flex-direction:column;flex:none;max-height:none;transition:opacity .24s ease,transform .32s cubic-bezier(.22,.61,.36,1);padding-bottom:0}
+.viewer-main.viewer-cards:not(.panel-open)>.viewer-panel{opacity:0;transform:translateY(28px);pointer-events:none}
+.photo-comparison.is-overlay:not(.is-split) .comparison-photo{transform:translateY(28px)}
+.catalog-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.card-handle{display:flex;align-items:center;justify-content:center;flex-shrink:0;height:32px;cursor:ns-resize;touch-action:none;user-select:none;outline-offset:-3px}
+.card-handle>span{width:48px;height:5px;border-radius:5px;background:var(--subtle-border,#b9c4ac);transition:background .15s}
+.card-handle:hover>span,.card-handle:focus-visible>span{background:var(--green)}
+.card-handle:focus-visible{outline:2px solid var(--focus,#a77636)}
+.viewer-cards .map-caption{left:calc(var(--map-free-left,0%) + 25px);top:calc(var(--map-free-top,0%) + 25px)}
+.viewer-cards .map-tools{right:calc(var(--map-free-right,0%) + 22px);top:calc(var(--map-free-top,0%) + 22px)}
+.viewer-cards .map-bottom{left:calc(var(--map-free-left,0%) + 22px);right:calc(var(--map-free-right,0%) + 22px);bottom:calc(var(--map-free-bottom,0%) + 16px)}
+@media(max-width:760px){
+  .photo-comparison.is-overlay .comparison-photo,.viewer-main.viewer-cards>.viewer-panel{border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  .viewer-cards .photo-comparison.is-overlay .map-tools{flex-direction:row;gap:0;top:auto;right:8px;bottom:calc(var(--map-free-bottom,0%) + 8px)}
+  .viewer-cards .map-tools .icon-button{width:32px;height:32px}
+  .viewer-cards .map-tools>span{width:1px;height:20px;margin:6px 5px}
+  .viewer-cards .photo-comparison.is-overlay .map-stage:not(.photo-perspective) .map-bottom{bottom:calc(var(--map-free-bottom,0%) + 50px)}
+  .viewer-cards .map-caption{left:14px;top:16px}
+}
 .edit-comparison-button{width:calc(100% - 40px);margin:12px 20px 0}
 .editor-main.comparing{display:flex;overflow:hidden}
 .editor-main.comparing>.library-panel,.editor-main.comparing>.edit-panel{display:none}

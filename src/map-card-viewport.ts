@@ -1,0 +1,27 @@
+import { Euler, Quaternion, Vector3 } from 'three';
+import type { CameraPose } from './photo-camera.ts';
+
+// Fractions of the unchanged map canvas that remain beside/above a card.
+export type MapViewport = { left: number; top: number; width: number; height: number };
+export const FULL_MAP_VIEWPORT: MapViewport = { left: 0, top: 0, width: 1, height: 1 };
+
+export function viewportProjectionOffset(viewport: MapViewport) {
+  return { x: .5 - viewport.left - viewport.width / 2, y: .5 - viewport.top - viewport.height / 2 };
+}
+
+// Turn toward the visible area's centre without changing distance or lens size.
+export function frameMapTarget(pose: CameraPose, object: Vector3, aspect: number, viewport: MapViewport): CameraPose {
+  const distance = Math.max(.01, pose.position.distanceTo(object));
+  const x = 2 * (viewport.left + viewport.width / 2) - 1;
+  const y = 1 - 2 * (viewport.top + viewport.height / 2);
+  const lens = Math.tan(pose.fov * Math.PI / 360);
+  const screenRay = new Vector3(x * lens * aspect, y * lens, -1).normalize();
+  const direction = object.clone().sub(pose.position).normalize();
+  const verticalRange = Math.hypot(screenRay.y, screenRay.z);
+  const pitch = Math.asin(Math.max(-1, Math.min(1, direction.y / verticalRange))) - Math.atan2(screenRay.y, -screenRay.z);
+  const rayZ = screenRay.y * Math.sin(pitch) + screenRay.z * Math.cos(pitch);
+  const yaw = Math.atan2(screenRay.x, -rayZ) - Math.atan2(direction.x, -direction.z);
+  // Keep the horizon level so OrbitControls can resume without removing roll.
+  const quaternion = new Quaternion().setFromEuler(new Euler(pitch, yaw, 0, 'YXZ'));
+  return { ...pose, quaternion, target: pose.position.clone().add(new Vector3(0, 0, -distance).applyQuaternion(quaternion)) };
+}
