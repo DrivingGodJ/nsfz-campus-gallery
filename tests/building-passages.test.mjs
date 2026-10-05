@@ -87,9 +87,9 @@ test('both teaching-building roads remain open, with slabs above and continuous 
         const ray = new THREE.Raycaster(start, direction, 0, length + 4);
         assert.equal(ray.intersectObjects(meshes, false).length, 0, 'The entire road width is open through both facades and the interior');
         ray.ray.origin.y = .12 + info.floorHeight * 1.5;
-        if (Math.abs(offset) < 1.5 || passage.sourcePathId === 'way/1233313444') {
+        if (passage.sourcePathId === 'way/1233313444') {
           assert.equal(ray.intersectObjects(meshes, false).length, 0, 'The upper connector also opens through the former end walls');
-        }
+        } else assert.ok(ray.intersectObjects(meshes, false).length >= 2, 'Classrooms remain solid above the other ground-only road');
       }
       const middle = new THREE.Vector3((from[0] + to[0]) / 2, .3, (from[1] + to[1]) / 2);
       const up = new THREE.Raycaster(middle, new THREE.Vector3(0, 1, 0));

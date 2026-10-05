@@ -97,7 +97,11 @@ function corridorFootprint(section: Shape, corridor: FloorCorridor, passages: Gr
 function corridorGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[], corridors: FloorCorridor[]) {
   const polygon = [section.outer, ...section.holes];
   const corridorCuts = corridors.map(corridor => [corridorFootprint(section, corridor, passages).outer]);
-  const corridorArea = polygonClipping.union(corridorCuts[0], ...corridorCuts.slice(1));
+  const infills = corridors.flatMap(corridor => corridor.slabInfill ? [[corridor.slabInfill.outer, ...corridor.slabInfill.holes]] : []);
+  const corridorArea = polygonClipping.union(corridorCuts[0], ...corridorCuts.slice(1), ...infills);
+  // Stitch the small imported facade notch at slab levels only. The open
+  // corridor and courtyard remain hollow between floors.
+  const slabFootprint = infills.length ? polygonClipping.union(polygon, ...infills) : [polygon];
   const core = polygonClipping.difference(polygon, corridorCuts[0], ...corridorCuts.slice(1));
   const passageCuts = passages.map(passage => {
     const shape = passageShape(passage);
@@ -113,7 +117,7 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   const layers = levels.slice(0, -1).map((bottom, i) => {
     const top = levels[i + 1], middle = (bottom + top) / 2;
     const slab = slabs.some(([a, b]) => middle >= a && middle <= b);
-    let footprint = slab ? [polygon] : core;
+    let footprint = slab ? slabFootprint : core;
     // Existing ground roads stay open across the full width, including the slabs.
     if (middle < floorHeight && passageCuts.length) footprint = polygonClipping.difference(footprint, passageCuts[0], ...passageCuts.slice(1));
     return { bottom, top, footprint, slab };

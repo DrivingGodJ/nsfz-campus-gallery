@@ -29,7 +29,7 @@ function model(override = site.buildingOverrides[building.id], floor) {
 }
 
 test('the marked forest-facing facade and both atriums are recessed three metres on every floor', async () => {
-  assert.deepEqual(building.floorCorridors, [{ partId: 'main', edge: 19, depth: 3 }, { partId: 'main', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', edges: [0, 1, 2], depth: 3 }, { partId: 'sixth-floor-wing', edges: [19, 20, 21, 22], depth: 3 }, { partId: 'main', passageIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', passageIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', passageIndex: 1, depth: 3 }]);
+  assert.deepEqual(building.floorCorridors.map(({ slabInfill, ...corridor }) => corridor), [{ partId: 'main', edge: 19, depth: 3 }, { partId: 'main', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', edges: [0, 1, 2], depth: 3 }, { partId: 'sixth-floor-wing', edges: [19, 20, 21, 22], depth: 3 }, { partId: 'sixth-floor-wing', passageIndex: 1, depth: 3 }]);
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   assert.deepEqual(applyCampusCorrections(campus, corrections), campus, 'Corridors persist after an OSM map refresh');
   const original = JSON.stringify([building, site]);
@@ -162,7 +162,7 @@ test('the recessed passage beside the rounded wing opens across every floor into
   dispose();
 });
 
-test('both formerly ground-only connectors have no blocking wall on any upper floor', () => {
+test('the rounded-wing connector is open while the marked main-wing classrooms stay solid', () => {
   const { info, meshes, dispose } = model();
   for (const passage of building.groundPassages) {
     const [from, to] = passage.points, direction = new THREE.Vector3(to[0] - from[0], 0, to[1] - from[1]);
@@ -170,11 +170,32 @@ test('both formerly ground-only connectors have no blocking wall on any upper fl
     for (let level = 1; level < Math.max(...info.sections.map(section => section.floors)); level++) {
       for (const offset of [-1.4, 0, 1.4]) {
         const start = new THREE.Vector3(from[0] + direction.z * offset, .12 + (level + .5) * info.floorHeight, from[1] - direction.x * offset).addScaledVector(direction, -2);
-        assert.equal(new THREE.Raycaster(start, direction, 0, length + 4).intersectObjects(meshes, false).length, 0, 'The full three-metre connection passes through both facades and every intermediate wall');
+        const hits = new THREE.Raycaster(start, direction, 0, length + 4).intersectObjects(meshes, false);
+        if (passage.sourcePathId === 'way/1233313444') assert.equal(hits.length, 0, 'The rounded-wing passage connects to its courtyard on every floor');
+        else if (level < info.sections[0].floors) assert.ok(hits.length, 'Opaque classroom walls remain above the ground-only road');
       }
     }
   }
   dispose();
+});
+
+test('the facade notch under the blue atrium has continuous floor and ceiling infills on every level', () => {
+  const patch = building.floorCorridors.find(corridor => corridor.slabInfill).slabInfill.outer;
+  for (const floor of [undefined, 1, 3]) {
+    const { info, meshes, dispose } = model(undefined, floor), levels = floor || info.sections[0].floors;
+    for (const u of [.1, .5, .9]) for (const v of [.1, .5, .9]) for (let level = 0; level < levels; level++) {
+      const x = patch[0][0] + (patch[1][0] - patch[0][0]) * u + (patch[3][0] - patch[0][0]) * v;
+      const z = patch[0][1] + (patch[1][1] - patch[0][1]) * u + (patch[3][1] - patch[0][1]) * v;
+      const point = new THREE.Vector3(x, .12 + (level + .5) * info.floorHeight, z);
+      for (const direction of [-1, 1]) {
+        const hit = new THREE.Raycaster(point, new THREE.Vector3(0, direction, 0), 0, info.floorHeight).intersectObject(meshes[0])[0];
+        assert.ok(hit, 'Every part of the former notch retains a floor and ceiling, including floor cutaways');
+        assert.equal(meshes[0].geometry.userData.photoOcclusionMask[hit.faceIndex], 0, 'The infilled slab does not hide corridor photos');
+      }
+      assert.equal(new THREE.Raycaster(point, new THREE.Vector3(patch[1][0] - patch[0][0], 0, patch[1][1] - patch[0][1]).normalize(), 0, .5).intersectObject(meshes[0]).length, 0, 'No wall is added across the patched corridor');
+    }
+    dispose();
+  }
 });
 
 test('oblique views show corridor photos through their slabs, while classroom walls and roofs still occlude', () => {
