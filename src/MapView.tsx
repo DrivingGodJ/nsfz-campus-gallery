@@ -208,7 +208,7 @@ export default function MapView(props: Props) {
   };
   const clickBackground = (e: ThreeEvent<MouseEvent>) => {
     if (viewingPhoto || e.delta >= 5) return;
-    if (!placing) { if (selectedLocation) { e.stopPropagation(); clearLocation(); } return; }
+    if (!placing) { if (selectedLocation || selectedPhoto) { e.stopPropagation(); clearLocation(); } return; }
     if (!onPlace) return;
     e.stopPropagation();
     const target = new THREE.Vector3();

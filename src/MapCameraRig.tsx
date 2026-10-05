@@ -99,21 +99,37 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     invalidate();
   }, [camera, invalidate]);
 
+  const activateMapInput = useCallback(() => {
+    const control = controls.current;
+    if (!control || live.current.preview) return false;
+    const returning = camera instanceof THREE.PerspectiveCamera && motion.current.cancelReturn(camera, control.target);
+    const focusing = motion.current.cancelFocus();
+    if (returning || focusing) {
+      pendingFocus.current = false;
+      stopOrbitMomentum(camera, control);
+      keepMapCameraAboveGround(camera, control.target);
+      // Interpolated targets and orientations can disagree partway through a
+      // journey. Resume orbit along the current gaze rather than snapping to it.
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), Math.max(1, camera.position.distanceTo(control.target)));
+      live.current.onMoving(false);
+      invalidate();
+    }
+    // Demand rendering may still have disabled controls from the animation's
+    // last frame. Check the current journey rather than losing the next down.
+    control.enabled = !motion.current.moving && !motion.current.photoTransition;
+    return control.enabled;
+  }, [camera, invalidate]);
+
   useEffect(() => {
     const surface = gl.domElement.closest?.('.map-stage') || gl.domElement;
-    const interrupt = () => {
-      const control = controls.current;
-      if (!control || live.current.preview || !motion.current.cancelFocus()) return;
-      stopOrbitMomentum(camera, control);
-      control.enabled = true; invalidate();
-    };
+    const interrupt = () => { activateMapInput(); };
     surface.addEventListener('pointerdown', interrupt, true);
     surface.addEventListener('wheel', interrupt, true);
     return () => { surface.removeEventListener('pointerdown', interrupt, true); surface.removeEventListener('wheel', interrupt, true); };
-  }, [camera, gl, invalidate]);
+  }, [gl, activateMapInput]);
 
   useEffect(() => bindMapTravelControls(gl.domElement, {
-    enabled: () => !!controls.current?.enabled && !live.current.preview && !motion.current.photoTransition,
+    enabled: activateMapInput,
     travel: steps => {
       const control = controls.current;
       if (!control) return;
@@ -165,7 +181,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       },
       finish: () => { gesturePivot.current = null; if (controls.current) controls.current.enableRotate = true; }
     }
-  }), [camera, gl, invalidate]);
+  }), [camera, gl, invalidate, activateMapInput]);
 
   // Runs before Drei's controls update, so orbit damping cannot fight the animation.
   useFrame(() => {

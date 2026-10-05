@@ -52,11 +52,12 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
         <MarkerFade visible={visible}>{shown => <button className={'map-photo ' + (grouped ? 'collage ' : '') + (active ? 'selected ' : '') + (compact && !active ? 'compact' : '')}
           style={{ opacity: shown ? 1 : 0, pointerEvents: shown ? 'auto' : 'none' }} disabled={!visible} aria-hidden={!visible}
           data-photo-count={cluster.photos.length} data-spot-count={cluster.spots.length} data-photo-ids={cluster.photos.map(photo => photo.id).join(',')}
+          aria-pressed={active}
           aria-label={grouped ? (cluster.spots.length > 1 ? '靠近查看' : '选择同地点') + '照片，共 ' + cluster.photos.length + ' 张' : '查看照片：' + photo.title}
           aria-haspopup={grouped && cluster.spots.length === 1 ? 'dialog' : undefined}
           onClick={event => {
             event.stopPropagation();
-            if (!grouped) { onSelect(photo); return; }
+            if (active || !grouped) { onSelect(photo); return; }
             if (cluster.spots.length === 1 || !(camera instanceof THREE.PerspectiveCamera) || camera.position.distanceTo(position.clone().add(new THREE.Vector3(0, PHOTO_MARKER_LIFT, 0))) < 10) onPick(cluster, event.currentTarget);
             else onExpand(clusterFocus(cluster, camera, size));
           }}>

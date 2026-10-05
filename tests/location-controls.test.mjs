@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { campusFilterLocations } from '../src/locations.ts';
+import { campusFilterLocations, campusLocations } from '../src/locations.ts';
 
 test('annotation and filtering offer broad destinations and corridors, while small landmarks cannot be selected', async () => {
   const root = fileURLToPath(new URL('../', import.meta.url));
@@ -43,7 +43,13 @@ test('annotation and filtering offer broad destinations and corridors, while sma
     assert.ok(!render({ placing: true, onSelect: () => {} }).includes('<button'), 'Placing a point keeps map labels from changing its location');
     assert.ok(!render({ featuresSelectable: false, onSelect: () => {} }).includes('<button'), 'Building settings do not offer feature edit actions');
     const filterSelection = { onSelect: () => {}, selectableIds: new Set(filters.map(location => location.id)) };
-    assert.ok(!render(filterSelection).includes('<button'), 'Small map landmarks cannot reintroduce a hidden filter');
+    assert.equal(render(filterSelection), '', 'Unfilterable landmarks do not leave a text label on the map');
+    for (const name of ['湖心亭', '紫藤长廊', '天桥', '小卖部', '办公室']) {
+      const feature = campusLocations(campus, site).find(item => item.name === name);
+      assert.ok(feature, name + ' exists in the model');
+      const label = renderToStaticMarkup(React.createElement(LocationSelection.Provider, { value: filterSelection }, React.createElement(LocationName, { id: feature.id, name })));
+      assert.equal(label, '', name + ' has no map label');
+    }
     const majorName = renderToStaticMarkup(React.createElement(LocationSelection.Provider, { value: filterSelection }, React.createElement(LocationName, { id: 'way/855459418', name: '未名湖' })));
     assert.match(majorName, /<button/, 'Broad map destinations stay selectable');
     for (const id of ['way/1233313439', 'local/underground-corridor', 'local/underpass']) {

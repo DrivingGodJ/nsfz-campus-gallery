@@ -20,6 +20,7 @@ export function LocationHtml({ children, ...props }: ComponentProps<typeof Html>
 
 export function LocationName({ id, name, underground = false, building = false }: { id: string; name: string; underground?: boolean; building?: boolean }) {
   const { selectedId, onSelect, placing, featuresSelectable, selectableIds } = useContext(LocationSelection);
+  if (selectableIds && !selectableIds.has(id)) return null;
   const selected = id === selectedId;
   const className = (building ? 'building-label' : 'structure-label') + (underground ? ' underground' : '') + (selected ? ' active' : '');
   return onSelect && !placing && (!selectableIds || selectableIds.has(id)) && (building || featuresSelectable !== false)

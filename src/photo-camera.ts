@@ -32,6 +32,7 @@ function applyProjectionOffset(camera: THREE.PerspectiveCamera, offset?: { x: nu
 
 export class PhotoCameraTransition {
   private animation: { from: CameraPose; to: CameraPose; elapsed: number; duration: number; firstFrame: boolean } | null = null;
+  private projectionReturn: { from: CameraPose; to: CameraPose; elapsed: number } | null = null;
   private returnPose: CameraPose | null = null;
   private photoView = false;
   get moving() { return this.animation !== null; }
@@ -39,18 +40,31 @@ export class PhotoCameraTransition {
   get photoTransition() { return this.returnPose !== null; }
 
   focus(camera: THREE.PerspectiveCamera, target: THREE.Vector3, pose: CameraPose, reducedMotion = false, duration = .7) {
-    if (!this.photoView && !this.returnPose) this.move(camera, target, pose, reducedMotion, duration);
+    if (!this.photoView && !this.returnPose) this.move(camera, target, this.mapProjection(pose), reducedMotion, duration);
   }
   cancelFocus() {
     if (!this.animation || this.photoView || this.returnPose) return false;
     this.animation = null;
     return true;
   }
+  cancelReturn(camera: THREE.PerspectiveCamera, target: THREE.Vector3) {
+    if (this.photoView || !this.returnPose) return false;
+    // A new gesture takes over the current pose immediately. Finish restoring
+    // the map lens separately, so neither the gesture nor the picture jumps.
+    this.projectionReturn = { from: readCameraPose(camera, target), to: this.returnPose, elapsed: 0 };
+    this.animation = null;
+    this.returnPose = null;
+    return true;
+  }
 
   enter(camera: THREE.PerspectiveCamera, target: THREE.Vector3, pose: CameraPose, reducedMotion = false) {
-    this.returnPose ??= readCameraPose(camera, target);
+    this.returnPose ??= this.mapProjection(readCameraPose(camera, target));
     this.photoView = true;
     this.move(camera, target, pose, reducedMotion);
+  }
+  private mapProjection(pose: CameraPose): CameraPose {
+    const projection = this.projectionReturn?.to;
+    return projection ? { ...pose, fov: projection.fov, near: projection.near, projectionOffset: projection.projectionOffset } : pose;
   }
   leave(camera: THREE.PerspectiveCamera, target: THREE.Vector3, reducedMotion = false) {
     if (!this.photoView || !this.returnPose) return;
@@ -81,12 +95,21 @@ export class PhotoCameraTransition {
     camera.updateMatrixWorld();
   }
   private move(camera: THREE.PerspectiveCamera, target: THREE.Vector3, to: CameraPose, reducedMotion: boolean, duration = .95) {
+    this.projectionReturn = null;
     this.animation = { from: readCameraPose(camera, target), to, elapsed: 0, duration: reducedMotion ? 0 : duration, firstFrame: true };
     this.tick(camera, target, 0);
   }
   tick(camera: THREE.PerspectiveCamera, target: THREE.Vector3, delta: number) {
     const animation = this.animation;
-    if (!animation) return false;
+    if (!animation) {
+      const projection = this.projectionReturn;
+      if (!projection) return false;
+      projection.elapsed += Math.max(0, delta);
+      const t = Math.min(1, projection.elapsed / .25);
+      this.applyProjection(camera, projection.from, projection.to, t);
+      if (t === 1) this.projectionReturn = null;
+      return true;
+    }
     // Demand rendering can resume after seconds of inactivity. That idle time is
     // not animation time; otherwise its first frame skips straight to the end.
     const step = Math.max(0, delta);
@@ -103,13 +126,17 @@ export class PhotoCameraTransition {
     camera.position.lerpVectors(animation.from.position, animation.to.position, ease);
     camera.quaternion.slerpQuaternions(animation.from.quaternion, animation.to.quaternion, ease);
     target.lerpVectors(animation.from.target, animation.to.target, ease);
-    camera.fov = THREE.MathUtils.lerp(animation.from.fov, animation.to.fov, ease);
-    const fromOffset = animation.from.projectionOffset || { x: 0, y: 0 }, toOffset = animation.to.projectionOffset || { x: 0, y: 0 };
-    applyProjectionOffset(camera, { x: THREE.MathUtils.lerp(fromOffset.x, toOffset.x, ease), y: THREE.MathUtils.lerp(fromOffset.y, toOffset.y, ease) });
-    // Reduce clipping immediately on entry; restore the map plane only at the end of the return.
-    camera.near = t === 1 ? animation.to.near : Math.min(animation.from.near, animation.to.near);
-    camera.updateProjectionMatrix();
+    this.applyProjection(camera, animation.from, animation.to, t);
     camera.updateMatrixWorld();
     if (t === 1) { this.animation = null; if (!this.photoView) this.returnPose = null; }
+  }
+  private applyProjection(camera: THREE.PerspectiveCamera, from: CameraPose, to: CameraPose, t: number) {
+    const ease = easing(t);
+    camera.fov = THREE.MathUtils.lerp(from.fov, to.fov, ease);
+    const fromOffset = from.projectionOffset || { x: 0, y: 0 }, toOffset = to.projectionOffset || { x: 0, y: 0 };
+    applyProjectionOffset(camera, { x: THREE.MathUtils.lerp(fromOffset.x, toOffset.x, ease), y: THREE.MathUtils.lerp(fromOffset.y, toOffset.y, ease) });
+    // Reduce clipping immediately on entry; restore the map plane only at the end of the return.
+    camera.near = t === 1 ? to.near : Math.min(from.near, to.near);
+    camera.updateProjectionMatrix();
   }
 }

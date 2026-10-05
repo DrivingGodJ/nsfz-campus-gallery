@@ -182,6 +182,77 @@ test('pointer and touch look controls respond immediately, capture one pointer, 
   assert.deepEqual(angles, { heading: 2, pitch: 90 }, 'Exiting preview removes its drag listeners');
 });
 
+test('the first desktop drag takes over immediately after closing a photo or leaving its preview', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const canvas = testCanvas();
+  const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let root;
+  try {
+    const { default: Rig } = await environment.server.ssrLoadModule('/src/MapCameraRig.tsx');
+    globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
+    root = createRoot(canvas);
+    await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
+    const moves = [];
+    const props = { command: { type: 'initial', sequence: 0 }, boundary: [[-500, -500], [500, -500], [500, 500], [-500, 500]], selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving: value => moves.push(value) };
+    let store, timeline = 0;
+    const render = async additions => { await act(async () => { store = root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, ...additions }))); }); };
+    await render({});
+    const state = store.getState(), camera = state.camera, control = state.controls;
+    const advance = async () => { await act(async () => { for (let n = 0; n < 120; n++) state.advance(timeline += 1 / 60, false); }); };
+    const drag = () => {
+      const before = camera.quaternion.clone();
+      pointerEvent(canvas, 'pointerdown');
+      assert.equal(control.enabled, true, 'The first pointerdown enables map gestures');
+      pointerEvent(canvas, 'pointermove', { clientX: 170, clientY: 120 });
+      assert.ok(camera.quaternion.angleTo(before) > .02, 'The first drag moves before another render frame');
+      pointerEvent(canvas, 'pointerup'); pointerEvent(canvas.ownerDocument, 'pointerup');
+    };
+    const selected = { ...photo, position: { ...photo.position, height: 9 } };
+    await render({ selected });
+    assert.equal(control.enabled, false, 'Photo centering is still animating');
+    await render({}); drag(); await advance();
+    assert.equal(canvas.hasPointerCapture(1), false);
+
+    await render({ selected }); await advance();
+    const fov = camera.fov, near = camera.near;
+    await render({ selected, preview: selected, visibleViewport: { left: 0, top: 0, width: .55, height: 1 } }); await advance();
+    assert.equal(control.enabled, false); assert.equal(camera.view.enabled, true);
+    await render({});
+    assert.equal(control.enabled, false, 'The return animation has just started');
+    drag();
+    assert.equal(moves.at(-1), false, 'Map UI resumes with the gesture');
+    const manualPosition = camera.position.clone(), manualOrientation = camera.quaternion.clone();
+    await advance();
+    vectorClose(camera.position, manualPosition); close(camera.quaternion.angleTo(manualOrientation), 0, 1e-7);
+    close(camera.fov, fov); close(camera.near, near); assert.equal(camera.view.enabled, false, 'The map lens completes its restoration independently');
+    assert.equal(control.enabled, true);
+  } finally {
+    await act(async () => { root?.unmount(); });
+    await environment.close(); globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
+  }
+});
+
+test('interrupting a return preserves the current pose while the lens fades back, including rapid re-entry', () => {
+  const { camera, target } = overview(), original = readCameraPose(camera, target), motion = new PhotoCameraTransition();
+  const pose = photoCameraPose(photo, 9, camera.aspect, { left: 0, top: 0, width: .55, height: 1 });
+  motion.enter(camera, target, pose); finish(motion, camera, target);
+  assert.equal(motion.cancelReturn(camera, target), false, 'An active preview remains fixed');
+  motion.leave(camera, target); motion.tick(camera, target, .1);
+  const before = readCameraPose(camera, target);
+  assert.equal(motion.cancelReturn(camera, target), true);
+  assert.equal(motion.moving, false); assert.equal(motion.photoTransition, false);
+  vectorClose(camera.position, before.position); close(camera.fov, before.fov);
+  camera.position.add(new THREE.Vector3(3, 2, 1)); target.add(new THREE.Vector3(3, 2, 1));
+  const moved = camera.position.clone();
+  motion.tick(camera, target, .1); vectorClose(camera.position, moved);
+  assert.ok(camera.fov !== before.fov && camera.fov !== original.fov, 'Projection restoration is gradual');
+  motion.enter(camera, target, pose); finish(motion, camera, target);
+  motion.leave(camera, target); finish(motion, camera, target);
+  vectorClose(camera.position, moved); close(camera.fov, original.fov); close(camera.near, original.near);
+  assert.equal(camera.view.enabled, false);
+});
+
 test('photo camera uses the exact shooting position and faces the saved compass heading and pitch, including vertical shots', () => {
   for (const heading of [0, 90, 180, 270, 359]) for (const pitch of [-90, -45, 0, 35, 90]) {
     const p = { ...photo, heading, pitch }, pose = photoCameraPose(p, 75, 1.5), camera = cameraAtPose(pose);
@@ -456,7 +527,7 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
 
     await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, props))); });
-    assert.equal(control.enabled, false); wheelEvent(canvas, -100); await advance();
+    assert.equal(control.enabled, false); await advance();
     vectorClose(camera.position, original.position); vectorClose(control.target, original.target); close(camera.fov, 43); close(camera.near, .5);
     await advance(); assert.equal(control.enabled, true);
     assert.equal(store.getState().events.enabled, true, 'Returning restores map selection');
