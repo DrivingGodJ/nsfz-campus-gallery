@@ -4,6 +4,7 @@ import { asset, type Photo } from './types';
 import { photoPreviewFile } from './photo-image';
 import { useAnimatedPresence } from './useAnimatedPresence';
 import PhotoImage from './PhotoImage';
+import PhotoInformation from './PhotoInformation';
 
 export default function PhotoComparison({ children, photo, imageSource, navigation, actions, information, onOpen }: {
   children: ReactNode; photo?: Photo | null; imageSource?: string;
@@ -54,7 +55,7 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
       <section className="comparison-photo" aria-label="原照片" aria-hidden={!photo} inert={!photo}>
         <div className="comparison-heading"><div><span className="eyebrow">原照片</span><strong>{displayedPhoto.title}</strong></div>{displayed.navigation}</div>
         {displayed.actions && <div className="comparison-actions">{displayed.actions}</div>}
-        {displayed.information && <details className="comparison-information"><summary>照片资料与同地点照片</summary><div className="comparison-information-content">{displayed.information}</div></details>}
+        {displayed.information && <PhotoInformation photoId={displayedPhoto.id}>{displayed.information}</PhotoInformation>}
         {displayed.onOpen ? <button className="comparison-image" onClick={displayed.onOpen} aria-label={'全屏查看照片：' + displayedPhoto.title}>
           <PhotoImage src={displayed.imageSource || asset(photoPreviewFile(displayedPhoto))} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} />
           <span><Maximize2 size={15} />全屏照片</span>

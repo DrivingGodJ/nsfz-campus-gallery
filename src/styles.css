@@ -77,8 +77,19 @@ button.comparison-image{cursor:zoom-in}
 .comparison-actions .photo-perspective-action .button{min-height:44px}
 .comparison-actions .field-help{margin:5px 0 0}
 .comparison-hint{font-size:11px;line-height:1.6;color:var(--muted);max-width:24ch}
-.comparison-information{flex:0 1 auto;max-height:45%;overflow:auto;min-height:48px;border-bottom:1px solid var(--line);scrollbar-width:thin}
-.comparison-information summary{cursor:pointer;min-height:48px;padding:13px 18px;font-size:13px;font-weight:550;line-height:1.5;color:var(--ink);background:var(--paper);position:sticky;top:0;z-index:1;touch-action:manipulation}
+.comparison-information{display:flex;flex-direction:column;flex:0 1 auto;max-height:45%;min-height:64px;border-bottom:1px solid var(--line);overflow:hidden}
+.comparison-information-toggle.button{flex-shrink:0;min-height:48px;margin:8px 18px;padding:10px 12px;font-size:13px;line-height:1.5;justify-content:flex-start;border-color:var(--active-border,#b7c7aa);background:var(--active-surface,#e7ecdf)}
+.comparison-information-toggle>span{margin-right:auto}
+.comparison-information-toggle>small{font-size:11px;font-weight:400;color:var(--muted)}
+.comparison-information-chevron{transition:transform .18s}
+.comparison-information.is-open .comparison-information-chevron{transform:rotate(180deg)}
+.comparison-information-body{position:relative;display:flex;min-height:0;flex:1}
+.comparison-information-body[hidden]{display:none}
+.comparison-information-scroll{width:100%;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin}
+.comparison-information-scroll:focus-visible{outline:2px solid var(--focus,#a77636);outline-offset:-2px}
+.comparison-information-content{padding-bottom:32px}
+.comparison-information-scroll-hint{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:center;align-items:flex-end;height:52px;padding:18px 12px 7px;background:linear-gradient(transparent,var(--paper) 65%);pointer-events:none}
+.comparison-information-scroll-hint>span{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:550;color:var(--ink)}
 .comparison-information-content .detail-copy{padding:14px 18px 22px}
 .comparison-information-content .detail-copy h2{font-size:19px}
 .edit-comparison-button{width:calc(100% - 40px);margin:12px 20px 0}
@@ -98,7 +109,7 @@ button.comparison-image{cursor:zoom-in}
   .comparison-actions{padding:8px 12px;gap:8px}
   .comparison-actions .photo-perspective-action .button{font-size:12px;min-height:40px;padding:9px 12px}
   .comparison-hint{display:none}
-  .comparison-information summary{padding:12px;font-size:13px}
+  .comparison-information-toggle.button{margin:8px 12px}
   .comparison-information-content .detail-copy{padding:12px}
   .editor-main.comparing>.editor-map{grid-column:auto;grid-row:auto;min-height:0}
   .edit-comparison-button{width:calc(100% - 28px);margin:10px 14px 0;font-size:11px}
@@ -122,7 +133,7 @@ button.comparison-image{cursor:zoom-in}
   .comparison-heading{padding:6px 10px}
   .comparison-heading .eyebrow{display:none}
   .comparison-actions{padding:6px 10px}
-  .comparison-information summary{padding:8px 10px}
+  .comparison-information-toggle.button{margin:8px 10px}
 }
 
 /* Photo grouping and explicit season filtering share the existing map palette. */
