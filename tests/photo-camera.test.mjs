@@ -140,18 +140,20 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
 
     const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
     const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
-    for (const id of ['way/855459418', 'way/855459407', 'way/855459417', 'local/specimen-forest', 'local/underground-corridor', 'local/underpass']) {
-      const focus = mapLocationTarget(campus, site, id), offset = camera.position.clone().sub(control.target), fov = camera.fov;
+    for (const id of ['way/855459420', 'way/855459418', 'way/855459407', 'way/855459417', 'local/specimen-forest', 'local/underground-corridor', 'local/underpass']) {
+      const focus = mapLocationTarget(campus, site, id), yaw = camera.rotation.clone().reorder('YXZ').y, fov = camera.fov;
       position = camera.position.clone();
       await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds });
       vectorClose(camera.position, position); // Selection starts a journey rather than teleporting.
       await advance();
       vectorClose(control.target, new THREE.Vector3(...focus.target));
-      vectorClose(camera.position.clone().sub(control.target), offset);
+      close(camera.position.distanceTo(control.target), 40);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+      close(camera.rotation.clone().reorder('YXZ').y, yaw);
       const projected = new THREE.Vector3(...focus.target).project(camera);
       close(projected.x, 0); close(projected.y, 0); assert.equal(camera.fov, fov);
       down(); move(); up(); await advance();
-      close(camera.position.distanceTo(new THREE.Vector3(...focus.target)), offset.length());
+      close(camera.position.distanceTo(new THREE.Vector3(...focus.target)), 40);
     }
   } finally {
     await act(async () => { root?.unmount(); });
@@ -670,7 +672,7 @@ test('exposed-area gestures stay anchored and deselection waits for centring and
   }
 });
 
-test('automatic photo-cluster approaches and selected-card resizes stay continuous at both camera poles', async () => {
+test('photo, building and area approaches and card resizes stay continuous at both camera poles', async () => {
   const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const canvas = testCanvas();
   const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
@@ -722,6 +724,48 @@ test('automatic photo-cluster approaches and selected-card resizes stay continuo
       await render({ command: { type: 'cluster', sequence: ++sequence, target: object.toArray(), distance: 40 }, visibleViewport: viewport });
       await advance(`cluster at ${pitch} degrees, viewport ${JSON.stringify(viewport)}`);
       frame(object, viewport); close(camera.position.distanceTo(object), 40, 1e-7);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+    }
+    // Real building and area selections use the same fixed approach from
+    // either camera pole, including when a card covers part of the canvas.
+    const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
+    const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
+    for (const id of ['way/855459420', 'way/855459418', 'local/underground-corridor']) for (const pitch of [-89.4, 89.4]) for (const viewport of [
+      FULL_MAP_VIEWPORT, { left: .4, top: 0, width: .6, height: 1 }, { left: 0, top: 0, width: 1, height: .35 }
+    ]) {
+      await render({ visibleViewport: viewport });
+      camera.position.set(0, 100, 0);
+      camera.quaternion.setFromEuler(new THREE.Euler(pitch * Math.PI / 180, .8, 0, 'YXZ'));
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 100);
+      control.update();
+      const focus = mapLocationTarget(campus, site, id), point = new THREE.Vector3(...focus.target), start = readCameraPose(camera, control.target);
+      await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds, visibleViewport: viewport });
+      vectorClose(camera.position, start.position);
+      await advance(`focusing ${id} at ${pitch} degrees`); frame(point, viewport);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+      close(camera.rotation.clone().reorder('YXZ').y, .8);
+      close(camera.position.distanceTo(point), 40, 1e-7);
+      // A card resize keeps the same framing policy and animates the movement.
+      const nextViewport = viewport.height === 1 ? { left: 0, top: 0, width: 1, height: .35 } : FULL_MAP_VIEWPORT;
+      const beforeResize = camera.position.clone();
+      await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds, visibleViewport: nextViewport });
+      vectorClose(camera.position, beforeResize);
+      await advance(`resizing a card around ${id}`); frame(point, nextViewport);
+      close(camera.position.distanceTo(point), 40, 1e-7);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+    }
+    // Switching between desktop and mobile keeps the fixed approach and
+    // recentres smoothly instead of briefly scaling back to the overview.
+    const resizeFocus = mapLocationTarget(campus, site, 'way/855459418'), resizePoint = new THREE.Vector3(...resizeFocus.target);
+    const resizeViewport = { left: .4, top: 0, width: .6, height: 1 };
+    await render({ selectedObjectTarget: resizeFocus.target, selectedObjectBounds: resizeFocus.bounds, visibleViewport: resizeViewport });
+    await advance('selecting an area before viewport resizing');
+    for (const [width, height] of [[900, 600], [390, 844]]) {
+      const beforeResize = readCameraPose(camera, control.target);
+      await act(async () => state.setSize(width, height));
+      vectorClose(camera.position, beforeResize.position);
+      await advance('resizing the screen with an area selected'); frame(resizePoint, resizeViewport);
+      close(camera.position.distanceTo(resizePoint), 40, 1e-7);
       close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
     }
     // Card movement preserves the selected photo's fixed tilt and distance.
