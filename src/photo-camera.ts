@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Photo } from './types';
 import { directionVector, photoFieldOfView } from './photo-view.ts';
-import { photoFrameSize } from './photo-perspective.ts';
+import { photoAspect, photoFrameSize } from './photo-perspective.ts';
 import { FULL_MAP_VIEWPORT, viewportProjectionOffset, type MapViewport } from './map-card-viewport.ts';
 
 export type CameraPose = { position: THREE.Vector3; quaternion: THREE.Quaternion; target: THREE.Vector3; fov: number; near: number; projectionOffset?: { x: number; y: number } };
@@ -10,7 +10,7 @@ const easing = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 
 export function photoCameraPose(photo: Photo, height: number, canvasAspect: number, viewport = FULL_MAP_VIEWPORT): CameraPose {
   const position = new THREE.Vector3(photo.position.x, height, photo.position.z);
-  const aspect = photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5;
+  const aspect = photoAspect(photo);
   const frame = photoFrameSize(aspect, Math.max(.01, canvasAspect * viewport.width / viewport.height));
   const view = photoFieldOfView(photo);
   // Keep the original image's composition inside its frame, even in a narrow map panel.

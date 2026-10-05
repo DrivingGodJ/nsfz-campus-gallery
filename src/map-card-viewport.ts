@@ -14,8 +14,8 @@ function viewportRay(fov: number, aspect: number, viewport: MapViewport) {
   return new Vector3(x * lens * aspect, y * lens, -1).normalize();
 }
 
-// A photo selection always starts with a level 45-degree downward view. Place
-// the camera behind the exposed centre ray, not underneath a nearby photo.
+// Every selection starts with a level 45-degree downward view, matching photos.
+// Place the camera behind the exposed centre ray rather than underneath the object.
 export function photoMapFocusPose(pose: CameraPose, object: Vector3, aspect: number, viewport: MapViewport): CameraPose {
   const yaw = new Euler().setFromQuaternion(pose.quaternion, 'YXZ').y;
   const quaternion = new Quaternion().setFromEuler(new Euler(-Math.PI / 4, yaw, 0, 'YXZ'));

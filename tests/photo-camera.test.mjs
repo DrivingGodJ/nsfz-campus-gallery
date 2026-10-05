@@ -140,18 +140,20 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
 
     const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
     const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
-    for (const id of ['way/855459418', 'way/855459407', 'way/855459417', 'local/specimen-forest', 'local/underground-corridor', 'local/underpass']) {
-      const focus = mapLocationTarget(campus, site, id), offset = camera.position.clone().sub(control.target), fov = camera.fov;
+    for (const id of ['way/855459420', 'way/855459418', 'way/855459407', 'way/855459417', 'local/specimen-forest', 'local/underground-corridor', 'local/underpass']) {
+      const focus = mapLocationTarget(campus, site, id), yaw = camera.rotation.clone().reorder('YXZ').y, fov = camera.fov;
       position = camera.position.clone();
       await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds });
       vectorClose(camera.position, position); // Selection starts a journey rather than teleporting.
       await advance();
       vectorClose(control.target, new THREE.Vector3(...focus.target));
-      vectorClose(camera.position.clone().sub(control.target), offset);
+      close(camera.position.distanceTo(control.target), 40);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+      close(camera.rotation.clone().reorder('YXZ').y, yaw);
       const projected = new THREE.Vector3(...focus.target).project(camera);
       close(projected.x, 0); close(projected.y, 0); assert.equal(camera.fov, fov);
       down(); move(); up(); await advance();
-      close(camera.position.distanceTo(new THREE.Vector3(...focus.target)), offset.length());
+      close(camera.position.distanceTo(new THREE.Vector3(...focus.target)), 40);
     }
   } finally {
     await act(async () => { root?.unmount(); });
@@ -378,10 +380,10 @@ const testServer = async () => {
   return { server, close: async () => { await server.close(); await fs.rm(cacheDir, { recursive: true, force: true }); } };
 };
 
-test('photo details, lightbox and draft preview expose enter/return actions and explain unavailable states', async () => {
+test('photo details, lightbox and draft preview expose enter/return actions, explain unavailable states and carry the transition overlay', async () => {
   const environment = await testServer();
   try {
-    const { PhotoPerspectiveButton, PhotoPerspectiveOverlay } = await environment.server.ssrLoadModule('/src/PhotoPerspective.tsx');
+    const { PhotoHalfOverlayButton, PhotoPerspectiveButton, PhotoPerspectiveOverlay } = await environment.server.ssrLoadModule('/src/PhotoPerspective.tsx');
     const { PhotoDetails, Lightbox } = await environment.server.ssrLoadModule('/src/components.tsx');
     const { default: PhotoComparison } = await environment.server.ssrLoadModule('/src/PhotoComparison.tsx');
     const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url))), site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
@@ -405,6 +407,19 @@ test('photo details, lightbox and draft preview expose enter/return actions and 
     assert.doesNotMatch(preview, /photo-perspective-bar|<button|返回地图/);
     const display = render(PhotoPerspectiveOverlay, { photo });
     assert.doesNotMatch(display, /photo-perspective-bar|<button|拖动|方向键/);
+    assert.doesNotMatch(display, /<img/, 'the frame stays empty until the transition is loaded');
+    const { default: PhotoOverlay } = await environment.server.ssrLoadModule('/src/PhotoOverlay.tsx');
+    const overlay = render(PhotoOverlay, { photo: renditions, viewport: FULL_MAP_VIEWPORT, theme: 'light', mode: 'off', cameraReady: true });
+    assert.doesNotMatch(overlay, /<button|role="switch"|<input|<select|調试|调试|转场设置|转场进度|深度图来源/);
+    assert.doesNotMatch(overlay, /src=/, 'off does not fetch photo or depth assets');
+    const half = render(PhotoHalfOverlayButton, { photo, active: false, onClick() {} });
+    assert.match(half, /半透明照片叠加/); assert.match(half, /button secondary/);
+    const comparison = render(PhotoComparison, { photo: renditions, onOpen() {}, openLabel: '沉浸看照片', openHelp: '沉浸式看照片中可下载原图', footerActions: React.createElement(PhotoHalfOverlayButton, {photo, active:false, onClick(){}}), children: 'model' });
+    assert.ok(comparison.indexOf('comparison-overlay-actions') > comparison.indexOf('comparison-image'), 'controls follow the photo rather than covering it');
+    assert.match(comparison, /沉浸式看照片中可下载原图/);
+    assert.doesNotMatch(comparison, /全屏照片/);
+    const withCanvas = render(PhotoPerspectiveOverlay, { photo: renditions, children: React.createElement('canvas', { className: 'depth-transition-layer' }) });
+    assert.match(withCanvas, /photo-perspective-frame/); assert.match(withCanvas, /depth-transition-layer/);
     assert.doesNotMatch(render(PhotoPerspectiveButton, { photo, active: false, onClick() {} }), /拖动|环顾/);
   } finally { await environment.close(); }
 });
@@ -495,6 +510,16 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, preview: edited }))); });
     await advance(); vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
     close(camera.fov, photoCameraPose(edited, 9, 1.5).fov);
+    const covered = { left: 0, top: .07, width: 1, height: .4 }, fullFov = camera.fov;
+    await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, preview: edited, visibleViewport: covered, smoothPhotoFraming: true }))); });
+    close(camera.fov, fullFov, 1e-6);
+    const coveredFov = photoCameraPose(edited, 9, 1.5, covered).fov;
+    await advance(15);
+    assert.ok(camera.fov > Math.min(fullFov, coveredFov) && camera.fov < Math.max(fullFov, coveredFov), 'card framing crosses intermediate lens values');
+    vectorClose(camera.position, new THREE.Vector3(20, 9, -10));
+    await advance(); close(camera.fov, coveredFov);
+    await act(async () => { root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, preview: edited, smoothPhotoFraming: true }))); });
+    close(camera.fov, coveredFov); await advance(); close(camera.fov, fullFov);
     pointerEvent(canvas, 'pointerdown', { pointerType: 'touch' }); pointerEvent(canvas, 'pointermove', { clientX: 140, clientY: 110, pointerType: 'touch' });
     pointerEvent(canvas, 'pointerup', { clientX: 140, clientY: 110, pointerType: 'touch' });
     const resizedDirection = camera.getWorldDirection(new THREE.Vector3());
@@ -670,7 +695,7 @@ test('exposed-area gestures stay anchored and deselection waits for centring and
   }
 });
 
-test('automatic photo-cluster approaches and selected-card resizes stay continuous at both camera poles', async () => {
+test('photo, building and area approaches and card resizes stay continuous at both camera poles', async () => {
   const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const canvas = testCanvas();
   const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
@@ -722,6 +747,48 @@ test('automatic photo-cluster approaches and selected-card resizes stay continuo
       await render({ command: { type: 'cluster', sequence: ++sequence, target: object.toArray(), distance: 40 }, visibleViewport: viewport });
       await advance(`cluster at ${pitch} degrees, viewport ${JSON.stringify(viewport)}`);
       frame(object, viewport); close(camera.position.distanceTo(object), 40, 1e-7);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+    }
+    // Real building and area selections use the same fixed approach from
+    // either camera pole, including when a card covers part of the canvas.
+    const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
+    const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
+    for (const id of ['way/855459420', 'way/855459418', 'local/underground-corridor']) for (const pitch of [-89.4, 89.4]) for (const viewport of [
+      FULL_MAP_VIEWPORT, { left: .4, top: 0, width: .6, height: 1 }, { left: 0, top: 0, width: 1, height: .35 }
+    ]) {
+      await render({ visibleViewport: viewport });
+      camera.position.set(0, 100, 0);
+      camera.quaternion.setFromEuler(new THREE.Euler(pitch * Math.PI / 180, .8, 0, 'YXZ'));
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 100);
+      control.update();
+      const focus = mapLocationTarget(campus, site, id), point = new THREE.Vector3(...focus.target), start = readCameraPose(camera, control.target);
+      await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds, visibleViewport: viewport });
+      vectorClose(camera.position, start.position);
+      await advance(`focusing ${id} at ${pitch} degrees`); frame(point, viewport);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+      close(camera.rotation.clone().reorder('YXZ').y, .8);
+      close(camera.position.distanceTo(point), 40, 1e-7);
+      // A card resize keeps the same framing policy and animates the movement.
+      const nextViewport = viewport.height === 1 ? { left: 0, top: 0, width: 1, height: .35 } : FULL_MAP_VIEWPORT;
+      const beforeResize = camera.position.clone();
+      await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds, visibleViewport: nextViewport });
+      vectorClose(camera.position, beforeResize);
+      await advance(`resizing a card around ${id}`); frame(point, nextViewport);
+      close(camera.position.distanceTo(point), 40, 1e-7);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+    }
+    // Switching between desktop and mobile keeps the fixed approach and
+    // recentres smoothly instead of briefly scaling back to the overview.
+    const resizeFocus = mapLocationTarget(campus, site, 'way/855459418'), resizePoint = new THREE.Vector3(...resizeFocus.target);
+    const resizeViewport = { left: .4, top: 0, width: .6, height: 1 };
+    await render({ selectedObjectTarget: resizeFocus.target, selectedObjectBounds: resizeFocus.bounds, visibleViewport: resizeViewport });
+    await advance('selecting an area before viewport resizing');
+    for (const [width, height] of [[900, 600], [390, 844]]) {
+      const beforeResize = readCameraPose(camera, control.target);
+      await act(async () => state.setSize(width, height));
+      vectorClose(camera.position, beforeResize.position);
+      await advance('resizing the screen with an area selected'); frame(resizePoint, resizeViewport);
+      close(camera.position.distanceTo(resizePoint), 40, 1e-7);
       close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
     }
     // Card movement preserves the selected photo's fixed tilt and distance.

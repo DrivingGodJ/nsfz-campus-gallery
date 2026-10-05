@@ -7,15 +7,16 @@ import PhotoImage from './PhotoImage';
 import PhotoInformation from './PhotoInformation';
 import CardHandle, { type CardSizing } from './CardHandle';
 
-export default function PhotoComparison({ children, photo, imageSource, navigation, actions, information, onOpen, card }: {
+export default function PhotoComparison({ children, photo, imageSource, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions, sideBySide = false, card }: {
   children: ReactNode; photo?: Photo | null; imageSource?: string;
-  navigation?: ReactNode; actions?: ReactNode; information?: ReactNode; onOpen?: () => void;
+  navigation?: ReactNode; actions?: ReactNode; information?: ReactNode; onOpen?: () => void; openLabel?: string; openHelp?: string; openDisabled?: string; footerActions?: ReactNode;
+  sideBySide?: boolean;
   card?: { style: CSSProperties; sizing: CardSizing };
 }) {
   const presence = useAnimatedPresence(!!photo);
-  const retained = useRef({ photo, imageSource, navigation, actions, information, onOpen });
-  if (photo) retained.current = { photo, imageSource, navigation, actions, information, onOpen };
-  const displayed = photo ? { photo, imageSource, navigation, actions, information, onOpen } : retained.current;
+  const retained = useRef({ photo, imageSource, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions });
+  if (photo) retained.current = { photo, imageSource, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions };
+  const displayed = photo ? { photo, imageSource, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions } : retained.current;
   const displayedPhoto = photo || (presence.present ? displayed.photo : null);
   const container = useRef<HTMLDivElement>(null);
   const drag = useRef<{ start: number; share: number; length: number } | null>(null);
@@ -26,12 +27,12 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
   const share = stacked ? stackedShare : wideShare;
   useEffect(() => {
     const query = window.matchMedia('(max-width: 760px) and (min-height: 520px)');
-    const update = () => { drag.current = null; setStacked(query.matches); };
+    const update = () => { drag.current = null; setStacked(!sideBySide && query.matches); };
     update(); query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
-  }, []);
+  }, [sideBySide]);
   const resize = (value: number) => (stacked ? setStackedShare : setWideShare)(Math.min(70, Math.max(30, value)));
-  return <div ref={container} className={'photo-comparison' + (card ? ' is-overlay' : '') + (presence.visible ? ' is-split' : '') + (displayedPhoto && !photo ? ' is-closing' : '') + (resizing ? ' is-resizing' : '')}
+  return <div ref={container} className={'photo-comparison' + (sideBySide ? ' is-side-by-side' : '') + (card ? ' is-overlay' : '') + (presence.visible ? ' is-split' : '') + (displayedPhoto && !photo ? ' is-closing' : '') + (resizing ? ' is-resizing' : '')}
     style={{ '--model-share': share + 'fr', '--photo-share': (100 - share) + 'fr' } as CSSProperties}>
     <section className="comparison-model" aria-label="校园模型">{children}</section>
     {displayedPhoto && <>{!card && <div className="comparison-divider" role="separator" tabIndex={photo ? 0 : -1} aria-hidden={!photo} inert={!photo} aria-label="调整模型与照片区域大小"
@@ -57,12 +58,17 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
       <section className="comparison-photo" style={card?.style} aria-label="原照片" aria-hidden={!photo} inert={!photo}>
         {card && <CardHandle label="调整照片预览卡片大小" sizing={card.sizing} />}
         <div className="comparison-heading"><div><span className="eyebrow">原照片</span><strong>{displayedPhoto.title}</strong></div>{displayed.navigation}</div>
-        {displayed.actions && <div className="comparison-actions">{displayed.actions}</div>}
         {displayed.information && <PhotoInformation photoId={displayedPhoto.id}>{displayed.information}</PhotoInformation>}
-        {displayed.onOpen ? <button className="comparison-image" onClick={displayed.onOpen} aria-label={'全屏查看照片：' + displayedPhoto.title}>
+        {displayed.onOpen ? <button className="comparison-image" onClick={displayed.onOpen} disabled={!!displayed.openDisabled} aria-label={(displayed.openLabel || '全屏查看照片') + '：' + displayedPhoto.title}>
           <PhotoImage src={displayed.imageSource || asset(photoPreviewFile(displayedPhoto))} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} />
-          <span><Maximize2 size={15} />全屏照片</span>
+          {!displayed.openLabel && <span><Maximize2 size={15} />全屏照片</span>}
         </button> : <div className="comparison-image"><PhotoImage src={displayed.imageSource || asset(photoPreviewFile(displayedPhoto))} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} /></div>}
+        {(displayed.openLabel || displayed.footerActions) && <div className={'comparison-overlay-actions' + (!displayed.footerActions ? ' is-single' : '')} role="group" aria-label="照片叠加与沉浸浏览">
+          {displayed.openLabel && <button className="button primary" onClick={displayed.onOpen} disabled={!!displayed.openDisabled} title={displayed.openDisabled}><Maximize2 size={16} />{displayed.openLabel}</button>}
+          {displayed.footerActions}
+          {(displayed.openDisabled || displayed.openHelp) && <p className="field-help">{displayed.openDisabled || displayed.openHelp}</p>}
+        </div>}
+        {displayed.actions && <div className="comparison-actions">{displayed.actions}</div>}
       </section>
     </>}
   </div>;

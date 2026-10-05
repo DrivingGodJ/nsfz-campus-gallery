@@ -27,12 +27,12 @@ function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
   camera.updateMatrixWorld();
 }
 
-export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
+export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
   boundary: Point[];
   selectedObjectTarget?: [number, number, number] | null;
   selectedObjectBounds?: MapObjectBounds | null;
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
-  canAdjustPhotoView?: boolean;
+  canAdjustPhotoView?: boolean; smoothPhotoFraming?: boolean;
   visibleViewport?: MapViewport;
   onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
   onPhotoOrientation?: (orientation: PhotoOrientation) => void;
@@ -52,7 +52,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
   const viewportKey = JSON.stringify(visibleViewport);
   const live = useRef({ size, boundary, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView });
   live.current = { size, boundary, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView };
-  const pendingFocus = useRef(false), focusedObjectKey = useRef('');
+  const pendingFocus = useRef(false);
   const dismissedObjectKey = useRef('');
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
   const fitDistance = OVERVIEW_DISTANCE / Math.min(1, size.width / Math.max(1, size.height));
@@ -60,7 +60,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
   useEffect(() => {
     const control = controls.current;
     if (!control) return;
-    if (!selected && (!preview || !previousFit.current) && !motion.current.moving && !motion.current.inPhotoView) {
+    if (!objectTarget && (!preview || !previousFit.current) && !motion.current.moving && !motion.current.inPhotoView) {
       const offset = camera.position.clone().sub(control.target);
       offset.multiplyScalar(previousFit.current ? fitDistance / previousFit.current : fitDistance / offset.length());
       camera.position.copy(control.target).add(offset);
@@ -78,24 +78,9 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     if (!control || !current.objectTarget || current.preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
     stopOrbitMomentum(camera, control);
     const target = new THREE.Vector3(...current.objectTarget);
-    let pose = readCameraPose(camera, control.target);
-    if (current.selected) {
-      pose = photoMapFocusPose(pose, target, camera.aspect, current.visibleViewport);
-    } else {
-      // Building selections retain their viewing distance and orientation.
-      if (focusedObjectKey.current !== current.objectKey) {
-        const viewport = current.visibleViewport, ray = new THREE.Raycaster();
-        ray.setFromCamera(new THREE.Vector2(2 * (viewport.left + viewport.width / 2) - 1, 1 - 2 * (viewport.top + viewport.height / 2)), camera);
-        // Translate the object onto the exposed centre ray at the same distance.
-        // This also works looking straight down, where yaw/pitch alone cannot
-        // move a centred object sideways without tilting the horizon.
-        const centre = ray.ray.at(camera.position.distanceTo(control.target), new THREE.Vector3());
-        pose.position.add(target.clone().sub(centre));
-      }
-      pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
-      pose = frameMapTarget(pose, target, camera.aspect, current.visibleViewport);
-    }
-    focusedObjectKey.current = current.objectKey; pendingFocus.current = false;
+    // Photos, buildings and areas share the same fixed approach and exposed centre.
+    const pose = photoMapFocusPose(readCameraPose(camera, control.target), target, camera.aspect, current.visibleViewport);
+    pendingFocus.current = false;
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     invalidate();
@@ -249,9 +234,9 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
   useEffect(() => {
     dismissedObjectKey.current = '';
     pendingFocus.current = !!objectTarget;
-    if (!objectTarget) { focusedObjectKey.current = ''; return; }
+    if (!objectTarget) return;
     focusSelectedObject();
-  }, [selected?.id, objectKey, viewportKey, focusSelectedObject]);
+  }, [selected?.id, objectKey, viewportKey, size.width, size.height, focusSelectedObject]);
 
   useEffect(() => {
     const control = controls.current;
@@ -275,7 +260,8 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       }
       control.enabled = false;
       const pose = photoCameraPose({ ...preview, ...look.current }, preview.position.height, size.width / Math.max(1, size.height), visibleViewport);
-      if (resizing) motion.current.reframe(camera, pose);
+      if (resizing && smoothPhotoFraming) motion.current.enter(camera, control.target, pose, reducedMotion);
+      else if (resizing) motion.current.reframe(camera, pose);
       else motion.current.enter(camera, control.target, pose, reducedMotion || (samePhoto && !motion.current.moving));
     } else if (motion.current.inPhotoView) {
       look.current = null; lastPoseKey.current = ''; lastShotKey.current = '';
@@ -285,7 +271,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     onMoving(motion.current.photoTransition && motion.current.moving); invalidate();
   }, [preview?.id, preview?.position.x, preview?.position.z, preview?.position.height, preview?.heading, preview?.pitch,
     preview?.width, preview?.height, preview?.metadata?.focalLength35Mm, preview?.metadata?.focalLengthMm,
-    preview?.view?.focalLength35Mm, preview?.view?.cropFactor, canAdjustPhotoView, size.width, size.height, viewportKey, camera, invalidate, onMoving]);
+    preview?.view?.focalLength35Mm, preview?.view?.cropFactor, canAdjustPhotoView, smoothPhotoFraming, size.width, size.height, viewportKey, camera, invalidate, onMoving]);
 
   useEffect(() => {
     const control = controls.current;
