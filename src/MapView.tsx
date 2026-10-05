@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Edges, Html, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import { ArrowDown, ArrowUp, Crosshair, Layers } from 'lucide-react';
+import { ArrowDown, ArrowUp, Crosshair, Layers, Minimize2, SlidersHorizontal } from 'lucide-react';
 import { buildingInfo, type Campus, type Photo, type Point, type Shape, type Site } from './types';
 import CampusStructures from './CampusStructures';
 import SportsGround from './SportsGround';
@@ -28,7 +28,14 @@ import PhotoClusterPicker from './PhotoClusterPicker';
 import type { PhotoCluster } from './photo-clusters';
 import MapCameraRig, { OVERVIEW_POSITION, type MapCommand, type MapPhoto } from './MapCameraRig';
 import { photoPerspectiveIssue } from './photo-perspective';
-import { PhotoPerspectiveOverlay } from './PhotoPerspective';
+import { PhotoPerspectiveOverlay, PhotoTransitionButton, DepthMapButton, DepthOverlayButton, DepthTransitionButton, DepthSourceToggle } from './PhotoPerspective';
+import DepthMapCapture, { type DepthMapCapture as DepthMapCaptureApi } from './DepthMapCapture';
+import DepthTransitionCanvas from './DepthTransitionCanvas';
+import { cropDepthPixels, depthMapBlob, depthMapFileName, depthMapFrameRect, downloadDepthMap, loadImageElement } from './depth-map';
+import { DEPTH_TRANSITION_DEFAULTS, DEPTH_TRANSITION_LIMITS, depthGray, depthHistogram, type DepthTransitionSettings } from './depth-transition';
+import { asset } from './types';
+import { photoDepthFile, photoPreviewFile } from './photo-image';
+import { resolveDepthSource, type DepthSource } from './depth-source';
 import type { PhotoOrientation } from './photo-look-controls';
 import type { PhotoTime } from './photo-time';
 import SkyEnvironment from './SkyEnvironment';
@@ -42,7 +49,7 @@ type Props = {
   season?: PhotoSeason | '';
   time?: PhotoTime | '';
   placing?: boolean; onPlace?: (point: { x: number; z: number }) => void; editPhoto?: Photo | null; onHeading?: (heading: number) => void;
-  photoPreview?: boolean; photoPerspective?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoOrientation) => void;
+  photoPreview?: boolean; photoPerspective?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoOrientation) => void; photoImageSource?: string;
   visibleViewport?: MapViewport;
 };
 function makeShape(data: Shape) {
@@ -180,6 +187,106 @@ export default function MapView(props: Props) {
   useEffect(() => setPicker(null), [photoIds, props.selectedPhoto?.id, props.editPhoto?.id, props.photoPerspective]);
   const candidate = editPhoto || selectedPhoto;
   const preview = props.photoPerspective && !placing && candidate && !photoPerspectiveIssue(candidate) ? candidate : null;
+  const [photoTransition, setPhotoTransition] = useState(false);
+  const depthCapture = useRef<DepthMapCaptureApi | null>(null);
+  const [depthBusy, setDepthBusy] = useState(false);
+  const [depthMessage, setDepthMessage] = useState('');
+  const [depth, setDepth] = useState<{ url: string; gray: Uint8Array; histogram: Uint32Array; width: number; height: number } | null>(null);
+  const [depthShown, setDepthShown] = useState(false);
+  const [transition, setTransition] = useState<DepthTransitionSettings>(DEPTH_TRANSITION_DEFAULTS);
+  const [depthSourceChoice, setDepthSourceChoice] = useState<DepthSource | null>(null);
+  // Null until the user picks: the default follows whichever maps are available
+  // for the current photo, so it never needs syncing when the photo changes.
+  const depthSource = resolveDepthSource(preview, depthSourceChoice);
+  // Read inside the async depth load, where the awaited state is already stale.
+  const depthSourceRef = useRef(depthSource);
+  depthSourceRef.current = depthSource;
+  const [transitionSettingsOpen, setTransitionSettingsOpen] = useState(false);
+  const [transitionToolsOpen, setTransitionToolsOpen] = useState(true);
+  const [transitionRun, setTransitionRun] = useState(0);
+  const [transitionPlaying, setTransitionPlaying] = useState(false);
+  const transitionScrubber = useRef<HTMLInputElement>(null);
+  const transitionReadout = useRef<HTMLSpanElement>(null);
+  // The overlay belongs to one photo view: switching photos or leaving the
+  // perspective drops it, so the map is never left covered by a stale picture.
+  // Changing the depth source counts too: the old map belongs to the other source.
+  useEffect(() => {
+    setPhotoTransition(false); setDepthShown(false); setDepth(null); setDepthMessage('');
+    setTransitionRun(0); setTransitionPlaying(false);
+  }, [preview?.id, depthSource]);
+  // Release the previous depth image once a new one replaces it or the map closes.
+  useEffect(() => () => { if (depth) URL.revokeObjectURL(depth.url); }, [depth]);
+  const stopTransition = () => { setTransitionRun(0); setTransitionPlaying(false); };
+  const toggleTransition = () => {
+    if (transitionPlaying) { setTransitionPlaying(false); return; }
+    setDepthShown(false); setPhotoTransition(false);
+    setTransitionRun(run => run + 1); setTransitionPlaying(true);
+  };
+  // Dragging the scrubber opens the transition on that frame; the canvas reads
+  // the thumb itself, so this only has to switch the mode on.
+  const scrubTransition = () => {
+    setDepthShown(false); setPhotoTransition(false); setTransitionPlaying(false);
+    setTransitionRun(run => run || 1);
+  };
+  const changeTransition = <K extends keyof DepthTransitionSettings>(key: K, value: DepthTransitionSettings[K]) =>
+    setTransition(current => ({ ...current, [key]: value }));
+  // Two sources, one shape. `model` renders the campus mesh through the photo
+  // camera: metric, and cropped to the frame. `photo` loads a precomputed
+  // monocular estimate of the photograph itself: relative, and already in the
+  // photo's own framing, so it needs no cropping. Both end up as the same
+  // {url, gray, histogram} record, so the overlay, the scrubber and the blue-line
+  // transition stay source-agnostic.
+  const buildDepthMap = async (photo: Photo, source: DepthSource) => {
+    if (source === 'photo') {
+      const file = photoDepthFile(photo);
+      if (!file) throw new Error('这张照片还没有预计算的深度图。');
+      const url = asset(file);
+      const image = await loadImageElement(url, '照片深度图读取失败。');
+      const width = Math.max(1, image.naturalWidth || image.width), height = Math.max(1, image.naturalHeight || image.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('无法创建深度图画布。');
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, width, height);
+      downloadDepthMap(await depthMapBlob({ pixels: pixels.data, width, height }), depthMapFileName(photo.title));
+      const gray = depthGray(pixels.data);
+      return { url, gray, histogram: depthHistogram(gray), width, height, message: '已载入照片深度图 ' + width + ' × ' + height + '（Depth Anything V2 相对深度）。' };
+    }
+    const capture = depthCapture.current;
+    if (!capture) throw new Error('深度渲染还没准备好，请稍后再点一次。');
+    const rendered = capture();
+    const frame = cropDepthPixels(rendered.pixels, rendered.width, rendered.height, depthMapFrameRect(photo, viewport, rendered.width, rendered.height));
+    const blob = await depthMapBlob(frame);
+    downloadDepthMap(blob, depthMapFileName(photo.title));
+    const gray = depthGray(frame.pixels);
+    return { url: URL.createObjectURL(blob), gray, histogram: depthHistogram(gray), width: frame.width, height: frame.height, message: '已导出并叠加 ' + frame.width + ' × ' + frame.height + ' 深度图。' };
+  };
+  const renderDepthMap = async () => {
+    const photo = preview;
+    if (!photo || depthBusy) return;
+    const source = depthSource;
+    setDepthBusy(true); setDepthMessage('');
+    try {
+      stopTransition();
+      const map = await buildDepthMap(photo, source);
+      // The user may have switched sources while this was loading; the map in hand
+      // belongs to the source that was selected when the click happened.
+      if (depthSourceRef.current !== source) return;
+      setDepth({ url: map.url, gray: map.gray, histogram: map.histogram, width: map.width, height: map.height });
+      setPhotoTransition(false);
+      // Loading the photo estimate is a one-click "run the wipe", so the grayscale
+      // plate is not parked over the model first: the photo sweeps straight in over
+      // the scene. The model estimate keeps the old behaviour, because its overlay
+      // is the thing you compare geometry against. Either way 叠加深度图 shows the
+      // plate on demand, and 停止转场 interrupts the automatic run.
+      setDepthShown(source !== 'photo');
+      if (source === 'photo') { setTransitionRun(run => run + 1); setTransitionPlaying(true); }
+      setDepthMessage(source === 'photo' ? map.message + '正在播放转场。' : map.message);
+    } catch (error) {
+      setDepthMessage((error as Error).message || '深度图生成失败。');
+    } finally { setDepthBusy(false); }
+  };
   const skyPhoto = editPhoto ? props.photoPreview || preview ? editPhoto : null : selectedPhoto;
   const environmentTime = photoSkyTime(props.time || '', skyPhoto);
   const environmentSeason = photoMapSeason(props.season || '', skyPhoto);
@@ -229,13 +336,45 @@ export default function MapView(props: Props) {
         {!viewingPhoto && <PhotoMarkers photos={photos} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
-      </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>
+      </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /><DepthMapCapture capture={depthCapture} /></Suspense></LocationSelection.Provider>
     </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {/* The map is isolated below viewer cards; place the chooser alongside them so the catalog cannot cover it. */}
     {labelPortal.current && createPortal(<PhotoClusterPicker photos={!viewingPhoto && picker ? picker.photos : null} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
-    {preview && <PhotoPerspectiveOverlay photo={preview} viewport={viewport} />}
+    {/* Both panels can fold away so they never sit on top of the picture. */}
+    {preview && !transitionToolsOpen && <div className="map-tools"><button type="button" className="icon-button" aria-label="展开转场控制" title="展开转场控制" aria-expanded="false" onClick={() => setTransitionToolsOpen(true)}><SlidersHorizontal size={18} aria-hidden="true" /></button></div>}
+    {preview && transitionToolsOpen && <div className="map-tools photo-transition-tools">
+      <div className="tools-head"><button type="button" className="panel-collapse" aria-label="收起转场控制" title="收起转场控制" aria-expanded="true" onClick={() => setTransitionToolsOpen(false)}><Minimize2 size={13} aria-hidden="true" />收起</button></div>
+      <PhotoTransitionButton active={photoTransition} onClick={() => { setPhotoTransition(!photoTransition); setDepthShown(false); stopTransition(); }} />
+      <DepthSourceToggle source={depthSource} photoAvailable={!!preview.files.depth} disabled={depthBusy} onChange={setDepthSourceChoice} />
+      <DepthMapButton busy={depthBusy} source={depthSource} onClick={() => void renderDepthMap()} />
+      {!!depth && <DepthOverlayButton active={depthShown} onClick={() => { setDepthShown(!depthShown); setPhotoTransition(false); stopTransition(); }} />}
+      {!!depth && <DepthTransitionButton playing={transitionPlaying} armed={transitionRun > 0} onClick={toggleTransition} />}
+      {!!depth && <label className="depth-transition-progress" title="拖动定位转场前缘"><span>转场进度</span><input ref={transitionScrubber} type="range" min="0" max="1" step="0.001" defaultValue="0" aria-label="转场进度" onInput={scrubTransition} /><span ref={transitionReadout}>0%</span></label>}
+      {!!depth && <button type="button" className={'button ' + (transitionSettingsOpen ? 'secondary' : 'primary')} aria-expanded={transitionSettingsOpen} onClick={() => setTransitionSettingsOpen(!transitionSettingsOpen)}><SlidersHorizontal size={16} aria-hidden="true" />转场设置</button>}
+      {depthMessage && <p className="depth-map-status" role="status">{depthMessage}</p>}
+    </div>}
+    {preview && transitionSettingsOpen && !!depth && <div className="depth-transition-settings" role="group" aria-label="转场设置">
+      <div className="settings-head"><span>转场设置</span><button type="button" className="panel-collapse" aria-label="收起转场设置" title="收起转场设置" aria-expanded="true" onClick={() => setTransitionSettingsOpen(false)}><Minimize2 size={13} aria-hidden="true" />收起</button></div>
+      <div className="transition-setting"><span>亮线颜色</span><input type="color" value={transition.color} aria-label="亮线颜色" onChange={event => changeTransition('color', event.target.value)} /><output>{transition.color}</output></div>
+      <div className="transition-setting"><span>时长</span><input type="range" min={DEPTH_TRANSITION_LIMITS.duration.min} max={DEPTH_TRANSITION_LIMITS.duration.max} step={DEPTH_TRANSITION_LIMITS.duration.step} value={transition.duration} aria-label="转场时长" onChange={event => changeTransition('duration', Number(event.target.value))} /><output>{(transition.duration / 1000).toFixed(1)} 秒</output></div>
+      <div className="transition-setting"><span>方向</span><select value={transition.direction} aria-label="转场方向" onChange={event => changeTransition('direction', event.target.value as DepthTransitionSettings['direction'])}><option value="far">由远到近（白→黑）</option><option value="near">由近到远（黑→白）</option></select><output /></div>
+      <div className="transition-setting"><span>缓动</span><select value={transition.easing} aria-label="转场缓动" onChange={event => changeTransition('easing', event.target.value as DepthTransitionSettings['easing'])}><option value="smooth">平滑</option><option value="linear">线性</option></select><output /></div>
+      <div className="transition-setting"><span>未替换一侧</span><select value={transition.background} aria-label="转场未替换一侧显示" title="转场还没扫到的那一侧显示什么：建筑模型让照片直接盖在真实场景上，深度图则是原来的灰度底" onChange={event => changeTransition('background', event.target.value as DepthTransitionSettings['background'])}><option value="model">建筑模型</option><option value="depth">深度图</option></select><output /></div>
+      <div className="transition-setting"><span>线宽</span><input type="range" min={DEPTH_TRANSITION_LIMITS.width.min} max={DEPTH_TRANSITION_LIMITS.width.max} step={DEPTH_TRANSITION_LIMITS.width.step} value={transition.width} aria-label="亮线宽度" onChange={event => changeTransition('width', Number(event.target.value))} /><output>{transition.width.toFixed(1)}%</output></div>
+      <div className="transition-setting"><span>实心占比</span><input type="range" min={DEPTH_TRANSITION_LIMITS.core.min} max={DEPTH_TRANSITION_LIMITS.core.max} step={DEPTH_TRANSITION_LIMITS.core.step} value={transition.core} aria-label="亮线实心占比" onChange={event => changeTransition('core', Number(event.target.value))} /><output>{transition.core}%</output></div>
+      <div className="transition-setting"><span>光晕强度</span><input type="range" min={DEPTH_TRANSITION_LIMITS.glow.min} max={DEPTH_TRANSITION_LIMITS.glow.max} step={DEPTH_TRANSITION_LIMITS.glow.step} value={transition.glow} aria-label="亮线光晕强度" onChange={event => changeTransition('glow', Number(event.target.value))} /><output>{transition.glow}</output></div>
+      <div className="transition-setting"><span>边缘柔和</span><input type="range" min={DEPTH_TRANSITION_LIMITS.softness.min} max={DEPTH_TRANSITION_LIMITS.softness.max} step={DEPTH_TRANSITION_LIMITS.softness.step} value={transition.softness} aria-label="转场边缘柔和度" onChange={event => changeTransition('softness', Number(event.target.value))} /><output>{transition.softness.toFixed(1)} 级</output></div>
+      <button type="button" className="text-button" onClick={() => setTransition(DEPTH_TRANSITION_DEFAULTS)}>恢复默认</button>
+    </div>}
+    {preview && <PhotoPerspectiveOverlay photo={preview} viewport={viewport} showPhoto={photoTransition} imageSource={props.photoImageSource} depthOverlay={depthShown && depth ? depth.url : undefined}>
+      {transitionRun > 0 && depth && <DepthTransitionCanvas run={transitionRun} playing={transitionPlaying} depthUrl={depth.url}
+        imageUrl={props.photoImageSource || asset(photoPreviewFile(preview))} gray={depth.gray} histogram={depth.histogram}
+        width={depth.width} height={depth.height} settings={transition} scrubber={transitionScrubber} readout={transitionReadout}
+        onScrub={() => setTransitionPlaying(false)}
+        onFinish={() => { stopTransition(); setPhotoTransition(true); }} />}
+    </PhotoPerspectiveOverlay>}
     {!viewingPhoto && <div className="map-bottom"><span className="map-help">{mapInteractionHelp(inputMode, placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>}
   </div>;
 }

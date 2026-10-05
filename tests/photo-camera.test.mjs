@@ -378,10 +378,10 @@ const testServer = async () => {
   return { server, close: async () => { await server.close(); await fs.rm(cacheDir, { recursive: true, force: true }); } };
 };
 
-test('photo details, lightbox and draft preview expose enter/return actions and explain unavailable states', async () => {
+test('photo details, lightbox and draft preview expose enter/return actions, explain unavailable states and carry the transition overlay', async () => {
   const environment = await testServer();
   try {
-    const { PhotoPerspectiveButton, PhotoPerspectiveOverlay } = await environment.server.ssrLoadModule('/src/PhotoPerspective.tsx');
+    const { PhotoPerspectiveButton, PhotoPerspectiveOverlay, PhotoTransitionButton, DepthMapButton, DepthOverlayButton, DepthTransitionButton } = await environment.server.ssrLoadModule('/src/PhotoPerspective.tsx');
     const { PhotoDetails, Lightbox } = await environment.server.ssrLoadModule('/src/components.tsx');
     const { default: PhotoComparison } = await environment.server.ssrLoadModule('/src/PhotoComparison.tsx');
     const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url))), site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
@@ -405,6 +405,38 @@ test('photo details, lightbox and draft preview expose enter/return actions and 
     assert.doesNotMatch(preview, /photo-perspective-bar|<button|返回地图/);
     const display = render(PhotoPerspectiveOverlay, { photo });
     assert.doesNotMatch(display, /photo-perspective-bar|<button|拖动|方向键/);
+    assert.doesNotMatch(display, /<img/, 'the frame stays empty until the transition is loaded');
+    const transition = render(PhotoPerspectiveOverlay, { photo: renditions, showPhoto: true });
+    assert.match(transition, /photo-perspective-frame/); assert.match(transition, /src="[^"]*small\.webp"/);
+    assert.match(render(PhotoPerspectiveOverlay, { photo: renditions, showPhoto: true, imageSource: 'draft.webp' }), /src="draft\.webp"/);
+    const load = render(PhotoTransitionButton, { active: false, onClick() {} });
+    assert.match(load, /开启照片覆盖/); assert.match(load, /aria-pressed="false"/); assert.doesNotMatch(load, /关闭照片覆盖/);
+    const drop = render(PhotoTransitionButton, { active: true, onClick() {} });
+    assert.match(drop, /关闭照片覆盖/); assert.match(drop, /aria-pressed="true"/); assert.doesNotMatch(drop, /开启照片覆盖/);
+    const depth = render(DepthMapButton, { busy: false, onClick() {} });
+    assert.match(depth, /渲染深度图/); assert.doesNotMatch(depth, /disabled=""/);
+    const rendering = render(DepthMapButton, { busy: true, onClick() {} });
+    assert.match(rendering, /渲染中…/); assert.match(rendering, /aria-busy="true"/); assert.match(rendering, /disabled=""/);
+    assert.doesNotMatch(render(PhotoPerspectiveOverlay, { photo: renditions }), /depth-map-layer/);
+    const depthLayer = render(PhotoPerspectiveOverlay, { photo: renditions, depthOverlay: 'depth.webp' });
+    assert.match(depthLayer, /class="depth-map-layer"/); assert.match(depthLayer, /src="depth\.webp"/);
+    const stacked = render(PhotoPerspectiveOverlay, { photo: renditions, showPhoto: true, depthOverlay: 'depth.webp' });
+    // React 19 hoists image preloads, so compare inside the frame markup itself.
+    const frame = stacked.slice(stacked.indexOf('photo-perspective-frame'));
+    assert.ok(frame.indexOf('depth-map-layer') < frame.indexOf('small.webp'), 'a real photo always covers the depth map');
+    const depthToggle = render(DepthOverlayButton, { active: false, onClick() {} });
+    assert.match(depthToggle, /叠加深度图/); assert.match(depthToggle, /aria-pressed="false"/);
+    const depthOff = render(DepthOverlayButton, { active: true, onClick() {} });
+    assert.match(depthOff, /取消叠加/); assert.match(depthOff, /aria-pressed="true"/); assert.doesNotMatch(depthOff, /叠加深度图/);
+    assert.match(render(DepthOverlayButton, { active: false, disabled: true, onClick() {} }), /disabled=""/);
+    assert.match(render(DepthTransitionButton, { playing: false, armed: false, onClick() {} }), /深度图转场/);
+    const transitionIdle = render(DepthTransitionButton, { playing: false, armed: false, onClick() {} });
+    assert.doesNotMatch(transitionIdle, /停止转场|重播转场/); assert.match(transitionIdle, /aria-pressed="false"/);
+    assert.match(render(DepthTransitionButton, { playing: true, armed: true, onClick() {} }), /停止转场/);
+    assert.match(render(DepthTransitionButton, { playing: false, armed: true, onClick() {} }), /重播转场/);
+    assert.match(render(DepthTransitionButton, { playing: false, armed: false, disabled: true, onClick() {} }), /disabled=""/);
+    const withCanvas = render(PhotoPerspectiveOverlay, { photo: renditions, children: React.createElement('canvas', { className: 'depth-transition-layer' }) });
+    assert.match(withCanvas, /photo-perspective-frame/); assert.match(withCanvas, /depth-transition-layer/);
     assert.doesNotMatch(render(PhotoPerspectiveButton, { photo, active: false, onClick() {} }), /拖动|环顾/);
   } finally { await environment.close(); }
 });

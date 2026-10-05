@@ -41,6 +41,7 @@ npm run dev
 | `preview.webp` | 普通浏览、照片与模型同屏、照片视角 | 最长边 1280 px，WebP 质量 65 起 |
 | `display.webp` | 兼容旧展示图 | 最长边 2400 px，WebP 质量 88 起 |
 | `download.jpg` | 全屏与高清下载 | 全尺寸，JPEG 质量 95 |
+| `depth.webp` | 深度图来源选「照片」时的深度图 | 与 `preview.webp` 同尺寸，无损灰度 |
 | `.local/originals/` | 私有原文件 | 按原字节保存，不发布 |
 
 预览图和旧展示图严格小于 **1,500,000 字节**。超过上限时先降低质量，必要时缩小边长。高清 JPEG 不套用此限制；它经过旋转纠正、sRGB 转换及 EXIF 移除，不称作原文件。
@@ -51,9 +52,31 @@ npm run dev
 npm run photos:previews             # 为缺失预览的内容补生成
 npm run photos:previews -- --refresh # 按当前规格重建已有预览
 npm run photos:limits               # 只调整超过 1.5 MB 的预览／旧展示图
+npm run photos:depth                # 为缺失深度图的内容补生成（需先准备模型，见下）
+npm run photos:depth -- --refresh   # 重建已有深度图
 ```
 
 这些操作不改高清下载、原片或标注，覆盖前保存旧图到 `.local/backups/`。移出内容库的照片保留文件，可在编辑器恢复；移除记录位于 `.local/removed/`。标注写入有版本冲突检查与历史备份。
+
+### 照片深度图（深度图来源选「照片」）
+
+深度图有两个来源：**模型**（按当前照片视角渲染校园模型，几何精确但模型是低模，深度图只有几块平面）和**照片**（用 [Depth Anything V2 Small](https://huggingface.co/onnx-community/depth-anything-v2-small) 从照片本身估计，细节跟随真实场景，但只有相对远近、没有米数）。照片这一侧在维护者机器上**预计算一次并随站点发布**，访客不下载模型、浏览器也不推理。
+
+```sh
+npm run photos:depth                # 60 张约 1 分钟，输出 4.9 MB
+```
+
+模型（Apache-2.0，代码与权重同许可）只存在于维护者机器：放在 gitignored 的 `.local/models/onnx-community/depth-anything-v2-small/`，不进仓库、不发布。整份 94.5 MB 全精度权重只需准备一次：
+
+```sh
+curl -L -x http://127.0.0.1:7897 --create-dirs -o .local/models/onnx-community/depth-anything-v2-small/config.json https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/config.json
+curl -L -x http://127.0.0.1:7897 --create-dirs -o .local/models/onnx-community/depth-anything-v2-small/preprocessor_config.json https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/preprocessor_config.json
+curl -L -x http://127.0.0.1:7897 --create-dirs -o .local/models/onnx-community/depth-anything-v2-small/onnx/model.onnx https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx
+```
+
+国内网络需要 `-x` 代理；不加代理时脚本会直接报出上面这三条命令。换更小的权重用 `--dtype q4f16`（18.2 MB，对应 `onnx/model_q4f16.onnx`）；`--dtype` 不是 `quantized`，那个值在 v4 里无效并会静默下载全精度权重。
+
+深度图按应用约定写入（**近处为黑、远处为白**），而模型预测的是相对逆深度（亮＝近），所以写入时统一取反一次。灰度值无损保存，蓝色转场线的前缘按直方图定位，依赖这些灰阶精确不变。
 
 ## 校园模型与数据
 

@@ -6,9 +6,10 @@ import { extractPhotoMetadata, validCaptureTime } from './photo-metadata.mjs';
 import { resolveLocationId } from './campus-corrections.mjs';
 import { automaticPhotoPlacement } from './photo-geolocation.mjs';
 import { createPhotoPreview, createPhotoDisplay } from './photo-preview.mjs';
+import { PHOTO_DEPTH_FILE, writePhotoDepth } from './photo-depth.mjs';
 
 export const ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg)$/;
+export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|depth\.webp|display\.webp|download\.jpg)$/;
 export const MAX_UPLOAD = 40 * 1024 * 1024;
 const emptySite = () => ({ schemaVersion: 1, revision: 0, photos: [], buildingOverrides: {} });
 export class UserError extends Error {
@@ -179,7 +180,7 @@ export function createStore(root) {
       }
       const destination = path.join(publicRoot, 'media', id);
       await fs.mkdir(destination, { recursive: true });
-      for (const name of ['thumbnail.webp', 'preview.webp', 'display.webp', 'download.jpg']) {
+      for (const name of ['thumbnail.webp', 'preview.webp', 'display.webp', 'download.jpg', ...(draft.files.depth ? [PHOTO_DEPTH_FILE] : [])]) {
         await fs.copyFile(path.join(localRoot, 'draft-media', id, name), path.join(destination, name));
       }
       await saveSite(site, { ...site, photos: [...site.photos.filter(p => p.id !== id), photo] });
@@ -284,6 +285,50 @@ export function createStore(root) {
       if (JSON.stringify(photos) !== JSON.stringify(site.photos)) await saveSite(site, { ...site, photos });
       if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
       return { generated, photos: photos.length, drafts: nextDrafts.length, backup };
+    }),
+    backfillPhotoDepths: ({ refresh = false, estimate, log = () => {} } = {}) => serial(async () => {
+      if (typeof estimate !== 'function') throw new UserError('缺少照片深度模型，请通过 npm run photos:depth 运行。');
+      const { site, drafts } = await state();
+      let generated = 0, skipped = 0, bytes = 0;
+      const backup = refresh ? path.join(localRoot, 'backups', 'depths-' + Date.now() + '-' + crypto.randomUUID()) : null;
+      const fill = async (photo, draft) => {
+        if (!ID_PATTERN.test(photo.id)) throw new UserError('照片编号无效。');
+        const depth = 'media/' + photo.id + '/depth.webp';
+        const directory = draft ? path.join(localRoot, 'draft-media', photo.id) : path.join(publicRoot, 'media', photo.id);
+        const destination = path.join(directory, PHOTO_DEPTH_FILE);
+        const source = path.join(directory, 'preview.webp');
+        let exists = true;
+        try { await fs.access(destination); }
+        catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          exists = false;
+        }
+        if (exists && !refresh) { skipped++; return { ...photo, files: { ...photo.files, depth } }; }
+        // The depth map is derived from the browsing rendition, which is the same
+        // picture the frame shows; generate it first if this library predates it.
+        try { await fs.access(source); }
+        catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          await createPhotoPreview(path.join(directory, 'download.jpg'), source);
+        }
+        if (exists && backup) {
+          const previous = path.join(backup, draft ? 'drafts' : 'published', photo.id, PHOTO_DEPTH_FILE);
+          await fs.mkdir(path.dirname(previous), { recursive: true });
+          await fs.copyFile(destination, previous);
+        }
+        const result = await writePhotoDepth(estimate, source, destination);
+        generated++; bytes += result.bytes;
+        log(photo.title + ' · ' + result.width + '×' + result.height + ' · ' + Math.round(result.bytes / 1024) + ' KB');
+        return { ...photo, files: { ...photo.files, depth } };
+      };
+      const photos = [], nextDrafts = [];
+      for (const photo of site.photos) photos.push(await fill(photo, false));
+      for (const photo of drafts) nextDrafts.push(await fill(photo, true));
+      const latest = await state();
+      if (JSON.stringify(latest.site) !== JSON.stringify(site) || JSON.stringify(latest.drafts) !== JSON.stringify(drafts)) throw new UserError('内容库刚刚有新修改，请重新运行深度图补全。', 409);
+      if (JSON.stringify(photos) !== JSON.stringify(site.photos)) await saveSite(site, { ...site, photos });
+      if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
+      return { generated, skipped, bytes, photos: photos.length, drafts: nextDrafts.length, backup };
     }),
     updateBuildings: (overrides, expected) => serial(async () => {
       const { site, map } = await state();

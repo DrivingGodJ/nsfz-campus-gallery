@@ -13,3 +13,6 @@ export function photoPerspectiveIssue(photo: Photo) {
 export const photoFrameSize = (photoAspect: number, canvasAspect: number) => ({
   width: Math.min(1, photoAspect / canvasAspect), height: Math.min(1, canvasAspect / photoAspect)
 });
+
+export const photoAspect = (photo: Pick<Photo, 'width' | 'height'>) =>
+  photo.width > 0 && photo.height > 0 ? photo.width / photo.height : 1.5;
