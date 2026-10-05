@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 139,
+  "revision": 141,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -2508,6 +2508,47 @@
         "download": "media/441637b4-598c-409a-8c83-e197c82b3dee/download.jpg"
       },
       "locationId": "way/855459407"
+    },
+    {
+      "id": "fe37c3bd-665e-4582-aeff-1d58a5c2b3b3",
+      "title": "IMG_6336 拷贝",
+      "description": "",
+      "capturedAt": "2024-12-16T15:12:48",
+      "metadata": {
+        "recordedAt": "2024-12-16T15:12:48",
+        "utcOffset": "+08:00",
+        "cameraMake": "Canon",
+        "cameraModel": "Canon EOS 90D",
+        "lensModel": "EF24-70mm f/2.8L II USM",
+        "focalLengthMm": 24,
+        "aperture": 8,
+        "exposureSeconds": 0.002,
+        "iso": 100,
+        "author": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "author": "DGJ",
+      "copyright": "",
+      "uploadedAt": "2026-10-05T14:04:32.784Z",
+      "captureType": "ground",
+      "position": {
+        "x": 139.08497204762017,
+        "z": -45.593018527794946
+      },
+      "placed": true,
+      "heading": 280.2164850977199,
+      "pitch": 39.20812621776251,
+      "width": 4640,
+      "height": 6960,
+      "downloadBytes": 12594615,
+      "files": {
+        "thumbnail": "media/fe37c3bd-665e-4582-aeff-1d58a5c2b3b3/thumbnail.webp",
+        "preview": "media/fe37c3bd-665e-4582-aeff-1d58a5c2b3b3/preview.webp",
+        "display": "media/fe37c3bd-665e-4582-aeff-1d58a5c2b3b3/display.webp",
+        "download": "media/fe37c3bd-665e-4582-aeff-1d58a5c2b3b3/download.jpg"
+      },
+      "locationId": ""
     }
   ],
   "buildingOverrides": {
