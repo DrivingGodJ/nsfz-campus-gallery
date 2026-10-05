@@ -73,7 +73,7 @@ function Bridge({ feature, buildings, overrides, labelPortal }: { feature: Featu
   return <group>{feature.archRise ? <ArchedBridgeDeck feature={feature} height={y} /> : <BridgeDeck shapes={layout.deck} height={y} />}<BridgeRails chains={layout.railChains} smooth={!!feature.archRise} />
     {bridgeSupports(feature, y).map((support, i) => <mesh key={i} position={support.position}><boxGeometry args={support.size} /><meshStandardMaterial color={mapColor('#9b9f8e')} /></mesh>)}
     {layout.stairs.map(stair => <BridgeStairs key={stair.id} from={stair.from} to={stair.to} width={width} top={stair.top} bottom={stair.bottom} />)}
-    {feature.connections?.filter(c => c.buildingId).map(connection => {
+    {feature.connections?.filter(c => c.buildingId && c.buildingId !== 'local/gymnasium').map(connection => {
       const end = connection.points.at(-1)!, building = buildings.find(b => b.id === connection.buildingId);
       if (!building) return null;
       const edges = building.outer.slice(1).map((to, i) => {
