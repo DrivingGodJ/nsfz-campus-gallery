@@ -45,7 +45,8 @@ async function fixture(t, options = {}) {
       const { photoIds } = JSON.parse(settings.body);
       return Response.json({ likes: Object.fromEntries(photoIds.map(id => [id, { count: 0, liked: false, ...(options.unsynced ? { available: false } : {}) }])) }, { status: options.likesStatus || 200 });
     }
-    return new Response(bytes, { status: options.responseStatus || 200 });
+    const published = options.remoteLibrary || current;
+    return new Response(JSON.stringify(published), { status: options.responseStatus || 200 });
   };
   const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3 });
   return { root, service, commands, requests };
@@ -118,6 +119,17 @@ test('publishing requires a matching live library even after a successful GitHub
   await service.start();
   const result = await finished(service);
   assert.equal(result.status, 'failed'); assert.match(result.message, /还没确认/);
+});
+
+test('publication accepts reordered JSON fields but still rejects changed photo content', async t => {
+  const reordered = { buildingOverrides: {}, photos: [{ title: '校园照片', id: 'approved' }] };
+  const { service } = await fixture(t, { remoteLibrary: reordered });
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  const changed = await fixture(t, { remoteLibrary: { ...reordered, photos: [{ title: '不是审核后的照片', id: 'approved' }] } });
+  await changed.service.start();
+  assert.equal((await finished(changed.service)).status, 'failed');
+  assert.ok(!changed.commands.flat().includes('likes:deploy:only'));
 });
 
 test('the unchanged version can be redeployed without manufacturing a new content commit', async t => {

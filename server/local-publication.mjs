@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { isDeepStrictEqual } from 'node:util';
 import { UserError, writeJSON } from './storage.mjs';
 
 export const PUBLIC_SITE = 'https://drivinggodj.github.io/nsfz-campus-gallery/';
@@ -134,11 +135,12 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     }
   }
   async function verifyWebsite(expected, changed) {
-    const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-    const local = await fs.readFile(path.join(root, 'public/data/site.json'));
+    const local = JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'), 'utf8'));
     for (let attempt = 0; attempt < 10; attempt++) {
       const response = await fetcher(PUBLIC_SITE + 'data/site.json?review=' + expected, { cache: 'no-store', signal: AbortSignal.timeout(25000) });
-      if (response.ok && hash(Buffer.from(await response.arrayBuffer())) === hash(local)) {
+      // Static validation may reorder fields (for example aerial altitude).
+      // Compare the entire library while ignoring JSON object key order.
+      if (response.ok && isDeepStrictEqual(await response.json().catch(() => null), local)) {
         for (const file of changed.filter(file => file.startsWith('public/media/'))) {
           const asset = await fetcher(PUBLIC_SITE + file.slice(7) + '?review=' + expected, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(25000) });
           if (!asset.ok) throw new UserError('网站已发布，但有照片文件尚未加载成功。请稍后重新上线。');
