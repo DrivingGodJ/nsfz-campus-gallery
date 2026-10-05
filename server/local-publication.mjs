@@ -135,6 +135,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     throw new UserError('GitHub 已完成发布，但还没确认到最新网页。请检查网站，或稍后重新上线。');
   }
   async function execute() {
+    let result;
     try {
       await update({ step: 0, message: '正在核对 GitHub、登录状态与最新内容…' });
       await gh('auth', 'status', '--hostname', 'github.com');
@@ -176,11 +177,12 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       await update({ step: 4, message: '正在确认网站已更新，并同步照片点赞名单…' });
       await verifyWebsite(commit, prepared.files);
       await npm('likes:deploy:only');
-      await update({ step: 5, running: false, status: 'completed', message: '上线完成。网站已更新，照片可以正常点赞。', finishedAt: new Date().toISOString() });
+      result = { step: 5, status: 'completed', message: '上线完成。网站已更新，照片可以正常点赞。', finishedAt: new Date().toISOString() };
     } catch (error) {
-      await update({ running: false, status: 'failed', message: redact(error.message), finishedAt: new Date().toISOString() });
+      result = { status: 'failed', message: redact(error.message), finishedAt: new Date().toISOString() };
     } finally {
       await fs.rm(lockFile, { force: true });
+      await update({ ...result, running: false });
     }
   }
   async function start() {

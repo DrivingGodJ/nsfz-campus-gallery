@@ -26,10 +26,11 @@ export function campusLocations(campus: Campus, site: Site): CampusLocation[] {
 // Annotation and filtering share broad destinations, including circulation spaces.
 const ancillaryBuildingIds = new Set(['way/1277841229', 'local/stand-office']);
 const filterFeatureTypes = new Set<Feature['type']>(['water', 'forest', 'sport', 'runningTrack', 'basketballCourts', 'undergroundRoom', 'tunnel', 'undergroundCorridor', 'undergroundTrack']);
+export const isFilterableCampusFeature = (feature: Feature) => filterFeatureTypes.has(feature.type) || feature.id === 'local/footbridge';
 export function campusFilterLocations(campus: Campus, site: Site): CampusLocation[] {
   return campusLocations(campus, site).filter(location => location.building
     ? !ancillaryBuildingIds.has(location.id)
-    : !!location.feature && filterFeatureTypes.has(location.feature.type));
+    : !!location.feature && isFilterableCampusFeature(location.feature));
 }
 
 export function resolveLocationId(id: string, campus?: Campus) {
