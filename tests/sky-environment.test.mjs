@@ -48,10 +48,19 @@ test('photo previews use their own capture clock without changing or erasing the
   assert.equal(photoSkyTime('', { capturedAt: '2026-10-05' }), '');
 });
 
-test('a temporary photo sky keeps the lower hemisphere matched to the existing map palette', () => {
-  const environment = skyEnvironment('light', 'winter', 'night', 'day');
-  assert.equal(environment.period, 'night');
-  assert.equal(environment.ground, timeMapColor('light', 'winter', 'day', '#eeeee5'));
+test('photo and filtered views share the whole time appearance, including night ground and model materials', () => {
+  for (const theme of ['light', 'dark']) for (const season of ['', 'spring', 'summer', 'autumn', 'winter']) {
+    for (const [clock, period] of [['06:00', 'dawn'], ['12:00', 'day'], ['18:59', 'dusk'], ['19:00', 'night']]) {
+      const photo = { capturedAt: '2026-10-05T' + clock };
+      const effectiveTime = photoSkyTime('day', photo);
+      const photoEnvironment = skyEnvironment(theme, season, effectiveTime);
+      assert.deepEqual(photoEnvironment, skyEnvironment(theme, season, period));
+      assert.equal(photoEnvironment.ground, timeMapColor(theme, season, effectiveTime, '#eeeee5'));
+      for (const color of ['#d7d2c3', '#cfd5bd', '#b5cbc7', '#798e65']) {
+        assert.equal(timeMapColor(theme, season, effectiveTime, color), timeMapColor(theme, season, period, color));
+      }
+    }
+  }
 });
 
 test('sky transitions do not jump after idle time and remain smooth at different frame rates', () => {

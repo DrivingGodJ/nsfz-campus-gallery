@@ -19,12 +19,12 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
   const signature = useRef('');
   const updateMarkers = () => {
     const occluders = photoOccluders(scene);
-    const clusters = cameraPhotoClusters(spots, camera, size, occluders);
+    const clusters = cameraPhotoClusters(spots, camera, size, occluders, { compact, selectedId: selected?.id });
     const points = visiblePhotoPoints(photos, camera, size, occluders);
     const key = clusters.map(cluster => cluster.photos.map(photo => photo.id).join(',')).join('|') + '/' + points.map(photo => photo.id).join(',');
     if (key !== signature.current) { signature.current = key; setMarkers({ clusters, points }); }
   };
-  useEffect(() => { signature.current = ''; updateMarkers(); }, [spots, scene, size.width, size.height]);
+  useEffect(() => { signature.current = ''; updateMarkers(); }, [spots, scene, size.width, size.height, compact, selected?.id]);
   useFrame(updateMarkers);
   // New photo/filter data must not briefly leave old entries clickable.
   const currentIds = new Set(photos.map(photo => photo.id));

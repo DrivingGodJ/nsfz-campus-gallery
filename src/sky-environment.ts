@@ -21,9 +21,9 @@ export function photoSkyTime(mapTime: PhotoTime | '', photo?: Pick<Photo, 'captu
   return captured === 'unknown' ? mapTime : captured;
 }
 
-export function skyEnvironment(theme: Theme, season: PhotoSeason | '', time: PhotoTime | '', groundTime: PhotoTime | '' = time) {
+export function skyEnvironment(theme: Theme, season: PhotoSeason | '', time: PhotoTime | '') {
   const period = skyTime(theme, time);
-  return { period, ...SKY_PALETTES[period], ground: timeMapColor(theme, season, groundTime, '#eeeee5') };
+  return { period, ...SKY_PALETTES[period], ground: timeMapColor(theme, season, time, '#eeeee5') };
 }
 
 export function skyTransitionBlend(delta: number, firstFrame: boolean, reducedMotion = false) {

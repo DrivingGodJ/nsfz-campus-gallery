@@ -70,13 +70,32 @@ test('merged thumbnails retain every original shooting point, including permanen
   assert.equal(JSON.stringify(photos), before, 'Point display cannot replace coordinates with cluster centres');
 });
 
-test('small shooting points stay visible near viewport edges while large thumbnails are hidden', () => {
+test('shooting points and thumbnails remain visible when they reach viewport edges', () => {
   const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000);
   camera.position.set(0, 1.6 + PHOTO_POINT_LIFT, 20); camera.lookAt(0, 1.6 + PHOTO_POINT_LIFT, 0); camera.updateMatrixWorld();
   const edge = photo('edge', 20 * Math.tan(camera.fov * Math.PI / 360) * camera.aspect * .95);
   const shots = [edge, photo('outside', 100), photo('behind', 0, 30)];
-  assert.equal(cameraPhotoClusters(permanentPhotoSpots(shots), camera, size).length, 0);
+  assert.deepEqual(cameraPhotoClusters(permanentPhotoSpots(shots), camera, size).flatMap(cluster => cluster.photos.map(photo => photo.id)), ['edge']);
   assert.deepEqual(visiblePhotoPoints(shots, camera, size).map(photo => photo.id), ['edge']);
+});
+
+test('thumbnails only disappear after fully leaving each edge, including compact, selected and merged sizes', () => {
+  for (const size of [{ width: 900, height: 600 }, { width: 390, height: 776 }]) {
+    const camera = new THREE.PerspectiveCamera(43, size.width / size.height, .08, 2000);
+    camera.position.set(0, 3.4, 20); camera.lookAt(0, 3.4, 0); camera.updateMatrixWorld();
+    for (const [appearance, halfSize, grouped] of [[{}, [32.5, 24], false], [{ compact: true }, [22, 18], false], [{ compact: true }, [30, 24], true], [{ compact: true, selectedId: 'a' }, [43, 32], false]]) {
+      for (const [axis, dimension] of [[0, size.width], [1, size.height]]) for (const sign of [-1, 1]) {
+        for (const [distance, visible] of [[-1, true], [0, true], [halfSize[axis] - .5, true], [halfSize[axis] + .5, false]]) {
+          const ndc = new THREE.Vector3();
+          ndc.setComponent(axis, sign * (1 + distance * 2 / dimension));
+          const anchor = ndc.unproject(camera);
+          const shot = photo('a', anchor.x, anchor.z, anchor.y - PHOTO_MARKER_LIFT);
+          const shots = grouped ? [shot, { ...shot, id: 'b' }] : [shot];
+          assert.equal(cameraPhotoClusters(permanentPhotoSpots(shots), camera, size, [], appearance).length > 0, visible, `axis ${axis}, sign ${sign}, distance ${distance}, compact ${!!appearance.compact}, grouped ${grouped}`);
+        }
+      }
+    }
+  }
 });
 
 test('screen groups keep separated regions and small collages have two distinct images without repeating photos', () => {

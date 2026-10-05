@@ -71,8 +71,8 @@ type SkyColors = Record<typeof colorNames[number], THREE.Color>;
 type SkyColorUniforms = Record<typeof colorNames[number], THREE.IUniform<THREE.Color>>;
 type SkyNumberUniforms = Record<typeof numberNames[number], THREE.IUniform<number>>;
 
-export default function SkyEnvironment({ theme, season, time, groundTime = time }: { theme: Theme; season: PhotoSeason | ''; time: PhotoTime | ''; groundTime?: PhotoTime | '' }) {
-  const environment = useMemo(() => skyEnvironment(theme, season, time, groundTime), [theme, season, time, groundTime]);
+export default function SkyEnvironment({ theme, season, time }: { theme: Theme; season: PhotoSeason | ''; time: PhotoTime | '' }) {
+  const environment = useMemo(() => skyEnvironment(theme, season, time), [theme, season, time]);
   const dome = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
   const ambient = useRef<THREE.AmbientLight>(null), sunlight = useRef<THREE.DirectionalLight>(null);
@@ -129,6 +129,19 @@ export default function SkyEnvironment({ theme, season, time, groundTime = time 
     }
     changing.current = remaining > .001;
     if (changing.current) invalidate();
+    else {
+      // Settle on the exact palette regardless of the previous sky, so selecting
+      // a photo and filtering its period produce the same final appearance.
+      for (const name of colorNames) values[name].value.copy(target[name]);
+      for (const name of numberNames) values[name].value = environment[name];
+      direction.copy(target.celestialDirection);
+      if (ambient.current && sunlight.current) {
+        ambient.current.intensity = lighting.ambient;
+        sunlight.current.intensity = lighting.intensity;
+        sunlight.current.color.copy(target.lightColor);
+        sunlight.current.position.copy(target.lightPosition);
+      }
+    }
   });
   return <><ambientLight ref={ambient} intensity={initialLighting.ambient} /><directionalLight ref={sunlight} position={initialLighting.position} color={initialLighting.color} intensity={initialLighting.intensity} /><mesh ref={dome} name="campus-sky-dome" renderOrder={-1000} frustumCulled={false} raycast={() => null} onBeforeRender={(_renderer, _scene, camera) => {
     // Follow the final camera pose, including movements applied later in this frame.

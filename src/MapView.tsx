@@ -153,7 +153,6 @@ class CanvasBoundary extends Component<{ children: ReactNode }, { failed: boolea
 export default function MapView(props: Props) {
   const viewport = props.visibleViewport || FULL_MAP_VIEWPORT;
   const theme = useSystemTheme();
-  const mapColor = useMapColor(theme, props.season || '', props.time || '');
   const inputMode = useInputMode();
   const { campus, site, floor, placing, onPlace } = props;
   const [selectionDismissed, setSelectionDismissed] = useState(false);
@@ -183,6 +182,9 @@ export default function MapView(props: Props) {
   const preview = props.photoPerspective && !placing && candidate && !photoPerspectiveIssue(candidate) ? candidate : null;
   const skyPhoto = editPhoto ? props.photoPreview || preview ? editPhoto : null : selectedPhoto;
   const environmentTime = photoSkyTime(props.time || '', skyPhoto);
+  // A photo temporarily overrides the whole scene appearance, without changing
+  // the directory filter. Closing it restores the user's chosen map time.
+  const mapColor = useMapColor(theme, props.season || '', environmentTime);
   const viewingPhoto = !!preview || moving;
   // Selection cuts above its floor; preview restores the building throughout the camera transition.
   const cutawayFloor = props.photoPreview || viewingPhoto ? undefined : floor;
@@ -211,10 +213,10 @@ export default function MapView(props: Props) {
     const target = new THREE.Vector3();
     if (e.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(editPhoto?.position.height || 0)), target)) onPlace({ x: target.x, z: target.z });
   };
-  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} data-time={props.time || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
-    <MapTheme.Provider value={theme}><MapSeason.Provider value={props.season || ''}><MapTime.Provider value={props.time || ''}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
+  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
+    <MapTheme.Provider value={theme}><MapSeason.Provider value={props.season || ''}><MapTime.Provider value={environmentTime}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
       <color attach="background" args={[mapColor('#eeeee5')]} />
-      <SkyEnvironment theme={theme} season={props.season || ''} time={environmentTime} groundTime={props.time || ''} />
+      <SkyEnvironment theme={theme} season={props.season || ''} time={environmentTime} />
       <LocationSelection.Provider value={{ selectedId: selectedLocation, onSelect: viewingPhoto ? undefined : onLocation, placing, featuresSelectable: props.featuresSelectable, selectableIds }}><Suspense fallback={null}><group onClick={clickBackground}>
         {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={-.08} unlit />)}
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}

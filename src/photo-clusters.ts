@@ -15,10 +15,12 @@ function groupPosition(spots: PhotoSpot[]) {
   return spots.reduce((nearest, spot) => spot.position.distanceToSquared(middle) < nearest.position.distanceToSquared(middle) ? spot : nearest).position.clone();
 }
 
-function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], ray: THREE.Raycaster, padding: [number, number]) {
+function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], ray: THREE.Raycaster, halfSize: [number, number]) {
   const projected = anchor.clone().project(camera);
-  const marginX = Math.min(.45, padding[0] / Math.max(1, size.width)), marginY = Math.min(.45, padding[1] / Math.max(1, size.height));
-  if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 - marginX * 2 || Math.abs(projected.y) > 1 - marginY * 2) return false;
+  // Keep partially clipped thumbnails at their real position until their entire
+  // rectangle leaves the canvas. Depth and building occlusion still apply.
+  const marginX = halfSize[0] / Math.max(1, size.width), marginY = halfSize[1] / Math.max(1, size.height);
+  if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) >= 1 + marginX * 2 || Math.abs(projected.y) >= 1 + marginY * 2) return false;
   if (!occluders.length) return true;
   ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), camera);
   ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
@@ -29,8 +31,8 @@ function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: {
   });
 }
 
-export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = [], ray = new THREE.Raycaster()) {
-  return photoAnchorVisible(markerPoint(position), camera, size, occluders, ray, [38, 30]);
+export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = [], ray = new THREE.Raycaster(), halfSize: [number, number] = [32.5, 24]) {
+  return photoAnchorVisible(markerPoint(position), camera, size, occluders, ray, halfSize);
 }
 
 // Thumbnail grouping never replaces or moves individual shooting points.
@@ -75,10 +77,13 @@ export function permanentPhotoSpots(photos: MapPhoto[]): PhotoSpot[] {
   return [...groups.values()].map(group => ({ id: group[0].id, photos: group, position: center(group.map(shootingPoint)) }));
 }
 
-export function cameraPhotoClusters(spots: PhotoSpot[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = []): PhotoCluster[] {
+export function cameraPhotoClusters(spots: PhotoSpot[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = [], appearance: { compact?: boolean; selectedId?: string } = {}): PhotoCluster[] {
   camera.updateMatrixWorld();
   const ray = new THREE.Raycaster();
-  const projected = spots.filter(spot => photoPointVisible(spot.position, camera, size, occluders, ray)).map(spot => {
+  // Include enough offscreen anchors for the largest possible collage, then
+  // test the final group's actual size after merging.
+  const maxHalfSize: [number, number] = appearance.selectedId ? [43, 32] : appearance.compact ? [30, 24] : [32.5, 24];
+  const projected = spots.filter(spot => photoPointVisible(spot.position, camera, size, occluders, ray, maxHalfSize)).map(spot => {
     const point = markerPoint(spot.position).project(camera);
     return { spot, point: new THREE.Vector2(point.x * size.width / 2, point.y * size.height / 2) };
   });
@@ -107,6 +112,10 @@ export function cameraPhotoClusters(spots: PhotoSpot[], camera: THREE.Camera, si
   return groups.map(group => {
     const members = group.map(item => item.spot);
     return { id: members[0].id, spots: members, photos: members.flatMap(spot => spot.photos), position: groupPosition(members) };
+  }).filter(cluster => {
+    const selected = cluster.photos.some(photo => photo.id === appearance.selectedId);
+    const halfSize: [number, number] = selected ? [43, 32] : appearance.compact ? cluster.photos.length > 1 ? [30, 24] : [22, 18] : [32.5, 24];
+    return photoPointVisible(cluster.position, camera, size, [], ray, halfSize);
   });
 }
 
