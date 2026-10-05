@@ -72,7 +72,7 @@ function BuildingMesh({ building, site, index, selected, floor, onClick, placing
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : building.facade?.type === 'dormitory' ? dormitoryBodyGeometry(building,
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : buildingGeometry(section,
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height,
-    info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id))), [building, site.buildingOverrides[building.id], selected, floor, gym]);
+    info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id), building.stairwells?.filter(stair => stair.partId === section.id))), [building, site.buildingOverrides[building.id], selected, floor, gym]);
   useEffect(() => () => { if (!gym) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;
   const color = selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
@@ -97,7 +97,7 @@ function BuildingMesh({ building, site, index, selected, floor, onClick, placing
     </group>)}
     <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>
     {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor ? floor * info.floorHeight : undefined} />}
-    {(building.floorCorridors?.length || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
+    {(building.floorCorridors?.length || building.stairwells?.length || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
     {building.facade?.type === 'dormitory' && <BuildingFacade building={building} floors={info.floors} floorHeight={info.floorHeight} height={height} selected={selected} cutaway={!!(selected && floor)} />}
     </group>}
     {(selected || !!building.name || !!site.buildingOverrides[building.id]?.name) && <LocationHtml portal={labelPortal} key={info.name} position={[info.center[0], height + 3, info.center[1]]} center zIndexRange={[5, 1]}><LocationName id={building.id} name={info.name} building /></LocationHtml>}

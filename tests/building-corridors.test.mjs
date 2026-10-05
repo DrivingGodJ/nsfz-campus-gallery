@@ -20,7 +20,7 @@ function model(override = site.buildingOverrides[building.id], floor) {
   const info = buildingLevels(building, override);
   const meshes = info.sections.map(section => {
     const height = floor ? Math.min(section.height, floor * info.floorHeight) : section.height;
-    const geometry = buildingGeometry(section, height, info.floorHeight, building.groundPassages, building.floorCorridors.filter(corridor => corridor.partId === section.id));
+    const geometry = buildingGeometry(section, height, info.floorHeight, building.groundPassages, building.floorCorridors.filter(corridor => corridor.partId === section.id), building.stairwells?.filter(stair => stair.partId === section.id));
     const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
     mesh.rotation.x = -Math.PI / 2; mesh.position.y = .12; mesh.updateMatrixWorld();
     return mesh;
