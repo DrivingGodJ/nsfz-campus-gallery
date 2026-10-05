@@ -13,11 +13,13 @@ import PhotoComparison from './PhotoComparison';
 import PhotoImage from './PhotoImage';
 import { photoPreviewFile } from './photo-image';
 import ReviewInbox from './ReviewInbox';
+import PublishPanel from './PublishPanel';
 import type { Submission } from './submission-types';
 import './styles.css';
 
 const MapView = React.lazy(() => import('./MapView'));
 const token = document.querySelector<HTMLMetaElement>('meta[name="local-editor-token"]')?.content || '';
+const desktop = new URLSearchParams(location.search).has('desktop');
 async function api(route: string, method = 'GET', value?: unknown, file?: File) {
   const response = await fetch('/__local/' + route, { method, headers: { 'x-local-editor-token': token, ...(file ? { 'x-photo-filename': encodeURIComponent(file.name), 'Content-Type': 'application/octet-stream' } : { 'Content-Type': 'application/json' }) }, body: file || (value ? JSON.stringify(value) : undefined) });
   const data = await response.json();
@@ -49,7 +51,9 @@ function Editor() {
   const [rejectReason, setRejectReason] = useState('');
   const [buildingId, setBuildingId] = useState('');
   const [buildingDraft, setBuildingDraft] = useState<BuildingOverride | null>(null);
-  const [busy, setBusy] = useState('');
+  const [operationBusy, setBusy] = useState('');
+  const [publishing, setPublishing] = useState(false);
+  const busy = operationBusy || (publishing ? '正在上线，完成后可以继续编辑' : '');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [removed, setRemoved] = useState('');
@@ -65,11 +69,12 @@ function Editor() {
   }, []);
   useEffect(() => { if (initial.current) return; initial.current = true; refresh().then(next => { const first = next.drafts[0] || next.site.photos[0]; if (first) selectPhoto(first); if (location.hash === '#review') setMode('reviews'); }).catch(e => setError(e.message)); }, [selectPhoto]);
   useEffect(() => {
+    (window as Window & { webkit?: { messageHandlers?: { reviewApp?: { postMessage: (value: unknown) => void } } } }).webkit?.messageHandlers?.reviewApp?.postMessage({ type: 'unsaved', value: dirty });
     const beforeUnload = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload); return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [dirty]);
   const change = (update: Partial<Photo>) => {
-    if (!photo) return;
+    if (!photo || busy) return;
     const next = { ...photo, ...update };
     setPhoto(next); setDirty(true);
     try { localStorage.setItem('nsfz:edit:' + next.id, JSON.stringify(next)); }
@@ -103,7 +108,7 @@ function Editor() {
       else if (draft) { await api('draft/' + photo.id, 'PUT', { photo }); await api('publish/' + photo.id, 'POST', { revision: state.site.revision }); }
       else await api('photo/' + photo.id, 'PUT', { photo, revision: state.site.revision });
       const next = await refresh(); setPhoto(next.site.photos.find(p => p.id === photo.id)!); setDirty(false); setPlacing(false);
-      localStorage.removeItem('nsfz:edit:' + photo.id); setMessage('已保存到内容库。静态预览已更新，推送仓库后可发布。');
+      localStorage.removeItem('nsfz:edit:' + photo.id); setMessage('已保存到内容库。核对完成后，点击右上角“上线”发布。');
     } catch (e) { setError((e as Error).message); await refresh(); }
     finally { setBusy(''); }
   };
@@ -155,19 +160,24 @@ function Editor() {
   };
   const reviewPhoto = !!activeReviewID;
   const saveLabel = reviewPhoto ? '通过审核并入库' : '保存到内容库';
+  const togglePerspective = () => {
+    if (busy) return;
+    if (previewing) exitPreview();
+    else { setPlacing(false); setComparing(true); setPreviewing(true); }
+  };
   const editingBuilding = state?.map.buildings.find(b => b.id === buildingId);
   const editingInfo = editingBuilding && state ? buildingInfo(editingBuilding, state.site) : null;
   const draft = state?.drafts.some(p => p.id === photo?.id);
   const photoView = photo && photoFieldOfView(photo);
   const imageSource = (p: Photo, type: 'thumbnail' | 'preview') => { const rendition = type === 'preview' && !p.files.preview ? 'thumbnail' : type; return state?.drafts.some(d => d.id === p.id) ? '/__local/draft-media/' + p.id + '/' + rendition + '.webp' : asset(type === 'preview' ? photoPreviewFile(p) : p.files.thumbnail); };
   return <div className={'app editor-app' + (comparing && mode === 'photos' && photo ? ' comparing' : '')}>
-    <header className="app-header"><Brand editor /><span className="local-badge">本地编辑</span><div className="header-actions"><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}</div></header>
+    <header className="app-header"><Brand editor href={desktop ? './editor.html?desktop=1' : undefined} /><span className="local-badge">{desktop ? '本地审核' : '本地编辑'}</span><div className="header-actions"><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}<PublishPanel api={api} unsaved={dirty} onRunningChange={setPublishing} /></div></header>
     {error && <Notice kind="error">{error}<button className="text-button" onClick={() => setError('')}>关闭</button></Notice>}
     {message && <Notice kind="success">{message}{removed && <button className="text-button" onClick={undo} disabled={!!busy}><Undo2 size={14} />恢复照片</button>}</Notice>}
     {busy && <div className="busy-bar" role="status"><LoaderCircle size={15} className="spin" />{busy}</div>}
     {!state ? <div className="page-loading">{error ? <button className="button primary" onClick={() => refresh().catch(e => setError(e.message))}>重新连接本地编辑器</button> : '正在打开本地内容库…'}</div> :
       <main className={'editor-main' + (comparing && mode === 'photos' && photo ? ' comparing' : '')}>
-        <aside className="library-panel" aria-label="本地内容库"><div className="editor-tabs"><button className={mode === 'photos' ? 'active' : ''} onClick={() => setMode('photos')}><Images size={15} />照片</button><button className={mode === 'reviews' ? 'active' : ''} onClick={() => { setMode('reviews'); setPreviewing(false); setComparing(false); setPlacing(false); }}>审核</button><button className={mode === 'buildings' ? 'active' : ''} onClick={() => { setMode('buildings'); setPreviewing(false); setPlacing(false); if (!buildingId) pickBuilding(state.map.buildings[0].id); }}><Building2 size={15} />建筑</button></div>
+        <aside className="library-panel" aria-label="本地内容库"><div className="editor-tabs"><button className={mode === 'photos' ? 'active' : ''} onClick={() => setMode('photos')}><Images size={15} />照片</button>{!desktop && <button className={mode === 'reviews' ? 'active' : ''} onClick={() => { setMode('reviews'); setPreviewing(false); setComparing(false); setPlacing(false); }}>审核</button>}<button className={mode === 'buildings' ? 'active' : ''} onClick={() => { setMode('buildings'); setPreviewing(false); setPlacing(false); if (!buildingId) pickBuilding(state.map.buildings[0].id); }}><Building2 size={15} />建筑</button></div>
           {mode === 'reviews' ? <ReviewInbox api={api} onImport={row => void importReview(row)} onReject={(row,reason) => { setBusy('正在退回投稿'); setError(''); void api('review/' + row.id + '/reject','POST',{reason}).then(() => {setReviewReload(n=>n+1);setMessage('投稿已退回。');}).catch(e=>setError(e.message)).finally(()=>setBusy('')); }} onError={setError} busy={!!busy} reload={reviewReload} onRecords={setReviewRows} /> : mode === 'photos' ? <><p className="quick-import-note">你的照片直接导入；邮件投稿的 ZIP 包也在这里导入，核对后保存到内容库。</p><div className={'import-box' + (dragging ? ' drag-over' : '')} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); void importFiles(Array.from(e.dataTransfer.files)); }}><ImagePlus size={24} strokeWidth={1.4} /><strong>添加校园照片</strong><span>拖入照片或投稿 ZIP 包</span><button className="button primary" onClick={() => input.current?.click()} disabled={!!busy}>导入照片或投稿包</button><input ref={input} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/tiff,image/heic,image/heif,application/zip,.zip" multiple onChange={e => void importFiles(Array.from(e.target.files || []))} aria-label="选择校园照片文件" /><small>支持批量导入 · 原片最多 40 MB · ZIP 保留投稿标注</small></div>
             <div className="library-title">内容库 <span>{state.drafts.length + state.site.photos.length}</span></div>
             {[...state.drafts, ...state.site.photos].map(p => <button className={'library-photo' + (photo?.id === p.id ? ' active' : '')} key={p.id} onClick={() => selectPhoto(p)}><img src={imageSource(p, 'thumbnail')} alt="" /><span><strong>{p.title}</strong><small>{state.drafts.some(d => d.id === p.id) ? '待标注草稿' : '已保存'}</small></span>{!state.drafts.some(d => d.id === p.id) && <Check size={13} />}</button>)}
@@ -185,7 +195,7 @@ function Editor() {
         </PhotoComparison>
         </div>
         <aside className="edit-panel" aria-label={mode === 'photos' ? '照片标注' : mode === 'reviews' ? '投稿审核' : '建筑资料'}>
-          {mode === 'photos' && photo ? <><div className="edit-heading"><p className="eyebrow">{draft ? '照片草稿' : '照片资料'}</p><span className={'save-status ' + (dirty ? 'unsaved' : '')}>{dirty ? '修改暂存在此浏览器' : draft ? '待保存到内容库' : '已保存'}</span></div><div className="photo-image-container"><PhotoImage className="edit-preview" src={imageSource(photo, 'preview')} alt={photo.title} /></div><button className="button secondary edit-comparison-button" onClick={() => { setPlacing(false); setComparing(true); }}><Columns2 size={16} />照片与模型同屏</button>
+          {mode === 'photos' && photo ? <><div className="edit-heading"><p className="eyebrow">{draft ? '照片草稿' : '照片资料'}</p><span className={'save-status ' + (dirty ? 'unsaved' : '')}>{dirty ? '修改暂存在此浏览器' : draft ? '待保存到内容库' : '已保存'}</span></div><div className="edit-preview-action"><PhotoPerspectiveButton photo={photo} active={previewing} editor disabled={!!busy} onClick={togglePerspective} /></div><div className="photo-image-container"><PhotoImage className="edit-preview" src={imageSource(photo, 'preview')} alt={photo.title} /></div><button className="button secondary edit-comparison-button" disabled={!!busy} onClick={() => { setPlacing(false); setComparing(true); }}><Columns2 size={16} />照片与模型同屏</button>
             <fieldset className="edit-form" disabled={!!busy}><label>照片标题<input value={photo.title} maxLength={160} onChange={e => change({ title: e.target.value })} /></label><label>文字描述<textarea value={photo.description} rows={3} maxLength={10000} placeholder="写下这张照片的故事…" onChange={e => change({ description: e.target.value })} /></label>
               <div className="field-pair"><label>拍摄日期<input type="date" value={photo.capturedAt.slice(0, 10)} onChange={e => { const time = photo.capturedAt.split('T')[1]; change({ capturedAt: e.target.value ? e.target.value + (time ? 'T' + time : '') : '' }); }} /></label><label>拍摄时间<input type="time" step={1} disabled={!photo.capturedAt} value={photo.capturedAt.split('T')[1] || ''} onChange={e => change({ capturedAt: photo.capturedAt.slice(0, 10) + (e.target.value ? 'T' + e.target.value : '') })} /></label></div>
               <div className="form-divider">作者与版权</div><label>作者<input name="author" value={photo.author || ''} maxLength={200} placeholder="原片未提供，可留空" onChange={e => change({ author: e.target.value })} /></label><label>版权信息<textarea name="copyright" value={photo.copyright || ''} rows={2} maxLength={3000} placeholder="原片未提供，可留空" onChange={e => change({ copyright: e.target.value })} /></label><p className="field-help">自动读取原片的作者与版权元数据；没有记录时留空，不推断作者或使用许可。</p>
@@ -195,7 +205,6 @@ function Editor() {
               <details className="precision"><summary>精确水平位置</summary><div className="field-pair"><label>东西位置 / m<input type="number" step={.1} value={Number(photo.position.x.toFixed(1))} onChange={e => change({ position: { ...photo.position, x: Number(e.target.value) }, placed: true })} /></label><label>南北位置 / m<input type="number" step={.1} value={Number(photo.position.z.toFixed(1))} onChange={e => change({ position: { ...photo.position, z: Number(e.target.value) }, placed: true })} /></label></div></details>
               <div className="form-divider">镜头方向</div><label>水平朝向<span className="range-value">{headingText(photo.heading)}</span><input type="range" min={0} max={359} step={1} value={photo.heading} onChange={e => change({ heading: Number(e.target.value) })} /></label><p className="field-help">{previewing ? '拖动预览画面或调整滑块，都可以改变镜头朝向。' : '也可拖动地图上的方向手柄调整朝向。'}</p><label>仰俯角<span className="range-value">{photo.pitch > 0 ? '仰拍' : photo.pitch < 0 ? '俯拍' : '平拍'} · {Number(Math.abs(photo.pitch).toFixed(1))}°</span><input type="range" min={-90} max={90} step={1} value={photo.pitch} onChange={e => change({ pitch: Number(e.target.value) })} /></label>
               {photoView ? <div className="photo-view-summary" role="status"><strong>水平视角约 {photoView.horizontal.toFixed(1)}°</strong><span>{viewSourceText(photoView)}</span></div> : <p className="field-help">未读取到焦距。补充等效焦距后，地图会显示镜头视角扇形。</p>}
-              <PhotoPerspectiveButton photo={photo} active={previewing} editor onClick={() => { if (previewing) exitPreview(); else { setPlacing(false); setComparing(true); setPreviewing(true); } }} />
               <details className="precision view-calibration"><summary>校准镜头视角</summary>
                 {!photo.metadata?.focalLength35Mm && photo.metadata?.focalLengthMm && <label>相机画幅<select value={photo.view?.cropFactor ?? ''} onChange={e => change({ view: { ...photo.view, cropFactor: e.target.value ? Number(e.target.value) : undefined } })}><option value="">待确认（先按全画幅估算）</option><option value="1">全画幅 · 1×</option><option value="1.5">APS-C · 1.5×</option><option value="1.6">佳能 APS-C · 1.6×</option><option value="2">M4/3 · 2×</option></select></label>}
                 <label>手动等效 35 mm 焦距 / mm<input type="number" min={1} max={10000} step={.1} placeholder={photo.metadata?.focalLength35Mm ? String(photo.metadata.focalLength35Mm) : '留空自动使用照片参数'} value={photo.view?.focalLength35Mm ?? ''} onChange={e => change({ view: { ...photo.view, focalLength35Mm: e.target.value ? Number(e.target.value) : undefined } })} /></label>

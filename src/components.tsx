@@ -8,8 +8,8 @@ import { photoPerspectiveIssue } from './photo-perspective';
 import { photoPreviewFile } from './photo-image';
 import PhotoImage from './PhotoImage';
 
-export function Brand({ editor = false }: { editor?: boolean }) {
-  return <a className="brand" href={editor ? './editor.html' : './'} aria-label={editor ? '附中影像本地编辑器' : '附中影像首页'}>
+export function Brand({ editor = false, href }: { editor?: boolean; href?: string }) {
+  return <a className="brand" href={href || (editor ? './editor.html' : './')} aria-label={editor ? '附中影像本地编辑器' : '附中影像首页'}>
     <span className="brand-mark"><Camera size={22} strokeWidth={1.5} /></span>
     <span><strong>附中影像</strong><small>NSFZ · CAMPUS ARCHIVE</small></span>
   </a>;

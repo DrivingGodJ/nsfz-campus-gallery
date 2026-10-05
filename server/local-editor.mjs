@@ -5,6 +5,7 @@ import { createReviewService } from './submission-review.mjs';
 import { createStore, ID_PATTERN, MAX_UPLOAD, UserError } from './storage.mjs';
 import { importPhotoPackage } from './package-import.mjs';
 import { MAX_PACKAGE_BYTES } from './photo-package.mjs';
+import { createPublicationService } from './local-publication.mjs';
 
 async function body(req, maximum) {
   const chunks = [];
@@ -26,7 +27,7 @@ export function isLocalRequest(req) {
 }
 export function localEditorPlugin() {
   const token = crypto.randomBytes(32).toString('hex');
-  let store, review;
+  let store, review, publication;
   return {
     name: 'nsfz-local-editor',
     transformIndexHtml(html, context) {
@@ -36,6 +37,7 @@ export function localEditorPlugin() {
     configureServer(server) {
       store = createStore(process.env.CAMPUS_CONTENT_ROOT || server.config.root);
       review = createReviewService(store, server.config.root);
+      publication = createPublicationService(store.root);
       server.middlewares.use(async (req, res, next) => {
         const url = new URL(req.url || '/', 'http://127.0.0.1');
         if (!url.pathname.startsWith('/__local/')) return next();
@@ -53,6 +55,12 @@ export function localEditorPlugin() {
             res.setHeader('Content-Type', 'image/webp'); res.setHeader('Cache-Control', 'no-store'); return res.end(bytes);
           }
           if (req.headers['x-local-editor-token'] !== token) throw new UserError('本地编辑会话已过期，请刷新页面。', 403);
+          if (resource === 'release') {
+            if (id === 'status' && req.method === 'GET') return send(200, await publication.status());
+            if (id === 'start' && req.method === 'POST') return send(202, await publication.start());
+            throw new UserError('上线操作不存在。', 404);
+          }
+          if (req.method !== 'GET' && await publication.publishing()) throw new UserError('正在上线，请等待完成后再修改内容。', 423);
           if (resource === 'review') {
             if (id === 'config' && req.method === 'GET') return send(200, await review.config());
             if (id === 'config' && req.method === 'PUT') return send(200, await review.configure(JSON.parse((await body(req,8192)).toString())));
