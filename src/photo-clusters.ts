@@ -3,6 +3,7 @@ import type { MapPhoto } from './MapCameraRig';
 
 export const PHOTO_MERGE_METERS = 2;
 export const PHOTO_MARKER_LIFT = 1.8;
+export const PHOTO_POINT_LIFT = .4;
 export type PhotoSpot = { id: string; photos: MapPhoto[]; position: THREE.Vector3 };
 export type PhotoCluster = PhotoSpot & { spots: PhotoSpot[] };
 const shootingPoint = (photo: MapPhoto) => new THREE.Vector3(photo.position.x, photo.position.height, photo.position.z);
@@ -14,9 +15,9 @@ function groupPosition(spots: PhotoSpot[]) {
   return spots.reduce((nearest, spot) => spot.position.distanceToSquared(middle) < nearest.position.distanceToSquared(middle) ? spot : nearest).position.clone();
 }
 
-export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = [], ray = new THREE.Raycaster()) {
-  const anchor = markerPoint(position), projected = anchor.clone().project(camera);
-  const marginX = Math.min(.45, 38 / Math.max(1, size.width)), marginY = Math.min(.45, 30 / Math.max(1, size.height));
+function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], ray: THREE.Raycaster, padding: [number, number]) {
+  const projected = anchor.clone().project(camera);
+  const marginX = Math.min(.45, padding[0] / Math.max(1, size.width)), marginY = Math.min(.45, padding[1] / Math.max(1, size.height));
   if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 - marginX * 2 || Math.abs(projected.y) > 1 - marginY * 2) return false;
   if (!occluders.length) return true;
   ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), camera);
@@ -26,6 +27,17 @@ export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera,
     const blockingFace = mesh.geometry?.userData.photoOcclusionMask?.[hit.faceIndex ?? -1] !== 0;
     return blockingFace && mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite));
   });
+}
+
+export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = [], ray = new THREE.Raycaster()) {
+  return photoAnchorVisible(markerPoint(position), camera, size, occluders, ray, [38, 30]);
+}
+
+// Thumbnail grouping never replaces or moves individual shooting points.
+export function visiblePhotoPoints(photos: MapPhoto[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = []): MapPhoto[] {
+  camera.updateMatrixWorld();
+  const ray = new THREE.Raycaster();
+  return photos.filter(photo => photoAnchorVisible(shootingPoint(photo).add(new THREE.Vector3(0, PHOTO_POINT_LIFT, 0)), camera, size, occluders, ray, [3, 3]));
 }
 
 export function photoOccluders(scene: THREE.Scene) {

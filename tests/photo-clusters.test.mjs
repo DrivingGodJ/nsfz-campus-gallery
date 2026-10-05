@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { cameraPhotoClusters, clusterFocus, collagePhotos, permanentPhotoSpots, PHOTO_MARKER_LIFT, photoPointVisible } from '../src/photo-clusters.ts';
+import { cameraPhotoClusters, clusterFocus, collagePhotos, permanentPhotoSpots, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, photoPointVisible, visiblePhotoPoints } from '../src/photo-clusters.ts';
 import { photoSeason, photosInSeason } from '../src/photo-season.ts';
 
 const photo = (id, x, z = 0, height = 1.6) => ({ id, position: { x, z, height }, capturedAt: '2025-04-18' });
@@ -59,6 +59,26 @@ test('far camera merges separate spots, drilling into a group separates them, an
   assert.equal(cameraPhotoClusters(spots, cameraAt(600), size).length, 1);
 });
 
+test('merged thumbnails retain every original shooting point, including permanent two metre groups', () => {
+  const photos = [photo('a', -10), photo('b', -9), photo('c', 10)];
+  const before = JSON.stringify(photos), camera = cameraAt(600);
+  const clusters = cameraPhotoClusters(permanentPhotoSpots(photos), camera, size);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].spots.length, 2);
+  assert.deepEqual(visiblePhotoPoints(photos, camera, size), photos);
+  assert.deepEqual(visiblePhotoPoints(photos, cameraAt(40), size).map(photo => photo.position.x), [-10, -9, 10]);
+  assert.equal(JSON.stringify(photos), before, 'Point display cannot replace coordinates with cluster centres');
+});
+
+test('small shooting points stay visible near viewport edges while large thumbnails are hidden', () => {
+  const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000);
+  camera.position.set(0, 1.6 + PHOTO_POINT_LIFT, 20); camera.lookAt(0, 1.6 + PHOTO_POINT_LIFT, 0); camera.updateMatrixWorld();
+  const edge = photo('edge', 20 * Math.tan(camera.fov * Math.PI / 360) * camera.aspect * .95);
+  const shots = [edge, photo('outside', 100), photo('behind', 0, 30)];
+  assert.equal(cameraPhotoClusters(permanentPhotoSpots(shots), camera, size).length, 0);
+  assert.deepEqual(visiblePhotoPoints(shots, camera, size).map(photo => photo.id), ['edge']);
+});
+
 test('screen groups keep separated regions and small collages have two distinct images without repeating photos', () => {
   const photos = Array.from({ length: 14 }, (_, i) => photo(String(i).padStart(2, '0'), i * 35));
   const clusters = cameraPhotoClusters(permanentPhotoSpots(photos), cameraAt(400), size);
@@ -89,6 +109,7 @@ test('behind-camera, offscreen and building-occluded photos never join visible s
   const shots = [photo('occluded', 0), photo('visible', 6), photo('behind', 0, 30), photo('outside', 100)];
   const clusters = cameraPhotoClusters(permanentPhotoSpots(shots), camera, size, [wall]);
   assert.deepEqual(clusters.flatMap(cluster => cluster.photos.map(photo => photo.id)), ['visible']);
+  assert.deepEqual(visiblePhotoPoints(shots, camera, size, [wall]).map(photo => photo.id), ['visible']);
   assert.equal(photoPointVisible(new THREE.Vector3(0, 1.6, 0), camera, size, [wall]), false);
   wall.material.transparent = true; wall.material.depthWrite = false;
   assert.equal(photoPointVisible(new THREE.Vector3(0, 1.6, 0), camera, size, [wall]), true, 'Ghost overlays do not hide photos');

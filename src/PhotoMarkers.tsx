@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { asset } from './types';
 import { useMapColor } from './MapTheme';
 import type { MapPhoto } from './MapCameraRig';
-import { cameraPhotoClusters, clusterFocus, collagePhotos, permanentPhotoSpots, photoOccluders, PHOTO_MARKER_LIFT, type PhotoCluster } from './photo-clusters';
+import { cameraPhotoClusters, clusterFocus, collagePhotos, permanentPhotoSpots, photoOccluders, visiblePhotoPoints, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, type PhotoCluster } from './photo-clusters';
 
 export default function PhotoMarkers({ photos, selected, compact, labelPortal, onSelect, onPick, onExpand, direction }: {
   photos: MapPhoto[]; selected?: MapPhoto | null; compact: boolean; labelPortal: RefObject<HTMLDivElement>;
@@ -15,24 +15,29 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
 }) {
   const { camera, size, scene } = useThree(), mapColor = useMapColor();
   const spots = useMemo(() => permanentPhotoSpots(photos), [photos]);
-  const [clusters, setClusters] = useState<PhotoCluster[]>([]);
+  const [markers, setMarkers] = useState<{ clusters: PhotoCluster[]; points: MapPhoto[] }>({ clusters: [], points: [] });
   const signature = useRef('');
-  useEffect(() => { signature.current = ''; setClusters(cameraPhotoClusters(spots, camera, size, photoOccluders(scene))); }, [spots, scene]);
-  useFrame(() => {
-    const next = cameraPhotoClusters(spots, camera, size, photoOccluders(scene));
-    const key = next.map(cluster => cluster.photos.map(photo => photo.id).join(',')).join('|');
-    if (key !== signature.current) { signature.current = key; setClusters(next); }
-  });
+  const updateMarkers = () => {
+    const occluders = photoOccluders(scene);
+    const clusters = cameraPhotoClusters(spots, camera, size, occluders);
+    const points = visiblePhotoPoints(photos, camera, size, occluders);
+    const key = clusters.map(cluster => cluster.photos.map(photo => photo.id).join(',')).join('|') + '/' + points.map(photo => photo.id).join(',');
+    if (key !== signature.current) { signature.current = key; setMarkers({ clusters, points }); }
+  };
+  useEffect(() => { signature.current = ''; updateMarkers(); }, [spots, scene, size.width, size.height]);
+  useFrame(updateMarkers);
   // New photo/filter data must not briefly leave old entries clickable.
   const currentIds = new Set(photos.map(photo => photo.id));
-  return <>{clusters.filter(cluster => cluster.photos.every(photo => currentIds.has(photo.id))).map(cluster => {
+  return <>{markers.points.filter(photo => currentIds.has(photo.id)).map(photo => <Html key={'point/' + photo.id} portal={labelPortal}
+    position={[photo.position.x, photo.position.height + PHOTO_POINT_LIFT, photo.position.z]} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}>
+    <span aria-hidden="true" data-photo-point-id={photo.id} className={'map-photo-point' + (photo.id === selected?.id ? ' selected' : '')} style={{ backgroundColor: mapColor('#46634e') }} />
+  </Html>)}{markers.clusters.filter(cluster => cluster.photos.every(photo => currentIds.has(photo.id))).map(cluster => {
     const photo = cluster.photos.find(photo => photo.id === selected?.id) || cluster.photos[0];
     const active = cluster.photos.some(photo => photo.id === selected?.id), grouped = cluster.photos.length > 1;
     const position = cluster.position;
     return <group key={cluster.id}>
       {!active && !grouped && direction(photo)}
       <Line points={[[position.x, position.y, position.z], [position.x, position.y + PHOTO_MARKER_LIFT, position.z]]} color={mapColor(active ? '#42634c' : '#989b83')} lineWidth={1.5} />
-      <mesh position={[position.x, position.y + .4, position.z]}><sphereGeometry args={[.9, 10, 10]} /><meshBasicMaterial color={mapColor('#46634e')} /></mesh>
       <Html portal={labelPortal} position={[position.x, position.y + PHOTO_MARKER_LIFT, position.z]} center zIndexRange={[18, 10]}>
         <button className={'map-photo ' + (grouped ? 'collage ' : '') + (active ? 'selected ' : '') + (compact && !active ? 'compact' : '')}
           data-photo-count={cluster.photos.length} data-spot-count={cluster.spots.length} data-photo-ids={cluster.photos.map(photo => photo.id).join(',')}

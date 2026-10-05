@@ -138,7 +138,7 @@ function Direction({ photo, editing = false, compact = false, onHeading, labelPo
   };
   const origin: [number, number, number] = [photo.position.x, photo.position.height + .4, photo.position.z];
   const color = editing ? '#b8723d' : '#3e6951';
-  return <group><primitive object={arrow} />{!compact && <mesh position={origin}><sphereGeometry args={[1.2, 16, 16]} /><meshBasicMaterial color={mapColor(editing ? '#b8723d' : '#344b40')} /></mesh>}
+  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={origin} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor('#b8723d') }} /></Html>}
     {rays.length > 0 && <><mesh geometry={sector} position={origin} renderOrder={28} raycast={() => null}><meshBasicMaterial color={mapColor(color)} transparent opacity={.17} side={THREE.DoubleSide} depthTest={false} depthWrite={false} /></mesh><Line points={[origin, ...rays.map(p => p.map((n, i) => n + origin[i]) as [number, number, number]), origin]} color={mapColor(color)} lineWidth={1.5} depthTest={false} depthWrite={false} renderOrder={29} raycast={() => null} /></>}
     {editing && onHeading && <Html portal={labelPortal} center position={[photo.position.x + Math.sin(yaw) * 22, photo.position.height + 2, photo.position.z - Math.cos(yaw) * 22]} zIndexRange={[20, 19]}><button className="direction-handle" aria-label="拖动调整拍摄方向" title="拖动调整拍摄方向" onPointerDown={beginDrag} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); onHeading((photo.heading + (e.key === 'ArrowRight' ? 5 : 355)) % 360); } }}>↔</button></Html>}
   </group>;
