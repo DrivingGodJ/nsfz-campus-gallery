@@ -14,7 +14,7 @@ function model(override, selectedFloor) {
   const info = buildingLevels(building, override);
   const meshes = info.sections.map(section => {
     const height = selectedFloor ? Math.min(section.height, selectedFloor * info.floorHeight) : section.height;
-    const mesh = new THREE.Mesh(buildingGeometry(section, height, info.floorHeight, building.groundPassages), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    const mesh = new THREE.Mesh(buildingGeometry(section, height, info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id)), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = .12;
     mesh.updateMatrixWorld();
@@ -26,7 +26,7 @@ function model(override, selectedFloor) {
   return { info, meshes, dispose };
 }
 
-test('both teaching-building roads really pass through the first floor, with the upper floors retained', async () => {
+test('both teaching-building roads remain open, with slabs above and continuous upper connectors', async () => {
   const original = JSON.stringify([building, site]);
   assert.deepEqual(building.groundPassages.map(passage => passage.sourcePathId), ['way/1233313441', 'way/1233313444']);
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
@@ -45,12 +45,36 @@ test('both teaching-building roads really pass through the first floor, with the
         for (const t of [0, .5, 1]) {
           const x = vertices.getX(i) * (1 - t) + vertices.getX(i + 1) * t;
           const z = -vertices.getY(i) * (1 - t) - vertices.getY(i + 1) * t;
-          assert.ok(building.groundPassages.some(passage => {
+          const onCorridor = building.floorCorridors?.some(corridor => {
+            if ('passageIndex' in corridor) return false; // Covered by the ground-passage footprint check below.
+            if ('edges' in corridor) {
+              const ring = building.parts.find(part => part.id === corridor.partId).outer;
+              return corridor.edges.some(edge => {
+                const from = ring[edge], to = ring[edge + 1], dx = to[0] - from[0], dz = to[1] - from[1];
+                const t = Math.max(0, Math.min(1, ((x - from[0]) * dx + (z - from[1]) * dz) / (dx * dx + dz * dz)));
+                return Math.hypot(x - from[0] - dx * t, z - from[1] - dz * t) <= corridor.depth * Math.SQRT2 + 1e-4;
+              });
+            }
+            if ('holeIndex' in corridor) {
+              const hole = building.parts.find(part => part.id === corridor.partId).holes[corridor.holeIndex];
+              return hole.slice(0, -1).some((from, i) => {
+                const to = hole[i + 1], dx = to[0] - from[0], dz = to[1] - from[1];
+                const t = Math.max(0, Math.min(1, ((x - from[0]) * dx + (z - from[1]) * dz) / (dx * dx + dz * dz)));
+                return Math.hypot(x - from[0] - dx * t, z - from[1] - dz * t) <= corridor.depth * Math.SQRT2 + 1e-4;
+              });
+            }
+            const ring = building.parts.find(part => part.id === corridor.partId).outer;
+            const from = ring[corridor.edge], to = ring[corridor.edge + 1], dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+            const along = ((x - from[0]) * dx + (z - from[1]) * dz) / length;
+            const inward = (dx * (z - from[1]) - dz * (x - from[0])) / length;
+            return along >= -corridor.depth * .05 - 1e-4 && along <= length + corridor.depth * .05 + 1e-4 && inward >= -1e-4 && inward <= corridor.depth + 1e-4;
+          });
+          assert.ok(onCorridor || building.groundPassages.some(passage => {
             const [from, to] = passage.points, dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
             const along = ((x - from[0]) * dx + (z - from[1]) * dz) / length;
             return Math.abs((x - from[0]) * dz - (z - from[1]) * dx) / length <= passage.width / 2 + 1e-4
               && along >= -passage.width - 1e-4 && along <= length + passage.width + 1e-4;
-          }), 'New horizontal outlines appear only at the passage ceilings, not across the intact facade');
+          }), 'New horizontal outlines appear only at passage ceilings or corridor slabs, not across the intact facade');
         }
       }
       edges.dispose();
@@ -63,7 +87,9 @@ test('both teaching-building roads really pass through the first floor, with the
         const ray = new THREE.Raycaster(start, direction, 0, length + 4);
         assert.equal(ray.intersectObjects(meshes, false).length, 0, 'The entire road width is open through both facades and the interior');
         ray.ray.origin.y = .12 + info.floorHeight * 1.5;
-        assert.ok(ray.intersectObjects(meshes, false).length >= 2, 'The upper building remains solid above the opening');
+        if (Math.abs(offset) < 1.5 || passage.sourcePathId === 'way/1233313444') {
+          assert.equal(ray.intersectObjects(meshes, false).length, 0, 'The upper connector also opens through the former end walls');
+        }
       }
       const middle = new THREE.Vector3((from[0] + to[0]) / 2, .3, (from[1] + to[1]) / 2);
       const up = new THREE.Raycaster(middle, new THREE.Vector3(0, 1, 0));
@@ -78,9 +104,9 @@ test('both teaching-building roads really pass through the first floor, with the
       });
       if (throughCourtyard) {
         assert.equal(up.intersectObjects(meshes, false).length, 0, 'The road remains open to the sky where it crosses the courtyard');
-        // Check the passage ceiling in the intact wing beside the courtyard.
-        up.ray.origin.set(from[0] + dx * .08, .3, from[1] + dz * .08);
       }
+      // Check the retained roof strip, rather than the newly opened return seam.
+      up.ray.origin.set(from[0] + dx * .85, .3, from[1] + dz * .85);
       const ceiling = up.intersectObjects(meshes, false)[0];
       assert.ok(ceiling, 'The passage has a visible ceiling');
       assert.ok(Math.abs(ceiling.point.y - .12 - info.floorHeight) < 1e-4, 'The opening height follows one floor height');

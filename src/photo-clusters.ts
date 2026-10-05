@@ -23,7 +23,8 @@ export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera,
   ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
   return !ray.intersectObjects(occluders, false).some(hit => {
     const mesh = hit.object as THREE.Mesh;
-    return mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite));
+    const blockingFace = mesh.geometry?.userData.photoOcclusionMask?.[hit.faceIndex ?? -1] !== 0;
+    return blockingFace && mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite));
   });
 }
 

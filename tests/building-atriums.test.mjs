@@ -44,18 +44,19 @@ test('both courtyards are hollow from ground to roof, including floor cutaways, 
   for (const override of [{ floors: 5, floorHeight: 3.6 }, { floors: 7, floorHeight: 4.2, partFloors: { 'sixth-floor-wing': 4 } }]) {
     const info = buildingLevels(building, override);
     for (const floor of [undefined, 1, 3]) {
-      const meshes = info.sections.map(section => mesh(buildingGeometry(section, floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight, building.groundPassages), true));
+      const meshes = info.sections.map(section => mesh(buildingGeometry(section, floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id)), true));
       for (const part of info.sections) {
         const hole = part.holes[0], middle = center(hole);
         for (const u of [.15, .5, .85]) for (const v of [.15, .5, .85]) {
           const point = [0, 1].map(d => hole[0][d] + (hole[1][d] - hole[0][d]) * u + (hole[3][d] - hole[0][d]) * v);
           assert.equal(down(point).intersectObjects(meshes, false).length, 0, 'No roof or solid floor remains inside either opening');
         }
-        const edge = [0, 1].map(d => (hole[0][d] + hole[1][d]) / 2), towardWall = new THREE.Vector3(edge[0] - middle[0], 0, edge[1] - middle[1]).normalize();
+        // The courtyard corridors recess the rear wall by three metres.
+        const edge = [0, 1].map(d => (hole[2][d] + hole[3][d]) / 2), towardWall = new THREE.Vector3(edge[0] - middle[0], 0, edge[1] - middle[1]).normalize();
         for (const level of [.5, ...floor === 1 ? [] : [1.5]]) {
           const ray = new THREE.Raycaster(new THREE.Vector3(middle[0], .12 + info.floorHeight * level, middle[1]), towardWall);
           const hit = ray.intersectObjects(meshes, false)[0];
-          assert.ok(hit && Math.hypot(hit.point.x - edge[0], hit.point.z - edge[1]) < 1e-4, 'Courtyard walls are visible from inside at the lower and upper floors');
+          assert.ok(hit && Math.abs(Math.hypot(hit.point.x - edge[0], hit.point.z - edge[1]) - 3) < 1e-4, 'Recessed courtyard back walls are visible from inside at the lower and upper floors');
         }
       }
       dispose(meshes);

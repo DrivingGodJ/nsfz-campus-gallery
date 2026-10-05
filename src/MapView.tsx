@@ -61,7 +61,7 @@ function BuildingMesh({ building, site, index, selected, floor, onClick, placing
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : building.facade?.type === 'dormitory' ? dormitoryBodyGeometry(building,
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : buildingGeometry(section,
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height,
-    info.floorHeight, building.groundPassages)), [building, site.buildingOverrides[building.id], selected, floor]);
+    info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id))), [building, site.buildingOverrides[building.id], selected, floor]);
   useEffect(() => () => geometries.forEach(geometry => geometry.dispose()), [geometries]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;
   const color = selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
