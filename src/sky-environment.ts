@@ -1,6 +1,7 @@
 import { activeMapTime, timeMapColor } from './time-palette.ts';
 import type { PhotoSeason } from './photo-season';
-import type { PhotoTime } from './photo-time';
+import { photoTime, type PhotoTime } from './photo-time.ts';
+import type { Photo } from './types';
 import type { Theme } from './theme';
 
 export type SkyTime = Exclude<PhotoTime, 'unknown'>;
@@ -15,9 +16,21 @@ export function skyTime(theme: Theme, time: PhotoTime | ''): SkyTime {
   return activeMapTime(time) || (theme === 'dark' ? 'night' : 'day');
 }
 
-export function skyEnvironment(theme: Theme, season: PhotoSeason | '', time: PhotoTime | '') {
+export function photoSkyTime(mapTime: PhotoTime | '', photo?: Pick<Photo, 'capturedAt'> | null): PhotoTime | '' {
+  const captured = photo ? photoTime(photo) : 'unknown';
+  return captured === 'unknown' ? mapTime : captured;
+}
+
+export function skyEnvironment(theme: Theme, season: PhotoSeason | '', time: PhotoTime | '', groundTime: PhotoTime | '' = time) {
   const period = skyTime(theme, time);
-  return { period, ...SKY_PALETTES[period], ground: timeMapColor(theme, season, time, '#eeeee5') };
+  return { period, ...SKY_PALETTES[period], ground: timeMapColor(theme, season, groundTime, '#eeeee5') };
+}
+
+export function skyTransitionBlend(delta: number, firstFrame: boolean, reducedMotion = false) {
+  if (reducedMotion) return 1;
+  // A demand-rendered scene can have been idle for minutes before a preview.
+  const step = Math.min(Number.isFinite(delta) ? Math.max(0, delta) : 0, firstFrame ? 1 / 60 : .05);
+  return 1 - Math.exp(-step * 7);
 }
 
 // The dome stays inside the camera's clipping range even far outside campus.

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { skyDomeRadius, skyEnvironment } from './sky-environment';
+import { skyDomeRadius, skyEnvironment, skyTransitionBlend } from './sky-environment';
+import { TIME_LIGHTING } from './time-palette';
 import type { PhotoSeason } from './photo-season';
 import type { PhotoTime } from './photo-time';
 import type { Theme } from './theme';
@@ -70,10 +71,12 @@ type SkyColors = Record<typeof colorNames[number], THREE.Color>;
 type SkyColorUniforms = Record<typeof colorNames[number], THREE.IUniform<THREE.Color>>;
 type SkyNumberUniforms = Record<typeof numberNames[number], THREE.IUniform<number>>;
 
-export default function SkyEnvironment({ theme, season, time }: { theme: Theme; season: PhotoSeason | ''; time: PhotoTime | '' }) {
-  const environment = useMemo(() => skyEnvironment(theme, season, time), [theme, season, time]);
+export default function SkyEnvironment({ theme, season, time, groundTime = time }: { theme: Theme; season: PhotoSeason | ''; time: PhotoTime | ''; groundTime?: PhotoTime | '' }) {
+  const environment = useMemo(() => skyEnvironment(theme, season, time, groundTime), [theme, season, time, groundTime]);
   const dome = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
+  const ambient = useRef<THREE.AmbientLight>(null), sunlight = useRef<THREE.DirectionalLight>(null);
+  const initialLighting = useMemo(() => TIME_LIGHTING[environment.period], []);
   const { invalidate } = useThree();
   const uniforms = useMemo(() => ({
     ...Object.fromEntries(colorNames.map(name => [name, { value: new THREE.Color(environment[name]) }])) as SkyColorUniforms,
@@ -83,8 +86,11 @@ export default function SkyEnvironment({ theme, season, time }: { theme: Theme; 
   const target = useMemo(() => ({
     ...Object.fromEntries(colorNames.map(name => [name, new THREE.Color(environment[name])])) as SkyColors,
     celestialDirection: new THREE.Vector3(...environment.direction).normalize(),
+    lightColor: new THREE.Color(TIME_LIGHTING[environment.period].color),
+    lightPosition: new THREE.Vector3(...TIME_LIGHTING[environment.period].position),
   }), [environment]);
   const changing = useRef(false);
+  const firstFrame = useRef(true);
   const reducedMotion = useRef(false);
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -92,12 +98,13 @@ export default function SkyEnvironment({ theme, season, time }: { theme: Theme; 
     read(); preference.addEventListener('change', read);
     return () => preference.removeEventListener('change', read);
   }, []);
-  useEffect(() => { changing.current = true; invalidate(); }, [environment, invalidate]);
+  useEffect(() => { changing.current = true; firstFrame.current = true; invalidate(); }, [environment, invalidate]);
   useFrame((_, delta) => {
     if (!changing.current) return;
     const values = material.current?.uniforms as typeof uniforms | undefined;
     if (!values) return;
-    const blend = reducedMotion.current ? 1 : 1 - Math.exp(-Math.min(delta, .1) * 7);
+    const blend = skyTransitionBlend(delta, firstFrame.current, reducedMotion.current);
+    firstFrame.current = false;
     let remaining = 0;
     for (const name of colorNames) {
       const value = values[name].value, to = target[name];
@@ -112,10 +119,18 @@ export default function SkyEnvironment({ theme, season, time }: { theme: Theme; 
     const direction = values.celestialDirection.value;
     direction.lerp(target.celestialDirection, blend);
     remaining = Math.max(remaining, direction.distanceTo(target.celestialDirection));
+    const lighting = TIME_LIGHTING[environment.period];
+    if (ambient.current && sunlight.current) {
+      ambient.current.intensity += (lighting.ambient - ambient.current.intensity) * blend;
+      sunlight.current.intensity += (lighting.intensity - sunlight.current.intensity) * blend;
+      sunlight.current.color.lerp(target.lightColor, blend);
+      sunlight.current.position.lerp(target.lightPosition, blend);
+      remaining = Math.max(remaining, Math.abs(ambient.current.intensity - lighting.ambient), Math.abs(sunlight.current.intensity - lighting.intensity), sunlight.current.position.distanceTo(target.lightPosition) / 400);
+    }
     changing.current = remaining > .001;
     if (changing.current) invalidate();
   });
-  return <mesh ref={dome} name="campus-sky-dome" renderOrder={-1000} frustumCulled={false} raycast={() => null} onBeforeRender={(_renderer, _scene, camera) => {
+  return <><ambientLight ref={ambient} intensity={initialLighting.ambient} /><directionalLight ref={sunlight} position={initialLighting.position} color={initialLighting.color} intensity={initialLighting.intensity} /><mesh ref={dome} name="campus-sky-dome" renderOrder={-1000} frustumCulled={false} raycast={() => null} onBeforeRender={(_renderer, _scene, camera) => {
     // Follow the final camera pose, including movements applied later in this frame.
     const mesh = dome.current;
     if (!mesh || !(camera instanceof THREE.PerspectiveCamera)) return;
@@ -125,5 +140,5 @@ export default function SkyEnvironment({ theme, season, time }: { theme: Theme; 
   }}>
     <sphereGeometry args={[1, 48, 24]} />
     <shaderMaterial ref={material} uniforms={uniforms} vertexShader={vertexShader} fragmentShader={fragmentShader} side={THREE.BackSide} depthTest={false} depthWrite={false} toneMapped={false} />
-  </mesh>;
+  </mesh></>;
 }

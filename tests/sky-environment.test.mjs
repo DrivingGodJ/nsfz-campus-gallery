@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKY_PALETTES, skyTime, skyEnvironment, skyDomeRadius } from '../src/sky-environment.ts';
+import { SKY_PALETTES, skyTime, skyEnvironment, skyDomeRadius, photoSkyTime, skyTransitionBlend } from '../src/sky-environment.ts';
 import { timeMapColor } from '../src/time-palette.ts';
 
 test('sky follows the selected capture period and falls back to the system appearance', () => {
@@ -32,5 +32,37 @@ test('the camera-centred dome fits the clipping range at both near and distant v
   for (const [near, far] of [[.5, 4000], [.1, 500], [1, 10000]]) {
     const radius = skyDomeRadius(near, far);
     assert.ok(radius > near && radius < far);
+  }
+});
+
+test('photo previews use their own capture clock without changing or erasing the map filter', () => {
+  const mapTime = 'dusk';
+  for (const [clock, period] of [['06:00', 'dawn'], ['12:00', 'day'], ['18:00', 'dusk'], ['23:00', 'night']]) {
+    const photo = { capturedAt: '2026-10-05T' + clock + ':00+08:00' };
+    const original = JSON.stringify(photo);
+    assert.equal(photoSkyTime(mapTime, photo), period);
+    assert.equal(JSON.stringify(photo), original);
+  }
+  for (const capturedAt of [undefined, '', '2026-10-05', 'invalid']) assert.equal(photoSkyTime(mapTime, { capturedAt }), mapTime);
+  assert.equal(photoSkyTime(mapTime, null), mapTime, 'Closing restores the original map time');
+  assert.equal(photoSkyTime('', { capturedAt: '2026-10-05' }), '');
+});
+
+test('a temporary photo sky keeps the lower hemisphere matched to the existing map palette', () => {
+  const environment = skyEnvironment('light', 'winter', 'night', 'day');
+  assert.equal(environment.period, 'night');
+  assert.equal(environment.ground, timeMapColor('light', 'winter', 'day', '#eeeee5'));
+});
+
+test('sky transitions do not jump after idle time and remain smooth at different frame rates', () => {
+  assert.ok(skyTransitionBlend(300, true) < .12);
+  assert.ok(skyTransitionBlend(300, false) < .3);
+  assert.equal(skyTransitionBlend(-1, false), 0);
+  assert.equal(skyTransitionBlend(NaN, true), 0);
+  assert.equal(skyTransitionBlend(300, true, true), 1);
+  for (const fps of [30, 60, 120]) {
+    let value = 0;
+    for (let frame = 0; frame < fps; frame++) value += (1 - value) * skyTransitionBlend(1 / fps, frame === 0);
+    assert.ok(value > .998 && value < 1, 'One second approaches the target without an instant snap');
   }
 });
