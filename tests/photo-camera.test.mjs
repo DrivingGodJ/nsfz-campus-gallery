@@ -669,3 +669,76 @@ test('exposed-area gestures stay anchored and deselection waits for centring and
     await environment.close();
   }
 });
+
+test('automatic photo-cluster approaches and selected-card resizes stay continuous at both camera poles', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const canvas = testCanvas();
+  const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let root;
+  try {
+    const { default: Rig } = await environment.server.ssrLoadModule('/src/MapCameraRig.tsx');
+    globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
+    root = createRoot(canvas);
+    await root.configure({ gl, size: { width: 390, height: 844, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
+    const props = { command: { type: 'initial', sequence: 0 }, boundary: [[-2000,-2000],[2000,-2000],[2000,2000],[-2000,2000]], selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving() {} };
+    let store, timeline = 0, sequence = 0;
+    const render = async changes => { await act(async () => { store = root.render(React.createElement(Rig, { ...props, ...changes })); }); };
+    await render({});
+    const state = store.getState(), camera = state.camera, control = state.controls;
+    const advance = async (message, frames = 75) => {
+      await act(async () => {
+        for (let n = 0; n < frames; n++) {
+          const before = camera.quaternion.clone();
+          state.advance(timeline += 1 / 60, false);
+          assert.ok(before.angleTo(camera.quaternion) < .2, `${message}: abrupt rotation on frame ${n}`);
+          assert.ok(camera.position.toArray().every(Number.isFinite));
+          assert.ok(camera.position.y >= 1.6 - 1e-8);
+        }
+      });
+      const settled = readCameraPose(camera, control.target);
+      await act(async () => { for (let n = 0; n < 20; n++) state.advance(timeline += 1 / 60, false); });
+      close(camera.quaternion.angleTo(settled.quaternion), 0, 1e-7);
+      vectorClose(camera.position, settled.position);
+      assert.ok(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).y > 0, `${message}: camera must stay upright`);
+    };
+    const frame = (point, viewport) => {
+      const projected = point.clone().project(camera);
+      close(projected.x, 2 * (viewport.left + viewport.width / 2) - 1, 1e-7);
+      close(projected.y, 1 - 2 * (viewport.top + viewport.height / 2), 1e-7);
+      close(camera.fov, 43); assert.equal(camera.view?.enabled || false, false);
+    };
+    for (const pitch of [-89.4, -85, -70, 0, 70, 89.4]) for (const viewport of [
+      FULL_MAP_VIEWPORT, { left: 0, top: 0, width: 1, height: .35 },
+      { left: .4, top: 0, width: .6, height: 1 }, { left: 0, top: .65, width: .6, height: .35 }
+    ]) {
+      await render({ visibleViewport: viewport });
+      const object = new THREE.Vector3(10, pitch > 0 ? 200 : 10, -25);
+      camera.position.set(0, 350, 100);
+      camera.quaternion.setFromEuler(new THREE.Euler(pitch * Math.PI / 180, .8, 0, 'YXZ'));
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 100);
+      const initialOrientation = camera.quaternion.clone(); control.update();
+      close(camera.quaternion.angleTo(initialOrientation), 0, 1e-7);
+      await render({ command: { type: 'cluster', sequence: ++sequence, target: object.toArray(), distance: 40 }, visibleViewport: viewport });
+      await advance(`cluster at ${pitch} degrees, viewport ${JSON.stringify(viewport)}`);
+      frame(object, viewport); close(camera.position.distanceTo(object), 40, 1e-7);
+    }
+    // The same photo stays selected while its card moves from the side to below
+    // the map. Turning alone cannot frame it here without crossing the pole.
+    const side = { left: .4, top: 0, width: .6, height: 1 }, bottom = { left: 0, top: 0, width: 1, height: .35 };
+    await render({ visibleViewport: side });
+    camera.position.set(0, 100, 0);
+    camera.quaternion.setFromEuler(new THREE.Euler(-89.4 * Math.PI / 180, .8, 0, 'YXZ'));
+    control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 100);
+    control.update();
+    const selected = { ...photo, position: { ...photo.position, height: 1.6 } }, point = new THREE.Vector3(10, 1.6, -25);
+    await render({ selected, visibleViewport: side }); await advance('selecting a single photo near the pole'); frame(point, side);
+    const distance = camera.position.distanceTo(point);
+    await render({ selected, visibleViewport: bottom }); await advance('resizing a selected photo card near the pole'); frame(point, bottom);
+    close(camera.position.distanceTo(point), distance, 1e-7);
+  } finally {
+    if (root) await act(async () => root.unmount());
+    globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
+    await environment.close();
+  }
+});

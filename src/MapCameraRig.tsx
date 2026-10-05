@@ -79,7 +79,8 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     stopOrbitMomentum(camera, control);
     const target = new THREE.Vector3(...current.objectTarget);
     let pose = readCameraPose(camera, control.target);
-    // Resizing a card only turns the gaze; don't repeatedly translate the camera.
+    // Prefer turning the gaze on card resizes; framing only repositions at a
+    // vertical limit where a turn alone cannot keep the object centred.
     if (focusedObjectKey.current !== current.objectKey) {
       const viewport = current.visibleViewport, ray = new THREE.Raycaster();
       ray.setFromCamera(new THREE.Vector2(2 * (viewport.left + viewport.width / 2) - 1, 1 - 2 * (viewport.top + viewport.height / 2)), camera);
@@ -91,8 +92,6 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     }
     pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
     pose = frameMapTarget(pose, target, camera.aspect, current.visibleViewport);
-    const polar = Math.acos(THREE.MathUtils.clamp((pose.position.y - pose.target.y) / pose.position.distanceTo(pose.target), -1, 1));
-    control.maxPolarAngle = Math.max(Math.PI * .48, polar);
     focusedObjectKey.current = current.objectKey; pendingFocus.current = false;
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -308,5 +307,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     return () => { unbind?.(); setEvents({ enabled: eventsEnabled }); };
   }, [preview?.id, canAdjustPhotoView, camera, gl, get, setEvents, invalidate]);
 
-  return <OrbitControls ref={controls} makeDefault enableZoom={false} enableDamping dampingFactor={.08} minPolarAngle={.01} maxPolarAngle={Math.PI * .48} target={[0, 0, 0]} />;
+  // Match the upright pitch limits used by both gestures and automatic framing.
+  // A separate, narrower orbit limit would correct the final animation pose.
+  return <OrbitControls ref={controls} makeDefault enableZoom={false} enableDamping dampingFactor={.08} minPolarAngle={.01} maxPolarAngle={Math.PI - .01} target={[0, 0, 0]} />;
 }
