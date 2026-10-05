@@ -587,11 +587,11 @@ test('overlay cards leave the map lens unchanged and keep selected objects centr
     const point = new THREE.Vector3(selected.position.x,selected.position.height,selected.position.z);
     const bottomCard = { left: 0, top: 0, width: 1, height: .35 };
     await render({selected,visibleViewport:bottomCard}); await advance();
-    const focused = camera.position.clone(), distance = camera.position.distanceTo(point);
+    const focused = camera.quaternion.clone(), distance = camera.position.distanceTo(point);
     let projected = point.clone().project(camera); close(projected.x,0); close(projected.y,.65); close(camera.fov,before.fov);
     const sideCard = { left: 0, top: 0, width: .55, height: 1 };
     await render({selected,visibleViewport:sideCard}); await advance();
-    vectorClose(camera.position,focused); close(camera.position.distanceTo(point),distance);
+    close(camera.quaternion.angleTo(focused),0,1e-7); close(camera.position.distanceTo(point),distance);
     projected = point.clone().project(camera); close(projected.x,-.45); close(projected.y,0); close(camera.fov,before.fov);
     const preview = {...selected,pitch:-20};
     await render({selected,preview,visibleViewport:sideCard}); await advance();
@@ -722,9 +722,9 @@ test('automatic photo-cluster approaches and selected-card resizes stay continuo
       await render({ command: { type: 'cluster', sequence: ++sequence, target: object.toArray(), distance: 40 }, visibleViewport: viewport });
       await advance(`cluster at ${pitch} degrees, viewport ${JSON.stringify(viewport)}`);
       frame(object, viewport); close(camera.position.distanceTo(object), 40, 1e-7);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
     }
-    // The same photo stays selected while its card moves from the side to below
-    // the map. Turning alone cannot frame it here without crossing the pole.
+    // Card movement preserves the selected photo's fixed tilt and distance.
     const side = { left: .4, top: 0, width: .6, height: 1 }, bottom = { left: 0, top: 0, width: 1, height: .35 };
     await render({ visibleViewport: side });
     camera.position.set(0, 100, 0);
@@ -736,6 +736,32 @@ test('automatic photo-cluster approaches and selected-card resizes stay continuo
     const distance = camera.position.distanceTo(point);
     await render({ selected, visibleViewport: bottom }); await advance('resizing a selected photo card near the pole'); frame(point, bottom);
     close(camera.position.distanceTo(point), distance, 1e-7);
+    close(distance, 40, 1e-7); close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+    // Close, elevated photos used to pull an upward-looking camera underneath
+    // the photo. Ground, upper floors, aerial and underground photos all use
+    // the same focus, even when another photo occupies the same shooting point.
+    for (const height of [-6.4, 1.6, 15, 75]) for (const viewport of [FULL_MAP_VIEWPORT, side, bottom]) {
+      await render({ visibleViewport: viewport });
+      camera.position.set(0, 1.6, 0);
+      camera.quaternion.setFromEuler(new THREE.Euler(Math.PI / 3, .8, 0, 'YXZ'));
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 8);
+      control.update();
+      const selected = { ...photo, id: `close-photo-${height}-${viewport.width}`, position: { x: 5, z: -8, height } };
+      const point = new THREE.Vector3(5, height, -8), start = readCameraPose(camera, control.target);
+      await render({ selected, visibleViewport: viewport });
+      vectorClose(camera.position, start.position);
+      await advance('focusing a close photo from below'); frame(point, viewport);
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+      close(camera.rotation.clone().reorder('YXZ').y, .8);
+      close(camera.position.distanceTo(point), 40, 1e-7);
+      assert.ok(camera.position.y > height, 'The focused camera is above the photograph');
+      const next = { ...selected, id: selected.id + '-same-point' };
+      camera.quaternion.setFromEuler(new THREE.Euler(.3, .8, 0, 'YXZ'));
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 20); control.update();
+      await render({ selected: next, visibleViewport: viewport }); await advance('selecting another photo at the same point');
+      frame(point, viewport); close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+      close(camera.position.distanceTo(point), 40, 1e-7);
+    }
   } finally {
     if (root) await act(async () => root.unmount());
     globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;

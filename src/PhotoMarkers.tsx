@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html, Line } from '@react-three/drei';
-import * as THREE from 'three';
 import { asset } from './types';
 import { useMapColor } from './MapTheme';
 import type { MapPhoto } from './MapCameraRig';
-import { cameraPhotoClusters, clusterFocus, collagePhotos, permanentPhotoSpots, photoOccluders, visiblePhotoPoints, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, type PhotoCluster } from './photo-clusters';
+import { cameraPhotoClusters, clusterFocus, clusterReadyToPick, collagePhotos, permanentPhotoSpots, photoOccluders, visiblePhotoPoints, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, type PhotoCluster } from './photo-clusters';
 import { useAnimatedPresence } from './useAnimatedPresence';
 import { useFadingItems } from './useFadingItems';
 import { PHOTO_FADE_MS } from './fading-items';
@@ -58,8 +57,8 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
           onClick={event => {
             event.stopPropagation();
             if (active || !grouped) { onSelect(photo); return; }
-            if (cluster.spots.length === 1 || !(camera instanceof THREE.PerspectiveCamera) || camera.position.distanceTo(position.clone().add(new THREE.Vector3(0, PHOTO_MARKER_LIFT, 0))) < 10) onPick(cluster, event.currentTarget);
-            else onExpand(clusterFocus(cluster, camera, size));
+            if (clusterReadyToPick(cluster, camera)) onPick(cluster, event.currentTarget);
+            else onExpand(clusterFocus(cluster));
           }}>
           {grouped ? <span className={'photo-collage' + (cluster.photos.length < 4 ? ' two-up' : '')}>{collagePhotos(cluster.photos).map(photo => <img key={photo.id} src={asset(photo.files.thumbnail)} alt="" draggable={false} />)}</span> : <img src={asset(photo.files.thumbnail)} alt="" draggable={false} />}
           {grouped && <span className="cluster-count">{cluster.photos.length}</span>}

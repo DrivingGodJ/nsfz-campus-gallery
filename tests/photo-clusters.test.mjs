@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { cameraPhotoClusters, clusterFocus, collagePhotos, permanentPhotoSpots, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, photoPointVisible, visiblePhotoPoints } from '../src/photo-clusters.ts';
+import { cameraPhotoClusters, clusterFocus, clusterReadyToPick, collagePhotos, permanentPhotoSpots, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, photoPointVisible, visiblePhotoPoints } from '../src/photo-clusters.ts';
 import { photoSeason, photosInSeason } from '../src/photo-season.ts';
 
 const photo = (id, x, z = 0, height = 1.6) => ({ id, position: { x, z, height }, capturedAt: '2025-04-18' });
@@ -52,11 +52,24 @@ test('far camera merges separate spots, drilling into a group separates them, an
   const spots = permanentPhotoSpots([photo('a', -10), photo('b', 0), photo('c', 10)]);
   const farCamera = cameraAt(600), far = cameraPhotoClusters(spots, farCamera, size);
   assert.equal(far.length, 1); assert.equal(far[0].spots.length, 3);
-  const focus = clusterFocus(far[0], farCamera, size), target = new THREE.Vector3(...focus.target);
+  const focus = clusterFocus(far[0]), target = new THREE.Vector3(...focus.target);
   const direction = farCamera.position.clone().sub(new THREE.Vector3(0, 1.6 + PHOTO_MARKER_LIFT, 0)).normalize();
   farCamera.position.copy(target).add(direction.multiplyScalar(focus.distance)); farCamera.lookAt(target); farCamera.updateMatrixWorld();
   assert.equal(cameraPhotoClusters(spots, farCamera, size).length, 3);
   assert.equal(cameraPhotoClusters(spots, cameraAt(600), size).length, 1);
+});
+
+test('groups still merged at the fixed focus distance open their photo menu instead of repeating the same approach', () => {
+  const spots = permanentPhotoSpots([photo('a', 0), photo('b', 3)]), camera = cameraAt(600);
+  const cluster = cameraPhotoClusters(spots, camera, size)[0];
+  assert.equal(clusterReadyToPick(cluster, camera), false);
+  const focus = clusterFocus(cluster); assert.equal(focus.distance, 40);
+  camera.position.copy(new THREE.Vector3(...focus.target)).add(new THREE.Vector3(0, 30, Math.sqrt(700)));
+  assert.equal(clusterReadyToPick(cluster, camera), true);
+  camera.position.z += 10;
+  assert.equal(clusterReadyToPick(cluster, camera), false);
+  const permanent = cameraPhotoClusters(permanentPhotoSpots([photo('a', 0), photo('b', 1)]), camera, size)[0];
+  assert.equal(clusterReadyToPick(permanent, camera), true);
 });
 
 test('merged thumbnails retain every original shooting point, including permanent two metre groups', () => {

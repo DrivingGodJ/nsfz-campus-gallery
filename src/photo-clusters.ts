@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { MapPhoto } from './MapCameraRig';
+import { MAP_PHOTO_FOCUS_DISTANCE } from './map-card-viewport.ts';
 
 export const PHOTO_MERGE_METERS = 2;
 export const PHOTO_MARKER_LIFT = 1.8;
@@ -119,13 +120,14 @@ export function cameraPhotoClusters(spots: PhotoSpot[], camera: THREE.Camera, si
   });
 }
 
-export function clusterFocus(cluster: PhotoCluster, camera: THREE.PerspectiveCamera, size: { width: number; height: number }) {
+export function clusterFocus(cluster: PhotoCluster) {
   const target = markerPoint(cluster.position);
-  const radius = Math.max(...cluster.spots.map(spot => spot.position.distanceTo(cluster.position)), 1);
-  const aspect = size.width / Math.max(1, size.height);
-  const fit = radius / Math.tan(camera.fov * Math.PI / 360) / Math.min(1, aspect) * 1.35;
-  const distance = Math.max(8, Math.min(camera.position.distanceTo(target) * .55, fit));
-  return { target: target.toArray() as [number, number, number], distance };
+  return { target: target.toArray() as [number, number, number], distance: MAP_PHOTO_FOCUS_DISTANCE };
+}
+
+export function clusterReadyToPick(cluster: PhotoCluster, camera: THREE.Camera) {
+  return cluster.spots.length === 1 || !(camera instanceof THREE.PerspectiveCamera)
+    || camera.position.distanceTo(markerPoint(cluster.position)) <= MAP_PHOTO_FOCUS_DISTANCE + 1;
 }
 
 export function collagePhotos(photos: MapPhoto[]): MapPhoto[] {

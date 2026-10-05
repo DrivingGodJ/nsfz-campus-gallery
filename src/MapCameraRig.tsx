@@ -9,7 +9,7 @@ import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-contr
 import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
 import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
-import { FULL_MAP_VIEWPORT, frameMapTarget, type MapViewport } from './map-card-viewport';
+import { FULL_MAP_VIEWPORT, frameMapTarget, photoMapFocusPose, type MapViewport } from './map-card-viewport';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
 export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
@@ -50,8 +50,8 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
   const touchOrbit = useRef<{ rotate: boolean; pan: boolean } | null>(null);
   const objectBounds = selected ? null : selectedObjectBounds;
   const viewportKey = JSON.stringify(visibleViewport);
-  const live = useRef({ size, boundary, objectTarget, objectBounds, objectKey, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView });
-  live.current = { size, boundary, objectTarget, objectBounds, objectKey, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView };
+  const live = useRef({ size, boundary, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView });
+  live.current = { size, boundary, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView };
   const pendingFocus = useRef(false), focusedObjectKey = useRef('');
   const dismissedObjectKey = useRef('');
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
@@ -79,19 +79,22 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
     stopOrbitMomentum(camera, control);
     const target = new THREE.Vector3(...current.objectTarget);
     let pose = readCameraPose(camera, control.target);
-    // Prefer turning the gaze on card resizes; framing only repositions at a
-    // vertical limit where a turn alone cannot keep the object centred.
-    if (focusedObjectKey.current !== current.objectKey) {
-      const viewport = current.visibleViewport, ray = new THREE.Raycaster();
-      ray.setFromCamera(new THREE.Vector2(2 * (viewport.left + viewport.width / 2) - 1, 1 - 2 * (viewport.top + viewport.height / 2)), camera);
-      // Translate the object onto the exposed centre ray at the same distance.
-      // This also works looking straight down, where yaw/pitch alone cannot
-      // move a centred object sideways without tilting the horizon.
-      const centre = ray.ray.at(camera.position.distanceTo(control.target), new THREE.Vector3());
-      pose.position.add(target.clone().sub(centre));
+    if (current.selected) {
+      pose = photoMapFocusPose(pose, target, camera.aspect, current.visibleViewport);
+    } else {
+      // Building selections retain their viewing distance and orientation.
+      if (focusedObjectKey.current !== current.objectKey) {
+        const viewport = current.visibleViewport, ray = new THREE.Raycaster();
+        ray.setFromCamera(new THREE.Vector2(2 * (viewport.left + viewport.width / 2) - 1, 1 - 2 * (viewport.top + viewport.height / 2)), camera);
+        // Translate the object onto the exposed centre ray at the same distance.
+        // This also works looking straight down, where yaw/pitch alone cannot
+        // move a centred object sideways without tilting the horizon.
+        const centre = ray.ray.at(camera.position.distanceTo(control.target), new THREE.Vector3());
+        pose.position.add(target.clone().sub(centre));
+      }
+      pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
+      pose = frameMapTarget(pose, target, camera.aspect, current.visibleViewport);
     }
-    pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
-    pose = frameMapTarget(pose, target, camera.aspect, current.visibleViewport);
     focusedObjectKey.current = current.objectKey; pendingFocus.current = false;
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -230,14 +233,14 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, .35);
       invalidate(); return;
     }
-    if (command.type === 'cluster' && command.target && command.distance) {
-      pose.target.fromArray(command.target);
-      pose.position.copy(pose.target).add(offset.normalize().multiplyScalar(command.distance));
+    if (command.type === 'cluster' && command.target) {
+      pose = photoMapFocusPose(pose, new THREE.Vector3(...command.target), camera.aspect, live.current.visibleViewport);
+    } else {
+      pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
+      const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
+      pose.quaternion.copy(oriented.quaternion);
+      if (command.type === 'reset') pose = frameMapTarget(pose, pose.target, camera.aspect, live.current.visibleViewport);
     }
-    pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
-    const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
-    pose.quaternion.copy(oriented.quaternion);
-    if (command.type === 'reset' || command.type === 'cluster') pose = frameMapTarget(pose, pose.target, camera.aspect, live.current.visibleViewport);
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
     invalidate();
