@@ -46,7 +46,7 @@ test('like API rejects untrusted origins, invalid bodies, unknown photos and rat
     assert.equal((await f.call('read', '{broken')).status, 400);
     assert.equal((await f.call('read', { photoIds: f.ids }, undefined, { 'Content-Type': 'text/plain' })).status, 415);
     assert.equal((await f.call('read', { photoIds: Array.from({ length: 51 }, () => f.ids[0]) })).status, 400);
-    assert.equal((await f.call('read', { photoIds: [crypto.randomUUID()] })).status, 400);
+    assert.equal((await f.call('read', { photoIds: ['not-a-photo'] })).status, 400);
     assert.equal((await f.call(crypto.randomUUID(), { visitorId: f.visitorId, liked: true })).status, 404);
     assert.equal((await f.call(f.ids[0], { visitorId: "' OR 1=1 --", liked: true })).status, 400);
     assert.equal((await f.call(f.ids[0], { visitorId: f.visitorId, liked: 1 })).status, 400);
@@ -60,6 +60,24 @@ test('like API rejects untrusted origins, invalid bodies, unknown photos and rat
     assert.equal(Object.values((await read.json()).likes).reduce((total, value) => total + value.count, 0), 0);
     const fail = await handleLikes(f.request('read', { photoIds: f.ids }), { ...f.env, DB: { prepare: () => { throw new Error('private DB error'); } } }, new Set(f.ids));
     assert.equal(fail.status, 503); assert.equal((await fail.text()).includes('private DB error'), false);
+  } finally { await f.proxy.dispose(); }
+});
+
+test('unsynced photos cannot block known likes or reveal unpublished totals', async () => {
+  const f = await fixture();
+  try {
+    const unknown = crypto.randomUUID();
+    await f.call(f.ids[0], { visitorId: f.visitorId, liked: true });
+    // A removed or private ID can still have historical rows; do not expose them.
+    await f.env.DB.prepare('INSERT INTO photo_likes (photo_id, visitor_id) VALUES (?, ?)').bind(unknown, f.visitorId).run();
+    const response = await f.call('read', { photoIds: [f.ids[0], unknown], visitorId: f.visitorId });
+    assert.equal(response.status, 200);
+    const { likes } = await response.json();
+    assert.deepEqual(likes[f.ids[0]], { count: 1, liked: true });
+    assert.deepEqual(likes[unknown], { count: 0, liked: false, available: false });
+    assert.equal((await f.call(unknown, { visitorId: f.visitorId, liked: true })).status, 404);
+    const client = createLikesClient('/api/likes', f.visitorId, async (_url, options) => f.call('read', JSON.parse(options.body)));
+    assert.deepEqual(await client.read([f.ids[0], unknown]), likes);
   } finally { await f.proxy.dispose(); }
 });
 

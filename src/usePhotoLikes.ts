@@ -37,7 +37,7 @@ export function usePhotoLikes(photos?: Photo[]) {
     return () => { abortRead.current?.abort(); window.removeEventListener('focus', onFocus); window.removeEventListener('online', onFocus); document.removeEventListener('visibilitychange', onFocus); };
   }, [refresh]);
   const toggle = async (id: string) => {
-    if (!visitor || !likes[id] || writing.current.has(id) || phase !== 'ready') return;
+    if (!visitor || !likes[id] || likes[id].available === false || writing.current.has(id) || phase !== 'ready') return;
     abortRead.current?.abort();
     writing.current.add(id); setPending(new Set(writing.current)); setError('');
     try {
@@ -49,6 +49,7 @@ export function usePhotoLikes(photos?: Photo[]) {
     } finally { writing.current.delete(id); setPending(new Set(writing.current)); }
   };
   return { likes, phase, pending, toggle, refresh,
-    message: error || (!API ? '点赞服务尚未连接。' : phase === 'loading' ? '正在连接点赞服务…' : !visitor ? '浏览器无法保存点赞标识，暂时只能查看点赞数。' : ''),
+    message: error || (!API ? '点赞服务尚未连接。' : phase === 'loading' ? '正在连接点赞服务…' : !visitor ? '浏览器无法保存点赞标识，暂时只能查看点赞数。'
+      : Object.values(likes).some(value => value.available === false) ? '部分新照片正在同步点赞，其余照片可以正常点赞。请稍后刷新。' : ''),
     canLike: phase === 'ready' && !!visitor };
 }

@@ -67,13 +67,17 @@ export async function handleLikes(request, env, publishedPhotos) {
     const data = await bodyJSON(request), visitor = visitorID(data.visitorId, !read);
     if (read) {
       const ids = data.photoIds;
-      if (!Array.isArray(ids) || ids.length > READ_BATCH_SIZE || ids.some(id => typeof id !== 'string' || !UUID.test(id) || !publishedPhotos.has(id))) throw new RequestError('照片列表无效，请刷新页面。');
+      if (!Array.isArray(ids) || ids.length > READ_BATCH_SIZE || ids.some(id => typeof id !== 'string' || !UUID.test(id))) throw new RequestError('照片列表无效，请刷新页面。');
       const unique = /** @type {string[]} */ ([...new Set(ids)]);
-      /** @type {Record<string, { count: number, liked: boolean }>} */
-      const likes = Object.fromEntries(unique.map(id => [id, { count: 0, liked: false }]));
-      if (unique.length) {
+      const known = unique.filter(id => publishedPhotos.has(id));
+      // Pages and this Worker deploy separately. An unsynced photo must not
+      // prevent the rest of the library from loading, or expose private totals.
+      /** @type {Record<string, { count: number, liked: boolean, available?: boolean }>} */
+      const likes = Object.fromEntries(unique.map(id => [id, publishedPhotos.has(id)
+        ? { count: 0, liked: false } : { count: 0, liked: false, available: false }]));
+      if (known.length) {
         const result = await env.DB.prepare(`SELECT photo_id, COUNT(*) AS count, MAX(visitor_id = ?) AS liked
-          FROM photo_likes WHERE photo_id IN (${unique.map(() => '?').join(',')}) GROUP BY photo_id`).bind(visitor, ...unique).all();
+          FROM photo_likes WHERE photo_id IN (${known.map(() => '?').join(',')}) GROUP BY photo_id`).bind(visitor, ...known).all();
         for (const row of result.results) likes[String(row.photo_id)] = { count: Number(row.count), liked: !!row.liked };
       }
       return json({ likes });

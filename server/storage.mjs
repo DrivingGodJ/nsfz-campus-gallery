@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
@@ -317,7 +318,9 @@ export async function exportStaticContent(root, destination) {
   for (const photo of site.photos) for (const file of Object.values(photo.files)) {
     const target = path.join(destination, file);
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.copyFile(path.join(root, 'public', file), target);
+    // APFS can clone immutable build assets without duplicating every original.
+    // COPYFILE_FICLONE falls back to a normal copy on other file systems.
+    await fs.copyFile(path.join(root, 'public', file), target, constants.COPYFILE_FICLONE);
   }
   await fs.writeFile(path.join(destination, '.nojekyll'), '');
   console.log('静态内容已导出：' + site.photos.length + ' 张照片；仅包含已保存内容。');

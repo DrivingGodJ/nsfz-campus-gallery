@@ -1,7 +1,7 @@
 import type { Photo } from './types';
 
 export type PhotoSort = 'uploaded' | 'captured' | 'likes';
-export type PhotoLike = { count: number; liked: boolean };
+export type PhotoLike = { count: number; liked: boolean; available?: boolean };
 export type PhotoLikes = Record<string, PhotoLike>;
 
 function time(value?: string) {

@@ -18,7 +18,8 @@ export function persistentVisitor(storage: Pick<Storage, 'getItem' | 'setItem'>,
 function isLike(value: unknown): value is PhotoLike {
   if (!value || typeof value !== 'object') return false;
   const item = value as PhotoLike;
-  return Number.isSafeInteger(item.count) && item.count >= 0 && typeof item.liked === 'boolean';
+  return Number.isSafeInteger(item.count) && item.count >= 0 && typeof item.liked === 'boolean'
+    && (item.available === undefined || typeof item.available === 'boolean');
 }
 
 export function createLikesClient(baseURL: string, visitorId: string, transport: typeof fetch = fetch) {

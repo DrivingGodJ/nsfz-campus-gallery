@@ -6,8 +6,8 @@ export default function PhotoLikeButton({ value, pending, disabled, message, onC
 }) {
   return <button type="button" className={'button secondary photo-like-button' + (value?.liked ? ' liked' : '')}
     aria-pressed={!!value?.liked} aria-busy={pending} aria-label={value?.liked ? '取消点赞' : '点赞照片'}
-    disabled={disabled || pending} title={message || '同一浏览器每张照片可点一个赞，再次点击可取消'} onClick={onClick}>
+    disabled={disabled || pending || value?.available === false} title={value?.available === false ? '这张照片正在同步点赞，请稍后刷新。' : message || '同一浏览器每张照片可点一个赞，再次点击可取消'} onClick={onClick}>
     <Heart size={17} aria-hidden="true" fill={value?.liked ? 'currentColor' : 'none'} />
-    <span>{pending ? '保存中' : value?.liked ? '已点赞' : '点赞'}</span><span className="like-count" aria-live="polite">{value?.count ?? '—'}</span>
+    <span>{pending ? '保存中' : value?.available === false ? '同步中' : value?.liked ? '已点赞' : '点赞'}</span><span className="like-count" aria-live="polite">{value?.available === false ? '—' : value?.count ?? '—'}</span>
   </button>;
 }

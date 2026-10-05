@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { contentPath, changedPaths, photoChanges, createPublicationService, runCommand } from '../server/local-publication.mjs';
+import { contentPath, changedPaths, photoChanges, createPublicationService, runCommand, cleanPublicationBuilds, publicationError, LIKES_API } from '../server/local-publication.mjs';
 
 test('publication includes only the public content library and approved renditions', () => {
   assert.ok(contentPath('public/data/site.json'));
@@ -39,6 +39,10 @@ async function fixture(t, options = {}) {
   };
   const fetcher = async (url, settings) => {
     requests.push([url, settings?.method || 'GET']);
+    if (url.startsWith(LIKES_API)) {
+      const { photoIds } = JSON.parse(settings.body);
+      return Response.json({ likes: Object.fromEntries(photoIds.map(id => [id, { count: 0, liked: false, ...(options.unsynced ? { available: false } : {}) }])) }, { status: options.likesStatus || 200 });
+    }
     return new Response(bytes, { status: options.responseStatus || 200 });
   };
   const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3 });
@@ -66,6 +70,7 @@ test('reviewed photos publish through checks, exact GitHub run, live verificatio
   assert.ok(commands.some(row => row[0] === 'git' && row[1] === 'push'));
   assert.ok(commands.some(row => row[0] === 'gh' && row[2]?.includes('head_sha=' + 'a'.repeat(40))));
   assert.equal(requests[0][0].split('?')[0], 'https://drivinggodj.github.io/nsfz-campus-gallery/data/site.json');
+  assert.ok(requests.some(([url, method]) => url === LIKES_API + '/read' && method === 'POST'));
   assert.ok(!commands.flat().some(value => String(value).includes('private-draft')));
 });
 
@@ -124,4 +129,50 @@ test('another local process sees the publish lock and cannot start a competing t
 test('subprocesses use literal arguments and redact credentials from errors and progress', async () => {
   const output = await runCommand(process.execPath, ['-e', 'process.stdout.write(process.argv[1]+" gho_dummy123 Bearer secret123")', '$(do-not-execute)']);
   assert.match(output, /\$\(do-not-execute\)/); assert.ok(!output.includes('gho_dummy123')); assert.ok(!output.includes('secret123'));
+});
+
+test('successful deployment is not reported complete until every photo can read likes', async t => {
+  for (const options of [{ likesStatus: 503 }, { unsynced: true }]) {
+    const { service } = await fixture(t, options);
+    await service.start();
+    const result = await finished(service);
+    assert.equal(result.status, 'failed');
+    assert.equal(result.websiteVerified, true);
+    assert.match(result.message, /网站已发布.*点赞名单/);
+  }
+});
+
+test('publication removes only its generated builds, preserving logs, originals and unknown directories', async t => {
+  const { root } = await fixture(t);
+  const directory = path.join(root, '.local/publication');
+  const id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  await fs.mkdir(path.join(directory, id, 'build/media'), { recursive: true });
+  await fs.mkdir(path.join(directory, 'unrecognized/build'), { recursive: true });
+  await fs.writeFile(path.join(directory, id, 'build/media/generated.jpg'), 'copy');
+  await fs.writeFile(path.join(directory, id + '.log'), 'record');
+  await fs.writeFile(path.join(directory, id, 'keep.json'), 'record');
+  await fs.writeFile(path.join(root, '.local/original.jpg'), 'original');
+  await cleanPublicationBuilds(directory);
+  await assert.rejects(fs.access(path.join(directory, id, 'build')));
+  assert.equal(await fs.readFile(path.join(directory, id + '.log'), 'utf8'), 'record');
+  assert.equal(await fs.readFile(path.join(directory, id, 'keep.json'), 'utf8'), 'record');
+  assert.equal(await fs.readFile(path.join(root, '.local/original.jpg'), 'utf8'), 'original');
+  await fs.access(path.join(directory, 'unrecognized/build'));
+});
+
+test('a failed build removes temporary images and keeps a readable disk-full error and saved photos', async t => {
+  const { service, root, commands } = await fixture(t, { onCommand: async (_tool, args) => {
+    if (args[1] !== 'run' || args[2] !== 'build') return;
+    const out = args[args.indexOf('--outDir') + 1];
+    await fs.mkdir(out, { recursive: true });
+    await fs.writeFile(path.join(out, 'partial.jpg'), 'generated');
+    throw new Error('Error: ENOSPC: no space left on device, copyfile original.jpg');
+  } });
+  await service.start();
+  const result = await finished(service);
+  assert.equal(result.status, 'failed'); assert.match(result.message, /磁盘空间不足/);
+  await assert.rejects(fs.access(path.join(root, '.local/publication', result.id, 'build')));
+  assert.ok(!commands.some(row => row[0] === 'git' && row[1] === 'push'));
+  assert.equal(JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'), 'utf8')).photos.length, 1);
+  assert.match(publicationError('ENOSPC'), /释放空间后可重试/);
 });

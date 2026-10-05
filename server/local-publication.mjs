@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { UserError, writeJSON } from './storage.mjs';
 
 export const PUBLIC_SITE = 'https://drivinggodj.github.io/nsfz-campus-gallery/';
+export const LIKES_API = 'https://likes.drivinggodj.dpdns.org/api/likes';
 const REPOSITORY = 'DrivingGodJ/nsfz-campus-gallery';
 const CONTENT = /^(public\/data\/site\.json|public\/media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg))$/;
 export const contentPath = value => CONTENT.test(value);
@@ -29,6 +30,20 @@ export function photoChanges(previous, current) {
   };
 }
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+export async function cleanPublicationBuilds(directory) {
+  let entries;
+  try { entries = await fs.readdir(directory, { withFileTypes: true }); }
+  catch (error) { if (error.code === 'ENOENT') return; throw error; }
+  // These are disposable checks, never the public content or private originals.
+  // Keep every publication record, log and unrecognized directory.
+  for (const entry of entries) if (entry.isDirectory() && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(entry.name)) {
+    await fs.rm(path.join(directory, entry.name, 'build'), { recursive: true, force: true });
+  }
+}
+export function publicationError(message) {
+  if (/ENOSPC|no space left on device/i.test(String(message))) return '磁盘空间不足，未完成上线。照片与审核记录已保留，临时构建文件会自动清理；释放空间后可重试。';
+  return redact(message);
+}
 function redact(value) {
   return String(value).replace(/\x1b\[[0-9;]*m/g, '').replace(/\bgh[pousr]_[A-Za-z0-9_]+/g, '[已隐藏凭证]').replace(/(Bearer\s+)\S+/gi, '$1[已隐藏凭证]');
 }
@@ -134,9 +149,29 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     }
     throw new UserError('GitHub 已完成发布，但还没确认到最新网页。请检查网站，或稍后重新上线。');
   }
+  async function verifyLikes() {
+    const site = JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'), 'utf8'));
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        for (let index = 0; index < site.photos.length; index += 50) {
+          const ids = site.photos.slice(index, index + 50).map(photo => photo.id);
+          const response = await fetcher(LIKES_API + '/read', { method: 'POST', cache: 'no-store',
+            headers: { Origin: new URL(PUBLIC_SITE).origin, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photoIds: ids }), signal: AbortSignal.timeout(25000) });
+          if (!response.ok) throw new Error('likes unavailable');
+          const data = await response.json();
+          if (ids.some(id => !Number.isSafeInteger(data.likes?.[id]?.count) || data.likes[id].count < 0
+            || typeof data.likes[id].liked !== 'boolean' || data.likes[id].available === false)) throw new Error('likes not synced');
+        }
+        return;
+      } catch { if (attempt < 3) await wait(pollMs); }
+    }
+    throw new UserError('网站已发布，但未能确认照片点赞名单已同步。照片与上线记录已保留，请稍后重试。');
+  }
   async function execute() {
     let result;
     try {
+      await cleanPublicationBuilds(directory);
       await update({ step: 0, message: '正在核对 GitHub、登录状态与最新内容…' });
       await gh('auth', 'status', '--hostname', 'github.com');
       await git('fetch', 'origin', 'main');
@@ -176,11 +211,15 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       if (!completed) throw new UserError('GitHub 仍在发布。请查看发布记录；稍后可以重试，内容已保留。');
       await update({ step: 4, message: '正在确认网站已更新，并同步照片点赞名单…' });
       await verifyWebsite(commit, prepared.files);
-      await npm('likes:deploy:only');
+      await update({ websiteVerified: true });
+      try { await npm('likes:deploy:only'); }
+      catch (error) { throw new UserError('网站已发布，但点赞服务同步失败。照片已保留，可以重试上线。\n' + publicationError(error.message)); }
+      await verifyLikes();
       result = { step: 5, status: 'completed', message: '上线完成。网站已更新，照片可以正常点赞。', finishedAt: new Date().toISOString() };
     } catch (error) {
-      result = { status: 'failed', message: redact(error.message), finishedAt: new Date().toISOString() };
+      result = { status: 'failed', message: publicationError(error.message), finishedAt: new Date().toISOString() };
     } finally {
+      await cleanPublicationBuilds(directory).catch(error => console.error('发布临时文件清理失败：' + publicationError(error.message)));
       await fs.rm(lockFile, { force: true });
       await update({ ...result, running: false });
     }
