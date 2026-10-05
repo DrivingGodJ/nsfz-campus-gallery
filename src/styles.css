@@ -185,6 +185,10 @@ button.comparison-image{cursor:zoom-in}
 .filter-results{padding:0 23px 14px;color:var(--muted);font-size:11px}
 .map-photo-point{display:block;width:5px;height:5px;border-radius:50%;border:1px solid var(--thumb-border,#faf9f4);pointer-events:none}
 .map-photo-point.selected{width:7px;height:7px}
+.map-photo.aerial{border-color:var(--photo-accent)}
+.map-photo.aerial.selected{border-color:var(--photo-selected)}
+.map-photo.mixed:not(.selected){border-color:transparent;background-image:linear-gradient(135deg,var(--photo-accent) 50%,var(--thumb-border,#faf9f4) 50%)}
+.map-photo.aerial .cluster-count{background:var(--photo-accent)}
 .map-photo.compact{width:44px;height:36px}
 .map-photo.collage.compact{width:60px;height:48px}
 .map-photo::before{content:"";position:absolute;inset:-6px}

@@ -23,9 +23,10 @@ import BasketballCourts from './BasketballCourts';
 import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from './LocationSelection';
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
 import { groundSurfaces } from './ground-geometry';
-import { photoMapHeight } from './locations';
+import { isAerialPhoto, photoMapHeight } from './locations';
 import { mapLocationTarget } from './location-geometry';
 import PhotoMarkers from './PhotoMarkers';
+import { photoMarkerColors } from './photo-marker-colors';
 import PhotoClusterPicker from './PhotoClusterPicker';
 import type { PhotoCluster } from './photo-clusters';
 import MapCameraRig, { OVERVIEW_POSITION, type MapCommand, type MapPhoto } from './MapCameraRig';
@@ -108,15 +109,17 @@ function Roads({ points, width }: { points: Point[]; width: number }) {
 }
 function Direction({ photo, editing = false, compact = false, onHeading, labelPortal }: { photo: MapPhoto; editing?: boolean; compact?: boolean; onHeading?: (heading: number) => void; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
+  const colors = photoMarkerColors(photo);
+  const color = editing && !isAerialPhoto(photo) ? '#b8723d' : colors.direction;
   const { camera, gl, controls } = useThree();
   const cleanup = useRef<(() => void) | null>(null);
   useEffect(() => () => cleanup.current?.(), []);
   const arrow = useMemo(() => {
     const vector = new THREE.Vector3(...directionVector(photo.heading, photo.pitch));
-    return new THREE.ArrowHelper(vector, new THREE.Vector3(photo.position.x, photo.position.height + .4, photo.position.z), compact ? 5 : 22, editing ? '#b8723d' : '#3e6951', compact ? 1.5 : 3, compact ? .8 : 1.5);
-  }, [photo.heading, photo.pitch, photo.position.x, photo.position.z, photo.position.height, editing, compact]);
+    return new THREE.ArrowHelper(vector, new THREE.Vector3(photo.position.x, photo.position.height + .4, photo.position.z), compact ? 5 : 22, color, compact ? 1.5 : 3, compact ? .8 : 1.5);
+  }, [photo.heading, photo.pitch, photo.position.x, photo.position.z, photo.position.height, color, compact]);
   useEffect(() => () => { arrow.dispose(); }, [arrow]);
-  useEffect(() => { arrow.setColor(mapColor(editing ? '#b8723d' : '#3e6951')); }, [arrow, editing, mapColor]);
+  useEffect(() => { arrow.setColor(mapColor(color)); }, [arrow, color, mapColor]);
   const view = photoFieldOfView(photo);
   const rays = useMemo(() => !compact && view ? viewSectorRays(photo.heading, photo.pitch, view.horizontal) : [], [photo.heading, photo.pitch, view?.horizontal, compact]);
   const sector = useMemo(() => {
@@ -145,8 +148,7 @@ function Direction({ photo, editing = false, compact = false, onHeading, labelPo
     document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
   };
   const origin: [number, number, number] = [photo.position.x, photo.position.height + .4, photo.position.z];
-  const color = editing ? '#b8723d' : '#3e6951';
-  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={origin} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor('#b8723d') }} /></Html>}
+  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={origin} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor(color) }} /></Html>}
     {rays.length > 0 && <><mesh geometry={sector} position={origin} renderOrder={28} raycast={() => null}><meshBasicMaterial color={mapColor(color)} transparent opacity={.17} side={THREE.DoubleSide} depthTest={false} depthWrite={false} /></mesh><Line points={[origin, ...rays.map(p => p.map((n, i) => n + origin[i]) as [number, number, number]), origin]} color={mapColor(color)} lineWidth={1.5} depthTest={false} depthWrite={false} renderOrder={29} raycast={() => null} /></>}
     {editing && onHeading && <Html portal={labelPortal} center position={[photo.position.x + Math.sin(yaw) * 22, photo.position.height + 2, photo.position.z - Math.cos(yaw) * 22]} zIndexRange={[20, 19]}><button className="direction-handle" aria-label="拖动调整拍摄方向" title="拖动调整拍摄方向" onPointerDown={beginDrag} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); onHeading((photo.heading + (e.key === 'ArrowRight' ? 5 : 355)) % 360); } }}>↔</button></Html>}
   </group>;

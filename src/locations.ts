@@ -46,6 +46,8 @@ export function resolveLocationId(id: string, campus?: Campus) {
 export const photoLocationId = (photo: Pick<Photo, 'locationId' | 'buildingId'>, campus?: Campus) => resolveLocationId(photo.locationId ?? photo.buildingId ?? '', campus);
 
 export const isAerialPhoto = (photo: Photo) => photo.captureType === 'aerial' || (photo.captureType === undefined && !!photo.metadata?.aerial);
+// A directory filter, never a destination offered during photo annotation.
+export const AERIAL_LOCATION_FILTER = 'capture/aerial';
 export const altitudeLabel = (photo: Photo) => photo.altitude?.reference === 'seaLevel' ? '拍摄海拔' : '航拍高度（相对起飞点）';
 
 export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {
@@ -90,6 +92,7 @@ export function assignPhotoLocation(photo: Photo, id: string, campus: Campus, si
 }
 
 export function photosAtLocation(photos: Photo[], id: string, floor = 0, campus?: Campus) {
+  if (id === AERIAL_LOCATION_FILTER) return photos.filter(isAerialPhoto);
   id = resolveLocationId(id, campus);
   return photos.filter(photo => (!id || photoLocationId(photo, campus) === id) && (!floor || photo.floor === floor));
 }
