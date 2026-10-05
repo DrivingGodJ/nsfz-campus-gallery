@@ -111,10 +111,12 @@ button.comparison-image{cursor:zoom-in}
 .viewer-cards .map-bottom{left:calc(var(--map-free-left,0%) + 22px);right:calc(var(--map-free-right,0%) + 22px);bottom:calc(var(--map-free-bottom,0%) + 16px)}
 @media(max-width:760px){
   .photo-comparison.is-overlay .comparison-photo,.viewer-main.viewer-cards>.viewer-panel{border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom)}
-  .viewer-cards .photo-comparison.is-overlay .map-tools{flex-direction:row;gap:0;top:auto;right:8px;bottom:calc(var(--map-free-bottom,0%) + 8px)}
+  .viewer-cards .photo-comparison.is-overlay .map-tools{flex-direction:column;gap:2px;top:12px;right:10px;bottom:auto;max-height:calc(100% - var(--map-free-bottom,0%) - 24px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;touch-action:pan-y}
   .viewer-cards .map-tools .icon-button{width:32px;height:32px}
-  .viewer-cards .map-tools>span{width:1px;height:20px;margin:6px 5px}
-  .viewer-cards .photo-comparison.is-overlay .map-stage:not(.photo-perspective) .map-bottom{bottom:calc(var(--map-free-bottom,0%) + 50px)}
+  .viewer-cards .photo-comparison.is-overlay .map-tools>span{width:auto;height:1px;min-height:1px;margin:2px 5px}
+  .viewer-cards .photo-comparison.is-overlay .map-bottom{left:14px;right:14px;bottom:calc(var(--map-free-bottom,0%) + 12px)}
+  .viewer-cards .photo-comparison.is-overlay .map-stage:not(.photo-perspective) .map-bottom{right:64px}
+  .viewer-cards .map-bottom a{margin-left:0}
   .viewer-cards .map-caption{left:14px;top:16px}
 }
 .edit-comparison-button{width:calc(100% - 40px);margin:12px 20px 0}

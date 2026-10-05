@@ -537,3 +537,64 @@ test('overlay cards leave the map lens unchanged and keep selected objects centr
     await environment.close();
   }
 });
+
+test('exposed-area gestures stay anchored and deselection waits for centring and photo transitions', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const canvas = testCanvas();
+  const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let root;
+  try {
+    const { default: Rig } = await environment.server.ssrLoadModule('/src/MapCameraRig.tsx');
+    globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
+    root = createRoot(canvas);
+    await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
+    let dismissed = 0, store, timeline = 0;
+    const props = { command: { type: 'initial', sequence: 0 }, boundary: [[-2000,-2000],[2000,-2000],[2000,2000],[-2000,2000]], selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving() {}, onSelectionOutOfView: () => dismissed++ };
+    const render = async changes => { await act(async () => { store = root.render(React.createElement(Rig, { ...props, ...changes })); }); };
+    await render({});
+    const state = store.getState(), camera = state.camera, control = state.controls;
+    const advance = async (frames = 65) => { await act(async () => { for(let n=0;n<frames;n++) state.advance(timeline += 1/60,false); }); };
+    for (const viewport of [{left:0,top:0,width:1,height:.35},{left:.4,top:0,width:.6,height:1}]) {
+      await render({visibleViewport:viewport}); await advance();
+      const pivot = mapGroundOrbitTarget(camera,props.boundary,viewport), before = readCameraPose(camera,control.target);
+      assert.ok(pivot);
+      const projection = pivot.clone().project(camera), radius = pivot.distanceTo(camera.position);
+      pointerEvent(canvas,'pointerdown',{pointerType:'touch',pageX:100,pageY:100});
+      vectorClose(camera.position,before.position); close(camera.quaternion.angleTo(before.quaternion),0,1e-7);
+      const move = {pointerType:'touch',pageX:135,pageY:115,clientX:135,clientY:115};
+      pointerEvent(canvas,'pointermove',move); pointerEvent(canvas.ownerDocument,'pointermove',move);
+      assert.ok(camera.position.distanceTo(before.position)>1,'Dragging orbits the exposed ground point');
+      vectorClose(pivot.clone().project(camera),projection); close(pivot.distanceTo(camera.position),radius);
+      pointerEvent(canvas,'pointerup',move); pointerEvent(canvas.ownerDocument,'pointerup',move);
+      await advance(); vectorClose(pivot.clone().project(camera),projection);
+    }
+    const viewport = {left:0,top:0,width:1,height:.35}, selected = {...photo,position:{...photo.position,height:1.6}};
+    await render({selected,visibleViewport:viewport}); await advance(8);
+    assert.equal(dismissed,0,'A selection is not cancelled while its centring animation runs');
+    await advance();
+    const point = new THREE.Vector3(selected.position.x,selected.position.height,selected.position.z);
+    close(point.clone().project(camera).y,.65); assert.equal(dismissed,0);
+    const preview = {...selected,heading:0,pitch:60};
+    await render({selected,preview,visibleViewport:viewport}); await advance(8);
+    assert.equal(dismissed,0); await advance(); assert.equal(dismissed,0,'Looking away from the selected photo in preview is allowed');
+    await render({selected,visibleViewport:viewport}); await advance(8); assert.equal(dismissed,0);
+    await advance(140); assert.equal(dismissed,0,'Returning restores the selected object before checking its visibility');
+    camera.lookAt(point); camera.updateMatrixWorld();
+    control.target.copy(point); control.update();
+    close(point.clone().project(camera).y,0);
+    await advance(1); assert.equal(dismissed,1,'A photo under the card is outside the exposed view even though it remains on the canvas');
+    await advance(); assert.equal(dismissed,1,'The dismissal is emitted once until selection changes');
+    await render({visibleViewport:{left:.4,top:0,width:.6,height:1}});
+    camera.position.set(0,100,0); control.target.set(0,0,0); camera.lookAt(control.target); control.update();
+    const verticalPhoto = {...selected,id:'vertical-photo',position:{x:10,z:20,height:1.6}};
+    await render({selected:verticalPhoto,visibleViewport:{left:.4,top:0,width:.6,height:1}}); await advance();
+    const verticalProjection = new THREE.Vector3(10,1.6,20).project(camera);
+    close(verticalProjection.x,.4); close(verticalProjection.y,0);
+    assert.equal(dismissed,1,'Selecting from a near-vertical view centres correctly and does not dismiss the new photo');
+  } finally {
+    if(root)await act(async()=>root.unmount());
+    globalThis.window=previousWindow;globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;
+    await environment.close();
+  }
+});
