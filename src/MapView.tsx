@@ -16,7 +16,7 @@ import BuildingSkylights from './BuildingSkylights';
 import { buildingGeometry } from './building-geometry';
 import { cafeteriaBodyGeometry, dormitoryBodyGeometry } from './facade-geometry';
 import { buildingFloorLineGeometry } from './building-floor-lines';
-import type { PhotoSeason } from './photo-season';
+import { photoMapSeason, type PhotoSeason } from './photo-season';
 import BasketballCourts from './BasketballCourts';
 import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from './LocationSelection';
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
@@ -182,9 +182,10 @@ export default function MapView(props: Props) {
   const preview = props.photoPerspective && !placing && candidate && !photoPerspectiveIssue(candidate) ? candidate : null;
   const skyPhoto = editPhoto ? props.photoPreview || preview ? editPhoto : null : selectedPhoto;
   const environmentTime = photoSkyTime(props.time || '', skyPhoto);
+  const environmentSeason = photoMapSeason(props.season || '', skyPhoto);
   // A photo temporarily overrides the whole scene appearance, without changing
-  // the directory filter. Closing it restores the user's chosen map time.
-  const mapColor = useMapColor(theme, props.season || '', environmentTime);
+  // the directory filters. Closing it restores the user's season and time.
+  const mapColor = useMapColor(theme, environmentSeason, environmentTime);
   const viewingPhoto = !!preview || moving;
   // Selection cuts above its floor; preview restores the building throughout the camera transition.
   const cutawayFloor = props.photoPreview || viewingPhoto ? undefined : floor;
@@ -213,10 +214,10 @@ export default function MapView(props: Props) {
     const target = new THREE.Vector3();
     if (e.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(editPhoto?.position.height || 0)), target)) onPlace({ x: target.x, z: target.z });
   };
-  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={props.season || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
-    <MapTheme.Provider value={theme}><MapSeason.Provider value={props.season || ''}><MapTime.Provider value={environmentTime}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
+  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={environmentSeason || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
+    <MapTheme.Provider value={theme}><MapSeason.Provider value={environmentSeason}><MapTime.Provider value={environmentTime}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
       <color attach="background" args={[mapColor('#eeeee5')]} />
-      <SkyEnvironment theme={theme} season={props.season || ''} time={environmentTime} />
+      <SkyEnvironment theme={theme} season={environmentSeason} time={environmentTime} />
       <LocationSelection.Provider value={{ selectedId: selectedLocation, onSelect: viewingPhoto ? undefined : onLocation, placing, featuresSelectable: props.featuresSelectable, selectableIds }}><Suspense fallback={null}><group onClick={clickBackground}>
         {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={-.08} unlit />)}
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}
@@ -233,8 +234,8 @@ export default function MapView(props: Props) {
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {/* The map is isolated below viewer cards; place the chooser alongside them so the catalog cannot cover it. */}
-    {!viewingPhoto && picker && labelPortal.current && createPortal(<PhotoClusterPicker photos={picker.photos} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
+    {labelPortal.current && createPortal(<PhotoClusterPicker photos={!viewingPhoto && picker ? picker.photos : null} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
     {preview && <PhotoPerspectiveOverlay photo={preview} viewport={viewport} />}
-    <div className="map-bottom"><span className="map-help">{mapInteractionHelp(inputMode, preview ? editPhoto ? 'editing' : 'preview' : placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>
+    {!viewingPhoto && <div className="map-bottom"><span className="map-help">{mapInteractionHelp(inputMode, placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>}
   </div>;
 }

@@ -11,6 +11,7 @@ export function bindMapTouchControls(canvas: HTMLCanvasElement, options: {
   const touches = new Map<number, { x: number; y: number; onMap: boolean }>();
   const seen = new WeakSet<Event>();
   let multi = false, locked = false, suppressClick = false;
+  let labelDrag: { id: number; x: number; y: number; dragged: boolean } | null = null;
   let previous: { distance: number; x: number; y: number } | null = null;
   const onMap = (target: EventTarget | null) => target === canvas || !!(target && surface.contains?.(target as Node));
   const mapContact = () => [...touches.values()].some(touch => touch.onMap);
@@ -29,12 +30,16 @@ export function bindMapTouchControls(canvas: HTMLCanvasElement, options: {
     if (event.pointerType !== 'touch') return;
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY, onMap: onMap(event.target) });
     if (touches.size >= 2 && mapContact()) {
-      if (!multi) { multi = true; suppressClick = true; options.single.finish(); }
+      if (!multi) { multi = true; suppressClick = true; labelDrag = null; options.single.finish(); }
       lock();
       for (const id of touches.keys()) canvas.setPointerCapture(id);
       consume(event);
-    } else if (event.target === canvas && options.enabled()) {
-      options.single.start(event); canvas.setPointerCapture(event.pointerId);
+    } else if (options.enabled() && (event.target === canvas || (event.target as Element)?.closest?.('.map-photo,.location-name,.building-label,.structure-label') && onMap(event.target))) {
+      // Keep a label's implicit capture until a deliberate drag: a stationary
+      // tap must still click its photo/location instead of the canvas.
+      labelDrag = event.target === canvas ? null : { id: event.pointerId, x: event.clientX, y: event.clientY, dragged: false };
+      options.single.start(event);
+      if (event.target === canvas) canvas.setPointerCapture(event.pointerId);
     }
     previous = pair();
   };
@@ -52,13 +57,22 @@ export function bindMapTouchControls(canvas: HTMLCanvasElement, options: {
         if (dx || dy) options.pan?.(dx, dy);
       }
       previous = next;
-    } else if (touch.onMap && options.enabled()) options.single.move(event);
+    } else if (touch.onMap && options.enabled()) {
+      if (labelDrag?.id === event.pointerId) {
+        if (!labelDrag.dragged && Math.hypot(event.clientX - labelDrag.x, event.clientY - labelDrag.y) < 5) return;
+        labelDrag.dragged = true; suppressClick = true;
+        if (!canvas.hasPointerCapture(event.pointerId)) canvas.setPointerCapture(event.pointerId);
+        consume(event);
+      }
+      options.single.move(event);
+    }
   };
   const finish = (event: PointerEvent) => {
     if (event.pointerType !== 'touch' || !touches.has(event.pointerId)) return;
     // Taking an overlay's implicit capture must not discard that contact.
     if (event.type === 'lostpointercapture' && event.target !== canvas) return;
     if (!multi) options.single.finish();
+    if (labelDrag?.id === event.pointerId) labelDrag = null;
     touches.delete(event.pointerId); previous = pair();
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
     // Stay in two-finger mode until both lift; the remaining finger must not
@@ -70,6 +84,7 @@ export function bindMapTouchControls(canvas: HTMLCanvasElement, options: {
   };
   const clear = () => {
     options.single.finish();
+    labelDrag = null;
     const captured = [...touches.keys()]; touches.clear(); previous = null; multi = false; suppressClick = false;
     if (locked) { locked = false; options.multiTouch?.(false); }
     for (const id of captured) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);

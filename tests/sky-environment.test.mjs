@@ -2,6 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SKY_PALETTES, skyTime, skyEnvironment, skyDomeRadius, photoSkyTime, skyTransitionBlend } from '../src/sky-environment.ts';
 import { timeMapColor } from '../src/time-palette.ts';
+import { photoMapSeason } from '../src/photo-season.ts';
+
+test('selected photos override the map season without changing the filter and restore it on close', () => {
+  for (const [date,season] of [['2026-04-05','spring'],['2026-07-05','summer'],['2026-10-05','autumn'],['2026-01-05','winter']]) {
+    const photo = {capturedAt:date+'T12:00:00+08:00'}, original=JSON.stringify(photo);
+    assert.equal(photoMapSeason('summer',photo),season);
+    assert.equal(JSON.stringify(photo),original);
+    for (const theme of ['light','dark']) {
+      assert.deepEqual(skyEnvironment(theme,photoMapSeason('summer',photo),photoSkyTime('night',photo)),skyEnvironment(theme,season,'day'));
+    }
+  }
+  for (const capturedAt of [undefined,'','invalid','2026-13-01']) assert.equal(photoMapSeason('winter',{capturedAt}),'winter');
+  assert.equal(photoMapSeason('summer',null),'summer'); assert.equal(photoMapSeason('',null),'');
+});
 
 test('sky follows the selected capture period and falls back to the system appearance', () => {
   assert.equal(skyTime('light', ''), 'day');

@@ -55,7 +55,7 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   const startRotation = (event: PointerEvent) => {
     if (options.rotation?.start()) {
       looking = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      canvas.setPointerCapture(event.pointerId);
+      if (event.pointerType !== 'touch' || event.target === canvas) canvas.setPointerCapture(event.pointerId);
     }
   };
   const surface = canvas.closest?.('.map-stage') || canvas;

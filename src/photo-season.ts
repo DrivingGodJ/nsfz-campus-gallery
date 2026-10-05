@@ -20,4 +20,8 @@ export function photoSeason(photo: Pick<Photo, 'capturedAt'>): PhotoSeason {
 export function photosInSeason<T extends Pick<Photo, 'capturedAt'>>(photos: T[], season: PhotoSeason | ''): T[] {
   return season ? photos.filter(photo => photoSeason(photo) === season) : photos;
 }
+export function photoMapSeason(mapSeason: PhotoSeason | '', photo?: Pick<Photo, 'capturedAt'> | null): PhotoSeason | '' {
+  const captured = photo ? photoSeason(photo) : 'unknown';
+  return captured === 'unknown' ? mapSeason : captured;
+}
 export const photoSeasonLabel = (photo: Pick<Photo, 'capturedAt'>) => SEASONS.find(season => season.id === photoSeason(photo))!.label;

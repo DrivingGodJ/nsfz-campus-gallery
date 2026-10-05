@@ -6,8 +6,10 @@ import { PerspectiveCamera, Vector3 } from 'three';
 
 const fixture = () => {
   const document = new EventTarget(), window = new EventTarget(), surface = new EventTarget();
-  const canvas = new EventTarget(), photo = new EventTarget(), button = new EventTarget(), outside = new EventTarget(), captures = new Set();
-  const mapNodes = new Set([canvas, photo, button]);
+  const canvas = new EventTarget(), photo = new EventTarget(), location = new EventTarget(), image = new EventTarget(), button = new EventTarget(), outside = new EventTarget(), captures = new Set();
+  const mapNodes = new Set([canvas, photo, location, image, button]);
+  for (const label of [photo, location]) Object.assign(label, { closest: selector => selector.includes('.map-photo') ? label : null });
+  Object.assign(image, { closest: selector => selector.includes('.map-photo') ? photo : null });
   Object.assign(surface, { contains: node => mapNodes.has(node) });
   Object.assign(document, { defaultView: window });
   Object.assign(canvas, { ownerDocument: document, closest: () => surface, clientHeight: 600,
@@ -23,8 +25,32 @@ const fixture = () => {
   const dispose = bindMapTouchControls(canvas, { enabled: () => enabled,
     travel: value => calls.travel.push(value), pan: (dx, dy) => calls.pan.push([dx, dy]), multiTouch: active => calls.lock.push(active),
     single: { start: event => calls.start.push(event.pointerId), move: event => calls.move.push(event.pointerId), finish: () => calls.finish++ } });
-  return { document, window, surface, canvas, photo, button, outside, captures, calls, send, pointer, dispose, enable: value => { enabled = value; } };
+  return { document, window, surface, canvas, photo, location, image, button, outside, captures, calls, send, pointer, dispose, enable: value => { enabled = value; } };
 };
+
+test('photo and location labels drag the map while taps and slight finger jitter still select the label', () => {
+  for (const name of ['photo','location','image']) {
+    const f = fixture(), label = f[name];
+    f.pointer(label,'pointerdown',1);
+    assert.deepEqual(f.calls.start,[1]); assert.equal(f.captures.size,0,'Keep a tap targeted at the label');
+    f.pointer(label,'pointermove',1,102,102);
+    assert.deepEqual(f.calls.move,[]);
+    f.pointer(label,'pointerup',1,102,102);
+    assert.equal(f.send(label,'click',{detail:1}).defaultPrevented,false);
+    f.pointer(label,'pointerdown',2);
+    assert.equal(f.pointer(label,'pointermove',2,110,105).defaultPrevented,true);
+    assert.deepEqual(f.calls.move,[2]); assert.deepEqual([...f.captures],[2]);
+    f.pointer(label,'lostpointercapture',2,110,105);
+    f.pointer(f.canvas,'pointermove',2,125,110);
+    assert.deepEqual(f.calls.move,[2,2],'Moving capture to the canvas does not interrupt rotation');
+    f.pointer(f.canvas,'pointerup',2,125,110);
+    assert.equal(f.captures.size,0);
+    assert.equal(f.send(label,'click',{detail:1}).defaultPrevented,true,'A drag must not also open a photo or choose a location');
+    f.pointer(label,'pointerdown',3); f.pointer(label,'pointerup',3);
+    assert.equal(f.send(label,'click',{detail:1}).defaultPrevented,false,'The next tap is usable');
+    f.dispose();
+  }
+});
 
 test('pinches spanning the canvas, photos, controls and page boundary travel without single-finger rotation in either touch order', () => {
   for (const names of [['canvas', 'photo'], ['photo', 'canvas'], ['photo', 'button'], ['outside', 'canvas'], ['canvas', 'outside']]) {

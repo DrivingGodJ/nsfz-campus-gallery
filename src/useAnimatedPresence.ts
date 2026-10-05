@@ -4,9 +4,9 @@ export const PANEL_TRANSITION_MS = 320;
 
 // Keep closing content mounted until its transition ends. Reopening cancels
 // the pending removal, including rapid photo/catalog changes.
-export function useAnimatedPresence(open: boolean, duration = PANEL_TRANSITION_MS) {
+export function useAnimatedPresence(open: boolean, duration = PANEL_TRANSITION_MS, animateOnMount = false) {
   const [present, setPresent] = useState(open);
-  const [visible, setVisible] = useState(open);
+  const [visible, setVisible] = useState(open && !animateOnMount);
   useEffect(() => {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       setPresent(open); setVisible(open); return;
