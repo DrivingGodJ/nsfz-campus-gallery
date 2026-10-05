@@ -40,7 +40,7 @@ export default function PhotoComparison({ children, photo, imageSource, navigati
       onPointerDown={e => {
         if (e.button !== 0 || !container.current) return;
         setResizing(true);
-        e.preventDefault(); e.currentTarget.focus({ preventScroll: true }); e.currentTarget.setPointerCapture(e.pointerId);
+        e.preventDefault(); e.currentTarget.blur(); e.currentTarget.setPointerCapture(e.pointerId);
         const rect = container.current.getBoundingClientRect();
         drag.current = { start: stacked ? e.clientY : e.clientX, share, length: stacked ? rect.height - 24 : rect.width - 24 };
       }}

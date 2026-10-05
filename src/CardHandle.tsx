@@ -11,7 +11,7 @@ export default function CardHandle({ label, sizing }: { label: string; sizing: C
     style={{ '--card-size': sizing.value } as CSSProperties}
     onPointerDown={e => {
       if (e.button !== 0 || !sizing.length) return;
-      e.preventDefault(); e.stopPropagation(); e.currentTarget.focus({ preventScroll: true });
+      e.preventDefault(); e.stopPropagation(); e.currentTarget.blur();
       e.currentTarget.setPointerCapture(e.pointerId);
       drag.current = { id: e.pointerId, y: e.clientY, value: sizing.value };
     }}
