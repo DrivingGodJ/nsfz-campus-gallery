@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 141,
+  "revision": 145,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -2549,6 +2549,77 @@
         "download": "media/fe37c3bd-665e-4582-aeff-1d58a5c2b3b3/download.jpg"
       },
       "locationId": ""
+    },
+    {
+      "id": "ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11",
+      "title": "夏日篮球场飞机",
+      "description": "西操场强五飞机航拍",
+      "capturedAt": "",
+      "metadata": {},
+      "buildingId": "",
+      "floor": 0,
+      "author": "略",
+      "copyright": "略",
+      "uploadedAt": "2026-10-05T16:21:56.380Z",
+      "captureType": "aerial",
+      "position": {
+        "x": -58.2,
+        "z": 29.3
+      },
+      "placed": true,
+      "heading": 291,
+      "pitch": -89.70094988225705,
+      "width": 4000,
+      "height": 2250,
+      "downloadBytes": 3089486,
+      "files": {
+        "thumbnail": "media/ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11/thumbnail.webp",
+        "preview": "media/ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11/preview.webp",
+        "display": "media/ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11/display.webp",
+        "download": "media/ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11/download.jpg"
+      },
+      "locationId": "way/855459417",
+      "view": {
+        "focalLength35Mm": 28
+      },
+      "altitude": {
+        "meters": 78,
+        "reference": "takeoff"
+      }
+    },
+    {
+      "id": "5d9c9500-f866-4cd3-8440-58c7eaa6b6a4",
+      "title": "夏日天桥",
+      "description": "夏日天桥",
+      "capturedAt": "",
+      "metadata": {},
+      "buildingId": "",
+      "floor": 0,
+      "author": "",
+      "copyright": "",
+      "uploadedAt": "2026-10-05T16:21:57.872Z",
+      "captureType": "aerial",
+      "position": {
+        "x": 31.269033572007146,
+        "z": -76.31902602624444
+      },
+      "placed": true,
+      "heading": 262.7633693549433,
+      "pitch": -90,
+      "width": 4000,
+      "height": 2250,
+      "downloadBytes": 3457995,
+      "files": {
+        "thumbnail": "media/5d9c9500-f866-4cd3-8440-58c7eaa6b6a4/thumbnail.webp",
+        "preview": "media/5d9c9500-f866-4cd3-8440-58c7eaa6b6a4/preview.webp",
+        "display": "media/5d9c9500-f866-4cd3-8440-58c7eaa6b6a4/display.webp",
+        "download": "media/5d9c9500-f866-4cd3-8440-58c7eaa6b6a4/download.jpg"
+      },
+      "locationId": "",
+      "altitude": {
+        "meters": 35,
+        "reference": "takeoff"
+      }
     }
   ],
   "buildingOverrides": {
