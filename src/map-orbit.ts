@@ -1,6 +1,6 @@
-import { Box3, Euler, Frustum, Matrix4, PerspectiveCamera, Quaternion, Raycaster, Spherical, Vector2, Vector3, type Camera } from 'three';
+import { Box3, Euler, Frustum, Matrix4, PerspectiveCamera, Raycaster, Vector2, Vector3, type Camera } from 'three';
 import type { Point } from './types';
-import { FULL_MAP_VIEWPORT, frameMapTarget, type MapViewport } from './map-card-viewport.ts';
+import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport.ts';
 
 export type MapObjectBounds = { min: [number, number, number]; max: [number, number, number] };
 
@@ -65,25 +65,27 @@ export function turnMapView(camera: Camera, target: Vector3, dx: number, dy: num
 // off-centre composition instead of snapping the gaze when the finger lands.
 export function orbitMapObject(camera: Camera, target: Vector3, pivot: Vector3, dx: number, dy: number, viewportHeight: number) {
   camera.updateMatrixWorld();
-  const composition = pivot.clone().project(camera);
-  const offset = camera.position.clone().sub(pivot);
-  if (offset.length() < .01) { turnMapView(camera, target, dx, dy, viewportHeight); return; }
+  const radius = camera.position.distanceTo(pivot);
+  if (radius < .01) { turnMapView(camera, target, dx, dy, viewportHeight); return; }
   const distance = camera.position.distanceTo(target);
-  const before = new Quaternion().setFromRotationMatrix(new Matrix4().lookAt(camera.position, pivot, camera.up));
-  const spherical = new Spherical().setFromVector3(offset), speed = 2 * Math.PI / Math.max(1, viewportHeight);
-  const maximumPolar = Math.max(Math.PI * .48, spherical.phi);
-  spherical.theta -= dx * speed;
-  spherical.phi = Math.max(.01, Math.min(maximumPolar, spherical.phi - dy * speed));
-  camera.position.copy(pivot).add(offset.setFromSpherical(spherical));
-  const after = new Quaternion().setFromRotationMatrix(new Matrix4().lookAt(camera.position, pivot, camera.up));
-  camera.quaternion.premultiply(after.multiply(before.invert()));
-  if (camera instanceof PerspectiveCamera && composition.z >= -1 && composition.z <= 1) {
-    // Preserve the pivot's screen position with a level horizon. Otherwise
-    // OrbitControls removes the induced roll and shifts it when it resumes.
-    const pose = frameMapTarget({ position: camera.position, quaternion: camera.quaternion, target, fov: camera.fov, near: camera.near },
-      pivot, camera.aspect, { left: composition.x / 2, top: -composition.y / 2, width: 1, height: 1 });
-    camera.quaternion.copy(pose.quaternion);
-  }
+  const direction = pivot.clone().sub(camera.position).normalize();
+  const screenRay = direction.clone().applyQuaternion(camera.quaternion.clone().invert());
+  const orientation = new Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  const speed = 2 * Math.PI / Math.max(1, viewportHeight);
+  // Retain the elevation limit around the pivot, accounting for its off-axis ray.
+  const maximumPolar = Math.max(Math.PI * .48, Math.acos(Math.max(-1, Math.min(1, -direction.y))));
+  const verticalRange = Math.hypot(screenRay.y, screenRay.z);
+  const maximumPitch = Math.max(orientation.x, Math.asin(Math.max(-1, Math.min(1, -Math.cos(maximumPolar) / verticalRange)))
+    - Math.atan2(screenRay.y, -screenRay.z));
+  orientation.y -= dx * speed;
+  orientation.x = Math.max(-Math.PI / 2 + .01, Math.min(Math.PI / 2 - .01, maximumPitch, orientation.x - dy * speed));
+  orientation.z = 0;
+  // Rotate the gaze and the offset together. Reframing a spherical orbit can
+  // cross the camera's vertical pole when a card moves the pivot off-centre;
+  // OrbitControls then flips the horizon by 180 degrees. Keeping the original
+  // camera-space ray preserves composition without that second correction.
+  camera.quaternion.setFromEuler(orientation);
+  camera.position.copy(pivot).addScaledVector(screenRay.applyQuaternion(camera.quaternion), -radius);
   target.copy(camera.position).addScaledVector(camera.getWorldDirection(new Vector3()), distance);
   camera.updateMatrixWorld();
 }

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { OrbitControls } from 'three-stdlib';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView } from '../src/map-orbit.ts';
 import { bindMapTravelControls, travelAlongView } from '../src/map-travel-controls.ts';
 
@@ -108,6 +109,41 @@ test('selected-object orbit preserves its radius and off-centre view even after 
   close(camera.position.distanceTo(pivot), radius);
   close(camera.getWorldDirection(new THREE.Vector3()).angleTo(pivot.clone().sub(camera.position)), offsetAngle);
   assert.ok(camera.position.distanceTo(position) > 10); assert.equal(camera.fov, 43);
+});
+
+test('near-vertical orbits stay continuous beside and above cards and survive OrbitControls updates', () => {
+  const campus = [[-1000,-1000],[1000,-1000],[1000,1000],[-1000,1000]];
+  for (const viewport of [
+    {left:0,top:0,width:1,height:1},
+    {left:.4,top:0,width:.6,height:1},
+    {left:0,top:0,width:1,height:.35},
+    {left:.3,top:0,width:.7,height:.4}
+  ]) {
+    const {camera,target} = fixture([0,60,100],[0,0,0]);
+    const pivot = mapGroundOrbitTarget(camera,campus,viewport);
+    const initial = pivot.clone().project(camera), radius = camera.position.distanceTo(pivot);
+    target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),radius);
+    const controls = new OrbitControls(camera);
+    controls.target.copy(target); controls.minPolarAngle = .01; controls.maxPolarAngle = Math.PI-.01;
+    for (let i=0;i<120;i++) {
+      const before = camera.quaternion.clone();
+      orbitMapObject(camera,controls.target,pivot,2,4,600);
+      const custom = camera.quaternion.clone(), position = camera.position.clone();
+      assert.ok(before.angleTo(custom)<.05,'A short drag must not flip the horizon at the pole');
+      controls.update();
+      assert.ok(custom.angleTo(camera.quaternion)<1e-7,'Controls must not correct the custom orbit');
+      close(camera.position.distanceTo(position),0);
+      const projected = pivot.clone().project(camera);
+      close(projected.x,initial.x); close(projected.y,initial.y);
+      close(camera.position.distanceTo(pivot),radius);
+    }
+    const atLimit = camera.quaternion.clone();
+    orbitMapObject(camera,controls.target,pivot,0,20,600); controls.update();
+    assert.ok(atLimit.angleTo(camera.quaternion)<1e-7,'Further upward dragging holds the pole limit');
+    orbitMapObject(camera,controls.target,pivot,0,-4,600); controls.update();
+    assert.ok(atLimit.angleTo(camera.quaternion)>.04,'Reversing the drag leaves the limit immediately');
+    controls.dispose();
+  }
 });
 
 test('rotation mode is chosen once per single-pointer gesture and yields to two-finger travel and fixed photo views', () => {
