@@ -1,5 +1,6 @@
 import { MapSeason, MapTheme, MapTime, useSystemTheme, useMapColor } from './MapTheme';
 import { Component, Suspense, useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Edges, Html, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -229,7 +230,8 @@ export default function MapView(props: Props) {
     </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
-    {!viewingPhoto && picker && <PhotoClusterPicker photos={picker.photos} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />}
+    {/* The map is isolated below viewer cards; place the chooser alongside them so the catalog cannot cover it. */}
+    {!viewingPhoto && picker && labelPortal.current && createPortal(<PhotoClusterPicker photos={picker.photos} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
     {preview && <PhotoPerspectiveOverlay photo={preview} viewport={viewport} />}
     <div className="map-bottom"><span className="map-help">{mapInteractionHelp(inputMode, preview ? editPhoto ? 'editing' : 'preview' : placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>
   </div>;
