@@ -1,5 +1,6 @@
 import { buildingInfo, type Campus, type Photo, type Site } from './types';
 import { buildingFloorText } from './building-model';
+import PhotoNumberInput from './PhotoNumberInput';
 import { aerialImportText, altitudeLabel, campusLocations, isAerialPhoto, photoLocationId } from './locations';
 
 export default function PhotoPositionFields({ photo, campus, site, onChange }: { photo: Photo; campus: Campus; site: Site; onChange: (update: Partial<Photo>) => void }) {
@@ -19,7 +20,7 @@ export default function PhotoPositionFields({ photo, campus, site, onChange }: {
     {aerial ? <>
       <p className="field-help" role="status">{aerialImportText(photo)}</p>
       {Number.isFinite(source?.latitude) && Number.isFinite(source?.longitude) && <p className="field-help">照片经纬度：{source!.latitude!.toFixed(6)}，{source!.longitude!.toFixed(6)}</p>}
-      <div className="field-pair"><label>{altitudeLabel(photo)} / m<input type="number" min={-12000} max={100000} step={.1} placeholder="补充航拍高度" value={photo.altitude?.meters ?? ''} onChange={e => onChange({ altitude: e.target.value === '' ? undefined : { meters: Number(e.target.value), reference: photo.altitude?.reference || 'takeoff' } })} /></label>
+      <div className="field-pair"><label>{altitudeLabel(photo)} / m<PhotoNumberInput name="altitude" min={-12000} max={100000} step={.1} placeholder="补充航拍高度" value={photo.altitude?.meters} onValue={value => { if (value !== undefined) onChange({ altitude: { meters: value, reference: photo.altitude?.reference || 'takeoff' } }); }} /></label>
         <label>高度基准<select value={photo.altitude?.reference || 'takeoff'} disabled={!photo.altitude} onChange={e => {
           const reference = e.target.value as 'takeoff' | 'seaLevel';
           const recorded = reference === 'takeoff' ? source?.relativeAltitude : source?.absoluteAltitude;
