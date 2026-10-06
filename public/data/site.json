@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 167,
+  "revision": 178,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -29,8 +29,8 @@
         "z": 52.17614398238132
       },
       "placed": true,
-      "heading": 8,
-      "pitch": 15,
+      "heading": 14.858594340361208,
+      "pitch": -0.36896506393309886,
       "width": 4342,
       "height": 5789,
       "downloadBytes": 3327998,
@@ -72,8 +72,8 @@
         "z": 1.1682903334479136
       },
       "placed": true,
-      "heading": 59,
-      "pitch": 0,
+      "heading": 80.01708228209031,
+      "pitch": -10.554254749533019,
       "width": 3942,
       "height": 7008,
       "downloadBytes": 6029574,
@@ -115,8 +115,8 @@
         "z": -85.31652191136224
       },
       "placed": true,
-      "heading": 289,
-      "pitch": -8,
+      "heading": 286.9438208493077,
+      "pitch": -5.112772260074387,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 8800580,
@@ -154,12 +154,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": -23.29929759781338,
-        "z": -83.70620816950986
+        "x": -17.9,
+        "z": -106.4
       },
       "placed": true,
-      "heading": 322,
-      "pitch": 0,
+      "heading": 321.33668366039456,
+      "pitch": -2.559883410122122,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 7187663,
@@ -198,11 +198,11 @@
       "captureType": "ground",
       "position": {
         "x": -54.54177005128939,
-        "z": -42.84439978960734
+        "z": -38
       },
       "placed": true,
-      "heading": 54,
-      "pitch": -25,
+      "heading": 42.49310113976708,
+      "pitch": -19.872010695989275,
       "width": 4112,
       "height": 5482,
       "downloadBytes": 5268597,
@@ -240,12 +240,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": -52.85155477059631,
-        "z": 76.06105026111709
+        "x": -52.1,
+        "z": 72.6
       },
       "placed": true,
-      "heading": 114.73661114671108,
-      "pitch": 1.5482809013715066,
+      "heading": 113.90067874840787,
+      "pitch": -2.940248034833222,
       "width": 6046,
       "height": 4534,
       "downloadBytes": 5695980,
@@ -1662,12 +1662,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 85.37442913198859,
-        "z": 36.13746589957353
+        "x": 83.3,
+        "z": 33.7
       },
       "placed": true,
-      "heading": 138.27323591957997,
-      "pitch": 7.867862940964929,
+      "heading": 128.02793178135062,
+      "pitch": 9.910544785125458,
       "width": 4638,
       "height": 6957,
       "downloadBytes": 7238430,
@@ -2713,12 +2713,12 @@
       "uploadedAt": "2026-10-05T16:56:16.156Z",
       "captureType": "ground",
       "position": {
-        "x": 86.41626492079035,
-        "z": 39.3130094332323
+        "x": 84.5,
+        "z": 37.5
       },
       "placed": true,
-      "heading": 117.72119223117113,
-      "pitch": 6.717447534028729,
+      "heading": 117.1951395951155,
+      "pitch": 12.40751966039435,
       "width": 4588,
       "height": 6117,
       "downloadBytes": 7912576,
@@ -2758,12 +2758,12 @@
       "uploadedAt": "2026-10-05T16:56:48.124Z",
       "captureType": "ground",
       "position": {
-        "x": 87.10814256049655,
-        "z": 44.21160315500579
+        "x": 86.3,
+        "z": 43.7
       },
       "placed": true,
-      "heading": 84.09112880798153,
-      "pitch": -1.911020585481349,
+      "heading": 80.37407443140228,
+      "pitch": 2.2875488115176887,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 7258498,
@@ -2966,7 +2966,7 @@
     },
     "way/855459419": {
       "name": "图书馆",
-      "floors": 4,
+      "floors": 5,
       "floorHeight": 3.6
     },
     "way/855459421": {
