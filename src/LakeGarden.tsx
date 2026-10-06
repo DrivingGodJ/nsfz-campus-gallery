@@ -6,6 +6,7 @@ import type { Feature, Point, Shape } from './types';
 import { boardwalkLayout, boardwalkPlanks, gardenFootprints, pavilionPoint, pavilionRoofGeometry, pergolaLayout } from './garden-geometry';
 import type { RailPoint } from './bridge-geometry';
 import { LocationHtml, LocationName, LocationSelection } from './LocationSelection';
+import { wisteriaArchitecture } from './wisteria-architecture';
 
 function Bar({ from, to, radius = .065, color = '#796e56' }: { from: RailPoint; to: RailPoint; radius?: number; color?: string }) {
   const mapColor = useMapColor();
@@ -57,18 +58,26 @@ function Pavilion({ feature, features, labelPortal }: { feature: Feature; featur
     <Name feature={feature} position={[model.center[0], layout.peak + 1.8, model.center[1]]} labelPortal={labelPortal} />
   </group>;
 }
-function Pergola({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
+function Pergola({ feature, library, labelPortal }: { feature: Feature; library: Shape; labelPortal: RefObject<HTMLDivElement> }) {
+  const mapColor = useMapColor();
   const layout = useMemo(() => pergolaLayout(feature), [feature]);
+  const architecture = useMemo(() => wisteriaArchitecture(feature, library), [feature, library]);
+  useEffect(() => () => Object.values(architecture).forEach(geometry => geometry.dispose()), [architecture]);
   const { selectedId, onSelect, placing, featuresSelectable } = useContext(LocationSelection);
   const model = feature.pergola!, selected = selectedId === feature.id;
   return <group onClick={e => { if (onSelect && !placing && featuresSelectable !== false && e.delta < 5) { e.stopPropagation(); onSelect(feature.id); } }}>
-    <Slab footprints={layout.footprint} height={layout.height} thickness={layout.height - layout.base} color={selected ? '#93aa98' : '#d7d2c3'} edgeColor={selected ? '#567760' : '#aaa895'} />
+    {(['floor', 'end', 'beams', 'posts'] as const).map(key => <mesh key={key} geometry={architecture[key]}><meshStandardMaterial color={mapColor(selected ? '#93aa98' : '#d7d2c3')} roughness={.95} /></mesh>)}
+    <group onClick={e => { if (onSelect && !placing && e.delta < 5 && feature.connectedTo?.[0]) { e.stopPropagation(); onSelect(feature.connectedTo[0]); } }}>
+      {(['room', 'roof', 'steps'] as const).map(key => <mesh key={key} geometry={architecture[key]}><meshStandardMaterial color={mapColor('#d7d2c3')} roughness={.95} /></mesh>)}
+      <mesh geometry={architecture.door}><meshStandardMaterial color={mapColor('#b7b09d')} roughness={.95} /></mesh>
+      <mesh geometry={architecture.details} raycast={() => null}><meshStandardMaterial color={mapColor('#979784')} roughness={.95} /></mesh>
+    </group>
     <Name feature={feature} position={[model.hub[0], layout.height + 1.8, model.hub[1]]} labelPortal={labelPortal} />
   </group>;
 }
-export default function LakeGarden({ feature, features, labelPortal }: { feature: Feature; features: Feature[]; labelPortal: RefObject<HTMLDivElement> }) {
+export default function LakeGarden({ feature, features, connectedBuilding, labelPortal }: { feature: Feature; features: Feature[]; connectedBuilding?: Shape; labelPortal: RefObject<HTMLDivElement> }) {
   if (feature.type === 'boardwalk') return <Boardwalk feature={feature} features={features} labelPortal={labelPortal} />;
   if (feature.type === 'lakePavilion' && feature.pavilion) return <Pavilion feature={feature} features={features} labelPortal={labelPortal} />;
-  if (feature.type === 'pergola' && feature.pergola) return <Pergola feature={feature} labelPortal={labelPortal} />;
+  if (feature.type === 'pergola' && feature.pergola && connectedBuilding) return <Pergola feature={feature} library={connectedBuilding} labelPortal={labelPortal} />;
   return null;
 }

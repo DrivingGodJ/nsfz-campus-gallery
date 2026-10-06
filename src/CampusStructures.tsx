@@ -157,7 +157,7 @@ export default function CampusStructures({ features, buildings, overrides, under
   return <>{features.map(feature => {
     if (feature.type === 'mottoStone' && feature.stone) return <MottoStone key={feature.id} feature={feature} />;
     if (feature.type === 'flagPlatform' && feature.flagPlatform) return <FlagPlatform key={feature.id} feature={feature} />;
-    if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return <LakeGarden key={feature.id} feature={feature} features={features} labelPortal={labelPortal} />;
+    if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return <LakeGarden key={feature.id} feature={feature} features={features} connectedBuilding={buildings.find(building => feature.connectedTo?.includes(building.id))} labelPortal={labelPortal} />;
     if (feature.type === 'landmark' && feature.landmark) return <GateLandmark key={feature.id} feature={feature} labelPortal={labelPortal} />;
     if (['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction'].includes(feature.type)) {
       const area = layout.areas.get(feature.id);

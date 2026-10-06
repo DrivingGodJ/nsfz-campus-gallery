@@ -119,5 +119,7 @@ export function pavilionRoofGeometry(model: LakePavilion, base: number) {
 }
 export function pergolaLayout(feature: Feature) {
   const model = feature.pergola!, base = feature.height ?? .12;
-  return { footprint: pergolaFootprint(feature), base, height: base + model.floors * model.floorHeight };
+  const hub: Shape = { outer: circleRing(model.hub, model.hubRadius), holes: [] };
+  const footprint = pergolaFootprint(feature);
+  return { footprint, hub, corridor: shapes(clip.difference(footprint.map(polygon), polygon(hub))), base, height: base + model.floors * model.floorHeight };
 }

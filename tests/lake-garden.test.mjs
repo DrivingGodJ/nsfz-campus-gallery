@@ -6,6 +6,7 @@ import clip from 'polygon-clipping';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 import { gardenFootprints, boardwalkLayout, boardwalkPlanks, pavilionRoofGeometry, pergolaLayout } from '../src/garden-geometry.ts';
 import { photoMapHeight, campusLocations, assignPhotoLocation } from '../src/locations.ts';
+import { libraryAnnexLayout, wisteriaArchitecture } from '../src/wisteria-architecture.ts';
 
 const read = async file => JSON.parse(await fs.readFile(new URL('../' + file, import.meta.url)));
 const campus = await read('public/data/campus.json'), site = await read('public/data/site.json');
@@ -100,5 +101,56 @@ test('all three garden locations remain selectable and retain their deck height 
     assert.equal(assigned.locationId, feature.id); assert.equal(assigned.buildingId, '');
     assert.equal(photoMapHeight(assigned, campus, site), feature.height + 1.6);
     assert.equal(assigned.position.x, 12); assert.equal(assigned.position.z, 107);
+  }
+});
+
+test('wisteria walkway stays open and its long library-side annex has a straight front-facing shutter', () => {
+  const library = campus.buildings.find(b => b.id === 'way/855459419');
+  const original = JSON.stringify(pergola), layout = pergolaLayout(pergola), annex = libraryAnnexLayout(library), model = wisteriaArchitecture(pergola, library);
+  const meshes = Object.fromEntries(Object.entries(model).map(([key, geometry]) => {
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    mesh.updateMatrixWorld(); return [key, mesh];
+  }));
+  const down = new THREE.Vector3(0, -1, 0), vector = p => new THREE.Vector3(p[0], 0, p[1]);
+  try {
+    let distance = 0, center, normal;
+    for (let i = 1; i < pergola.points.length; i++) {
+      const a = pergola.points[i - 1], b = pergola.points[i], length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (distance <= 9.5 && distance + length > 9.5) {
+        const t = (9.5 - distance) / length;
+        center = new THREE.Vector3(a[0] + (b[0] - a[0]) * t, layout.base + 1.6, a[1] + (b[1] - a[1]) * t);
+        normal = new THREE.Vector3(-(b[1] - a[1]) / length, 0, (b[0] - a[0]) / length); break;
+      }
+      distance += length;
+    }
+    const side = center.clone().addScaledVector(normal, -2);
+    const across = new THREE.Raycaster(side, normal, 0, 4);
+    for (const key of ['floor', 'beams', 'posts', 'end']) assert.equal(across.intersectObject(meshes[key]).length, 0, 'The passage has no solid wall between its spaced posts');
+    const ground = center.clone(); ground.y = 1;
+    assert.ok(Math.abs(new THREE.Raycaster(ground, down, 0, 2).intersectObject(meshes.floor)[0].point.y - (layout.base + .08)) < 1e-5, 'The open corridor keeps its walking slab');
+    const hub = vector(pergola.pergola.hub); hub.y = layout.base + 1.6;
+    assert.ok(new THREE.Raycaster(hub.clone().add(new THREE.Vector3(-5, 0, 0)), new THREE.Vector3(1, 0, 0), 0, 10).intersectObject(meshes.end).length, 'Only the terminal circular region stays solid');
+    for (const building of campus.buildings) assert.ok(area(clip.intersection(polygon(annex.footprint), polygon(building))) < 1e-7, 'The annex sits outside the existing library footprint');
+    assert.equal(clip.union(polygon(annex.footprint), polygon(library)).length, 1, 'The long annex sits flush along the entire marked library wall');
+    assert.ok(annex.u1 - annex.u0 > 18 && (annex.u1 - annex.u0) / annex.depth > 4, 'The annex is a long strip rather than the previous small box');
+    assert.deepEqual(annex.footprint.outer.slice(0, 3), library.outer.slice(11, 14).reverse(), 'The strip spans both segments of the marked side wall');
+    for (const water of campus.features.filter(f => f.type === 'water')) assert.ok(area(clip.intersection(polygon(annex.roof), polygon(water))) < 1e-7);
+    assert.ok(area(clip.intersection(polygon(annex.footprint), layout.footprint.map(polygon))) < 1e-7, 'The relocated annex leaves the curved walking route clear');
+    const doorCenter = (annex.doorStart + annex.doorEnd) / 2;
+    for (let step = 0; step < 3; step++) {
+      const p = annex.at(annex.u0 - .3 * (2.5 - step), doorCenter);
+      const hit = new THREE.Raycaster(new THREE.Vector3(p[0], 1, p[1]), down, 0, 2).intersectObject(meshes.steps)[0];
+      assert.ok(Math.abs(hit.point.y - (layout.base + .08 * (step + 1))) < 1e-5, 'Each of the three entrance steps rises toward the room');
+    }
+    const outside = annex.at(annex.u0 - 1, doorCenter), towardDoor = vector(annex.at(annex.u0, doorCenter)).sub(vector(outside)).normalize();
+    assert.ok(new THREE.Raycaster(new THREE.Vector3(outside[0], 1.6, outside[1]), towardDoor, 0, 2).intersectObject(meshes.door).length, 'The closed louver door faces the stepped approach');
+    const positions = model.door.getAttribute('position');
+    const frontU = Array.from({ length: positions.count }, (_, i) => (positions.getX(i) - library.outer[13][0]) * annex.along[0] + (positions.getZ(i) - library.outer[13][1]) * annex.along[1]);
+    assert.ok(Math.max(...frontU) - Math.min(...frontU) < .031, 'The entire shutter is parallel to the straight front end, without the previous angled door face');
+    for (const key of ['floor', 'beams', 'posts', 'roof']) assert.ok(model[key].userData.photoOcclusionMask.every(v => v === 0), 'Thin open structure does not hide corridor photos');
+    assert.ok(Object.values(model).reduce((n, geometry) => n + geometry.getAttribute('position').count / 3, 0) < 2200, 'The annex and trellis retain a simple merged model');
+    assert.equal(JSON.stringify(pergola), original);
+  } finally {
+    Object.values(meshes).forEach(mesh => mesh.material.dispose()); Object.values(model).forEach(geometry => geometry.dispose());
   }
 });

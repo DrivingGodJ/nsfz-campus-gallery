@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildingGeometry } from './building-geometry.ts';
+import { GYM_WALL, gymFrame, gymStairGeometry, gymWindowOpenings } from './gym-interior.ts';
 import type { Building, BuildingPart, Feature, GroundPassage, Point, Shape } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -70,19 +71,9 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
   return combined(parts, false);
 }
 
-function gymAxes(building: Shape) {
-  const [p0, p1, p2, p3] = building.outer;
-  const length = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
-  const width = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
-  const along: Point = [(p2[0] - p1[0]) / length, (p2[1] - p1[1]) / length];
-  const across: Point = [(p1[0] - p0[0]) / width, (p1[1] - p0[1]) / width];
-  const at = (u: number, v: number): Point => [p0[0] + along[0] * u + across[0] * v, p0[1] + along[1] * u + across[1] * v];
-  return { length, width, along, across, at, p0, p1, p2, p3 };
-}
-
 export function gymRoofHeight(height: number, progress: number) {
   const rise = Math.min(1.45, height * .1);
-  return height - rise + rise * Math.sin(Math.PI * THREE.MathUtils.clamp(progress, 0, 1));
+  return height - rise + (rise + 1.2) * Math.sin(Math.PI * THREE.MathUtils.clamp(progress, 0, 1));
 }
 
 function extrudedWorld(shape: Shape, bottom: number, top: number, floorHeight: number, passages: GroundPassage[] = [], omitTop = false) {
@@ -109,8 +100,8 @@ function surface(positions: number[]) {
 }
 
 export function gymArchitecture(building: Building, height: number, floorHeight: number, bridge?: Feature, cutawayHeight?: number) {
-  const { length, width, along, across, at } = gymAxes(building);
-  const wall = .38, roofThickness = .22;
+  const frame = gymFrame(building), { length, width, across, at } = frame;
+  const wall = GYM_WALL, roofThickness = .22;
   const inner = [at(wall, wall), at(wall, width - wall), at(length - wall, width - wall), at(length - wall, wall)];
   const shell: Shape = { outer: building.outer, holes: [[...inner, inner[0]]] };
   const roofBottom = gymRoofHeight(height, 0) - roofThickness;
@@ -118,29 +109,30 @@ export function gymArchitecture(building: Building, height: number, floorHeight:
   const connection = bridge?.connections?.find(c => c.type === 'deck' && c.buildingId === building.id);
   const entryHeight = ((connection?.floor ?? 2) - 1) * floorHeight;
   const entry = connection ? { id: connection.id, sourcePathId: '', width: 3.2, points: [connection.points[0], lerp(connection.points[0], connection.points[1], 2.6)] } : undefined;
-  const front = at(length / 2, 0);
-  const groundDoor: GroundPassage = { id: 'gym-door', sourcePathId: '', width: 2.8,
-    points: [front.map((v, i) => v - across[i] * 2) as Point, front.map((v, i) => v + across[i] * 2) as Point] };
+  const doorTop = Math.min(2.85, floorHeight - .35);
+  const groundDoors = [-2.1, 0, 2.1].map(offset => {
+    const front = at(length / 2 + offset, 0);
+    return { id: `gym-door-${offset}`, sourcePathId: '', width: 1.65,
+      points: [front.map((v, i) => v - across[i] * 2) as Point, front.map((v, i) => v + across[i] * 2) as Point] };
+  });
   const wallTop = Math.min(roofBottom, shown);
+  const windows = gymWindowOpenings(frame, height, floorHeight, roofBottom, connection && {
+    u: frame.local(connection.points[0])[0], width: 3.32, bottom: entryHeight, top: entryHeight + floorHeight
+  });
   // Split at both ends of the doorway, including a bridge entering at a half floor.
-  const boundaries = [0, wallTop, entryHeight, entryHeight + floorHeight];
+  const boundaries = [0, wallTop, doorTop, entryHeight, entryHeight + floorHeight];
+  for (const window of windows) boundaries.push(window.bottom, window.top);
   for (let level = floorHeight; level < wallTop; level += floorHeight) boundaries.push(level);
   const levels = [...new Set(boundaries.filter(y => y >= 0 && y <= wallTop))].sort((a, b) => a - b);
   for (let i = 0; i < levels.length - 1; i++) {
     const bottom = levels[i], top = levels[i + 1];
-    const cuts = [...(bottom < floorHeight ? [groundDoor] : []), ...(bottom >= entryHeight && top <= entryHeight + floorHeight && entry ? [entry] : [])];
+    const cuts = [...(top <= doorTop ? groundDoors : []), ...(bottom >= entryHeight && top <= entryHeight + floorHeight && entry ? [entry] : []),
+      ...windows.filter(window => bottom >= window.bottom - 1e-6 && top <= window.top + 1e-6).map(window => window.cut)];
     parts.push(extrudedWorld(shell, bottom, top, floorHeight, cuts, top < wallTop - 1e-6));
   }
   parts.push(extrudedWorld({ outer: building.outer, holes: [] }, 0, Math.min(.16, shown), floorHeight));
-  // Keep the internal landing level with the bridge, including half-floor entries.
-  if (entry && entryHeight > .05 && shown > entryHeight + .05) {
-    const landing = connection!.points.at(-1)!, corners = [-1, 1].flatMap(side => [
-      landing.map((v, i) => v + along[i] * side * 1.6) as Point,
-      landing.map((v, i) => v + along[i] * side * 1.6 + across[i] * 2.5) as Point,
-    ]);
-    parts.push(extrudedWorld({ outer: [corners[0], corners[2], corners[3], corners[1], corners[0]], holes: [] }, entryHeight - .22, entryHeight, floorHeight));
-  }
-  const body = combined(parts), roofPositions: number[] = [], crownPositions: number[] = [];
+  const body = combined(parts), roofPositions: number[] = [];
+  const glassParts: THREE.BufferGeometry[] = [], frameParts: THREE.BufferGeometry[] = [];
   const roofVisible = shown >= height - 1e-6;
   if (roofVisible) {
     for (let i = 0; i < 24; i++) {
@@ -156,30 +148,41 @@ export function gymArchitecture(building: Building, height: number, floorHeight:
       for (const v of [0, width]) {
         const q0 = point(u0, v, BASE + roofBottom), q1 = point(u1, v, BASE + roofBottom);
         const t0 = point(u0, v, h0 - roofThickness), t1 = point(u1, v, h1 - roofThickness);
-        if (v === 0) face(crownPositions, q0, q1, t1, t0); else face(crownPositions, q1, q0, t0, t1);
-        const inset = v === 0 ? wall : -wall;
-        const inner0 = point(u0, v + inset, h0 - roofThickness), inner1 = point(u1, v + inset, h1 - roofThickness);
-        if (v === 0) face(crownPositions, point(u1, v + inset, BASE + roofBottom), point(u0, v + inset, BASE + roofBottom), inner0, inner1);
-        else face(crownPositions, point(u0, v + inset, BASE + roofBottom), point(u1, v + inset, BASE + roofBottom), inner1, inner0);
+        const pane: number[] = [];
+        if (v === 0) face(pane, q0, q1, t1, t0); else face(pane, q1, q0, t0, t1);
+        glassParts.push(surface(pane));
+        frameParts.push(bar(t0, t1, .07));
+        if (i > 0) frameParts.push(bar(point(u0, v, BASE + height - 2.8), t0, .08));
       }
     }
   }
-  const walls = crownPositions.length ? combined([body, surface(crownPositions)]) : body;
-  const glassParts: THREE.BufferGeometry[] = [], frameParts: THREE.BufferGeometry[] = [];
-  const windowBottom = height * .69, windowTop = height * .82;
-  if (shown >= windowTop) {
-    for (const v of [-.035, width + .035]) {
-      const from = at(.7, v), to = at(length - .7, v);
-      glassParts.push(windowPanel(from, to, windowBottom, windowTop));
-      for (const y of [windowBottom, windowTop]) frameParts.push(bar([from[0], BASE + y, from[1]], [to[0], BASE + y, to[1]], .08));
-      const count = Math.ceil(length / 5);
-      for (let i = 0; i <= count; i++) {
-        const p = lerp(from, to, i / count);
-        frameParts.push(bar([p[0], BASE + windowBottom, p[1]], [p[0], BASE + windowTop, p[1]], .065));
-      }
+  for (const window of windows) {
+    const { from, to, bottom } = window, top = Math.min(window.top, shown);
+    if (top <= bottom) continue;
+    glassParts.push(windowPanel(from, to, bottom, top));
+    const tall = window.cut.id.startsWith('gym-tower-');
+    const crossbars = tall ? [bottom, top, ...Array.from({ length: Math.ceil(height / floorHeight) }, (_, i) => i * floorHeight).filter(y => y > bottom && y < top)] : [bottom, top, bottom + (top - bottom) * .3];
+    for (const y of crossbars) frameParts.push(bar([from[0], BASE + y, from[1]], [to[0], BASE + y, to[1]], .07));
+    const count = Math.max(2, Math.ceil(Math.hypot(to[0] - from[0], to[1] - from[1]) / 3.5));
+    for (let i = 0; i <= count; i++) {
+      const p = lerp(from, to, i / count);
+      frameParts.push(bar([p[0], BASE + bottom, p[1]], [p[0], BASE + top, p[1]], .06));
     }
+  }
+  // Three recessed ground-floor entrances sit between the low front windows.
+  for (const offset of [-2.1, 0, 2.1]) {
+    const u = length / 2 + offset, top = Math.min(doorTop, shown);
+    if (top <= .16) continue;
+    const a = at(u - .825, .22), b = at(u + .825, .22);
+    glassParts.push(windowPanel(a, b, .16, top));
+    frameParts.push(bar([a[0], BASE + top, a[1]], [b[0], BASE + top, b[1]], .09));
+    for (const p of [a, lerp(a, b, .5), b]) frameParts.push(bar([p[0], BASE + .16, p[1]], [p[0], BASE + top, p[1]], .07));
+  }
+  if (!roofVisible) for (const geometry of frameParts) {
+    const vertices = geometry.getAttribute('position');
+    for (let i = 0; i < vertices.count; i++) vertices.setY(i, Math.min(vertices.getY(i), BASE + shown));
   }
   // Body uses the same extrusion axes as BuildingMesh; decoration stays in world axes.
-  walls.translate(0, -BASE, 0); walls.rotateX(Math.PI / 2);
-  return { body: walls, roof: surface(roofPositions), glass: combined(glassParts), frame: combined(frameParts) };
+  body.translate(0, -BASE, 0); body.rotateX(Math.PI / 2);
+  return { body, roof: surface(roofPositions), glass: combined(glassParts, false), frame: combined(frameParts, false), ...gymStairGeometry(frame, height, floorHeight, cutawayHeight) };
 }
