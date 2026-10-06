@@ -9,6 +9,7 @@ import { featureFootprints } from './location-geometry';
 import { bridgeLayout } from './bridge-geometry';
 import { archedBridgeGeometry } from './bridge-mesh';
 import { pergolaLayout } from './garden-geometry';
+import { curvedStairTreads } from './structure-geometry';
 
 export const LocationSelection = createContext<{ selectedId?: string; onSelect?: (id: string) => void; placing?: boolean; featuresSelectable?: boolean; selectableIds?: ReadonlySet<string> }>({});
 
@@ -36,16 +37,19 @@ function FeatureTarget({ feature, campus, site, alignedFootprints, labelPortal }
   const archOutline = useMemo(() => archTarget ? bridgeLayout(feature, height).railChains : [], [feature, height, archTarget]);
   useEffect(() => () => archTarget?.dispose(), [archTarget]);
   const footprints = useMemo(() => featureFootprints(feature, campus.features, height, alignedFootprints), [feature, height, alignedFootprints, campus.features]);
-  const shapes = useMemo(() => footprints.map(data => {
+  const stair = feature.type === 'tunnelEntrance' ? feature.curvedStair : undefined;
+  const surfaces = useMemo(() => stair ? curvedStairTreads(stair).map(tread => ({ outer: tread.ring, holes: [], height: tread.height + .01 }))
+    : footprints.map(shape => ({ ...shape, height: height + .25 })), [stair, footprints, height]);
+  const shapes = useMemo(() => surfaces.map(data => {
     const shape = new THREE.Shape(data.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
     shape.holes = data.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
-    return shape;
-  }), [footprints]);
+    return { shape, height: data.height };
+  }), [surfaces]);
   const points = feature.points || feature.outer?.slice(0, -1) || [];
   const center = points.reduce((sum, point) => [sum[0] + point[0] / points.length, sum[1] + point[1] / points.length], [0, 0]);
   return <group onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onSelect?.(feature.id); } }}>
-    {archTarget ? <mesh geometry={archTarget}><meshBasicMaterial side={THREE.DoubleSide} transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh> : shapes.map((shape, i) => <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, height + .25, 0]}><shapeGeometry args={[shape]} /><meshBasicMaterial side={THREE.DoubleSide} transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh>)}
-    {selectedId === feature.id && (archTarget ? archOutline.map((chain, i) => <Line key={i} points={chain.map(([x, y, z]) => [x, y + .3, z])} color={mapColor('#355f45')} lineWidth={2.5} depthWrite={false} renderOrder={27} raycast={() => null} />) : footprints.flatMap((shape, i) => [shape.outer, ...shape.holes].map((ring, j) => <Line key={i + '/' + j} points={ring.map(([x, z]) => [x, height + .3, z])} color={mapColor('#355f45')} lineWidth={2.5} depthTest={height >= 0} depthWrite={false} renderOrder={27} raycast={() => null} />)))}
+    {archTarget ? <mesh geometry={archTarget}><meshBasicMaterial side={THREE.DoubleSide} transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh> : shapes.map(({ shape, height }, i) => <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, height, 0]}><shapeGeometry args={[shape]} /><meshBasicMaterial side={THREE.DoubleSide} transparent opacity={0} depthWrite={false} colorWrite={false} /></mesh>)}
+    {selectedId === feature.id && (archTarget ? archOutline.map((chain, i) => <Line key={i} points={chain.map(([x, y, z]) => [x, y + .3, z])} color={mapColor('#355f45')} lineWidth={2.5} depthWrite={false} renderOrder={27} raycast={() => null} />) : surfaces.flatMap((shape, i) => [shape.outer, ...shape.holes].map((ring, j) => <Line key={i + '/' + j} points={ring.map(([x, z]) => [x, shape.height + .05, z])} color={mapColor('#355f45')} lineWidth={2.5} depthTest={!stair && height >= 0} depthWrite={false} renderOrder={27} raycast={() => null} />)))}
     {!feature.hideLabel && ['path', 'water', 'green', 'sport'].includes(feature.type) && <LocationHtml portal={labelPortal} position={[center[0], height + 4, center[1]]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name!} /></LocationHtml>}
   </group>;
 }

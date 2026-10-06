@@ -30,7 +30,7 @@ export default function PhotoPositionFields({ photo, campus, site, onChange }: {
       <label>{info ? '所在楼层' : '所在层面'}<select value={photo.floor} disabled={!info} onChange={e => onChange({ floor: Number(e.target.value), position: { x: photo.position.x, z: photo.position.z } })}>
         {!info ? <option value={0}>{location?.levelText || '室外'}</option> : Array.from({ length: Math.max(info.floors, photo.floor) }, (_, i) => <option key={i} value={i + 1}>{i + 1} 楼{i + 1 > info.baseFloors ? '（局部）' : ''}</option>)}
       </select></label>
-      <p className="field-help">普通照片只记录楼层，地图位置随楼层显示。{info && info.sections.length > 1 && <> 此楼分为{buildingFloorText(info)}。</>}</p>
+      <p className="field-help">{location?.feature?.type === 'tunnelEntrance' ? '点击入口的台阶标记拍摄位置，高度会随台阶自动确定，无需填写楼层。' : <>普通照片只记录楼层，地图位置随楼层显示。{info && info.sections.length > 1 && <> 此楼分为{buildingFloorText(info)}。</>}</>}</p>
     </>}
     <p className="field-help">可从列表选择地点，也可点击地图上的名称。</p>
   </>;

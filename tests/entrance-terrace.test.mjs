@@ -27,7 +27,7 @@ test('entrance stands beside the marked basketball corner, parallel to the road 
     const buffer = passageFootprint(road.points, (road.width || 3) + .4);
     for (const ring of [marker.outer, opening]) assert.ok(area(clip.intersection([ring], [buffer.outer])) < 1e-7, 'Both the entrance block and stair opening leave the road clear');
   }
-  assert.equal(entrance.hideLabel, true);
+  assert.equal(entrance.hideLabel, false, 'The entrance now provides a selectable photo location');
 });
 
 test('relocated stairs join the tunnel without a gap and keep the existing underground exit', () => {

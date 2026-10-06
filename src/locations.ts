@@ -1,4 +1,4 @@
-import { bridgeHeight, bridgeSurfaceHeight } from './structure-geometry.ts';
+import { bridgeHeight, bridgeSurfaceHeight, curvedStairSurfaceHeight } from './structure-geometry.ts';
 import { buildingLevels } from './building-model.ts';
 import { groundElevationAt } from './sports-ground-geometry.ts';
 import type { Building, Campus, Feature, Photo, Site } from './types';
@@ -26,7 +26,7 @@ export function campusLocations(campus: Campus, site: Site): CampusLocation[] {
 
 // Annotation and filtering share broad destinations, including circulation spaces.
 const ancillaryBuildingIds = new Set(['way/1277841229', 'local/stand-office']);
-const filterFeatureTypes = new Set<Feature['type']>(['water', 'forest', 'sport', 'runningTrack', 'basketballCourts', 'undergroundRoom', 'tunnel', 'undergroundCorridor', 'undergroundTrack']);
+const filterFeatureTypes = new Set<Feature['type']>(['water', 'forest', 'sport', 'runningTrack', 'basketballCourts', 'undergroundRoom', 'tunnel', 'tunnelEntrance', 'undergroundCorridor', 'undergroundTrack']);
 export const isFilterableCampusFeature = (feature: Feature) => filterFeatureTypes.has(feature.type) || feature.id === 'local/footbridge';
 export function campusFilterLocations(campus: Campus, site: Site): CampusLocation[] {
   return campusLocations(campus, site).filter(location => location.building
@@ -64,6 +64,7 @@ export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {
   const feature = campus.features.find(f => f.id === id);
   if (!feature) return groundElevationAt(campus, [photo.position.x, photo.position.z]) + 1.6;
   const surface = featureSurfaceHeight(feature, campus, site);
+  if (feature.type === 'tunnelEntrance' && feature.curvedStair) return curvedStairSurfaceHeight(feature.curvedStair, [photo.position.x, photo.position.z]) + 1.6;
   return (feature.type === 'bridge' ? bridgeSurfaceHeight(feature, surface, [photo.position.x, photo.position.z]) : surface) + 1.6;
 }
 

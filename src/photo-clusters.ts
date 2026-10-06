@@ -8,6 +8,7 @@ export const PHOTO_POINT_LIFT = .4;
 export type PhotoSpot = { id: string; photos: MapPhoto[]; position: THREE.Vector3 };
 export type PhotoCluster = PhotoSpot & { spots: PhotoSpot[] };
 const shootingPoint = (photo: MapPhoto) => new THREE.Vector3(photo.position.x, photo.position.height, photo.position.z);
+export const photoPointPosition = (photo: MapPhoto) => new THREE.Vector3(photo.position.x, photo.pointHeight ?? photo.position.height + PHOTO_POINT_LIFT, photo.position.z);
 const center = (points: THREE.Vector3[]) => points.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(points.length);
 const markerPoint = (position: THREE.Vector3) => position.clone().add(new THREE.Vector3(0, PHOTO_MARKER_LIFT, 0));
 function groupPosition(spots: PhotoSpot[]) {
@@ -40,7 +41,7 @@ export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera,
 export function visiblePhotoPoints(photos: MapPhoto[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = []): MapPhoto[] {
   camera.updateMatrixWorld();
   const ray = new THREE.Raycaster();
-  return photos.filter(photo => photoAnchorVisible(shootingPoint(photo).add(new THREE.Vector3(0, PHOTO_POINT_LIFT, 0)), camera, size, occluders, ray, [3, 3]));
+  return photos.filter(photo => photoAnchorVisible(photoPointPosition(photo), camera, size, occluders, ray, [3, 3]));
 }
 
 export function photoOccluders(scene: THREE.Scene) {

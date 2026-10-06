@@ -20,6 +20,25 @@ export function curvedStairTreads(stair: CurvedStair) {
   });
 }
 
+export function pointOnStairTread(point: Point, ring: Point[]) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, az] = ring[j], [bx, bz] = ring[i];
+    const dx = bx - ax, dz = bz - az, lengthSquared = dx * dx + dz * dz;
+    if (lengthSquared > 0) {
+      const t = Math.max(0, Math.min(1, ((point[0] - ax) * dx + (point[1] - az) * dz) / lengthSquared));
+      if (Math.hypot(point[0] - ax - t * dx, point[1] - az - t * dz) < 1e-7) return true;
+    }
+    if ((az > point[1]) !== (bz > point[1]) && point[0] < ax + (point[1] - az) * dx / dz) inside = !inside;
+  }
+  return inside;
+}
+
+// Use the modeled flat tread, rather than a continuous ramp or the entry's top level.
+export function curvedStairSurfaceHeight(stair: CurvedStair, point: Point) {
+  return curvedStairTreads(stair).find(tread => pointOnStairTread(point, tread.ring))?.height ?? stair.topHeight;
+}
+
 export function bridgeHeight(feature: Feature, buildings: Building[], overrides: Record<string, BuildingOverride>) {
   const anchor = feature.levelAnchor;
   const building = anchor && buildings.find(b => b.id === anchor.buildingId);

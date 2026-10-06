@@ -4,7 +4,7 @@ import { Html, Line } from '@react-three/drei';
 import { asset } from './types';
 import { useMapColor } from './MapTheme';
 import type { MapPhoto } from './MapCameraRig';
-import { cameraPhotoClusters, clusterFocus, clusterReadyToPick, collagePhotos, permanentPhotoSpots, photoOccluders, visiblePhotoPoints, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, type PhotoCluster } from './photo-clusters';
+import { cameraPhotoClusters, clusterFocus, clusterReadyToPick, collagePhotos, permanentPhotoSpots, photoOccluders, visiblePhotoPoints, photoPointPosition, PHOTO_MARKER_LIFT, type PhotoCluster } from './photo-clusters';
 import { useAnimatedPresence } from './useAnimatedPresence';
 import { useFadingItems } from './useFadingItems';
 import { PHOTO_FADE_MS } from './fading-items';
@@ -39,7 +39,7 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
   // New photo/filter data must not briefly leave old entries clickable.
   const currentIds = new Set(photos.map(photo => photo.id));
   return <>{markers.points.filter(photo => currentIds.has(photo.id)).map(photo => <Html key={'point/' + photo.id} portal={labelPortal}
-    position={[photo.position.x, photo.position.height + PHOTO_POINT_LIFT, photo.position.z]} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}>
+    position={photoPointPosition(photo)} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}>
     <span aria-hidden="true" data-photo-point-id={photo.id} className={'map-photo-point' + (photo.id === selected?.id ? ' selected' : '')} style={{ backgroundColor: mapColor(photoMarkerColors(photo).point) }} />
   </Html>)}{fadingClusters.map(({ item: cluster, expiresAt }) => {
     const photo = cluster.photos.find(photo => photo.id === selected?.id) || cluster.photos[0];
@@ -51,7 +51,7 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
     const visible = expiresAt === null && cluster.photos.every(photo => currentIds.has(photo.id));
     return <group key={cluster.id}>
       {!active && !grouped && direction(photo)}
-      <Line points={[[position.x, position.y, position.z], [position.x, position.y + PHOTO_MARKER_LIFT, position.z]]} color={mapColor(active ? colors.selected : allAerial ? colors.stem : '#989b83')} lineWidth={1.5} />
+      <Line points={[[position.x, Math.min(position.y, ...cluster.photos.map(photo => photo.pointHeight ?? photo.position.height)), position.z], [position.x, position.y + PHOTO_MARKER_LIFT, position.z]]} color={mapColor(active ? colors.selected : allAerial ? colors.stem : '#989b83')} lineWidth={1.5} />
       <Html portal={labelPortal} position={[position.x, position.y + PHOTO_MARKER_LIFT, position.z]} center zIndexRange={[18, 10]} style={{ pointerEvents: 'none' }}>
         <MarkerFade visible={visible}>{shown => <button className={'map-photo ' + (grouped ? 'collage ' : '') + (active ? 'selected ' : '') + (allAerial ? 'aerial ' : mixed ? 'mixed ' : '') + (compact && !active ? 'compact' : '')}
           style={{ opacity: shown ? 1 : 0, pointerEvents: shown ? 'auto' : 'none', '--photo-accent': mapColor(aerialColors.border), '--photo-selected': mapColor(colors.selected), borderColor: active && isAerialPhoto(photo) ? mapColor(colors.selected) : undefined } as CSSProperties} disabled={!visible} aria-hidden={!visible}

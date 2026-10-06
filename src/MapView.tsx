@@ -23,12 +23,13 @@ import BasketballCourts from './BasketballCourts';
 import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from './LocationSelection';
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
 import { groundSurfaces } from './ground-geometry';
-import { isAerialPhoto, photoMapHeight } from './locations';
+import { isAerialPhoto, photoLocationId, photoMapHeight } from './locations';
 import { mapLocationTarget } from './location-geometry';
+import { photoPlacementPoint } from './photo-placement';
 import PhotoMarkers from './PhotoMarkers';
 import { photoMarkerColors } from './photo-marker-colors';
 import PhotoClusterPicker from './PhotoClusterPicker';
-import type { PhotoCluster } from './photo-clusters';
+import { photoPointPosition, type PhotoCluster } from './photo-clusters';
 import MapCameraRig, { OVERVIEW_POSITION, type MapCommand, type MapPhoto } from './MapCameraRig';
 import { photoPerspectiveIssue } from './photo-perspective';
 import PhotoOverlay from './PhotoOverlay';
@@ -151,7 +152,7 @@ function Direction({ photo, editing = false, compact = false, onHeading, labelPo
     document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
   };
   const origin: [number, number, number] = [photo.position.x, photo.position.height + .4, photo.position.z];
-  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={origin} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor(color) }} /></Html>}
+  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={photoPointPosition(photo)} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor(color) }} /></Html>}
     {rays.length > 0 && <><mesh geometry={sector} position={origin} renderOrder={28} raycast={() => null}><meshBasicMaterial color={mapColor(color)} transparent opacity={.17} side={THREE.DoubleSide} depthTest={false} depthWrite={false} /></mesh><Line points={[origin, ...rays.map(p => p.map((n, i) => n + origin[i]) as [number, number, number]), origin]} color={mapColor(color)} lineWidth={1.5} depthTest={false} depthWrite={false} renderOrder={29} raycast={() => null} /></>}
     {editing && onHeading && <Html portal={labelPortal} center position={[photo.position.x + Math.sin(yaw) * 22, photo.position.height + 2, photo.position.z - Math.cos(yaw) * 22]} zIndexRange={[20, 19]}><button className="direction-handle" aria-label="拖动调整拍摄方向" title="拖动调整拍摄方向" onPointerDown={beginDrag} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); onHeading((photo.heading + (e.key === 'ArrowRight' ? 5 : 355)) % 360); } }}>↔</button></Html>}
   </group>;
@@ -171,7 +172,11 @@ export default function MapView(props: Props) {
   const selectedLocation = selectionDismissed ? undefined : props.selectedLocation;
   const selectableIds = useMemo(() => props.selectableLocationIds ? new Set(props.selectableLocationIds) : undefined, [props.selectableLocationIds]);
   const onLocation = props.onLocation ? (id: string) => { if (selectableIds && !selectableIds.has(id)) return; setSelectionDismissed(false); props.onLocation?.(id); } : undefined;
-  const atMapHeight = (photo: Photo): MapPhoto => ({ ...photo, position: { ...photo.position, height: photoMapHeight(photo, campus, site) } });
+  const atMapHeight = (photo: Photo): MapPhoto => {
+    const height = photoMapHeight(photo, campus, site);
+    const onStairs = !isAerialPhoto(photo) && campus.features.some(feature => feature.id === photoLocationId(photo, campus) && feature.type === 'tunnelEntrance' && feature.curvedStair);
+    return { ...photo, position: { ...photo.position, height }, pointHeight: onStairs ? height - 1.6 + .08 : undefined };
+  };
   const photos = useMemo(() => props.photos.map(atMapHeight), [props.photos, campus, site]);
   const selectedPhoto = props.selectedPhoto ? atMapHeight(props.selectedPhoto) : null;
   const editPhoto = props.editPhoto ? atMapHeight(props.editPhoto) : null;
@@ -181,6 +186,8 @@ export default function MapView(props: Props) {
   const [compact, setCompact] = useState(false);
   const [azimuth, setAzimuth] = useState(0);
   const [underground, setUnderground] = useState(true);
+  const entranceSelected = campus.features.some(feature => feature.id === props.selectedLocation && feature.type === 'tunnelEntrance');
+  useEffect(() => { if (entranceSelected) setUnderground(true); }, [entranceSelected, placing]);
   const [moving, setMoving] = useState(false);
   const [picker, setPicker] = useState<PhotoCluster | null>(null);
   const pickerTrigger = useRef<HTMLButtonElement | null>(null);
@@ -222,8 +229,8 @@ export default function MapView(props: Props) {
     if (!placing) { if (selectedLocation || selectedPhoto) { e.stopPropagation(); clearLocation(); } return; }
     if (!onPlace) return;
     e.stopPropagation();
-    const target = new THREE.Vector3();
-    if (e.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(editPhoto?.position.height || 0)), target)) onPlace({ x: target.x, z: target.z });
+    const point = photoPlacementPoint(e.ray, props.editPhoto || null, campus, site);
+    if (point) onPlace(point);
   };
   return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={environmentSeason || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
     <MapTheme.Provider value={theme}><MapSeason.Provider value={environmentSeason}><MapTime.Provider value={environmentTime}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
@@ -247,6 +254,6 @@ export default function MapView(props: Props) {
     {/* The map is isolated below viewer cards; place the chooser alongside them so the catalog cannot cover it. */}
     {labelPortal.current && createPortal(<PhotoClusterPicker photos={!viewingPhoto && picker ? picker.photos : null} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
     {preview && <PhotoOverlay key={preview.id + ':' + (props.photoDepthSource || preview.depthUpdatedAt || '')} photo={preview} viewport={viewport} imageSource={props.photoImageSource} depthSource={props.photoDepthSource} theme={theme} mode={props.photoOverlayMode || 'off'} cameraReady={!moving} onEntered={props.onPhotoOverlayEntered} onExited={props.onPhotoOverlayExited} />}
-    {!viewingPhoto && <div className="map-bottom"><span className="map-help">{mapInteractionHelp(inputMode, placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>}
+    {!viewingPhoto && <div className="map-bottom"><span className="map-help">{placing && entranceSelected && editPhoto && !isAerialPhoto(editPhoto) ? '点击入口台阶，标记楼梯上的拍摄位置' : mapInteractionHelp(inputMode, placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>}
   </div>;
 }

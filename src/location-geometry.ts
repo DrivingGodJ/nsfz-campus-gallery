@@ -4,7 +4,7 @@ import { buildingLevels } from './building-model.ts';
 import { featureSurfaceHeight } from './locations.ts';
 import { passageFootprint, undergroundLayout } from './underground-geometry.ts';
 import { bridgeLayout } from './bridge-geometry.ts';
-import { curvedStairTreads } from './structure-geometry.ts';
+import { curvedStairPoint, curvedStairTreads } from './structure-geometry.ts';
 import { gardenFootprints, pergolaLayout } from './garden-geometry.ts';
 
 // Picking, highlighting and camera focus must describe the same footprint,
@@ -34,6 +34,11 @@ export function mapLocationTarget(campus: Campus, site: Site, id?: string, cutaw
     points = featureFootprints(feature, campus.features, height, aligned).flatMap(shape => shape.outer);
     center = feature.track?.center || feature.courts?.center;
     bottom = top = height;
+    if (feature.type === 'tunnelEntrance' && feature.curvedStair) {
+      const stair = feature.curvedStair, middle = curvedStairPoint(stair, .5);
+      center = [middle[0], middle[2]];
+      bottom = Math.min(stair.topHeight, stair.bottomHeight); top = Math.max(stair.topHeight, stair.bottomHeight);
+    }
   }
   if (!points.length) return null;
   const minX = Math.min(...points.map(p => p[0])), maxX = Math.max(...points.map(p => p[0]));

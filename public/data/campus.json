@@ -2637,7 +2637,7 @@
       "connectedTo": [
         "local/underpass"
       ],
-      "hideLabel": true
+      "hideLabel": false
     },
     {
       "id": "local/underpass-exit",

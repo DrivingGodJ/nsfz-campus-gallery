@@ -34,8 +34,8 @@ test('annotation and filtering offer broad destinations and corridors, while sma
     const filters = campusFilterLocations(campus, site);
     assert.equal((html.match(/<option /g) || []).length, filters.length);
     assert.match(html, /<optgroup label="建筑">/); assert.match(html, /<optgroup label="校园区域与通道">/);
-    for (const name of ['主教学楼', '宿舍', '食堂', '操场', '篮球场', '未名湖', '标本林', '走廊', '地下走廊', '地下通道', '风雨跑道', '天桥']) assert.ok(html.includes('>' + name + '</option>'), name + ' is available for annotation and filtering');
-    for (const name of ['湖心亭', '钟楼', '校门碑', '诚朴雄伟碑', '紫藤长廊', '湖桥', '拱桥', '湖中栈道', '地下通道入口', '地下通道出口', '小卖部', '办公室']) assert.ok(!html.includes('>' + name + '</option>'), name + ' cannot be newly annotated or used as a filter');
+    for (const name of ['主教学楼', '宿舍', '食堂', '操场', '篮球场', '未名湖', '标本林', '走廊', '地下走廊', '地下通道', '地下通道入口', '风雨跑道', '天桥']) assert.ok(html.includes('>' + name + '</option>'), name + ' is available for annotation and filtering');
+    for (const name of ['湖心亭', '钟楼', '校门碑', '诚朴雄伟碑', '紫藤长廊', '湖桥', '拱桥', '湖中栈道', '地下通道出口', '小卖部', '办公室']) assert.ok(!html.includes('>' + name + '</option>'), name + ' cannot be newly annotated or used as a filter');
     const render = value => renderToStaticMarkup(React.createElement(LocationSelection.Provider, { value }, React.createElement(LocationName, { id: 'local/underpass-exit', name: '地下通道出口', underground: true })));
     const selected = render({ selectedId: 'local/underpass-exit', onSelect: () => {} });
     assert.match(selected, /<button/); assert.match(selected, /aria-label="选择地点：地下通道出口"/); assert.match(selected, /aria-pressed="true"/);
@@ -52,12 +52,13 @@ test('annotation and filtering offer broad destinations and corridors, while sma
     }
     const majorName = renderToStaticMarkup(React.createElement(LocationSelection.Provider, { value: filterSelection }, React.createElement(LocationName, { id: 'way/855459418', name: '未名湖' })));
     assert.match(majorName, /<button/, 'Broad map destinations stay selectable');
-    for (const id of ['way/1233313439', 'local/underground-corridor', 'local/underpass', 'local/footbridge']) {
+    for (const id of ['way/1233313439', 'local/underground-corridor', 'local/underpass', 'local/underpass-entrance', 'local/footbridge']) {
       const corridor = renderToStaticMarkup(React.createElement(LocationSelection.Provider, { value: filterSelection }, React.createElement(LocationName, { id, name: '走廊' })));
       assert.match(corridor, /<button/, 'Circulation map locations stay selectable');
     }
     const submissionCampus = JSON.parse(await fs.readFile(new URL('../worker/src/submission-campus.json', import.meta.url)));
     assert.ok(submissionCampus.locationIds.includes('local/footbridge'), 'Submitted photos can retain the elevated bridge as their location');
+    assert.ok(submissionCampus.locationIds.includes('local/underpass-entrance'), 'Submitted photos can be annotated on the entrance stairs');
     for (const id of ['local/lake-bridge', 'local/arched-lake-bridge']) assert.ok(!submissionCampus.locationIds.includes(id));
     const value = { selectedId: 'local/underpass-exit', onSelect: () => {} };
     const inSeparateHtmlRoot = renderToStaticMarkup(React.createElement(LocationSelection.Provider, { value },

@@ -11,7 +11,7 @@ import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, typ
 import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
 import { FULL_MAP_VIEWPORT, frameMapTarget, photoMapFocusPose, type MapViewport } from './map-card-viewport';
 
-export type MapPhoto = Photo & { position: { x: number; z: number; height: number } };
+export type MapPhoto = Photo & { position: { x: number; z: number; height: number }; pointHeight?: number };
 export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
 // View into campus from the gate: dormitory and cafeteria fronts face the camera.
 export const OVERVIEW_POSITION: [number, number, number] = [-240, 340, -380];
