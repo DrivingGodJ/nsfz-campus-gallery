@@ -123,9 +123,9 @@ test('aerial import, association, edits, restore and static export preserve loca
     assert.throws(() => validatePhoto({ ...restored, altitude: undefined }, restored, campus), /没有读取到/);
     const ground = validatePhoto({ ...restored, captureType: 'ground', floor: 3, position: { ...restored.position, height: 99 } }, restored, campus);
     assert.equal(ground.altitude, undefined); assert.equal(ground.position.height, undefined); assert.equal(ground.floor, 3);
-    assert.equal(photoMapHeight(ground, campus, site), 8.8);
+    assert.equal(photoMapHeight(ground, campus, site), 12.4, 'Ground photos include the gym\'s raised base');
     const changed = { ...site, buildingOverrides: { [ground.buildingId]: { floors: 4, floorHeight: 4.2 } } };
-    assert.equal(photoMapHeight(ground, campus, changed), 10);
+    assert.equal(photoMapHeight(ground, campus, changed), 13.6);
     assert.equal(samePhotoSpot(ground, restored, campus, site), false);
     assert.equal(samePhotoSpot(restored, { ...restored, altitude: { meters: 86, reference: 'takeoff' } }, campus, site), true);
     assert.equal(samePhotoSpot(restored, { ...restored, altitude: { meters: 85, reference: 'seaLevel' } }, campus, site), false);

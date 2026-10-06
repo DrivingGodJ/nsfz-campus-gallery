@@ -22,8 +22,9 @@ export function curvedStairTreads(stair: CurvedStair) {
 
 export function bridgeHeight(feature: Feature, buildings: Building[], overrides: Record<string, BuildingOverride>) {
   const anchor = feature.levelAnchor;
-  if (anchor && buildings.some(b => b.id === anchor.buildingId)) {
-    return .12 + (anchor.floor - 1) * (overrides[anchor.buildingId]?.floorHeight ?? 3.6);
+  const building = anchor && buildings.find(b => b.id === anchor.buildingId);
+  if (anchor && building) {
+    return (building.baseElevation ?? 0) + .12 + (anchor.floor - 1) * (overrides[anchor.buildingId]?.floorHeight ?? 3.6);
   }
   return feature.deckHeight ?? (.12 + (feature.height ?? 3.6));
 }

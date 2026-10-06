@@ -68,7 +68,7 @@ test('every named map feature is a selectable location; building and underground
   assert.ok(photoMapHeight(underground, campus, site) < 0);
   const bridge = campus.features.find(feature => feature.type === 'bridge');
   const adjustedSite = { ...site, buildingOverrides: { ...site.buildingOverrides, [bridge.levelAnchor.buildingId]: { name: '体育馆', floors: 2, floorHeight: 4.2 } } };
-  assert.ok(Math.abs(photoMapHeight(assignPhotoLocation(photo, bridge.id, campus, adjustedSite), campus, adjustedSite) - 5.92) < 1e-7);
+  assert.ok(Math.abs(photoMapHeight(assignPhotoLocation(photo, bridge.id, campus, adjustedSite), campus, adjustedSite) - 7.42) < 1e-7);
   const building = campus.buildings[0], legacy = { ...photo, buildingId: building.id, floor: 2, position: { ...photo.position, height: 5.2 } };
   assert.equal(photoLocationId(legacy), building.id);
   assert.deepEqual(photosAtLocation([legacy, underground], building.id, 2), [legacy]);
@@ -106,7 +106,7 @@ test('named ground locations derive height from their surface through save, rest
     await store.removePhoto(draft.id, 2);
     await store.restorePhoto(draft.id, 3);
     const saved = (await store.state()).site.photos[0];
-    assert.equal(saved.locationId, 'local/footbridge'); assert.equal(saved.position.height, undefined); assert.equal(photoMapHeight(saved, campus, (await store.state()).site), 5.32);
+    assert.equal(saved.locationId, 'local/footbridge'); assert.equal(saved.position.height, undefined); assert.ok(Math.abs(photoMapHeight(saved, campus, (await store.state()).site) - 7.12) < 1e-7);
     const destination = path.join(root, 'dist');
     await exportStaticContent(root, destination);
     const exported = JSON.parse(await fs.readFile(path.join(destination, 'data/site.json')));

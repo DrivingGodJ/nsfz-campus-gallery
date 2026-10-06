@@ -8,7 +8,7 @@ export function buildingLevels(building: Building, override?: BuildingOverride) 
     const floors = part.id === 'main' ? baseFloors : override?.partFloors?.[part.id] ?? part.floors ?? baseFloors;
     return { ...part, floors, height: floors * floorHeight };
   });
-  return { baseFloors, floorHeight, baseHeight, sections,
+  return { baseFloors, floorHeight, baseHeight, baseElevation: building.baseElevation ?? 0, sections,
     floors: Math.max(...sections.map(part => part.floors)),
     height: Math.max(...sections.map(part => part.height)) };
 }

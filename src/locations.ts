@@ -1,5 +1,6 @@
 import { bridgeHeight, bridgeSurfaceHeight } from './structure-geometry.ts';
 import { buildingLevels } from './building-model.ts';
+import { groundElevationAt } from './sports-ground-geometry.ts';
 import type { Building, Campus, Feature, Photo, Site } from './types';
 
 export type CampusLocation = { id: string; name: string; kind: 'building' | 'feature'; surfaceHeight: number; levelText: string; building?: Building; feature?: Feature };
@@ -14,7 +15,7 @@ export function campusLocations(campus: Campus, site: Site): CampusLocation[] {
   return [
     ...campus.buildings.map((building, i) => ({ id: building.id,
       name: site.buildingOverrides[building.id]?.name || building.name || '未命名建筑 ' + String(i + 1).padStart(2, '0'),
-      kind: 'building' as const, building, surfaceHeight: 0, levelText: '楼层' })),
+      kind: 'building' as const, building, surfaceHeight: building.baseElevation ?? 0, levelText: '楼层' })),
     ...campus.features.filter(feature => !!feature.name?.trim()).map(feature => ({
       id: feature.id, name: feature.name!.trim(), kind: 'feature' as const, feature,
       surfaceHeight: featureSurfaceHeight(feature, campus, site),
@@ -56,9 +57,12 @@ export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {
     return photo.altitude?.reference === 'takeoff' ? photo.altitude.meters : 1.6;
   }
   const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
-  if (building) return (Math.max(1, photo.floor) - 1) * buildingLevels(building, site.buildingOverrides[id]).floorHeight + 1.6;
+  if (building) {
+    const info = buildingLevels(building, site.buildingOverrides[id]);
+    return info.baseElevation + (Math.max(1, photo.floor) - 1) * info.floorHeight + 1.6;
+  }
   const feature = campus.features.find(f => f.id === id);
-  if (!feature) return 1.6;
+  if (!feature) return groundElevationAt(campus, [photo.position.x, photo.position.z]) + 1.6;
   const surface = featureSurfaceHeight(feature, campus, site);
   return (feature.type === 'bridge' ? bridgeSurfaceHeight(feature, surface, [photo.position.x, photo.position.z]) : surface) + 1.6;
 }

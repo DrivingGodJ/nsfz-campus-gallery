@@ -81,10 +81,10 @@ function BuildingMesh({ building, site, index, selected, floor, onClick, placing
   const floorLineMaterial = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ camera }) => {
     // Subpixel floor lines should fade before they turn into a striped, flickering far view.
-    const distance = Math.hypot(camera.position.x - info.center[0], camera.position.y - height / 2, camera.position.z - info.center[1]);
+    const distance = Math.hypot(camera.position.x - info.center[0], camera.position.y - info.baseElevation - height / 2, camera.position.z - info.center[1]);
     if (floorLineMaterial.current) floorLineMaterial.current.opacity = THREE.MathUtils.clamp((800 - distance) / 500, 0, 1);
   });
-  return <group userData={{ photoOccluder: true }}>
+  return <group position={[0, info.baseElevation, 0]} userData={{ photoOccluder: true }}>
     {building.appearance?.type === 'glass-pavilion' ? <group onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(); } }} onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
       <HistoryPavilion building={building} height={height} color={color} selected={selected} />
     </group> : <group

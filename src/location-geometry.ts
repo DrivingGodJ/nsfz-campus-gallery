@@ -25,7 +25,7 @@ export function mapLocationTarget(campus: Campus, site: Site, id?: string, cutaw
     const info = buildingLevels(building, site.buildingOverrides[building.id]);
     const height = cutawayFloor ? Math.min(info.height, cutawayFloor * info.floorHeight) : info.height;
     points = info.sections.flatMap(section => section.outer);
-    center = building.center; bottom = .12; top = height + .12;
+    center = building.center; bottom = info.baseElevation + .12; top = height + bottom;
   } else {
     const feature = campus.features.find(feature => feature.id === id);
     if (!feature) return null;

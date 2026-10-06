@@ -116,23 +116,29 @@ export function gymArchitecture(building: Building, height: number, floorHeight:
   const roofBottom = gymRoofHeight(height, 0) - roofThickness;
   const shown = Math.min(height, cutawayHeight ?? height), parts: THREE.BufferGeometry[] = [];
   const connection = bridge?.connections?.find(c => c.type === 'deck' && c.buildingId === building.id);
+  const entryHeight = ((connection?.floor ?? 2) - 1) * floorHeight;
   const entry = connection ? { id: connection.id, sourcePathId: '', width: 3.2, points: [connection.points[0], lerp(connection.points[0], connection.points[1], 2.6)] } : undefined;
   const front = at(length / 2, 0);
   const groundDoor: GroundPassage = { id: 'gym-door', sourcePathId: '', width: 2.8,
     points: [front.map((v, i) => v - across[i] * 2) as Point, front.map((v, i) => v + across[i] * 2) as Point] };
-  for (let bottom = 0; bottom < Math.min(roofBottom, shown) - 1e-6; bottom += floorHeight) {
-    const top = Math.min(bottom + floorHeight, roofBottom, shown);
-    const cuts = bottom === 0 ? [groundDoor] : bottom === floorHeight && entry ? [entry] : [];
-    parts.push(extrudedWorld(shell, bottom, top, floorHeight, cuts, top < Math.min(roofBottom, shown) - 1e-6));
+  const wallTop = Math.min(roofBottom, shown);
+  // Split at both ends of the doorway, including a bridge entering at a half floor.
+  const boundaries = [0, wallTop, entryHeight, entryHeight + floorHeight];
+  for (let level = floorHeight; level < wallTop; level += floorHeight) boundaries.push(level);
+  const levels = [...new Set(boundaries.filter(y => y >= 0 && y <= wallTop))].sort((a, b) => a - b);
+  for (let i = 0; i < levels.length - 1; i++) {
+    const bottom = levels[i], top = levels[i + 1];
+    const cuts = [...(bottom < floorHeight ? [groundDoor] : []), ...(bottom >= entryHeight && top <= entryHeight + floorHeight && entry ? [entry] : [])];
+    parts.push(extrudedWorld(shell, bottom, top, floorHeight, cuts, top < wallTop - 1e-6));
   }
   parts.push(extrudedWorld({ outer: building.outer, holes: [] }, 0, Math.min(.16, shown), floorHeight));
-  // A small landing connects the existing second-floor bridge to the open hall.
-  if (entry && shown > floorHeight + .05) {
+  // Keep the internal landing level with the bridge, including half-floor entries.
+  if (entry && entryHeight > .05 && shown > entryHeight + .05) {
     const landing = connection!.points.at(-1)!, corners = [-1, 1].flatMap(side => [
       landing.map((v, i) => v + along[i] * side * 1.6) as Point,
       landing.map((v, i) => v + along[i] * side * 1.6 + across[i] * 2.5) as Point,
     ]);
-    parts.push(extrudedWorld({ outer: [corners[0], corners[2], corners[3], corners[1], corners[0]], holes: [] }, floorHeight - .22, floorHeight, floorHeight));
+    parts.push(extrudedWorld({ outer: [corners[0], corners[2], corners[3], corners[1], corners[0]], holes: [] }, entryHeight - .22, entryHeight, floorHeight));
   }
   const body = combined(parts), roofPositions: number[] = [], crownPositions: number[] = [];
   const roofVisible = shown >= height - 1e-6;

@@ -66,13 +66,18 @@ test('gym roof bows smoothly along the archived long axis without changing calib
 
 test('gym bridge enters a real doorway while the adjacent wall and ground remain intact', () => {
   const info = buildingLevels(gym, site.buildingOverrides[gym.id]), model = gymArchitecture(gym, info.height, info.floorHeight, bridge);
-  const body = mesh(model.body, true), connection = bridge.connections.find(c => c.type === 'deck');
+  const body = mesh(model.body, true), connection = bridge.connections.find(c => c.type === 'deck' && c.buildingId === gym.id);
+  body.position.y += info.baseElevation; body.updateMatrixWorld();
   const [a, b] = connection.points, direction = vector(b).sub(vector(a)).normalize();
-  const start = vector(a); start.y = .12 + info.floorHeight + 1.6;
-  assert.equal(new THREE.Raycaster(start, direction, 0, 7).intersectObject(body).length, 0, 'The bridge route has no solid facade cap');
+  const start = vector(a); start.y = .12 + info.baseElevation + (connection.floor - 1) * info.floorHeight + 1.6;
+  const entryY = .12 + info.baseElevation + (connection.floor - 1) * info.floorHeight;
+  for (const eyeHeight of [.3, 1.6, info.floorHeight - .3]) {
+    const eye = start.clone(); eye.y = entryY + eyeHeight;
+    assert.equal(new THREE.Raycaster(eye, direction, 0, 7).intersectObject(body).length, 0, 'The half-floor doorway is open across the regular floor boundary');
+  }
   const beside = start.clone().add(new THREE.Vector3(direction.z, 0, -direction.x).multiplyScalar(3));
   assert.ok(new THREE.Raycaster(beside, direction, 0, 7).intersectObject(body).length, 'The entrance does not erase the neighboring facade');
-  const center = vector(gym.center); center.y = 2;
+  const center = vector(gym.center); center.y = info.baseElevation + 2;
   assert.ok(new THREE.Raycaster(center, new THREE.Vector3(0, -1, 0)).intersectObject(body).length, 'The hall retains its ground slab');
   dispose(model);
 });
