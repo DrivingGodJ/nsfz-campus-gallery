@@ -43,6 +43,7 @@ import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 
 type Props = {
   campus: Campus; site: Site; photos: Photo[]; selectedPhoto?: Photo | null; onSelectPhoto?: (photo: Photo) => void;
+  onVisiblePhotos?: (ids: string[]) => void;
   selectedLocation?: string; floor?: number; onLocation?: (id: string) => void; onClearLocation?: () => void; featuresSelectable?: boolean; selectableLocationIds?: string[];
   season?: PhotoSeason | '';
   time?: PhotoTime | '';
@@ -244,7 +245,7 @@ export default function MapView(props: Props) {
         {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={() => { if (!viewingPhoto) onLocation?.(b.id); }} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
         <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground={underground} labelPortal={labelPortal} />
         <FeatureTargets campus={campus} site={site} underground={underground} labelPortal={labelPortal} />
-        {!viewingPhoto && <PhotoMarkers photos={photos} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
+        {!viewingPhoto && <PhotoMarkers photos={photos} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
       </group><MapCameraRig command={command} boundary={campus.boundary} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto} smoothPhotoFraming={props.smoothPhotoFraming} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>

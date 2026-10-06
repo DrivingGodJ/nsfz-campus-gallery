@@ -10,32 +10,45 @@ import { useFadingItems } from './useFadingItems';
 import { PHOTO_FADE_MS } from './fading-items';
 import { isAerialPhoto } from './locations';
 import { photoMarkerColors } from './photo-marker-colors';
+import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 
 function MarkerFade({ visible, children }: { visible: boolean; children: (shown: boolean) => ReactNode }) {
   const presence = useAnimatedPresence(visible, PHOTO_FADE_MS, true);
   return children(presence.visible && visible);
 }
 
-export default function PhotoMarkers({ photos, selected, compact, labelPortal, onSelect, onPick, onExpand, direction }: {
+export default function PhotoMarkers({ photos, selected, compact, labelPortal, onSelect, onPick, onExpand, direction, onVisiblePhotos, visibleViewport = FULL_MAP_VIEWPORT }: {
   photos: MapPhoto[]; selected?: MapPhoto | null; compact: boolean; labelPortal: RefObject<HTMLDivElement>;
   onSelect: (photo: MapPhoto) => void; onPick: (cluster: PhotoCluster, trigger: HTMLButtonElement) => void;
   onExpand: (focus: { target: [number, number, number]; distance: number }) => void;
   direction: (photo: MapPhoto) => ReactNode;
+  onVisiblePhotos?: (ids: string[]) => void; visibleViewport?: MapViewport;
 }) {
   const { camera, size, scene } = useThree(), mapColor = useMapColor();
   const spots = useMemo(() => permanentPhotoSpots(photos), [photos]);
   const [markers, setMarkers] = useState<{ clusters: PhotoCluster[]; points: MapPhoto[] }>({ clusters: [], points: [] });
   const fadingClusters = useFadingItems(markers.clusters);
   const signature = useRef('');
+  const visibleSignature = useRef('');
   const updateMarkers = () => {
     const occluders = photoOccluders(scene);
     const clusters = cameraPhotoClusters(spots, camera, size, occluders, { compact, selectedId: selected?.id });
     const points = visiblePhotoPoints(photos, camera, size, occluders);
     const key = clusters.map(cluster => cluster.photos.map(photo => photo.id).join(',')).join('|') + '/' + points.map(photo => photo.id).join(',');
     if (key !== signature.current) { signature.current = key; setMarkers({ clusters, points }); }
+    if (onVisiblePhotos) {
+      const visible = clusters.filter(cluster => {
+        const p = cluster.position.clone(); p.y += PHOTO_MARKER_LIFT; p.project(camera);
+        const x = (p.x + 1) / 2, y = (1 - p.y) / 2;
+        return x >= visibleViewport.left && x <= visibleViewport.left + visibleViewport.width && y >= visibleViewport.top && y <= visibleViewport.top + visibleViewport.height;
+      }).flatMap(cluster => cluster.photos.map(photo => photo.id)).sort();
+      const next = visible.join(',');
+      if (next !== visibleSignature.current) { visibleSignature.current = next; onVisiblePhotos(visible); }
+    }
   };
   useEffect(() => { signature.current = ''; updateMarkers(); }, [spots, scene, size.width, size.height, compact, selected?.id]);
   useFrame(updateMarkers);
+  useEffect(() => () => onVisiblePhotos?.([]), [onVisiblePhotos]);
   // New photo/filter data must not briefly leave old entries clickable.
   const currentIds = new Set(photos.map(photo => photo.id));
   return <>{markers.points.filter(photo => currentIds.has(photo.id)).map(photo => <Html key={'point/' + photo.id} portal={labelPortal}

@@ -4,6 +4,7 @@ import { asset, type Photo } from './types';
 import { photoDepthFile, photoPreviewFile } from './photo-image';
 import { PhotoPerspectiveOverlay } from './PhotoPerspective';
 import { loadImageElement } from './depth-map';
+import { loadCachedImageElement } from './photo-image-cache';
 import { depthGray, depthHistogram, depthLineRadius, depthTransitionFrame, parseLineColor, revealFront } from './depth-transition';
 import { advanceOverlayClock, OVERLAY_WAITING_RATE, overlayPhotoAlpha, overlayProgress, type PhotoOverlayMode } from './photo-overlay';
 import type { MapViewport } from './map-card-viewport';
@@ -27,39 +28,49 @@ export default function PhotoOverlay({ photo, viewport, imageSource, originalSou
   const prepared = useRef<Prepared | null>(null), frame = useRef({ phase: 'entering' as 'entering' | 'exiting', progress: 0 });
   const callbacks = useRef({ onEntered, onExited }); callbacks.current = { onEntered, onExited };
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false), [message, setMessage] = useState('');
+  const [stillSource, setStillSource] = useState<string>();
   const [original, setOriginal] = useState<OriginalImage | null>(null), [retry, setRetry] = useState(0);
   const usesDepth = mode === 'entering' || mode === 'shown' || mode === 'exiting';
+  const translucent = mode === 'translucent';
   const originalImage = useRef<HTMLImageElement | undefined>(undefined);
   originalImage.current = original && original.url === originalSource ? original.image : undefined;
   const originalPending = usesDepth && !!originalSource && originalSource !== imageUrl && (!original || original.url !== originalSource || original.state === 'loading');
   const waitingForOriginal = useRef(originalPending); waitingForOriginal.current = originalPending;
 
   useEffect(() => {
-    if (!usesDepth || !originalSource || originalSource === imageUrl) { setOriginal(null); return; }
+    if (!usesDepth || !ready || !originalSource || originalSource === imageUrl) { setOriginal(null); return; }
     const controller = new AbortController();
     setOriginal({ url: originalSource, state: 'loading' });
-    // The full-size download must never hold up the wipe or compete with its image.
+    // Start the original only after the secondary image and depth are usable,
+    // so even browsers without request-priority support load the transition first.
     void loadImageElement(originalSource, '原图暂时无法载入。', { signal: controller.signal, fetchPriority: 'low' })
       .then(image => { if (!controller.signal.aborted) setOriginal({ url: originalSource, state: 'loaded', image }); })
       .catch(() => { if (!controller.signal.aborted) setOriginal({ url: originalSource, state: 'error' }); });
     return () => controller.abort();
-  }, [usesDepth, imageUrl, originalSource, retry]);
+  }, [usesDepth, ready, imageUrl, originalSource, retry]);
 
   useEffect(() => {
     // Half opacity is a plain image: no depth request, mask, or animated wipe.
-    if (!usesDepth) return;
+    if (!usesDepth && !translucent) return;
     const controller = new AbortController();
+    if (translucent) {
+      void loadCachedImageElement(imageUrl, '照片暂时无法载入。', controller.signal)
+        .then(picture => { if (!controller.signal.aborted) setStillSource(picture.src); })
+        .catch(() => { /* Cancellation or a failed photo must not interrupt map interaction. */ });
+      return () => controller.abort();
+    }
     setReady(false); setFailed(false); setMessage('');
     void (async () => {
       // Fetch the secondary HD image and its depth map together. Neither waits for the original.
       const [picture, depth] = await Promise.all([
-        loadImageElement(imageUrl, '照片暂时无法载入，请返回后重试。', { signal: controller.signal, fetchPriority: 'high' }),
-        depthUrl ? loadImageElement(depthUrl, '深度图载入失败。', { signal: controller.signal, fetchPriority: 'high' }).catch(() => {
+        loadCachedImageElement(imageUrl, '照片暂时无法载入，请返回后重试。', controller.signal),
+        depthUrl ? loadCachedImageElement(depthUrl, '深度图载入失败。', controller.signal).catch(() => {
           if (!controller.signal.aborted) setMessage('深度图暂时无法载入，本次使用渐隐过渡。');
           return undefined;
         }) : undefined,
       ]);
       if (controller.signal.aborted) return;
+      setStillSource(picture.src);
       // Only the wipe uses a small canvas; the finished image stays sharp.
       const scale = Math.min(1, 720 / Math.max(picture.naturalWidth, picture.naturalHeight));
       const width = Math.max(1, Math.round(picture.naturalWidth * scale)), height = Math.max(1, Math.round(picture.naturalHeight * scale));
@@ -78,7 +89,7 @@ export default function PhotoOverlay({ photo, viewport, imageSource, originalSou
       setReady(true);
     })().catch(error => { if (!controller.signal.aborted) { setMessage(error.message); setFailed(true); } });
     return () => controller.abort();
-  }, [usesDepth, imageUrl, depthUrl]);
+  }, [usesDepth, translucent, imageUrl, depthUrl]);
 
   const draw = (phase: 'entering' | 'exiting', progress: number) => {
     const target = canvas.current, data = prepared.current, image = still.current;
@@ -183,7 +194,7 @@ export default function PhotoOverlay({ photo, viewport, imageSource, originalSou
   return <>
     {usesDepth && status && <p className="photo-overlay-status" role="status" aria-live="polite">{(!ready && !failed || awaitingOriginal && !originalFailed) && <LoaderCircle size={14} className="photo-image-spinner" aria-hidden="true" />}{status}{originalFailed && <button type="button" className="text-button" onClick={event => { event.stopPropagation(); setRetry(value => value + 1); }}>重试</button>}</p>}
     <PhotoPerspectiveOverlay photo={photo} viewport={viewport}>
-      <img ref={still} className="photo-overlay-still" src={mode !== 'off' ? imageUrl : undefined} alt="" draggable={false} />
+      <img ref={still} className="photo-overlay-still" src={mode !== 'off' ? stillSource : undefined} alt="" draggable={false} />
       <div ref={originalLayer} className="photo-overlay-original-layer" />
       <canvas ref={canvas} className="depth-transition-layer" aria-hidden="true" />
     </PhotoPerspectiveOverlay>
