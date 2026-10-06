@@ -1,9 +1,12 @@
 import AppKit
 import WebKit
 import UniformTypeIdentifiers
+import Darwin
 
 @MainActor
 final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+    let resources: URL?
+    let servicePort: Int
     var window: NSWindow!
     var webView: WKWebView!
     var service: Process?
@@ -14,6 +17,16 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     var output = ""
     var launching = false
     var restartRequested = false
+    var quitting = false
+    var serviceLifetime: Pipe?
+    var serviceOutput: Pipe?
+    var serviceGroup: pid_t?
+
+    init(resources: URL? = Bundle.main.resourceURL, servicePort: Int = 5188) {
+        self.resources = resources
+        self.servicePort = servicePort
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -27,12 +40,13 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         window.minSize = NSSize(width: 960, height: 640)
         window.contentView = webView
         window.delegate = self
+        window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("CampusReviewWindow")
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         if let saved = UserDefaults.standard.string(forKey: "contentRoot") { root = saved }
-        else if let file = Bundle.main.url(forResource: "project", withExtension: "json"),
+        else if let file = resources?.appendingPathComponent("project.json"),
                 let data = try? Data(contentsOf: file), let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] { root = json["root"] ?? "" }
         if FileManager.default.fileExists(atPath: root + "/server/local-editor.mjs") { startService() }
         else { showStartup("请选择附中影像内容库", detail: "内容库保存你的照片、标注和网站文件。第一次使用时选择 nsfz-campus-gallery 文件夹。", failed: true) }
@@ -68,17 +82,17 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     }
 
     func startService() {
-        guard !launching else { return }
+        guard !launching, !quitting else { return }
         if let current = service, current.isRunning {
             launching = true; restartRequested = true
             showStartup("正在连接内容库", detail: "正在关闭上一连接并打开新的内容库…")
-            current.terminate()
+            stopService(current)
             return
         }
         launching = true; output = ""; serviceURL = nil
         showStartup("正在打开附中影像审核", detail: "正在连接本地内容库…\n照片和审核记录保存在这台电脑。")
         let process = Process()
-        guard let resources = Bundle.main.resourceURL else { return }
+        guard let resources = resources else { launching = false; return }
         process.executableURL = resources.appendingPathComponent("runtime/bin/node")
         process.arguments = [resources.appendingPathComponent("bootstrap.mjs").path, root]
         process.currentDirectoryURL = URL(fileURLWithPath: root)
@@ -86,37 +100,102 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         environment["PATH"] = resources.appendingPathComponent("runtime/bin").path + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         environment["CAMPUS_NPM_CLI"] = resources.appendingPathComponent("runtime/lib/node_modules/npm/bin/npm-cli.js").path
         environment["CAMPUS_DESKTOP_APP"] = "1"
+        environment["CAMPUS_REVIEW_PORT"] = String(servicePort)
         process.environment = environment
+        // EOF also stops the service if the app crashes or is force-quit.
+        let lifetime = Pipe(); process.standardInput = lifetime
+        serviceLifetime = lifetime
         let pipe = Pipe(); process.standardOutput = pipe; process.standardError = pipe
+        serviceOutput = pipe
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+            guard !data.isEmpty else { handle.readabilityHandler = nil; return }
+            guard let text = String(data: data, encoding: .utf8) else { return }
             DispatchQueue.main.async { self?.receive(text) }
         }
         process.terminationHandler = { [weak self] task in
-            DispatchQueue.main.async {
-                guard let self = self, self.service === task else { return }
-                self.launching = false; self.service = nil
-                if self.restartRequested { self.restartRequested = false; self.startService(); return }
-                if task.terminationStatus != 0 { self.showStartup("审核器未能打开", detail: self.output.suffix(1800).description + "\n\n请确认内容库仍在原位置，或重新选择内容库。", failed: true) }
+            // Quit waits in AppKit's modal run loop. A main-queue callback can
+            // be blocked by that wait, so deliver completion in its run modes.
+            RunLoop.main.perform(inModes: [.default, .modalPanel, .eventTracking]) {
+                MainActor.assumeIsolated {
+                    guard let self = self, self.service === task else { return }
+                    self.finishService(task)
+                }
             }
         }
         service = process
         do {
             try process.run()
+            // Foundation gives this child its own group. Never signal the app's
+            // group or another service if that launch behavior changes.
+            let group = getpgid(process.processIdentifier)
+            serviceGroup = group == process.processIdentifier ? group : nil
+            try? lifetime.fileHandleForReading.close()
+            try? pipe.fileHandleForWriting.close()
             DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self] in
-                guard let self = self, self.service === process, self.serviceURL == nil, process.isRunning else { return }
+                guard let self = self, !self.quitting, self.service === process, self.serviceURL == nil, process.isRunning else { return }
                 self.showStartup("正在等待内容库访问", detail: "如果 macOS 询问访问文稿或下载文件夹，请点击“允许”。\n也可在“系统设置 → 隐私与安全性 → 文件与文件夹”中允许附中影像审核访问文稿，然后点“重试打开”。", failed: true)
             }
         }
-        catch { launching = false; showStartup("审核器未能打开", detail: error.localizedDescription, failed: true) }
+        catch {
+            service = nil; serviceGroup = nil; launching = false
+            closeServicePipes()
+            showStartup("审核器未能打开", detail: error.localizedDescription, failed: true)
+        }
+    }
+
+    func closeServicePipes() {
+        try? serviceLifetime?.fileHandleForWriting.close()
+        try? serviceLifetime?.fileHandleForReading.close()
+        serviceLifetime = nil
+        serviceOutput?.fileHandleForReading.readabilityHandler = nil
+        try? serviceOutput?.fileHandleForReading.close()
+        try? serviceOutput?.fileHandleForWriting.close()
+        serviceOutput = nil
+    }
+
+    func stopService(_ process: Process) {
+        if let lifetime = serviceLifetime { try? lifetime.fileHandleForWriting.close() }
+        else if process.isRunning { process.terminate() }
+        // Give Vite time to close its watcher, sockets and local database worker.
+        afterServiceDelay(8) { [weak self] in
+            guard let self = self, self.service === process, process.isRunning else { return }
+            if let group = self.serviceGroup { kill(-group, SIGKILL) }
+            else { kill(process.processIdentifier, SIGKILL) }
+        }
+    }
+
+    func finishService(_ process: Process, attempts: Int = 0) {
+        guard service === process else { return }
+        // Publishing commands share the owned group and may outlive Node.
+        // Wait for them too before quitting or reconnecting to another library.
+        if let group = serviceGroup, kill(-group, 0) == 0 {
+            kill(-group, attempts < 20 ? SIGTERM : SIGKILL)
+            if attempts < 40 {
+                afterServiceDelay(0.05) { [weak self] in
+                    self?.finishService(process, attempts: attempts + 1)
+                }
+                return
+            }
+        }
+        closeServicePipes()
+        launching = false; service = nil; serviceGroup = nil; serviceURL = nil
+        if quitting { NSApp.reply(toApplicationShouldTerminate: true); return }
+        if restartRequested { restartRequested = false; startService(); return }
+        if process.terminationStatus != 0 { showStartup("审核器未能打开", detail: output.suffix(1800).description + "\n\n请确认内容库仍在原位置，或重新选择内容库。", failed: true) }
+    }
+
+    func afterServiceDelay(_ interval: TimeInterval, _ action: @escaping @MainActor () -> Void) {
+        let timer = Timer(timeInterval: interval, repeats: false) { _ in MainActor.assumeIsolated { action() } }
+        RunLoop.main.add(timer, forMode: .common)
+        RunLoop.main.add(timer, forMode: .modalPanel)
     }
 
     func receive(_ text: String) {
         output = String((output + text).suffix(12000))
-        guard serviceURL == nil else { return }
+        guard serviceURL == nil, !quitting, !restartRequested else { return }
         for line in output.components(separatedBy: "\n") where line.hasPrefix("REVIEW_APP_READY ") {
-            if let data = line.dropFirst(17).data(using: .utf8), let info = try? JSONSerialization.jsonObject(with: data) as? [String: String], let value = info["url"], let url = URL(string: value), url.host == "127.0.0.1", url.port == 5188 {
+            if let data = line.dropFirst(17).data(using: .utf8), let info = try? JSONSerialization.jsonObject(with: data) as? [String: String], let value = info["url"], let url = URL(string: value), url.host == "127.0.0.1", url.port == servicePort {
                 serviceURL = url; launching = false
                 UserDefaults.standard.set(root, forKey: "contentRoot")
                 webView.load(URLRequest(url: url))
@@ -163,23 +242,38 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     }
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
-        if url.scheme == "about" || (url.host == "127.0.0.1" && url.port == 5188) { decisionHandler(.allow) }
+        if url.scheme == "about" || (url.host == "127.0.0.1" && url.port == servicePort) { decisionHandler(.allow) }
         else { if ["https", "http"].contains(url.scheme ?? "") { NSWorkspace.shared.open(url) }; decisionHandler(.cancel) }
     }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if quitting { return .terminateLater }
         if publishing || unsaved {
             let alert = NSAlert(); alert.messageText = publishing ? "网站正在上线" : "照片还有未保存的修改"
             alert.informativeText = publishing ? "建议等待上线完成。现在退出会中断本地任务，已保存内容仍会保留。" : "修改已暂存在应用里。保存到内容库后，才能发布到网站。"
             alert.addButton(withTitle: publishing ? "继续等待" : "继续编辑"); alert.addButton(withTitle: "退出应用")
             if alert.runModal() == .alertFirstButtonReturn { return .terminateCancel }
         }
-        return .terminateNow
+        guard let current = service else { return .terminateNow }
+        quitting = true; restartRequested = false
+        stopService(current)
+        return .terminateLater
     }
-    func applicationWillTerminate(_ notification: Notification) { service?.terminate() }
-    func windowShouldClose(_ sender: NSWindow) -> Bool { NSApp.terminate(nil); return false }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { window.makeKeyAndOrderFront(nil); return true }
+    func applicationWillTerminate(_ notification: Notification) {
+        try? serviceLifetime?.fileHandleForWriting.close()
+        if let group = serviceGroup { kill(-group, SIGTERM) }
+        else if service?.isRunning == true { service?.terminate() }
+    }
+    func windowShouldClose(_ sender: NSWindow) -> Bool { sender.orderOut(nil); return false }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !quitting else { return false }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        return true
+    }
 }
 
+#if !REVIEW_APP_TESTING
 @main
 struct Main {
     @MainActor static func main() {
@@ -189,3 +283,4 @@ struct Main {
         withExtendedLifetime(delegate) { app.run() }
     }
 }
+#endif

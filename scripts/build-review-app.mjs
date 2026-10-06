@@ -30,7 +30,7 @@ await fs.writeFile(path.join(contents, 'Info.plist'), `<?xml version="1.0" encod
 <plist version="1.0"><dict>
 <key>CFBundleName</key><string>附中影像审核</string><key>CFBundleDisplayName</key><string>附中影像审核</string>
 <key>CFBundleIdentifier</key><string>com.drivinggodj.nsfz-review</string><key>CFBundleExecutable</key><string>CampusReview</string>
-<key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.0</string><key>CFBundleVersion</key><string>1</string>
+<key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.0.1</string><key>CFBundleVersion</key><string>2</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string><key>CFBundleIconFile</key><string>AppIcon</string>
 <key>NSDocumentsFolderUsageDescription</key><string>读取并保存附中影像的照片、审核记录和网站内容库。</string>
