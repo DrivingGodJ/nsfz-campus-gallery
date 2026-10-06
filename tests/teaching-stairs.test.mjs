@@ -20,7 +20,7 @@ const mesh = (geometry, extrusion = false) => {
 const down = (model, origin) => new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0)).intersectObject(model)[0];
 const dispose = geometry => Object.values(geometry).forEach(g => g.dispose());
 
-test('the photographed stairwell connects every main-building floor with two opposing flights and a half landing', () => {
+test('every main-building floor starts on the right-hand flight and turns back onto the left-hand flight', () => {
   for (const override of [site.buildingOverrides[building.id], { floors: 7, floorHeight: 4.2 }]) {
     const info = buildingLevels(building, override), geometry = teachingStairGeometry(building, info.sections, info.floorHeight), model = mesh(geometry.concrete);
     const near = stair.landingDepth, far = near + stair.run;
@@ -28,8 +28,8 @@ test('the photographed stairwell connects every main-building floor with two opp
       const bottom = .12 + level * info.floorHeight + .25, middle = bottom + info.floorHeight / 2;
       for (let i = 0; i < stair.stepsPerFlight; i++) {
         const t = (i + .5) / stair.stepsPerFlight, rise = (i + 1) * info.floorHeight / 2 / stair.stepsPerFlight;
-        const lower = down(model, point(near + t * stair.run, -1.3, middle + .1));
-        const upper = down(model, point(far - t * stair.run, 1.3, bottom + info.floorHeight + .1));
+        const lower = down(model, point(near + t * stair.run, 1.3, middle + .1));
+        const upper = down(model, point(far - t * stair.run, -1.3, bottom + info.floorHeight + .1));
         assert.ok(lower && upper, 'Both flights have solid, upward-facing treads');
         assert.ok(Math.abs(lower.point.y - (bottom + rise)) < 1e-4);
         assert.ok(Math.abs(upper.point.y - (middle + rise)) < 1e-4);

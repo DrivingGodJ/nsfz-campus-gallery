@@ -94,9 +94,10 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
     // There is no extra flight from the top floor through the retained roof.
     for (let level = 0; level < section.floors - 1 && level * floorHeight + SLAB < shown; level++) {
       const bottom = level * floorHeight + SLAB, middle = bottom + floorHeight / 2;
-      flight(near, far, -half, -gap / 2, bottom);
+      // Start on the right-hand flight, then turn back onto the left-hand flight.
+      flight(near, far, gap / 2, half, bottom);
       box(far, far + stair.landingDepth, -half, half, middle - .22, middle);
-      flight(far, near, gap / 2, half, middle);
+      flight(far, near, -half, -gap / 2, middle);
       for (const v of [-half + .06, half - .06]) guard(far, far + stair.landingDepth - .06, v, middle, middle);
       for (const rise of [.48, RAIL_HEIGHT]) bar(point(far + stair.landingDepth - .06, -half + .06, middle + rise), point(far + stair.landingDepth - .06, half - .06, middle + rise));
     }
