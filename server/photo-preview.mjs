@@ -2,8 +2,8 @@ import sharp from 'sharp';
 import fs from 'node:fs/promises';
 
 export const PHOTO_PREVIEW_EDGE = 1280;
-// Decimal MB: browsing renditions must be strictly smaller than 1.5 MB.
-export const PHOTO_DISPLAY_MAX_BYTES = 1500000;
+// Decimal KB: browsing renditions must be strictly smaller than 500 KB.
+export const PHOTO_DISPLAY_MAX_BYTES = 500000;
 export async function createBoundedPhotoWebP(source, destination, { edge, quality, maxBytes = PHOTO_DISPLAY_MAX_BYTES }) {
   if (!Number.isInteger(maxBytes) || maxBytes < 1024) throw new Error('图片大小上限不能小于 1 KB。');
   let size = edge, currentQuality = quality;

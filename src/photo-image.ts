@@ -4,7 +4,8 @@ import type { Photo } from './types';
 export const photoPreviewFile = (photo: Pick<Photo, 'files'>) => photo.files.preview ? photo.files.preview + '?v=2' : photo.files.thumbnail;
 
 // The middle, secondary-HD tier used by both the card and immersive transition.
-export const photoDisplayFile = (photo: Pick<Photo, 'files'>) => photo.files.display || photoPreviewFile(photo);
+// Bump the rendition version after recompression so cached larger files expire.
+export const photoDisplayFile = (photo: Pick<Photo, 'files'>) => photo.files.display ? photo.files.display + '?v=2' : photoPreviewFile(photo);
 
 // Paired depth images are imported with the photograph. Replacing one changes
 // its version so an existing browser cache cannot keep the previous map.

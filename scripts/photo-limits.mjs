@@ -28,5 +28,5 @@ for (const [kind, photos, parent] of [['published', site.photos, 'public/media']
     }
   }
 }
-console.log('已调整 ' + changed + ' 张展示图，大小均小于 1.5 MB；高清下载、私有原片与标注保持原样。');
+console.log('已调整 ' + changed + ' 张展示图，大小均小于 ' + PHOTO_DISPLAY_MAX_BYTES / 1000 + ' KB；高清下载、私有原片与标注保持原样。');
 if (changed) console.log('旧图备份：' + backup);

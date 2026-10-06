@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import { createBoundedPhotoWebP, createPhotoDisplay, PHOTO_DISPLAY_MAX_BYTES } from '../server/photo-preview.mjs';
 
 test('detailed photos fit the display byte limit and remain decodable without changing the source', async () => {
+  assert.equal(PHOTO_DISPLAY_MAX_BYTES, 500000);
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'photo-size-'));
   try {
     const bytes = crypto.randomBytes(2400 * 2400 * 3);

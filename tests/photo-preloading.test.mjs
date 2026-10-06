@@ -124,6 +124,6 @@ test('hidden, offline and save-data connections suppress speculation, and the se
   const normal = { hidden: false, online: true };
   assert.equal(backgroundPhotoLoadingAllowed(normal), true);
   for (const override of [{ hidden: true }, { online: false }, { saveData: true }, { effectiveType: '2g' }, { effectiveType: 'slow-2g' }]) assert.equal(backgroundPhotoLoadingAllowed({ ...normal, ...override }), false);
-  assert.equal(photoDisplayFile({ files: { display: 'display.webp', preview: 'preview.webp', thumbnail: 'thumbnail.webp', download: 'download.jpg' } }), 'display.webp');
+  assert.equal(photoDisplayFile({ files: { display: 'display.webp', preview: 'preview.webp', thumbnail: 'thumbnail.webp', download: 'download.jpg' } }), 'display.webp?v=2');
   assert.equal(photoDisplayFile({ files: { thumbnail: 'thumbnail.webp', download: 'download.jpg' } }), 'thumbnail.webp');
 });
