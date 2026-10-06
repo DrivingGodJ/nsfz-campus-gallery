@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 272,
+  "revision": 349,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -21,16 +21,16 @@
         "author": "DrivingGodJ",
         "copyright": "DGJ"
       },
-      "buildingId": "way/855459420",
-      "floor": 1,
+      "buildingId": "",
+      "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 160.39631889210457,
-        "z": 52.17614398238132
+        "x": 162.40531490595149,
+        "z": 33.349498148271486
       },
       "placed": true,
-      "heading": 14.858594340361208,
-      "pitch": -0.36896506393309886,
+      "heading": 9.230177398522187,
+      "pitch": 3.0509888269732857,
       "width": 4342,
       "height": 5789,
       "downloadBytes": 3327998,
@@ -41,9 +41,10 @@
         "preview": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/preview.webp",
         "depth": "media/8cf1e176-fe09-4c3b-9e04-a84286f36f4e/depth.webp"
       },
-      "locationId": "way/855459420",
+      "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "8c3974ab-328d-42e1-b49a-92e78c2e563e"
     },
     {
       "id": "07daa633-1b1c-427e-bbd7-37dc23428ee8",
@@ -86,7 +87,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "4e8b3544-20b9-4549-9f8a-872c33f3fdd7"
     },
     {
       "id": "5680b7f7-73b1-4563-a7d9-64babbaebb82",
@@ -129,7 +131,8 @@
       },
       "locationId": "local/footbridge",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "1a56e533-3eef-4f76-8a16-6e87cb3cda30"
     },
     {
       "id": "32a56078-7475-4d8e-ac9d-ec107b07ee04",
@@ -172,7 +175,8 @@
       },
       "locationId": "way/855459407",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "ea82102e-d91a-4a29-9eae-a0f8063e7573"
     },
     {
       "id": "13411ce1-b933-425c-ac78-0a0569842170",
@@ -215,7 +219,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "0cc1228b-3f7a-4ef4-bb2a-c172ab6e83d4"
     },
     {
       "id": "6deb58ad-debc-4321-bdfb-d21c2d83fb97",
@@ -258,7 +263,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "afa10598-63dc-435e-9d68-07486ac5869b"
     },
     {
       "id": "39208fcf-95ae-46eb-8007-1b921fe732b0",
@@ -301,7 +307,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "7dccc862-b1ee-48fb-95fe-40612f6a30a3"
     },
     {
       "id": "5bd99665-2443-4ae7-93b2-ab7694285ee4",
@@ -344,7 +351,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "bf4e077f-94f7-4a7e-96e5-49fa9499fe3f"
     },
     {
       "id": "e0ea73b2-fbeb-4a71-82fb-9c11810b5c6d",
@@ -387,7 +395,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "710647c1-00c1-4df9-b464-1732eabe7e8f"
     },
     {
       "id": "62c412f5-d3b2-4ae2-bbed-1308ec44ff50",
@@ -430,7 +439,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "cab5f1a0-68ef-4c1d-9203-c18351019c52"
     },
     {
       "id": "56bfa131-0bcd-4cee-9adf-2e7043063dae",
@@ -473,7 +483,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "d007efda-438f-4904-8d84-94578fce241f"
     },
     {
       "id": "a0e17620-7437-42cf-92f2-1d7d23e20842",
@@ -516,7 +527,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "b5967e41-684f-4f5d-beac-aec9c5afd45e"
     },
     {
       "id": "691551ff-0730-4879-a53e-678bc812d733",
@@ -559,7 +571,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "c264080f-2a44-4cc0-9b6e-1698c975d8ba"
     },
     {
       "id": "d922f197-3db1-4e37-8741-ba753ec3233c",
@@ -602,7 +615,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "5efb54ee-4c5f-4438-8c8a-e231d3db4b9f"
     },
     {
       "id": "72cbcabe-914c-4ff3-b21a-fc6197bdd416",
@@ -645,7 +659,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "e3d628f8-a9ea-4b85-ac1d-ab25191dea7a"
     },
     {
       "id": "c28fcc63-542b-4757-830b-eb23432a634f",
@@ -688,7 +703,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "3804debf-7401-472d-86e3-099ac197d23a"
     },
     {
       "id": "926f5f00-e507-474d-8dc6-643f96c53c7c",
@@ -731,7 +747,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "1a9cc2e7-05e1-4081-a767-08006272da14"
     },
     {
       "id": "f2526e97-f7f0-4fa6-a096-679c3d36f300",
@@ -774,7 +791,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "a323067c-42e5-4641-ba67-85eb4ebd020b"
     },
     {
       "id": "737d3945-edc2-40e0-a7ba-f25c464d4561",
@@ -817,7 +835,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "8562ed73-7330-4489-bfea-c00a9accbcce"
     },
     {
       "id": "d028fbd6-09a9-47ea-a7bc-06641eada0d1",
@@ -860,7 +879,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "86aaaa15-a059-4c63-a380-353b80e7ae15"
     },
     {
       "id": "831757f0-d70a-4ac1-8d8d-f3af0636f728",
@@ -903,7 +923,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "77a661a0-7835-4f0d-a71e-828fd7c94eea"
     },
     {
       "id": "8a4eeea3-449d-41f4-a6b9-4b29cfce4f23",
@@ -946,7 +967,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "fd4df645-0964-4619-bc15-68aab0bf6c5b"
     },
     {
       "id": "05fe3597-88ac-46f4-a3d2-007df5a1b957",
@@ -989,7 +1011,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "cc0233db-3a58-4930-8cc2-07b0e79c896e"
     },
     {
       "id": "a61c941b-14f3-454e-af38-45edb7bdf202",
@@ -1032,7 +1055,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "214c2be3-d913-4f9f-888d-d9ffa63e5e35"
     },
     {
       "id": "8b793917-d0f6-4953-8480-4337289b2739",
@@ -1075,7 +1099,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "4ec4569d-7328-4019-baeb-095b04200d0d"
     },
     {
       "id": "9d583001-6ff5-4487-8f70-8e59ccc83fa9",
@@ -1118,7 +1143,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "0cd15a67-3ec4-42d0-8aef-1ed84226016f"
     },
     {
       "id": "9084dc2d-a2f2-4d42-8734-4fdbe5a9c563",
@@ -1161,7 +1187,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "d82eba30-f2b5-4b60-aa72-8f3063d181e1"
     },
     {
       "id": "51f40733-0225-4555-a676-40aeffb92106",
@@ -1204,7 +1231,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "913559dc-a431-43ff-aa3f-a6eff5196d9d"
     },
     {
       "id": "5f450ef0-72b5-4d73-860a-14d812c93b9d",
@@ -1247,7 +1275,8 @@
       },
       "locationId": "way/855459417",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "c33f0f61-c515-41ee-8efd-2d47d8f3a588"
     },
     {
       "id": "ba32ecca-0828-4f5d-8b3b-e9a435f19152",
@@ -1290,7 +1319,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "5a9d1488-4fcf-4bf3-9633-ae42becd9c76"
     },
     {
       "id": "0aeb5fae-050d-40a6-90f4-762d786c845b",
@@ -1333,7 +1363,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "80f4e299-370e-46db-b830-04e298b6045b"
     },
     {
       "id": "cbfe6584-8662-44e1-9369-1a2b2dd6b194",
@@ -1376,7 +1407,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "13dfcef5-fe2e-4ea7-b9a5-5b1ba270357a"
     },
     {
       "id": "0600b3d2-6358-40b3-b901-f6f04d609c52",
@@ -1419,7 +1451,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "c5e03c65-0772-485f-9c9b-77da3dd02899"
     },
     {
       "id": "c9cc3a66-ce05-4bc3-b854-bbbf9fd0a44c",
@@ -1462,7 +1495,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "ebab0b1c-bfaf-43f3-a707-21bf2828f770"
     },
     {
       "id": "fe448383-e603-49e9-9e86-35fc165cf63b",
@@ -1505,7 +1539,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "b2ed03de-2fb6-416d-b524-50502a8a6850"
     },
     {
       "id": "88c65cc9-1f8f-4383-8ffb-f446bdc663dd",
@@ -1548,7 +1583,8 @@
       },
       "locationId": "way/855459409",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "51d5b3e3-0d10-4a4b-8b1d-43d7b8abbb86"
     },
     {
       "id": "eeeb7f00-9aab-4dc1-bb0f-db42fa067465",
@@ -1597,7 +1633,8 @@
       "copyright": "",
       "view": {
         "focalLength35Mm": 16
-      }
+      },
+      "depthUpdatedAt": "b0203d66-b05b-4852-af1e-e547170971af"
     },
     {
       "id": "35af56d9-984d-43be-82bb-aaa47ddefb37",
@@ -1640,7 +1677,8 @@
       },
       "locationId": "local/underground-badminton",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "68ae7d76-742c-43c2-898c-12138b23d2fb"
     },
     {
       "id": "e93e02ac-f00d-4e8d-af01-3c09706f2856",
@@ -1683,7 +1721,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "26704d05-2864-4914-8c84-6fd3df50b1b0"
     },
     {
       "id": "da1c1aee-1f3d-4389-a101-e4b35f487666",
@@ -1726,7 +1765,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "e1022b3a-6ae5-4676-8ef5-fbb7b6c015ed"
     },
     {
       "id": "18e7fdb0-dd30-46ea-af2f-05d5f3cb9bd9",
@@ -1769,7 +1809,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "0bc2051a-2a2e-4883-b56c-cfab370e44fc"
     },
     {
       "id": "7a8a54a9-5482-403c-9d3c-002a9fde0115",
@@ -1812,7 +1853,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "c977e554-af40-4394-b774-8da4073882e3"
     },
     {
       "id": "e69cd3af-74a7-4f32-8577-4f654b6aba23",
@@ -1855,7 +1897,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "7f8fab40-59f7-42c8-bada-ea82e668c363"
     },
     {
       "id": "2669769a-31d5-4200-a7e2-9a441c66e533",
@@ -1894,7 +1937,8 @@
       },
       "locationId": "way/855459420",
       "author": "",
-      "copyright": ""
+      "copyright": "",
+      "depthUpdatedAt": "dc811daa-261f-47d5-bdc3-86b5d846349e"
     },
     {
       "id": "b49bea6d-af0a-4087-9793-0f1ad8ccc667",
@@ -1937,7 +1981,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "135603bb-ffe1-4db1-92cd-66e0a98e3f94"
     },
     {
       "id": "0373aa23-e993-4f57-aba9-a7936fe081a2",
@@ -1980,7 +2025,8 @@
       },
       "locationId": "local/gymnasium",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "96983794-5cb5-43a7-a538-a52fc937081e"
     },
     {
       "id": "aa553764-213d-4716-b3ad-545c60589bf8",
@@ -2023,7 +2069,8 @@
       },
       "locationId": "local/gymnasium",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "6fb6a8d5-dd12-433b-a88f-c5e8ee6662a9"
     },
     {
       "id": "719592c1-5539-42c7-b21a-7d9492d273b0",
@@ -2066,7 +2113,8 @@
       },
       "locationId": "way/1233313431",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "5a3ba781-2a02-4340-9e7d-db418a89af57"
     },
     {
       "id": "0441ecc7-6b59-42b9-b9d1-f929f93c2f0e",
@@ -2109,7 +2157,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "302813cb-0f45-48b1-ae05-cbdc15f7c4fb"
     },
     {
       "id": "f420c8e0-41ba-4ead-81a3-1bb806701061",
@@ -2152,7 +2201,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "aa2bbf78-5d29-4169-8050-69560aa47542"
     },
     {
       "id": "4aed67d1-6342-4523-b749-1c7a2e6ed99b",
@@ -2195,7 +2245,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "d039aff3-ce35-4304-bd9e-3f853c2b1710"
     },
     {
       "id": "252d968f-08a5-4ec9-9d27-c52017da3348",
@@ -2238,7 +2289,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "f2d0f1c2-83d7-41df-a59e-65ef94d04068"
     },
     {
       "id": "f5acf721-c782-4eb7-a3b2-5e1d17e7dafd",
@@ -2281,7 +2333,8 @@
       },
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "c5fa4843-de70-4f8e-9ecf-dc8d919863ce"
     },
     {
       "id": "59a0baa4-9e8f-4b50-9d3f-f9b7564c7e39",
@@ -2324,7 +2377,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "b28b6177-1e84-41e2-807d-6a99a032b77a"
     },
     {
       "id": "34868811-15fa-4147-ac2e-f4e1278dc2f4",
@@ -2367,7 +2421,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "8f8e4f8d-ef39-4bfc-8826-1dbb5f2302b8"
     },
     {
       "id": "c61510ee-8301-4106-be76-5aae082a0fb2",
@@ -2410,7 +2465,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "110282b4-f183-4d83-b071-7af81ebfe859"
     },
     {
       "id": "77bb78cb-1908-4cc8-bd7d-9a7d1215d117",
@@ -2453,7 +2509,8 @@
       },
       "locationId": "",
       "author": "DrivingGodJ",
-      "copyright": "DGJ"
+      "copyright": "DGJ",
+      "depthUpdatedAt": "79412802-1902-4a4e-99a8-1574e67df219"
     },
     {
       "id": "0747e1af-1233-4c61-946b-64f2327e31b5",
@@ -2487,7 +2544,8 @@
       "locationId": "way/1233313451",
       "view": {
         "focalLength35Mm": 27.2
-      }
+      },
+      "depthUpdatedAt": "3cf4a1ef-aeae-4d14-8f81-00fea6c4b6d1"
     },
     {
       "id": "8d529fdf-7f3a-4186-85aa-9ec6acf7f6a1",
@@ -2532,7 +2590,8 @@
       "locationId": "way/855459420",
       "view": {
         "focalLength35Mm": 26.9
-      }
+      },
+      "depthUpdatedAt": "8f00d7b6-ec4e-422b-a987-30e07067d268"
     },
     {
       "id": "441637b4-598c-409a-8c83-e197c82b3dee",
@@ -2573,7 +2632,8 @@
         "download": "media/441637b4-598c-409a-8c83-e197c82b3dee/download.jpg",
         "depth": "media/441637b4-598c-409a-8c83-e197c82b3dee/depth.webp"
       },
-      "locationId": "way/855459407"
+      "locationId": "way/855459407",
+      "depthUpdatedAt": "c4c7fb9e-ea34-42b3-8012-ce5f01ecc1b1"
     },
     {
       "id": "fe37c3bd-665e-4582-aeff-1d58a5c2b3b3",
@@ -2616,7 +2676,7 @@
         "depth": "media/fe37c3bd-665e-4582-aeff-1d58a5c2b3b3/depth.webp"
       },
       "locationId": "",
-      "depthUpdatedAt": "00bf2346-647a-4d4a-a452-054b7e82ad6f"
+      "depthUpdatedAt": "0e7bdd9e-21ea-42e9-9f34-51e5d01f6c42"
     },
     {
       "id": "ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11",
@@ -2651,7 +2711,7 @@
       "view": {
         "focalLength35Mm": 26
       },
-      "depthUpdatedAt": "523e8579-52be-4498-94ec-6457765613b3",
+      "depthUpdatedAt": "93e1b137-fa77-4e73-bb66-bad657ee8e33",
       "altitude": {
         "meters": 78,
         "reference": "takeoff"
@@ -2687,7 +2747,7 @@
         "depth": "media/5d9c9500-f866-4cd3-8440-58c7eaa6b6a4/depth.webp"
       },
       "locationId": "",
-      "depthUpdatedAt": "cf60beb3-9bba-4673-9cfc-404e46551595",
+      "depthUpdatedAt": "faafa130-d963-47e2-b126-3400b4eaee70",
       "altitude": {
         "meters": 35,
         "reference": "takeoff"
@@ -2739,7 +2799,7 @@
         "depth": "media/63e87114-9fe9-41ad-9f66-df4e5b69cc68/depth.webp"
       },
       "locationId": "",
-      "depthUpdatedAt": "af642e3c-0629-478b-9664-99abacd347c6"
+      "depthUpdatedAt": "e957115e-7915-4e95-9d25-7db367190486"
     },
     {
       "id": "9ed7bfd4-676f-45c8-a1b8-103e367f78d1",
@@ -2784,7 +2844,7 @@
         "depth": "media/9ed7bfd4-676f-45c8-a1b8-103e367f78d1/depth.webp"
       },
       "locationId": "",
-      "depthUpdatedAt": "cec45c96-7bd1-42bf-b3bc-6fe2c0b1f2e3"
+      "depthUpdatedAt": "af6d35c1-8fa4-4396-916c-39b88793cbc6"
     },
     {
       "id": "ad1302d5-d2d8-49f8-a616-fc0da975ad00",
@@ -2829,7 +2889,7 @@
         "depth": "media/ad1302d5-d2d8-49f8-a616-fc0da975ad00/depth.webp"
       },
       "locationId": "way/855459420",
-      "depthUpdatedAt": "364dfbe9-9180-461d-954b-ee4204b311b9"
+      "depthUpdatedAt": "9c85fd38-5e47-4270-809d-33cd35fc6a29"
     },
     {
       "id": "ce1808de-7eaf-4fd2-a7dc-f96cdcfe9275",
@@ -2874,7 +2934,7 @@
         "depth": "media/ce1808de-7eaf-4fd2-a7dc-f96cdcfe9275/depth.webp"
       },
       "locationId": "",
-      "depthUpdatedAt": "5835c034-a80a-42b6-9b97-81dc967b7cc1"
+      "depthUpdatedAt": "d3b4deed-0d7a-42c4-9343-669fdef0e903"
     },
     {
       "id": "09d9222c-5b5c-450c-8591-3d339dc8a83d",
@@ -2919,7 +2979,7 @@
         "depth": "media/09d9222c-5b5c-450c-8591-3d339dc8a83d/depth.webp"
       },
       "locationId": "",
-      "depthUpdatedAt": "58c8b7ac-181e-48f2-92db-fa7ec1dffe1d"
+      "depthUpdatedAt": "bd4581cc-1486-47d7-8018-08be3532fd83"
     },
     {
       "id": "ea9f1ef6-4bb2-4a12-8330-cd6130be8659",
@@ -2964,7 +3024,7 @@
         "depth": "media/ea9f1ef6-4bb2-4a12-8330-cd6130be8659/depth.webp"
       },
       "locationId": "",
-      "depthUpdatedAt": "8c804cfe-ce0e-426d-8dfd-ce675b2458b9"
+      "depthUpdatedAt": "d8006f12-88e6-4958-8a44-c24085ba63db"
     },
     {
       "id": "286e0a8a-7813-45e5-9974-79de2a605dc2",
@@ -3005,9 +3065,93 @@
         "thumbnail": "media/286e0a8a-7813-45e5-9974-79de2a605dc2/thumbnail.webp",
         "preview": "media/286e0a8a-7813-45e5-9974-79de2a605dc2/preview.webp",
         "display": "media/286e0a8a-7813-45e5-9974-79de2a605dc2/display.webp",
-        "download": "media/286e0a8a-7813-45e5-9974-79de2a605dc2/download.jpg"
+        "download": "media/286e0a8a-7813-45e5-9974-79de2a605dc2/download.jpg",
+        "depth": "media/286e0a8a-7813-45e5-9974-79de2a605dc2/depth.webp"
       },
-      "locationId": ""
+      "locationId": "",
+      "depthUpdatedAt": "d79e588a-dab3-4164-a174-3d091361c5a3"
+    },
+    {
+      "id": "06863d9c-c0cb-4a6f-b6f1-b1080f9f9efa",
+      "title": "向上",
+      "description": "",
+      "capturedAt": "2025-10-29T13:30:08",
+      "metadata": {
+        "recordedAt": "2025-10-29T13:30:08",
+        "utcOffset": "+09:00",
+        "cameraMake": "NIKON CORPORATION",
+        "cameraModel": "NIKON D7500",
+        "lensModel": "18.0-140.0 mm f/3.5-5.6",
+        "focalLengthMm": 18,
+        "focalLength35Mm": 27,
+        "aperture": 3.5,
+        "exposureSeconds": 0.003125,
+        "iso": 100
+      },
+      "buildingId": "",
+      "floor": 0,
+      "author": "2025级24班lx",
+      "copyright": "",
+      "uploadedAt": "2026-10-06T15:55:46.312Z",
+      "captureType": "ground",
+      "position": {
+        "x": -31.6,
+        "z": 12.3
+      },
+      "placed": true,
+      "heading": 112.07588212435394,
+      "pitch": 16.659967446195715,
+      "width": 5568,
+      "height": 3712,
+      "downloadBytes": 5156093,
+      "files": {
+        "thumbnail": "media/06863d9c-c0cb-4a6f-b6f1-b1080f9f9efa/thumbnail.webp",
+        "preview": "media/06863d9c-c0cb-4a6f-b6f1-b1080f9f9efa/preview.webp",
+        "display": "media/06863d9c-c0cb-4a6f-b6f1-b1080f9f9efa/display.webp",
+        "download": "media/06863d9c-c0cb-4a6f-b6f1-b1080f9f9efa/download.jpg",
+        "depth": "media/06863d9c-c0cb-4a6f-b6f1-b1080f9f9efa/depth.webp"
+      },
+      "locationId": "local/underpass",
+      "depthUpdatedAt": "eb61ff8f-b8c9-43d4-a604-2394977992ce"
+    },
+    {
+      "id": "525b0ee9-3c28-4aba-a858-a252576ed315",
+      "title": "校史馆",
+      "description": "校史馆",
+      "capturedAt": "",
+      "metadata": {},
+      "buildingId": "way/1233313451",
+      "floor": 0,
+      "author": "",
+      "copyright": "",
+      "uploadedAt": "2026-10-06T15:55:51.468Z",
+      "captureType": "aerial",
+      "position": {
+        "x": 6.5,
+        "z": 29.1
+      },
+      "placed": true,
+      "heading": 271.93005282807826,
+      "pitch": -90,
+      "width": 4000,
+      "height": 2250,
+      "downloadBytes": 3846534,
+      "files": {
+        "thumbnail": "media/525b0ee9-3c28-4aba-a858-a252576ed315/thumbnail.webp",
+        "preview": "media/525b0ee9-3c28-4aba-a858-a252576ed315/preview.webp",
+        "display": "media/525b0ee9-3c28-4aba-a858-a252576ed315/display.webp",
+        "download": "media/525b0ee9-3c28-4aba-a858-a252576ed315/download.jpg",
+        "depth": "media/525b0ee9-3c28-4aba-a858-a252576ed315/depth.webp"
+      },
+      "locationId": "way/1233313451",
+      "view": {
+        "focalLength35Mm": 28
+      },
+      "altitude": {
+        "meters": 80,
+        "reference": "takeoff"
+      },
+      "depthUpdatedAt": "ba90da49-af18-4302-886f-90eadf66d9bf"
     }
   ],
   "buildingOverrides": {
