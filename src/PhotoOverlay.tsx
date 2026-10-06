@@ -5,7 +5,7 @@ import { photoDepthFile, photoPreviewFile } from './photo-image';
 import { PhotoPerspectiveOverlay } from './PhotoPerspective';
 import { loadImageElement } from './depth-map';
 import { depthGray, depthHistogram, depthLineRadius, depthTransitionFrame, parseLineColor, revealFront } from './depth-transition';
-import { overlayPhotoAlpha, overlayProgress, type PhotoOverlayMode } from './photo-overlay';
+import { advanceOverlayClock, OVERLAY_WAITING_RATE, overlayPhotoAlpha, overlayProgress, type PhotoOverlayMode } from './photo-overlay';
 import type { MapViewport } from './map-card-viewport';
 
 type Prepared = {
@@ -31,6 +31,8 @@ export default function PhotoOverlay({ photo, viewport, imageSource, originalSou
   const usesDepth = mode === 'entering' || mode === 'shown' || mode === 'exiting';
   const originalImage = useRef<HTMLImageElement | undefined>(undefined);
   originalImage.current = original && original.url === originalSource ? original.image : undefined;
+  const originalPending = usesDepth && !!originalSource && originalSource !== imageUrl && (!original || original.url !== originalSource || original.state === 'loading');
+  const waitingForOriginal = useRef(originalPending); waitingForOriginal.current = originalPending;
 
   useEffect(() => {
     if (!usesDepth || !originalSource || originalSource === imageUrl) { setOriginal(null); return; }
@@ -136,13 +138,17 @@ export default function PhotoOverlay({ photo, viewport, imageSource, originalSou
         for (let i = 0; i < base.length; i++) data.exitBase[i] = overlayPhotoAlpha(previous.phase, base[i], data.exitBase[i]);
       } else data.exitBase.fill(255);
     }
-    const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 200 : 1600;
-    let handle = 0, started: number | undefined;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const duration = reducedMotion ? 200 : 1600;
+    const shouldSlow = () => phase === 'entering' && !reducedMotion && waitingForOriginal.current;
+    let clock = { elapsed: 0, rate: shouldSlow() ? OVERLAY_WAITING_RATE : 1 };
+    let handle = 0, previous: number | undefined;
     const step = (now: number) => {
-      started ??= now;
-      const progress = overlayProgress(now - started, duration);
+      clock = advanceOverlayClock(clock, previous === undefined ? 0 : now - previous, shouldSlow());
+      previous = now;
+      const progress = overlayProgress(clock.elapsed, duration);
       frame.current = { phase, progress }; draw(phase, progress);
-      if (now - started < duration) handle = requestAnimationFrame(step);
+      if (clock.elapsed < duration) handle = requestAnimationFrame(step);
       else (phase === 'exiting' ? callbacks.current.onExited : callbacks.current.onEntered)?.();
     };
     handle = requestAnimationFrame(step);
@@ -170,7 +176,7 @@ export default function PhotoOverlay({ photo, viewport, imageSource, originalSou
     return () => { full.current = null; layer.replaceChildren(); };
   }, [original, usesDepth]);
   useEffect(revealOriginal, [original, mode]);
-  const awaitingOriginal = mode === 'shown' && ready && !!originalSource && originalSource !== imageUrl && original?.url === originalSource && original.state !== 'loaded';
+  const awaitingOriginal = (mode === 'entering' || mode === 'shown') && ready && !!originalSource && originalSource !== imageUrl && original?.url === originalSource && original.state !== 'loaded';
   const originalFailed = awaitingOriginal && original?.state === 'error';
   const status = awaitingOriginal ? originalFailed ? '原图加载失败，已保留次高清照片。' : '正在加载原图…' : message || (!ready ? '正在载入照片…' : '');
 
