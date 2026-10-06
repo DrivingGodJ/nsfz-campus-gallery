@@ -88,7 +88,7 @@ function Editor() {
     setError(''); setMessage('');
     const imported: Photo[] = [], failed: string[] = [];
     for (let i = 0; i < files.length; i++) {
-      setBusy('正在导入 ' + (i + 1) + ' / ' + files.length);
+      setBusy('正在导入并准备深度图 ' + (i + 1) + ' / ' + files.length);
       try { const result = await api(/\.zip$/i.test(files[i].name) ? 'import-package' : 'import', 'POST', undefined, files[i]); imported.push(...(result.photos || [result.photo])); }
       catch (e) { failed.push(files[i].name + '：' + (e as Error).message); }
     }
@@ -96,25 +96,28 @@ function Editor() {
     if (failed.length) setError(failed.join('\n'));
     if (imported.length) {
       const automatic = imported.filter(p => isAerialPhoto(p) && p.placed).length;
-      setMessage('已导入 ' + imported.length + ' 张照片。' + (automatic ? '其中 ' + automatic + ' 张航拍已自动定位。' : '') + '补充资料后保存到内容库。');
+      const depthReady = imported.filter(p => p.files.depth).length;
+      const depthFailed = imported.filter(p => p.depthGenerationError).length;
+      setMessage('已导入 ' + imported.length + ' 张照片，' + depthReady + ' 张已准备好深度图。' + (automatic ? '其中 ' + automatic + ' 张航拍已自动定位。' : '') + '补充资料后保存到内容库。');
+      if (depthFailed) setError(current => [current, depthFailed + ' 张照片的深度图生成失败，照片已保留。可在“配套深度图”中重试。'].filter(Boolean).join('\n'));
     }
     if (input.current) input.current.value = '';
   };
-  const changeDepth = async (file: File | null) => {
+  const changeDepth = async (file: File | null, generate = false) => {
     if (!photo || !state || busy) return;
     const id = photo.id;
-    setBusy(file ? '正在保存配套深度图' : '正在移除配套深度图'); setError('');
+    setBusy(generate ? '正在本机生成深度图，请稍候' : file ? '正在保存配套深度图' : '正在移除配套深度图'); setError('');
     try {
       if (file) { const url = await validateDepthUpload(file, photo); URL.revokeObjectURL(url); }
-      const { photo: saved } = await api('photo/' + id + '/depth?revision=' + state.site.revision, file ? 'PUT' : 'DELETE', undefined, file || undefined);
+      const { photo: saved } = await api('photo/' + id + '/depth?revision=' + state.site.revision, generate ? 'POST' : file ? 'PUT' : 'DELETE', undefined, file || undefined);
       await refresh();
       setPhoto(current => {
         if (!current || current.id !== id) return current;
-        const next = { ...current, files: saved.files, depthUpdatedAt: saved.depthUpdatedAt };
+        const next = { ...current, files: saved.files, depthUpdatedAt: saved.depthUpdatedAt, depthGenerationError: saved.depthGenerationError };
         if (dirty) localStorage.setItem('nsfz:edit:' + id, JSON.stringify(next));
         return next;
       });
-      setMessage(file ? '配套深度图已保存，可以进入照片视角体验叠加。' : '配套深度图已移除，照片叠加使用渐隐过渡。');
+      setMessage(generate ? '深度图已生成并压缩。保存入库后可用于沉浸转场。' : file ? '配套深度图已保存，可以进入照片视角体验叠加。' : '配套深度图已移除，照片叠加使用渐隐过渡。');
     } catch (error) { setError((error as Error).message); await refresh(); }
     finally { setBusy(''); }
   };
@@ -169,7 +172,7 @@ function Editor() {
     change(assignPhotoLocation(photo, id, state.map, state.site));
   };
   const importReview = async (row: Submission) => {
-    if (busy) return; setBusy('正在导入投稿原片'); setError('');
+    if (busy) return; setBusy('正在导入投稿原片并准备深度图'); setError('');
     try { const result = await api('review/' + row.id + '/import', 'POST'); await refresh(); selectPhoto(result.photo); setReviewID(row.id); setReviewReload(n => n + 1); setMessage('原片已导入。核对标注后点击“通过审核并入库”，或填写原因退回。'); }
     catch(e) { setError((e as Error).message); await refresh(); } finally { setBusy(''); }
   };
@@ -222,7 +225,7 @@ function Editor() {
               <div className="field-pair"><label>拍摄日期<input type="date" value={photo.capturedAt.slice(0, 10)} onChange={e => { const time = photo.capturedAt.split('T')[1]; change({ capturedAt: e.target.value ? e.target.value + (time ? 'T' + time : '') : '' }); }} /></label><label>拍摄时间<input type="time" step={1} disabled={!photo.capturedAt} value={photo.capturedAt.split('T')[1] || ''} onChange={e => change({ capturedAt: photo.capturedAt.slice(0, 10) + (e.target.value ? 'T' + e.target.value : '') })} /></label></div>
               <div className="form-divider">作者与版权</div><label>作者<input name="author" value={photo.author || ''} maxLength={200} placeholder="原片未提供，可留空" onChange={e => change({ author: e.target.value })} /></label><label>版权信息<textarea name="copyright" value={photo.copyright || ''} rows={2} maxLength={3000} placeholder="原片未提供，可留空" onChange={e => change({ copyright: e.target.value })} /></label><p className="field-help">自动读取原片的作者与版权元数据；没有记录时留空，不推断作者或使用许可。</p>
               <PhotoMetadataView photo={photo} editor />
-              <PhotoDepthField attached={photo.files.depth ? '已附配套深度图' : undefined} disabled={!!busy} onChoose={file => void changeDepth(file)} onRemove={() => void changeDepth(null)} />
+              <PhotoDepthField attached={photo.files.depth ? '深度图已就绪 · 已压缩' : undefined} disabled={!!busy} generationError={photo.depthGenerationError} onGenerate={() => void changeDepth(null, true)} onChoose={file => void changeDepth(file)} onRemove={() => void changeDepth(null)} />
               {!photo.placed && <p className="placement-help">先点击“标记拍摄位置”，再点击地图。</p>}
               <button className="button primary full-width" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>{activeReviewID && <><label>退回原因<textarea maxLength={1000} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="可留空；投稿人能通过投稿凭证查看" /></label><button className="button secondary full-width" onClick={rejectReview}>退回这份投稿</button></>}<button className="text-button remove-button" onClick={remove} disabled={!!busy}><Trash2 size={14} />移出内容库</button>
             </fieldset>

@@ -19,6 +19,8 @@
     "likes:deploy": "node scripts/likes-config-check.mjs && npm run likes:manifest && wrangler deploy --config worker/wrangler.jsonc",
     "likes:deploy:only": "node scripts/likes-config-check.mjs && npm run likes:manifest && node scripts/likes-only-config.mjs && wrangler deploy --config .local/deployment/likes.jsonc",
     "photos:previews": "node scripts/photo-previews.mjs",
+    "photos:depth-setup": "node scripts/setup-photo-depth.mjs",
+    "photos:depths": "node scripts/photo-depths.mjs",
     "photos:limits": "node scripts/photo-limits.mjs",
     "photos:credits": "node scripts/photo-credits.mjs",
     "pretest": "node scripts/likes-manifest.mjs && node scripts/submissions-manifest.mjs",

@@ -35,7 +35,7 @@ export type PhotoMetadata = {
   aerial?: { latitude?: number; longitude?: number; relativeAltitude?: number; absoluteAltitude?: number };
 };
 export type Photo = {
-  author?: string; copyright?: string; uploadedAt?: string; depthUpdatedAt?: string;
+  author?: string; copyright?: string; uploadedAt?: string; depthUpdatedAt?: string; depthGenerationError?: string;
   id: string; title: string; description: string; capturedAt: string; buildingId: string; locationId?: string; floor: number;
   captureType?: 'ground' | 'aerial';
   altitude?: { meters: number; reference: 'takeoff' | 'seaLevel' };

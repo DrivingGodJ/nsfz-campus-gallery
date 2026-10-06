@@ -6,6 +6,7 @@ import { createStore, ID_PATTERN, MAX_UPLOAD, UserError } from './storage.mjs';
 import { importPhotoPackage } from './package-import.mjs';
 import { MAX_DEPTH_BYTES, MAX_PACKAGE_BYTES } from './photo-package.mjs';
 import { createPublicationService } from './local-publication.mjs';
+import { createPhotoDepthGenerator } from './photo-depth-generator.mjs';
 
 async function body(req, maximum) {
   const chunks = [];
@@ -35,7 +36,9 @@ export function localEditorPlugin() {
       return html.replace('<head>', '<head><meta name="local-editor-token" content="' + token + '">');
     },
     configureServer(server) {
-      store = createStore(process.env.CAMPUS_CONTENT_ROOT || server.config.root);
+      const generator = createPhotoDepthGenerator(server.config.root);
+      server.httpServer?.once('close', () => generator.close());
+      store = createStore(process.env.CAMPUS_CONTENT_ROOT || server.config.root, { generateDepth: generator.generate });
       review = createReviewService(store, server.config.root);
       publication = createPublicationService(store.root);
       server.middlewares.use(async (req, res, next) => {
@@ -90,6 +93,7 @@ export function localEditorPlugin() {
             const revisionValue = url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : undefined;
             if (req.method === 'PUT') return send(200, { photo: await store.setPhotoDepth(id, await body(req, MAX_DEPTH_BYTES), revisionValue) });
             if (req.method === 'DELETE') return send(200, { photo: await store.setPhotoDepth(id, null, revisionValue) });
+            if (req.method === 'POST') return send(200, { photo: await store.generatePhotoDepth(id, revisionValue) });
           }
           if (!ID_PATTERN.test(id || '') || segments.length !== 2) throw new UserError('请求地址不正确。', 404);
           const input = req.method === 'GET' ? {} : JSON.parse((await body(req, 1024 * 1024)).toString() || '{}');

@@ -6,7 +6,7 @@ import os from 'node:os';
 import sharp from 'sharp';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { createStore, exportStaticContent, ASSET_PATTERN } from '../server/storage.mjs';
-import { PHOTO_DEPTH_FILE, normalizePhotoDepth } from '../server/photo-depth.mjs';
+import { PHOTO_DEPTH_FILE, PHOTO_DEPTH_EDGE, PHOTO_DEPTH_OUTPUT_BYTES, normalizePhotoDepth } from '../server/photo-depth.mjs';
 import { createPhotoPackage, createPhotoBatchPackage, readPhotoPackages } from '../server/photo-package.mjs';
 import { importPhotoPackage } from '../server/package-import.mjs';
 import { photoDepthFile } from '../src/photo-image.ts';
@@ -81,5 +81,78 @@ test('replacing/removing published maps keeps backups, enforces revisions and ch
     for (const name of await fs.readdir(backups)) assert.deepEqual(await fs.readFile(path.join(backups, name)), first);
     assert.ok(ASSET_PATTERN.test(published.files.depth));
     assert.equal(ASSET_PATTERN.test('media/../../secret/depth.webp'), false);
+  } finally { await f.cleanup(); }
+});
+
+test('depth compression bounds noisy maps, keeps orientation and retains near/far ordering', async () => {
+  const width = 1200, height = 800;
+  let seed = 42;
+  const values = Uint8Array.from({ length: width * height }, () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed >>> 24; });
+  const noisy = await sharp(values, { raw: { width, height, channels: 1 } }).png().toBuffer();
+  const compact = await normalizePhotoDepth(noisy, { width, height });
+  const metadata = await sharp(compact).metadata();
+  assert.ok(compact.length <= PHOTO_DEPTH_OUTPUT_BYTES);
+  assert.ok(Math.max(metadata.width, metadata.height) <= PHOTO_DEPTH_EDGE);
+  assert.ok(Math.abs(metadata.width / metadata.height - width / height) < .01);
+  const f = await fixture();
+  try {
+    const depth = await normalizePhotoDepth(f.depth, { width: 80, height: 40 });
+    const gray = await sharp(depth).greyscale().raw().toBuffer();
+    assert.ok(gray[0] < 4);
+    assert.ok(gray.at(-1) > 230);
+  } finally { await f.cleanup(); }
+});
+
+test('local imports generate compressed depth and packages keep supplied maps', async () => {
+  const f = await fixture();
+  const sources = [];
+  const store = createStore(f.root, { generateDepth: async source => { sources.push(source); return f.depth; } });
+  try {
+    const draft = await store.importPhoto(f.original);
+    assert.ok(draft.files.depth);
+    assert.equal(sources.length, 1);
+    assert.equal(path.basename(sources[0]), 'preview.webp');
+    assert.equal((await store.state()).site.photos.length, 0);
+    assert.deepEqual(await fs.readFile(path.join(f.root, '.local/originals', draft.id, 'source.jpeg')), f.original);
+    const pack = await createPhotoBatchPackage([{ file: f.file, photo: f.photo, depthFile: f.depthFile }, { file: f.file, photo: f.photo }]);
+    const imported = await importPhotoPackage(store, pack.bytes);
+    assert.equal(sources.length, 2, 'paired map skips inference, missing map is generated');
+    for (const photo of imported.photos) assert.ok(photo.files.depth);
+  } finally { await f.cleanup(); }
+});
+
+test('generation failures keep editable originals and retry restores the depth map', async () => {
+  const f = await fixture();
+  let fail = true;
+  const store = createStore(f.root, { generateDepth: async () => { if (fail) throw new Error('offline'); return f.depth; } });
+  try {
+    const draft = await store.importPhoto(f.original);
+    assert.equal(draft.files.depth, undefined);
+    assert.match(draft.depthGenerationError, /照片已保留/);
+    assert.equal((await store.state()).drafts.length, 1);
+    assert.deepEqual(await fs.readFile(path.join(f.root, '.local/originals', draft.id, 'source.jpeg')), f.original);
+    fail = false;
+    const retried = await store.generatePhotoDepth(draft.id);
+    assert.ok(retried.files.depth);
+    assert.equal(retried.depthGenerationError, undefined);
+    await store.updateDraft(draft.id, { ...retried, ...f.photo, id: draft.id });
+    const published = await store.publish(draft.id, 0);
+    assert.ok(published.files.depth);
+    assert.ok((await fs.stat(path.join(f.root, 'public', published.files.depth))).size <= PHOTO_DEPTH_OUTPUT_BYTES);
+  } finally { await f.cleanup(); }
+});
+
+test('slow generation cannot replace a concurrently supplied draft depth', async () => {
+  const f = await fixture();
+  let complete;
+  const store = createStore(f.root, { generateDepth: () => new Promise(resolve => { complete = resolve; }) });
+  try {
+    const draft = await f.store.importPhoto(f.original);
+    const request = store.generatePhotoDepth(draft.id);
+    while (!complete) await new Promise(resolve => setImmediate(resolve));
+    const supplied = await store.setPhotoDepth(draft.id, f.depth);
+    complete(f.depth);
+    await assert.rejects(request, /其他窗口更新/);
+    assert.equal((await store.state()).drafts[0].depthUpdatedAt, supplied.depthUpdatedAt);
   } finally { await f.cleanup(); }
 });

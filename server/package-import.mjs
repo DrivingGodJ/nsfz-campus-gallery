@@ -17,9 +17,8 @@ export async function importPhotoPackage(store, bytes) {
   const photos = [], imported = [];
   try {
     for (const entry of pack.photos) {
-      let draft = await store.importPhoto(entry.original);
+      let draft = await store.importPhoto(entry.original, { depth: entry.depth });
       imported.push(draft.id);
-      if (entry.depth) draft = await store.setPhotoDepth(draft.id, entry.depth);
       // Keep server-generated IDs, assets and metadata; packages change annotations only.
       photos.push(await store.updateDraft(draft.id, { ...draft, ...entry.annotation, id: draft.id }));
     }

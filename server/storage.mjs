@@ -104,7 +104,7 @@ export function validateOverrides(input, map) {
   }
   return result;
 }
-export function createStore(root) {
+export function createStore(root, { generateDepth } = {}) {
   const publicRoot = path.join(root, 'public');
   const localRoot = path.join(root, '.local');
   const siteFile = path.join(publicRoot, 'data/site.json');
@@ -123,9 +123,9 @@ export function createStore(root) {
     next.revision = before.revision + 1;
     await writeJSON(siteFile, next);
   }
-  return {
+  const store = {
     root, publicRoot, localRoot, state,
-    importPhoto: bytes => serial(async () => {
+    importPhoto: (bytes, { depth } = {}) => serial(async () => {
       if (!bytes.length || bytes.length > MAX_UPLOAD) throw new UserError('单张照片不能超过 40 MB。', 413);
       let metadata;
       try { metadata = await sharp(bytes, { limitInputPixels: 70000000, failOn: 'error' }).metadata(); }
@@ -152,6 +152,19 @@ export function createStore(root) {
           author: photoMetadata.author || '', copyright: photoMetadata.copyright || '', uploadedAt: new Date().toISOString(),
           ...automaticPhotoPlacement(photoMetadata, map), heading: 0, pitch: 0, width: download.width, height: download.height,
           downloadBytes: stats.size, files: { thumbnail: 'media/' + id + '/thumbnail.webp', preview: 'media/' + id + '/preview.webp', display: 'media/' + id + '/display.webp', download: 'media/' + id + '/download.jpg' } };
+        let normalized;
+        if (depth) {
+          try { normalized = await normalizePhotoDepth(depth, draft); }
+          catch (error) { throw new UserError(error.message); }
+        } else if (generateDepth) {
+          try { normalized = await normalizePhotoDepth(await generateDepth(path.join(directory, 'preview.webp')), draft); }
+          catch { draft.depthGenerationError = '自动生成深度图失败，照片已保留。请重试或手动上传深度图。'; }
+        }
+        if (normalized) {
+          await fs.writeFile(path.join(directory, PHOTO_DEPTH_FILE), normalized);
+          draft.files.depth = 'media/' + id + '/' + PHOTO_DEPTH_FILE;
+          draft.depthUpdatedAt = crypto.randomUUID();
+        }
         const drafts = await readJSON(draftsFile, []);
         await writeJSON(draftsFile, [...drafts, draft]);
         return draft;
@@ -161,6 +174,21 @@ export function createStore(root) {
         throw new UserError('这张照片暂时无法转换，请先导出为 JPEG 后重试。');
       }
     }),
+    generatePhotoDepth: async (id, expected) => {
+      if (!ID_PATTERN.test(id || '')) throw new UserError('照片编号无效。');
+      if (!generateDepth) throw new UserError('本机尚未准备深度生成组件。');
+      const { site, drafts } = await state();
+      const draft = drafts.find(photo => photo.id === id), photo = draft || site.photos.find(photo => photo.id === id);
+      if (!photo) throw new UserError('照片不存在。', 404);
+      if (!draft) revision(site, expected);
+      const directory = draft ? path.join(localRoot, 'draft-media', id) : path.join(publicRoot, 'media', id);
+      let bytes;
+      try { bytes = await generateDepth(path.join(directory, 'preview.webp')); }
+      catch { throw new UserError('自动生成深度图失败，照片已保留。请重试或手动上传深度图。'); }
+      // The version check is repeated after inference, so a concurrent edit
+      // cannot be overwritten by a slow generation request.
+      return store.setPhotoDepth(id, bytes, expected, { depthUpdatedAt: photo.depthUpdatedAt, draft: !!draft });
+    },
     updateDraft: (id, input) => serial(async () => {
       const { drafts, map } = await state();
       const existing = drafts.find(p => p.id === id);
@@ -287,11 +315,12 @@ export function createStore(root) {
       if (JSON.stringify(nextDrafts) !== JSON.stringify(drafts)) await writeJSON(draftsFile, nextDrafts);
       return { generated, photos: photos.length, drafts: nextDrafts.length, backup };
     }),
-    setPhotoDepth: (id, bytes, expected) => serial(async () => {
+    setPhotoDepth: (id, bytes, expected, generation) => serial(async () => {
       if (!ID_PATTERN.test(id || '')) throw new UserError('照片编号无效。');
       const { site, drafts } = await state();
       const draft = drafts.find(p => p.id === id), existing = draft || site.photos.find(p => p.id === id);
       if (!existing) throw new UserError('照片不存在。', 404);
+      if (generation && (generation.draft !== !!draft || generation.depthUpdatedAt !== existing.depthUpdatedAt)) throw new UserError('深度图已在其他窗口更新，请刷新后重试。', 409);
       if (!draft) revision(site, expected);
       let normalized;
       if (bytes !== null) {
@@ -307,7 +336,8 @@ export function createStore(root) {
         await fs.copyFile(destination, backup);
       } catch (error) { if (error.code !== 'ENOENT') throw error; }
       const { depth: _oldDepth, ...files } = existing.files;
-      const next = { ...existing, depthUpdatedAt: crypto.randomUUID(), files: { ...files, ...(normalized ? { depth: 'media/' + id + '/' + PHOTO_DEPTH_FILE } : {}) } };
+      const { depthGenerationError: _oldDepthError, ...record } = existing;
+      const next = { ...record, depthUpdatedAt: crypto.randomUUID(), files: { ...files, ...(normalized ? { depth: 'media/' + id + '/' + PHOTO_DEPTH_FILE } : {}) } };
       if (normalized) {
         const temp = destination + '.' + crypto.randomUUID() + '.tmp';
         try { await fs.writeFile(temp, normalized); await fs.rename(temp, destination); }
@@ -323,6 +353,7 @@ export function createStore(root) {
       await saveSite(site, { ...site, buildingOverrides: validateOverrides(overrides, map) });
     })
   };
+  return store;
 }
 export async function exportStaticContent(root, destination) {
   const { site, map } = await createStore(root).state();

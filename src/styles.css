@@ -345,7 +345,7 @@ img[data-load-state="loading"],img[data-load-state="error"]{visibility:hidden}
 .immersive-actions .button{min-height:44px;min-width:140px}
 .photo-depth-field{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:10px}
 .photo-depth-field>strong{display:block;font-size:13px;margin-bottom:10px}.photo-depth-field small{font-size:11px;font-weight:400;color:var(--muted);margin-left:4px}
-.photo-depth-actions{display:flex;gap:6px;align-items:center}.photo-depth-filename{display:block;margin:8px 0;overflow-wrap:anywhere;font-size:12px;color:var(--muted)}
+.photo-depth-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.photo-depth-filename{display:block;margin:8px 0;overflow-wrap:anywhere;font-size:12px;color:var(--muted)}
 .photo-depth-field .field-help{margin:8px 0 0}
 @media(max-width:760px){.comparison-overlay-actions{padding:10px 14px 6px;gap:7px}.comparison-overlay-actions>.button{font-size:11px}.comparison-actions{padding-inline:14px}.immersive-actions{width:calc(100% - 28px);gap:8px;padding-inline:10px}.immersive-actions .button{flex:1;min-width:0}}
 
