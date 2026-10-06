@@ -1,6 +1,8 @@
 import { Vector3, type Camera, type PerspectiveCamera } from 'three';
 import { bindMapTouchControls } from './map-touch-controls.ts';
-import { aboveGroundMovement, keepMapCameraAboveGround } from './map-camera-ground.ts';
+import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground.ts';
+import { mapGroundOrbitTarget } from './map-orbit.ts';
+import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport.ts';
 
 // Translate the target too: orbit dolly would otherwise stop at its centre.
 export function travelAlongView(camera: Camera, target: Vector3, distance: number) {
@@ -22,6 +24,21 @@ export function mapGroundViewDistance(camera: Camera) {
   return Math.abs(camera.position.y) / Math.max(.01, Math.abs(direction.y));
 }
 
+// OrbitControls scales pan by its target distance. That target is synthetic and
+// may be very close after a cancelled camera journey or a previous ground orbit.
+// Refresh it from the scenery at gesture start without moving or turning the eye.
+export function retargetMapPan(camera: PerspectiveCamera, target: Vector3, viewport: MapViewport = FULL_MAP_VIEWPORT) {
+  const direction = camera.getWorldDirection(new Vector3());
+  const ground = mapGroundOrbitTarget(camera, viewport);
+  // Grazing rays can meet the plane kilometres away. Cap their pan scale by
+  // altitude, smoothly matching the fallback when the view crosses the horizon.
+  const horizonDistance = Math.max(MAP_CAMERA_GROUND_HEIGHT, camera.position.y) * 10;
+  const depth = ground ? ground.sub(camera.position).dot(direction) : horizonDistance;
+  const distance = Math.max(2, Math.min(camera.far, horizonDistance, depth));
+  target.copy(camera.position).addScaledVector(direction, distance);
+  return distance;
+}
+
 export function panMapView(camera: PerspectiveCamera, target: Vector3, dx: number, dy: number, viewportHeight: number) {
   camera.updateMatrixWorld();
   const scale = 2 * camera.position.distanceTo(target) * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, viewportHeight);
@@ -37,6 +54,7 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   enabled: () => boolean;
   travel: (steps: number) => void;
   pan?: (dx: number, dy: number) => void;
+  panStart?: () => void;
   multiTouch?: (active: boolean) => void;
   rotation?: {
     // True selects custom rotation; false leaves rotation to OrbitControls.
@@ -78,6 +96,7 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
     } else {
       const modified = event.ctrlKey || event.metaKey || event.shiftKey;
       if (event.button === 0 && !modified || event.button === 2 && modified) startRotation(event);
+      else if (event.button === 2 || event.button === 0 && modified) options.panStart?.();
     }
   };
   const move = (event: PointerEvent) => {

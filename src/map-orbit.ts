@@ -1,5 +1,4 @@
 import { Box3, Euler, Frustum, Matrix4, PerspectiveCamera, Raycaster, Vector2, Vector3, type Camera } from 'three';
-import type { Point } from './types';
 import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport.ts';
 
 export type MapObjectBounds = { min: [number, number, number]; max: [number, number, number] };
@@ -15,24 +14,9 @@ export function mapObjectInView(camera: Camera, point: Vector3, bounds?: MapObje
   return bounds ? frustum.intersectsBox(new Box3(new Vector3(...bounds.min), new Vector3(...bounds.max))) : frustum.containsPoint(point);
 }
 
-function withinBoundary(point: Vector3, boundary: Point[]) {
-  let inside = false;
-  for (let i = 0, j = boundary.length - 1; i < boundary.length; j = i++) {
-    const [ax, az] = boundary[j], [bx, bz] = boundary[i];
-    const dx = bx - ax, dz = bz - az, lengthSquared = dx * dx + dz * dz;
-    if (lengthSquared > 0) {
-      const t = Math.max(0, Math.min(1, ((point.x - ax) * dx + (point.z - az) * dz) / lengthSquared));
-      if (Math.hypot(point.x - ax - t * dx, point.z - az - t * dz) < 1e-6) return true;
-    }
-    if ((az > point.z) !== (bz > point.z) && point.x < ax + (point.z - az) * dx / dz) inside = !inside;
-  }
-  return inside;
-}
-
-// Only the forward centre ray counts. A point behind the camera or outside
-// campus must not turn a look gesture into a distant orbit.
-export function mapGroundOrbitTarget(camera: Camera, boundary: Point[], viewport: MapViewport = FULL_MAP_VIEWPORT) {
-  if (boundary.length < 3) return null;
+// The level ground continues beyond campus and the finite model footprint.
+// Only a forward hit counts; looking at the horizon or sky stays an in-place turn.
+export function mapGroundOrbitTarget(camera: Camera, viewport: MapViewport = FULL_MAP_VIEWPORT) {
   camera.updateMatrixWorld();
   const raycaster = new Raycaster();
   raycaster.setFromCamera(new Vector2(2 * (viewport.left + viewport.width / 2) - 1, 1 - 2 * (viewport.top + viewport.height / 2)), camera);
@@ -42,7 +26,7 @@ export function mapGroundOrbitTarget(camera: Camera, boundary: Point[], viewport
   if (!Number.isFinite(distance) || distance < .01) return null;
   const target = origin.clone().addScaledVector(direction, distance);
   target.y = 0;
-  return withinBoundary(target, boundary) ? target : null;
+  return target;
 }
 
 // Grab the scenery without translating the camera. Keep a target on the new

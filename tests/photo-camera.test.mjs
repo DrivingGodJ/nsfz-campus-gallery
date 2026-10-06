@@ -70,7 +70,7 @@ test('photo camera centres its true shooting ray in the exposed canvas and resto
   }
 });
 
-test('real map gestures anchor the ground, turn in place outside campus, prefer visible selections and release offscreen selections', async () => {
+test('real map gestures anchor all ground, turn in place toward the sky, prefer visible selections and release offscreen selections', async () => {
   const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const canvas = testCanvas();
   const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
@@ -81,7 +81,7 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
     globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
     root = createRoot(canvas);
     await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
-    const props = { command: { type: 'initial', sequence: 0 }, boundary: [[-300, -300], [300, -300], [300, 300], [-300, 300]], selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving() {} };
+    const props = { command: { type: 'initial', sequence: 0 }, selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving() {} };
     let store;
     const render = async additions => { await act(async () => { store = root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, ...additions }))); }); };
     await render({});
@@ -94,9 +94,27 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
       pointerEvent(canvas, 'pointermove', values); pointerEvent(canvas.ownerDocument, 'pointermove', values);
     };
     const up = () => { pointerEvent(canvas, 'pointerup', { pointerType: 'touch' }); pointerEvent(canvas.ownerDocument, 'pointerup', { pointerType: 'touch' }); };
+
+    const panPose = readCameraPose(camera,control.target);
+    let panMovement;
+    for (const oldDistance of [.0001,1,4000]) {
+      camera.position.copy(panPose.position); camera.quaternion.copy(panPose.quaternion);
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),oldDistance);
+      const panPosition = camera.position.clone();
+      pointerEvent(canvas,'pointerdown',{button:2,pageX:100,pageY:100});
+      vectorClose(camera.position,panPosition); close(camera.quaternion.angleTo(panPose.quaternion),0,1e-7);
+      const pan={button:2,clientX:160,clientY:100,pageX:160,pageY:100};
+      pointerEvent(canvas,'pointermove',pan); pointerEvent(canvas.ownerDocument,'pointermove',pan);
+      pointerEvent(canvas,'pointerup',{button:2}); pointerEvent(canvas.ownerDocument,'pointerup',{button:2});
+      await advance();
+      const movement=camera.position.clone().sub(panPosition);
+      assert.ok(movement.length()>10,'A real right-button drag moves immediately even with a tiny stale target');
+      if(panMovement) vectorClose(movement,panMovement); else panMovement=movement;
+    }
+    camera.position.copy(panPose.position); camera.quaternion.copy(panPose.quaternion); control.target.copy(panPose.target); control.update();
     wheelEvent(canvas, -100); wheelEvent(canvas, -100); wheelEvent(canvas, -100);
     let position = camera.position.clone(), quaternion = camera.quaternion.clone();
-    const ground = mapGroundOrbitTarget(camera, props.boundary), radius = position.distanceTo(ground);
+    const ground = mapGroundOrbitTarget(camera), radius = position.distanceTo(ground);
     assert.ok(control.target.distanceTo(ground) > 1, 'Forward travel has moved the old orbit target');
     down(); vectorClose(camera.position, position); close(camera.quaternion.angleTo(quaternion), 0, 1e-7);
     vectorClose(control.target, ground);
@@ -105,7 +123,14 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
 
     camera.position.set(450, 60, 300); control.target.set(600, 0, 300); camera.lookAt(control.target); control.update();
     position = camera.position.clone(); quaternion = camera.quaternion.clone();
-    assert.equal(mapGroundOrbitTarget(camera, props.boundary), null);
+    const outsideGround=mapGroundOrbitTarget(camera), outsideRadius=position.distanceTo(outsideGround);
+    down(); move(); up(); await advance();
+    assert.ok(camera.position.distanceTo(position)>1,'Campus-exterior ground also supports orbit');
+    close(camera.position.distanceTo(outsideGround),outsideRadius);
+
+    camera.position.set(450,60,300); control.target.set(600,90,300); camera.lookAt(control.target); control.update();
+    position=camera.position.clone(); quaternion=camera.quaternion.clone();
+    assert.equal(mapGroundOrbitTarget(camera), null);
     down(); vectorClose(camera.position, position); close(camera.quaternion.angleTo(quaternion), 0, 1e-7);
     move(160, 220); vectorClose(camera.position, position);
     assert.ok(camera.quaternion.angleTo(quaternion) > .05, 'Look responds before a render frame');
@@ -121,7 +146,7 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
 
     // The building remains selected, but is now behind a camera looking away.
     camera.position.set(0, 60, 100); control.target.set(0, 0, 200); camera.lookAt(control.target); control.update();
-    const fallbackGround = mapGroundOrbitTarget(camera, props.boundary);
+    const fallbackGround = mapGroundOrbitTarget(camera);
     down(); vectorClose(control.target, fallbackGround); move(); up(); await advance();
     vectorClose(control.target, fallbackGround);
     assert.ok(control.target.distanceTo(pivot) > 1, 'Offscreen selection does not capture the next orbit');
@@ -133,8 +158,10 @@ test('real map gestures anchor the ground, turn in place outside campus, prefer 
     down(); move(); up(); await advance(); close(camera.position.distanceTo(photoPivot), photoRadius);
     assert.ok(Math.abs(control.target.y - 9) < 1e-7, 'Selected photo location overrides its building and the ground');
     camera.position.set(450, 60, 300); control.target.set(600, 0, 300); camera.lookAt(control.target); control.update();
+    const offscreenGround=mapGroundOrbitTarget(camera), offscreenRadius=camera.position.distanceTo(offscreenGround);
     position = camera.position.clone(); down(); move(); up(); await advance();
-    vectorClose(camera.position, position); assert.equal(control.enableRotate, true, 'Ending an in-place gesture restores other gestures');
+    assert.ok(camera.position.distanceTo(position)>1); close(camera.position.distanceTo(offscreenGround),offscreenRadius);
+    assert.equal(control.enableRotate, true, 'Ending an outside-ground gesture restores other gestures');
     await render({});
     assert.equal(canvas.hasPointerCapture(1), false);
 
@@ -653,7 +680,7 @@ test('exposed-area gestures stay anchored and deselection waits for centring and
     const advance = async (frames = 65) => { await act(async () => { for(let n=0;n<frames;n++) state.advance(timeline += 1/60,false); }); };
     for (const viewport of [{left:0,top:0,width:1,height:.35},{left:.4,top:0,width:.6,height:1}]) {
       await render({visibleViewport:viewport}); await advance();
-      const pivot = mapGroundOrbitTarget(camera,props.boundary,viewport), before = readCameraPose(camera,control.target);
+      const pivot = mapGroundOrbitTarget(camera,viewport), before = readCameraPose(camera,control.target);
       assert.ok(pivot);
       const projection = pivot.clone().project(camera), radius = pivot.distanceTo(camera.position);
       pointerEvent(canvas,'pointerdown',{pointerType:'touch',pageX:100,pageY:100});

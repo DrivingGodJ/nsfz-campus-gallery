@@ -5,7 +5,6 @@ import { OrbitControls } from 'three-stdlib';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView } from '../src/map-orbit.ts';
 import { bindMapTravelControls, travelAlongView } from '../src/map-travel-controls.ts';
 
-const boundary = [[-100, -100], [100, -100], [100, 100], [-100, 100]];
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} ~= ${b}`);
 const fixture = (position = [0, 60, 100], gaze = [20, 0, 10]) => {
   const camera = new THREE.PerspectiveCamera(43, 1.5, .5, 4000), target = new THREE.Vector3(...gaze);
@@ -17,34 +16,41 @@ test('ground orbit uses the forward centre ray after travel, without moving or t
   const { camera, target } = fixture();
   travelAlongView(camera, target, 30);
   const position = camera.position.clone(), quaternion = camera.quaternion.clone();
-  const intersection = mapGroundOrbitTarget(camera, boundary);
+  const intersection = mapGroundOrbitTarget(camera);
   close(intersection.distanceTo(new THREE.Vector3(20, 0, 10)), 0);
   close(camera.position.distanceTo(position), 0); close(camera.quaternion.angleTo(quaternion), 0);
   assert.ok(intersection.distanceTo(camera.position) < target.distanceTo(camera.position));
 });
 
-test('outside, horizon, sky and intersections behind the camera choose in-place look; campus edges still orbit', () => {
+test('horizon, sky and intersections behind the camera choose in-place look', () => {
   for (const [position, gaze] of [
-    [[0, 60, 100], [101, 0, 0]], [[0, 60, 100], [0, 60, 0]],
+    [[0, 60, 100], [0, 60, 0]],
     [[0, 60, 100], [0, 70, 0]], [[0, -60, 100], [0, -70, 0]], [[0, 0, 100], [0, -10, 0]]
-  ]) assert.equal(mapGroundOrbitTarget(fixture(position, gaze).camera, boundary), null);
-  assert.ok(mapGroundOrbitTarget(fixture([0, 60, 100], [100, 0, 0]).camera, boundary));
-  const concave = [[-100, -100], [100, -100], [100, 100], [0, 100], [0, 0], [-100, 0]];
-  assert.equal(mapGroundOrbitTarget(fixture([0, 60, 100], [-20, 0, 20]).camera, concave), null, 'Campus range uses its polygon, not a bounding rectangle');
+  ]) assert.equal(mapGroundOrbitTarget(fixture(position, gaze).camera), null);
+});
+
+test('ground orbit extends beyond both the campus boundary and the finite model ground', () => {
+  for (const gaze of [[101,0,0], [-20,0,20], [2400,0,-1800]]) {
+    const {camera,target} = fixture([0,60,100],gaze);
+    const pivot = mapGroundOrbitTarget(camera);
+    close(pivot.distanceTo(new THREE.Vector3(...gaze)),0);
+    const position = camera.position.clone(), projected = pivot.clone().project(camera);
+    orbitMapObject(camera,target,pivot,20,0,600);
+    assert.ok(camera.position.distanceTo(position)>1,'Outside ground hits orbit rather than only turning the head');
+    close(pivot.clone().project(camera).distanceTo(projected),0);
+  }
 });
 
 test('ground pivots follow the exposed centre ray, including when that ray leaves campus', () => {
   const { camera } = fixture([0, 60, 100], [0, 0, 0]);
-  const campus = [[-1000,-1000],[1000,-1000],[1000,1000],[-1000,1000]];
   const originalPosition = camera.position.clone(), originalQuaternion = camera.quaternion.clone();
   for (const viewport of [{left:.4,top:0,width:.6,height:1},{left:0,top:0,width:1,height:.35}]) {
-    const pivot = mapGroundOrbitTarget(camera,campus,viewport), projected = pivot.clone().project(camera);
+    const pivot = mapGroundOrbitTarget(camera,viewport), projected = pivot.clone().project(camera);
     close(projected.x,2*(viewport.left+viewport.width/2)-1);
     close(projected.y,1-2*(viewport.top+viewport.height/2)); close(pivot.y,0);
   }
-  const smallCampus = [[-10,-10],[10,-10],[10,10],[-10,10]];
-  assert.ok(mapGroundOrbitTarget(camera,smallCampus));
-  assert.equal(mapGroundOrbitTarget(camera,smallCampus,{left:.4,top:0,width:.6,height:1}),null);
+  const outsidePivot = mapGroundOrbitTarget(camera,{left:.4,top:0,width:.6,height:1});
+  assert.ok(Math.abs(outsidePivot.x)>10,'A card can place the exposed centre beyond campus and still supply a pivot');
   close(camera.position.distanceTo(originalPosition),0); close(camera.quaternion.angleTo(originalQuaternion),0);
 });
 
@@ -88,7 +94,7 @@ test('cards exclude covered photos and fully covered buildings from the visible 
 test('off-axis ground orbit keeps the pivot in the exposed centre without horizon roll or a lens change', () => {
   const { camera, target } = fixture([0,60,100],[0,0,0]);
   const viewport = {left:0,top:0,width:1,height:.35};
-  const pivot = mapGroundOrbitTarget(camera,[[-1000,-1000],[1000,-1000],[1000,1000],[-1000,1000]],viewport);
+  const pivot = mapGroundOrbitTarget(camera,viewport);
   const radius = camera.position.distanceTo(pivot), initial = pivot.clone().project(camera);
   for (const [dx,dy] of [[30,10],[-50,30],[20,-20]]) {
     orbitMapObject(camera,target,pivot,dx,dy,600);
@@ -112,7 +118,6 @@ test('selected-object orbit preserves its radius and off-centre view even after 
 });
 
 test('near-vertical orbits stay continuous beside and above cards and survive OrbitControls updates', () => {
-  const campus = [[-1000,-1000],[1000,-1000],[1000,1000],[-1000,1000]];
   for (const viewport of [
     {left:0,top:0,width:1,height:1},
     {left:.4,top:0,width:.6,height:1},
@@ -120,7 +125,7 @@ test('near-vertical orbits stay continuous beside and above cards and survive Or
     {left:.3,top:0,width:.7,height:.4}
   ]) {
     const {camera,target} = fixture([0,60,100],[0,0,0]);
-    const pivot = mapGroundOrbitTarget(camera,campus,viewport);
+    const pivot = mapGroundOrbitTarget(camera,viewport);
     const initial = pivot.clone().project(camera), radius = camera.position.distanceTo(pivot);
     target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),radius);
     const controls = new OrbitControls(camera);

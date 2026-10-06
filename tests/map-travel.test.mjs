@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, travelAlongView } from '../src/map-travel-controls.ts';
+import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, retargetMapPan, travelAlongView } from '../src/map-travel-controls.ts';
+import { OrbitControls } from 'three-stdlib';
 
 const close = (a, b, epsilon = 1e-8) => assert.ok(Math.abs(a - b) < epsilon, `${a} ~= ${b}`);
 const fixture = () => {
@@ -46,6 +47,40 @@ test('forward travel follows a new heading and near-ground markers use actual vi
   close(camera.position.distanceTo(before), 0);
 });
 
+test('pan speed is independent of a stale tiny or distant target and retargeting does not move the view', () => {
+  for (const viewport of [{left:0,top:0,width:1,height:1},{left:.4,top:0,width:.6,height:1},{left:0,top:0,width:1,height:.35}]) {
+    let expected;
+    for (const oldDistance of [.0001,1,20,4000]) {
+      const {camera,target} = fixture(), position = camera.position.clone(), orientation = camera.quaternion.clone();
+      const controls = new OrbitControls(camera);
+      controls.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()),oldDistance);
+      const distance = retargetMapPan(camera,controls.target,viewport);
+      assert.ok(distance>100,'The scene depth replaces the tiny synthetic orbit distance');
+      close(camera.position.distanceTo(position),0);
+      close(camera.quaternion.angleTo(orientation),0,1e-7);
+      controls.update();
+      close(camera.position.distanceTo(position),0);
+      close(camera.quaternion.angleTo(orientation),0,1e-7);
+      panMapView(camera,controls.target,30,0,600); controls.update();
+      const movement = camera.position.clone().sub(position);
+      assert.ok(movement.length()>10,'The first pan already moves at the scene scale');
+      if (expected) close(movement.distanceTo(expected),0);
+      else expected=movement;
+      controls.dispose();
+    }
+  }
+});
+
+test('pan distance remains finite near the horizon or looking at the sky, including eye level', () => {
+  for (const gaze of [[0,1.6,-100],[0,1.6-1e-5,-100],[0,50,-100]]) {
+    const {camera,target} = fixture(); camera.position.set(0,1.6,0); camera.lookAt(new THREE.Vector3(...gaze));
+    const orientation=camera.quaternion.clone(), distance=retargetMapPan(camera,target);
+    assert.ok(distance>=2 && distance<=camera.far);
+    assert.ok(target.toArray().every(Number.isFinite));
+    close(camera.quaternion.angleTo(orientation),0,1e-7);
+  }
+});
+
 const canvasFixture = () => {
   const canvas = new EventTarget(), captures = new Set();
   Object.assign(canvas, { clientHeight: 600, setPointerCapture: id => captures.add(id),
@@ -56,6 +91,22 @@ const dispatch = (canvas, type, values) => {
   const event = new Event(type, { cancelable: true }); Object.assign(event, values); canvas.dispatchEvent(event); return event;
 };
 const pointer = (canvas, type, values = {}) => dispatch(canvas, type, { pointerId: 1, pointerType: 'touch', button: 0, clientX: 100, clientY: 100, ...values });
+
+test('right-button and modified-left pan refresh their distance before the native controls handle a drag', () => {
+  const canvas=canvasFixture(); let starts=0, enabled=true;
+  const dispose=bindMapTravelControls(canvas,{enabled:()=>enabled,travel:()=>{},panStart:()=>starts++});
+  for (const values of [{button:2},{button:0,shiftKey:true},{button:0,ctrlKey:true},{button:0,metaKey:true}]) {
+    pointer(canvas,'pointerdown',{pointerType:'mouse',...values});
+  }
+  assert.equal(starts,4);
+  for (const values of [{button:0},{button:1},{button:2,shiftKey:true},{pointerType:'touch',button:2}]) {
+    pointer(canvas,'pointerdown',{pointerType:'mouse',...values});
+    pointer(canvas,'pointerup',{pointerType:'mouse'});
+  }
+  assert.equal(starts,4,'Rotation, travel and touch do not also start mouse panning');
+  enabled=false; pointer(canvas,'pointerdown',{pointerType:'mouse',button:2}); assert.equal(starts,4);
+  dispose(); enabled=true; pointer(canvas,'pointerdown',{pointerType:'mouse',button:2}); assert.equal(starts,4);
+});
 
 test('wheel uses continuous deltas across mouse, trackpad and line/page units, and bindings respect fixed photo views', () => {
   const canvas = canvasFixture(), steps = [];

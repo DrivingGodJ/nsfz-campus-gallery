@@ -3,10 +3,10 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import type { Photo, Point } from './types';
+import type { Photo } from './types';
 import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-camera';
 import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-controls';
-import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, travelAlongView } from './map-travel-controls';
+import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, retargetMapPan, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
 import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
 import { FULL_MAP_VIEWPORT, frameMapTarget, photoMapFocusPose, type MapViewport } from './map-card-viewport';
@@ -27,8 +27,7 @@ function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
   camera.updateMatrixWorld();
 }
 
-export default function MapCameraRig({ command, boundary, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
-  boundary: Point[];
+export default function MapCameraRig({ command, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
   selectedObjectTarget?: [number, number, number] | null;
   selectedObjectBounds?: MapObjectBounds | null;
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
@@ -50,8 +49,8 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
   const touchOrbit = useRef<{ rotate: boolean; pan: boolean } | null>(null);
   const objectBounds = selected ? null : selectedObjectBounds;
   const viewportKey = JSON.stringify(visibleViewport);
-  const live = useRef({ size, boundary, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView });
-  live.current = { size, boundary, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView };
+  const live = useRef({ size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView });
+  live.current = { size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView };
   const pendingFocus = useRef(false);
   const dismissedObjectKey = useRef('');
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
@@ -129,11 +128,18 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
       panMapView(camera, control.target, dx, dy, live.current.size.height);
       control.update(); invalidate();
     },
+    panStart: () => {
+      const control = controls.current;
+      if (!control || !(camera instanceof THREE.PerspectiveCamera)) return;
+      stopOrbitMomentum(camera, control);
+      retargetMapPan(camera, control.target, live.current.visibleViewport);
+    },
     multiTouch: active => {
       const control = controls.current;
       if (!control) return;
       if (active) {
         stopOrbitMomentum(camera, control);
+        if (camera instanceof THREE.PerspectiveCamera) retargetMapPan(camera, control.target, live.current.visibleViewport);
         touchOrbit.current = { rotate: control.enableRotate, pan: control.enablePan };
         control.enableRotate = false; control.enablePan = false;
       } else if (touchOrbit.current) {
@@ -149,7 +155,7 @@ export default function MapCameraRig({ command, boundary, selectedObjectTarget, 
         gesturePivot.current = live.current.objectTarget ? new THREE.Vector3(...live.current.objectTarget) : null;
         if (gesturePivot.current && !mapObjectInView(camera, gesturePivot.current, live.current.objectBounds, live.current.visibleViewport)) gesturePivot.current = null;
         if (!gesturePivot.current) {
-          gesturePivot.current = mapGroundOrbitTarget(camera, live.current.boundary, live.current.visibleViewport);
+          gesturePivot.current = mapGroundOrbitTarget(camera, live.current.visibleViewport);
           if (gesturePivot.current) {
             // The exposed centre is off-axis. Retarget along the existing gaze
             // rather than snapping the whole canvas centre onto its ground hit.
