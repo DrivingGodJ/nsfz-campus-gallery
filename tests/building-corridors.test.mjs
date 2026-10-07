@@ -35,7 +35,7 @@ test('the marked forest-facing facade and both atriums are recessed three metres
   const original = JSON.stringify([building, site]);
   for (const override of [site.buildingOverrides[building.id], { floors: 7, floorHeight: 4.2, partFloors: { 'sixth-floor-wing': 4 } }]) {
     const { info, meshes, dispose } = model(override);
-    for (let level = 0; level < override.floors; level++) for (const t of [.1, .3, .4, .9]) {
+    for (let level = 0; level < override.floors; level++) for (const t of [.1, .3, .5, .9]) {
       const start = position(t, -1, .12 + (level + .5) * info.floorHeight);
       const ray = new THREE.Raycaster(start, inward, 0, 8);
       const hits = ray.intersectObjects(meshes, false);

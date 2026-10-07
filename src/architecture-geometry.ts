@@ -77,9 +77,10 @@ export function teachingWindowGeometry(building: Building, sections: Section[], 
   const glass: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [], config = building.classroomWindows;
   if (config) for (const section of sections) {
     const height = Math.min(section.height, cutawayHeight ?? section.height);
-    const core = buildingCoreFootprint(section, building.groundPassages || [], (building.floorCorridors || []).filter(corridor => corridor.partId === section.id), (building.stairwells || []).filter(stair => stair.partId === section.id));
+    const solids = (building.solidCores || []).filter(core => core.partId === section.id);
+    const core = buildingCoreFootprint(section, building.groundPassages || [], (building.floorCorridors || []).filter(corridor => corridor.partId === section.id), (building.stairwells || []).filter(stair => stair.partId === section.id), solids, (building.cutouts || []).filter(cut => cut.partId === section.id));
     const groundOpenings = (building.groundPassages || []).map(passage => { const shape = passageShape(passage); return [shape.outer, ...shape.holes]; });
-    for (const { from, to, bottom, top } of classroomWindowLayout(core, config, height, floorHeight, groundOpenings)) {
+    for (const { from, to, bottom, top } of classroomWindowLayout(core, config, height, floorHeight, groundOpenings, solids.map(core => [core.outer, ...core.holes]))) {
       glass.push(windowPanel(from, to, bottom, top));
       const y0 = BASE + bottom, y1 = BASE + top;
       for (const y of [y0, y1 - Math.min(config.transom, (top - bottom) / 3), y1]) frames.push(bar([from[0], y, from[1]], [to[0], y, to[1]], .055));

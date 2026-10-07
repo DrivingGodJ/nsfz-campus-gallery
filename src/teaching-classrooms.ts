@@ -30,7 +30,7 @@ export function classroomWallFootprint(core: MultiPolygon, thickness: number): M
   return polygonClipping.intersection(core, polygonClipping.union(walls[0], ...walls.slice(1)));
 }
 
-export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = []): ClassroomWindow[] {
+export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = []): ClassroomWindow[] {
   const result: ClassroomWindow[] = [];
   for (const { from, to, length, normal } of wallEdges(core)) {
     if (length < 3.2) continue;
@@ -44,6 +44,9 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
         const top = Math.min(floor * floorHeight + Math.min(config.top, floorHeight - .35), height - .25);
         if (top <= bottom) continue;
         const cut = strip(a, b, normal, -.04, config.wallThickness + .04);
+        // Elevator shafts remain concrete, including the boundary shared with
+        // a classroom. Never put a pane or an opening into that solid volume.
+        if (solidCores.some(solid => polygonClipping.intersection(cut, solid).length)) continue;
         if (!floor && groundOpenings.some(opening => polygonClipping.intersection(cut, opening).length)) continue;
         result.push({ from: inset(a), to: inset(b), cut, bottom, top });
       }
