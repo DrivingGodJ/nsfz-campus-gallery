@@ -1,15 +1,16 @@
 export type PhotoOverlayMode = 'off' | 'translucent' | 'entering' | 'shown' | 'exiting';
 
-export const OVERLAY_WAITING_RATE = .25;
 export type OverlayClock = { elapsed: number; rate: number };
 
-// Advance a virtual clock instead of changing the total duration, which would
-// move the reveal front abruptly when the original finishes loading.
-export function advanceOverlayClock(clock: OverlayClock, delta: number, waiting: boolean): OverlayClock {
-  const time = Math.max(0, delta), target = waiting ? OVERLAY_WAITING_RATE : 1;
+// The thumbnail can start the sweep; incoming bytes set how far it may go.
+// Decoding the display image releases the last part, always at normal speed.
+export function advanceOverlayClock(clock: OverlayClock, delta: number, loaded: number, duration = 1600): OverlayClock {
+  const time = Math.max(0, delta), progress = Number.isFinite(loaded) ? Math.max(0, Math.min(1, loaded)) : 0;
   const smoothing = 180, decay = Math.exp(-time / smoothing);
+  const limit = progress === 1 ? Infinity : Math.max(clock.elapsed, duration * Math.max(.1, progress * .95));
+  const target = progress === 1 ? 1 : Math.min(1, (limit - clock.elapsed) / smoothing);
   return {
-    elapsed: clock.elapsed + target * time + (clock.rate - target) * smoothing * (1 - decay),
+    elapsed: Math.min(limit, clock.elapsed + target * time + (clock.rate - target) * smoothing * (1 - decay)),
     rate: target + (clock.rate - target) * decay,
   };
 }

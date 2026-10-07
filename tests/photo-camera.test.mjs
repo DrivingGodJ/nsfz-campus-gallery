@@ -417,11 +417,11 @@ test('photo details, lightbox and draft preview expose enter/return actions, exp
     const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
     const details = render(PhotoDetails, { photo, campus, site, onOpen() {}, onPhotoPerspective() {} });
     const renditions = { ...photo, files: { thumbnail:'small.webp', preview:'preview.webp', display:'large.webp', download:'full.jpg' } };
-    for (const markup of [render(PhotoDetails,{photo:renditions,campus,site,onOpen(){}}),render(PhotoComparison,{photo:renditions,onOpen(){},children:'model'})]) {
+    for (const markup of [render(PhotoDetails,{photo:renditions,campus,site,onOpen(){}}),render(PhotoComparison,{photo:renditions,onOpen(){},children:'model'}),render(Lightbox,{photo:renditions,onClose(){}})]) {
       assert.match(markup, /src="[^"]*small\.webp"/);
-      assert.doesNotMatch(markup, /src="[^"]*(large\.webp|full\.jpg)"|rel="preload"[^>]*full\.jpg/);
+      assert.doesNotMatch(markup, /src="[^"]*(large\.webp|preview\.webp|full\.jpg)[^"]*"|rel="preload"[^>]*full\.jpg/);
     }
-    assert.match(render(Lightbox,{photo:renditions,onClose(){}}),/src="[^"]*preview\.webp\?v=2"/);
+    assert.match(render(Lightbox,{photo:renditions,onClose(){}}), /href="[^\"]*full\.jpg" download=/);
     assert.match(details, /进入照片视角/); assert.match(details, /aria-pressed="false"/);
     assert.match(render(Lightbox, { photo, onClose() {}, onPhotoPerspective() {} }), /进入照片视角/);
     assert.match(render(PhotoPerspectiveButton, { photo, active: false, editor: true, onClick() {} }), /照片视角 · 调整角度/);

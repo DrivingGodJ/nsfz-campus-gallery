@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Maximize2 } from 'lucide-react';
 import { asset, type Photo } from './types';
-import { photoDisplayFile, photoPreviewFile } from './photo-image';
+import { photoDisplayFile } from './photo-image';
 import { useAnimatedPresence } from './useAnimatedPresence';
 import PhotoImage from './PhotoImage';
 import PhotoInformation from './PhotoInformation';
@@ -61,9 +61,9 @@ export default function PhotoComparison({ children, photo, imageSource, highQual
         <div className="comparison-heading"><div><span className="eyebrow">原照片</span><strong>{displayedPhoto.title}</strong></div>{displayed.navigation}</div>
         {displayed.information && <PhotoInformation photoId={displayedPhoto.id}>{displayed.information}</PhotoInformation>}
         {displayed.onOpen ? <button className="comparison-image" onClick={displayed.onOpen} disabled={!!displayed.openDisabled} aria-label={(displayed.openLabel || '全屏查看照片') + '：' + displayedPhoto.title}>
-          <PhotoImage src={displayed.imageSource || asset(highQuality ? photoDisplayFile(displayedPhoto) : photoPreviewFile(displayedPhoto))} managed={highQuality && !displayed.imageSource} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} />
+          <PhotoImage src={displayed.imageSource || asset(photoDisplayFile(displayedPhoto))} managed={highQuality && !displayed.imageSource} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} />
           {!displayed.openLabel && <span><Maximize2 size={15} />全屏照片</span>}
-        </button> : <div className="comparison-image"><PhotoImage src={displayed.imageSource || asset(highQuality ? photoDisplayFile(displayedPhoto) : photoPreviewFile(displayedPhoto))} managed={highQuality && !displayed.imageSource} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} /></div>}
+        </button> : <div className="comparison-image"><PhotoImage src={displayed.imageSource || asset(photoDisplayFile(displayedPhoto))} managed={highQuality && !displayed.imageSource} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} /></div>}
         {(displayed.openLabel || displayed.footerActions) && <div className={'comparison-overlay-actions' + (!displayed.footerActions ? ' is-single' : '')} role="group" aria-label="照片叠加与沉浸浏览">
           {displayed.openLabel && <button className="button primary" onClick={displayed.onOpen} disabled={!!displayed.openDisabled} title={displayed.openDisabled}><Maximize2 size={16} />{displayed.openLabel}</button>}
           {displayed.footerActions}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceOverlayClock, OVERLAY_WAITING_RATE, overlayPhotoAlpha, overlayProgress } from '../src/photo-overlay.ts';
+import { advanceOverlayClock, overlayPhotoAlpha, overlayProgress } from '../src/photo-overlay.ts';
 import { depthHistogram, depthTransitionFrame, revealFront } from '../src/depth-transition.ts';
 
 test('both depth fronts advance far to near, and exit grows the model instead of retracting the photo', () => {
@@ -34,39 +34,54 @@ test('wipe progress has smooth bounded endpoints', () => {
   assert.equal(overlayProgress(9000, 1600), 1);
 });
 
-test('waiting for an original slows entry without waiting indefinitely', () => {
-  const normal = advanceOverlayClock({ elapsed: 0, rate: 1 }, 800, false);
-  const waiting = advanceOverlayClock({ elapsed: 0, rate: OVERLAY_WAITING_RATE }, 800, true);
+test('a thumbnail starts entry immediately while incoming display bytes limit its progress', () => {
+  const normal = advanceOverlayClock({ elapsed: 0, rate: 1 }, 800, 1);
+  const waiting = advanceOverlayClock({ elapsed: 0, rate: 1 }, 800, 0);
   assert.equal(normal.elapsed, 800);
-  assert.ok(overlayProgress(waiting.elapsed, 1600) < overlayProgress(normal.elapsed, 1600));
-  const finished = advanceOverlayClock(waiting, 6400 - 800, true);
-  assert.equal(overlayProgress(finished.elapsed, 1600), 1, 'a stalled request still lets the photo appear');
+  assert.ok(waiting.elapsed > 0, 'the thumbnail can start before any display bytes arrive');
+  const stalled = advanceOverlayClock(waiting, 6400, 0);
+  assert.ok(stalled.elapsed <= 160, 'a stalled download cannot finish the transition');
+  const downloading = advanceOverlayClock(stalled, 6400, .6);
+  assert.ok(downloading.elapsed > stalled.elapsed);
+  assert.ok(downloading.elapsed <= 1600 * .6 * .95);
+  const decoding = advanceOverlayClock(downloading, 6400, .99);
+  assert.ok(overlayProgress(decoding.elapsed, 1600) < 1, 'reserve the end until the display image has decoded');
 });
 
-test('an original becoming ready restores speed continuously without skipping or rewinding', () => {
-  const waiting = advanceOverlayClock({ elapsed: 0, rate: OVERLAY_WAITING_RATE }, 1000, true);
-  assert.deepEqual(advanceOverlayClock(waiting, 0, false), waiting, 'loading state alone cannot move the reveal front');
+test('the display becoming ready restores speed continuously without skipping or rewinding', () => {
+  const waiting = advanceOverlayClock({ elapsed: 0, rate: 1 }, 1000, .25);
+  assert.deepEqual(advanceOverlayClock(waiting, 0, 1), waiting, 'loading state alone cannot move the reveal front');
   let clock = waiting;
   for (let i = 0; i < 60; i++) {
-    const next = advanceOverlayClock(clock, 16, false);
+    const next = advanceOverlayClock(clock, 16, 1);
     assert.ok(next.elapsed > clock.elapsed);
     assert.ok(next.elapsed - clock.elapsed <= 16, 'the animation never runs faster than normal to catch up');
     assert.ok(next.rate >= clock.rate && next.rate <= 1);
     clock = next;
   }
   assert.ok(clock.rate > .99, 'normal playback returns promptly');
-  assert.ok(advanceOverlayClock(clock, 1000, false).elapsed >= 1600);
+  assert.ok(advanceOverlayClock(clock, 1000, 1).elapsed >= 1600);
 });
 
 test('adaptive playback is independent of frame rate and can slow again on retry', () => {
-  const start = { elapsed: 200, rate: OVERLAY_WAITING_RATE };
-  const whole = advanceOverlayClock(start, 1000, false);
+  const start = { elapsed: 200, rate: .25 };
+  const whole = advanceOverlayClock(start, 1000, 1);
   let split = start;
-  for (let i = 0; i < 100; i++) split = advanceOverlayClock(split, 10, false);
+  for (let i = 0; i < 100; i++) split = advanceOverlayClock(split, 10, 1);
   assert.ok(Math.abs(split.elapsed - whole.elapsed) < 1e-8);
   assert.ok(Math.abs(split.rate - whole.rate) < 1e-8);
-  const retried = advanceOverlayClock(whole, 16, true);
-  assert.ok(retried.rate < whole.rate && retried.rate > OVERLAY_WAITING_RATE);
-  assert.ok(retried.elapsed > whole.elapsed);
-  assert.deepEqual(advanceOverlayClock(whole, -50, true), whole, 'clock corrections do not move backwards');
+  const retried = advanceOverlayClock(whole, 16, 0);
+  assert.ok(retried.rate < whole.rate && retried.rate >= 0);
+  assert.ok(retried.elapsed >= whole.elapsed);
+  assert.deepEqual(advanceOverlayClock(whole, -50, 0), whole, 'clock corrections do not move backwards');
+});
+
+test('changing download progress never makes the animation faster than normal or rewind', () => {
+  let clock = { elapsed: 0, rate: 1 };
+  for (const loaded of [0, .1, .8, .9, .2, .99, 1]) for (let frame = 0; frame < 50; frame++) {
+    const next = advanceOverlayClock(clock, 16, loaded);
+    assert.ok(next.elapsed >= clock.elapsed && next.elapsed - clock.elapsed <= 16.0000001);
+    assert.ok(next.rate >= 0 && next.rate <= 1);
+    clock = next;
+  }
 });

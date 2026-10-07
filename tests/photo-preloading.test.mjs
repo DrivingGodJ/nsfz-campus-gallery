@@ -126,4 +126,27 @@ test('hidden, offline and save-data connections suppress speculation, and the se
   for (const override of [{ hidden: true }, { online: false }, { saveData: true }, { effectiveType: '2g' }, { effectiveType: 'slow-2g' }]) assert.equal(backgroundPhotoLoadingAllowed({ ...normal, ...override }), false);
   assert.equal(photoDisplayFile({ files: { display: 'display.webp', preview: 'preview.webp', thumbnail: 'thumbnail.webp', download: 'download.jpg' } }), 'display.webp?v=2');
   assert.equal(photoDisplayFile({ files: { thumbnail: 'thumbnail.webp', download: 'download.jpg' } }), 'thumbnail.webp');
+  assert.equal(photoDisplayFile({ files: { thumbnail: 'thumbnail.webp', preview: 'preview.webp', download: 'download.jpg' } }), 'thumbnail.webp');
+});
+
+test('shared image downloads report actual byte progress and reach completion only after the body ends', async t => {
+  let stream;
+  const response = new Response(new ReadableStream({ start(controller) { stream = controller; } }), {
+    headers: { 'content-length': '100', 'content-type': 'image/webp' },
+  });
+  const fetch = t.mock.method(globalThis, 'fetch', async () => response);
+  const cache = new PhotoImageCache(), card = new AbortController(), overlay = new AbortController();
+  t.after(() => { card.abort(); overlay.abort(); cache.dispose(); });
+  const first = cache.acquire('display.webp', card.signal), second = cache.acquire('display.webp', overlay.signal);
+  assert.equal(cache.progress('display.webp'), 0);
+  stream.enqueue(new Uint8Array(40)); await flush();
+  assert.equal(cache.progress('display.webp'), .4);
+  stream.enqueue(new Uint8Array(30)); await flush();
+  assert.equal(cache.progress('display.webp'), .7);
+  stream.enqueue(new Uint8Array(30)); await flush();
+  assert.equal(cache.progress('display.webp'), .99, 'receiving the declared bytes alone does not finish the resource');
+  stream.close();
+  assert.equal(await first, await second);
+  assert.equal(fetch.mock.callCount(), 1);
+  assert.equal(cache.progress('display.webp'), 1);
 });

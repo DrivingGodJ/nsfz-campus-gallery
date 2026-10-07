@@ -1,16 +1,28 @@
 import { loadImageElement } from './depth-map.ts';
 
 type Resource = { src: string; bytes: number; dispose: () => void };
-type Loader = (url: string, signal: AbortSignal, priority: 'high' | 'low') => Promise<Resource>;
-type Entry = { controller: AbortController; promise: Promise<string>; users: number; touched: number; resource?: Resource };
+type Loader = (url: string, signal: AbortSignal, priority: 'high' | 'low', onProgress: (fraction: number) => void) => Promise<Resource>;
+type Entry = { controller: AbortController; promise: Promise<string>; users: number; touched: number; progress: number; resource?: Resource };
 const cancelled = () => new DOMException('Image loading cancelled', 'AbortError');
 
-async function fetchImage(url: string, signal: AbortSignal, priority: 'high' | 'low'): Promise<Resource> {
+async function fetchImage(url: string, signal: AbortSignal, priority: 'high' | 'low', onProgress: (fraction: number) => void): Promise<Resource> {
   // Blob URLs let the card and transition reuse the same bytes even when an
   // image host disables its HTTP cache. Aborting fetch also stops its body.
   const response = await fetch(url, { signal, priority });
   if (!response.ok) throw new Error('照片暂时无法载入，请稍后重试。');
-  const blob = await response.blob();
+  const total = Number(response.headers.get('content-length'));
+  let blob: Blob;
+  if (response.body && total > 0) {
+    const reader = response.body.getReader(), chunks: Uint8Array<ArrayBuffer>[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(new Uint8Array(value)); received += value.byteLength;
+      onProgress(Math.min(.99, received / total));
+    }
+    blob = new Blob(chunks, { type: response.headers.get('content-type') || '' });
+  } else blob = await response.blob();
   if (signal.aborted) throw cancelled();
   const src = URL.createObjectURL(blob);
   return { src, bytes: blob.size, dispose: () => URL.revokeObjectURL(src) };
@@ -29,6 +41,7 @@ export class PhotoImageCache {
   constructor(loader: Loader = fetchImage, limit = 8, byteLimit = 12_000_000) { this.loader = loader; this.limit = limit; this.byteLimit = byteLimit; }
 
   peek(url: string) { return this.entries.get(url)?.resource?.src; }
+  progress(url: string) { return this.entries.get(url)?.progress ?? 0; }
 
   select(urls: string[]) {
     this.focus = new Set(urls);
@@ -89,11 +102,13 @@ export class PhotoImageCache {
     const existing = this.entries.get(url);
     if (existing) { existing.touched = ++this.sequence; return existing; }
     const controller = new AbortController();
-    const entry: Entry = { controller, promise: Promise.resolve(''), users: 0, touched: ++this.sequence };
+    const entry: Entry = { controller, promise: Promise.resolve(''), users: 0, touched: ++this.sequence, progress: 0 };
     this.entries.set(url, entry);
-    entry.promise = this.loader(url, controller.signal, priority).then(resource => {
+    entry.promise = this.loader(url, controller.signal, priority, fraction => {
+      if (!controller.signal.aborted && Number.isFinite(fraction)) entry.progress = Math.max(entry.progress, Math.min(.99, Math.max(0, fraction)));
+    }).then(resource => {
       if (controller.signal.aborted || this.entries.get(url) !== entry) { resource.dispose(); throw cancelled(); }
-      entry.resource = resource; this.failed.delete(url); this.trim(); return resource.src;
+      entry.resource = resource; entry.progress = 1; this.failed.delete(url); this.trim(); return resource.src;
     }, error => {
       if (this.entries.get(url) === entry) this.entries.delete(url);
       if (!controller.signal.aborted) this.failed.set(url, Date.now());

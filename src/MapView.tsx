@@ -48,7 +48,7 @@ type Props = {
   season?: PhotoSeason | '';
   time?: PhotoTime | '';
   placing?: boolean; onPlace?: (point: { x: number; z: number }) => void; editPhoto?: Photo | null; onHeading?: (heading: number) => void;
-  photoPreview?: boolean; photoPerspective?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoOrientation) => void; photoImageSource?: string; photoOriginalSource?: string; photoDepthSource?: string;
+  photoPreview?: boolean; photoPerspective?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoOrientation) => void; photoImageSource?: string; photoDepthSource?: string;
   smoothPhotoFraming?: boolean;
   photoOverlayMode?: PhotoOverlayMode; onPhotoOverlayEntered?: () => void; onPhotoOverlayExited?: () => void;
   visibleViewport?: MapViewport;
@@ -258,7 +258,7 @@ export default function MapView(props: Props) {
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {/* The map is isolated below viewer cards; place the chooser alongside them so the catalog cannot cover it. */}
     {labelPortal.current && createPortal(<PhotoClusterPicker photos={!viewingPhoto && picker ? picker.photos : null} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
-    {preview && <PhotoOverlay key={preview.id + ':' + (props.photoDepthSource || preview.depthUpdatedAt || '')} photo={preview} viewport={viewport} imageSource={props.photoImageSource} originalSource={props.photoOriginalSource} depthSource={props.photoDepthSource} theme={theme} mode={props.photoOverlayMode || 'off'} cameraReady={!moving} onEntered={props.onPhotoOverlayEntered} onExited={props.onPhotoOverlayExited} />}
+    {preview && <PhotoOverlay key={preview.id + ':' + (props.photoDepthSource || preview.depthUpdatedAt || '')} photo={preview} viewport={viewport} imageSource={props.photoImageSource} depthSource={props.photoDepthSource} theme={theme} mode={props.photoOverlayMode || 'off'} cameraReady={!moving} onEntered={props.onPhotoOverlayEntered} onExited={props.onPhotoOverlayExited} />}
     {!viewingPhoto && <div className="map-bottom"><span className="map-help">{placing && entranceSelected && editPhoto && !isAerialPhoto(editPhoto) ? '点击入口台阶，标记楼梯上的拍摄位置' : mapInteractionHelp(inputMode, placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>}
   </div>;
 }

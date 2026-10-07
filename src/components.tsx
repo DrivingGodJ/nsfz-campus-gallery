@@ -5,7 +5,7 @@ import { photoFieldOfView, viewSourceText } from './photo-view';
 import { altitudeLabel, campusLocations, isAerialPhoto } from './locations';
 import { PhotoPerspectiveButton } from './PhotoPerspective';
 import { photoPerspectiveIssue } from './photo-perspective';
-import { photoPreviewFile } from './photo-image';
+import { photoDisplayFile } from './photo-image';
 import PhotoImage from './PhotoImage';
 
 export function Brand({ editor = false, href }: { editor?: boolean; href?: string }) {
@@ -47,7 +47,7 @@ export function PhotoDetails({ photo, campus, site, onOpen, showImage = true, ph
   const view = photoFieldOfView(photo);
   const layer = campusLocations(campus, site).find(location => location.id === (photo.locationId ?? photo.buildingId))?.levelText || '室外';
   return <article className="photo-details">
-    {showImage && <button className="detail-image" onClick={onOpen} aria-label={'查看大图：' + photo.title}><PhotoImage src={asset(photoPreviewFile(photo))} fallbackSrc={asset(photo.files.thumbnail)} alt={photo.title} /><span>查看大图 <Plus size={14} /></span></button>}
+    {showImage && <button className="detail-image" onClick={onOpen} aria-label={'查看大图：' + photo.title}><PhotoImage src={asset(photoDisplayFile(photo))} managed fallbackSrc={asset(photo.files.thumbnail)} alt={photo.title} /><span>查看大图 <Plus size={14} /></span></button>}
     <div className="detail-copy"><p className="eyebrow">{photoLocation(photo, campus, site)}</p><h2>{photo.title}</h2>
       {photo.capturedAt && <time className="muted capture-time" dateTime={photo.capturedAt}>{captureTimeText(photo.capturedAt)}</time>}
       {onPhotoPerspective && <PhotoPerspectiveButton photo={photo} active={photoPerspective} onClick={onPhotoPerspective} />}
@@ -109,7 +109,7 @@ export function Lightbox({ photo, onClose, onPhotoPerspective }: { photo: Photo;
       }}
       onPointerUp={e => { pointers.current.delete(e.pointerId); lastDistance.current = 0; }}
       onPointerCancel={e => { pointers.current.delete(e.pointerId); lastDistance.current = 0; }}>
-      <PhotoImage src={asset(photo.files.download)} fallbackSrc={asset(photoPreviewFile(photo))} alt={photo.title} loadingText="高清照片加载中…" style={{ transform: 'translate(' + pan.x + 'px,' + pan.y + 'px) scale(' + zoom + ')' }} />
+      <PhotoImage src={asset(photoDisplayFile(photo))} managed fallbackSrc={asset(photo.files.thumbnail)} alt={photo.title} loadingText="次高清照片加载中…" style={{ transform: 'translate(' + pan.x + 'px,' + pan.y + 'px) scale(' + zoom + ')' }} />
     </div>
     <div className="lightbox-bottom"><div className="zoom-controls"><button className="icon-button inverse" onClick={() => changeZoom(zoom - .5)} disabled={zoom <= 1} aria-label="缩小照片"><Minus size={18} /></button><span>{Math.round(zoom * 100)}%</span><button className="icon-button inverse" onClick={() => changeZoom(zoom + .5)} disabled={zoom >= 5} aria-label="放大照片"><Plus size={18} /></button><button className="icon-button inverse" onClick={() => changeZoom(1)} aria-label="适应窗口"><RotateCcw size={17} /></button></div>{onPhotoPerspective && <button type="button" className="button light" onClick={onPhotoPerspective} disabled={!!photoPerspectiveIssue(photo)} title={photoPerspectiveIssue(photo) || undefined}><Camera size={16} />进入照片视角</button>}<a className="button light" href={asset(photo.files.download)} download={photo.title.replace(/[\\/:*?"<>|]/g, '_') + '.jpg'}><Download size={16} />下载高清 JPEG</a></div>
   </div>;
