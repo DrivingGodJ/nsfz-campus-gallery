@@ -47,6 +47,11 @@ test('both teaching-building roads remain open, with slabs above and continuous 
           const z = -vertices.getY(i) * (1 - t) - vertices.getY(i + 1) * t;
           const onCorridor = building.floorCorridors?.some(corridor => {
             if ('passageIndex' in corridor) return false; // Covered by the ground-passage footprint check below.
+            if ('points' in corridor) return corridor.points.slice(1).some((to, i) => {
+              const from = corridor.points[i], dx = to[0] - from[0], dz = to[1] - from[1];
+              const t = Math.max(0, Math.min(1, ((x - from[0]) * dx + (z - from[1]) * dz) / (dx * dx + dz * dz)));
+              return Math.hypot(x - from[0] - dx * t, z - from[1] - dz * t) <= corridor.depth / 2 + 1e-4;
+            });
             if ('edges' in corridor) {
               const ring = building.parts.find(part => part.id === corridor.partId).outer;
               return corridor.edges.some(edge => {

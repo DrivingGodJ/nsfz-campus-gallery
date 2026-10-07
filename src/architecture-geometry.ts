@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { buildingGeometry } from './building-geometry.ts';
+import { buildingCoreFootprint, buildingGeometry, passageShape } from './building-geometry.ts';
+import { classroomWindowLayout } from './teaching-classrooms.ts';
 import { GYM_WALL, gymFrame, gymStairGeometry, gymWindowOpenings } from './gym-interior.ts';
 import type { Building, BuildingPart, Feature, GroundPassage, Point, Shape } from './types';
 
@@ -45,15 +46,16 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
     const section = sections.find(section => section.id === corridor.partId);
     if (!section || 'passageIndex' in corridor) continue;
     const ring = 'holeIndex' in corridor ? section.holes[corridor.holeIndex] : section.outer;
-    const edges = 'holeIndex' in corridor ? Array.from({ length: ring.length - 1 }, (_, i) => i) : 'edge' in corridor ? [corridor.edge] : corridor.edges;
+    const edges = 'holeIndex' in corridor ? Array.from({ length: ring.length - 1 }, (_, i) => i) : 'edge' in corridor ? [corridor.edge] : 'edges' in corridor ? corridor.edges : [];
+    const segments = 'points' in corridor ? (corridor.railEdges || []).flatMap(points => points.slice(1).map((to, i) => [points[i], to])) : edges.map(edge => [ring[edge], ring[edge + 1]]);
     const area = ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0);
-    const inset = .09 * (area >= 0 ? 1 : -1) * ('holeIndex' in corridor ? 1 : -1);
+    const inset = 'points' in corridor ? -.09 : .09 * (area >= 0 ? 1 : -1) * ('holeIndex' in corridor ? 1 : -1);
     const height = Math.min(section.height, cutawayHeight ?? section.height);
     for (let floor = 1; floor * floorHeight + 1.3 < height; floor++) {
       const y = BASE + floor * floorHeight + .25;
       const posts = new Map<string, Point>();
-      for (const edge of edges) {
-        const a = ring[edge], b = ring[edge + 1], length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      for (const [a, b] of segments) {
+        const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
         if (length < .05) continue;
         const offset: Point = [(b[1] - a[1]) / length * inset, -(b[0] - a[0]) / length * inset];
         const from = a.map((v, i) => v + offset[i]) as Point, to = b.map((v, i) => v + offset[i]) as Point;
@@ -69,6 +71,25 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
   }
   // Like the corridor slabs, these slim rails must not hide corridor photos.
   return combined(parts, false);
+}
+
+export function teachingWindowGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
+  const glass: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [], config = building.classroomWindows;
+  if (config) for (const section of sections) {
+    const height = Math.min(section.height, cutawayHeight ?? section.height);
+    const core = buildingCoreFootprint(section, building.groundPassages || [], (building.floorCorridors || []).filter(corridor => corridor.partId === section.id), (building.stairwells || []).filter(stair => stair.partId === section.id));
+    const groundOpenings = (building.groundPassages || []).map(passage => { const shape = passageShape(passage); return [shape.outer, ...shape.holes]; });
+    for (const { from, to, bottom, top } of classroomWindowLayout(core, config, height, floorHeight, groundOpenings)) {
+      glass.push(windowPanel(from, to, bottom, top));
+      const y0 = BASE + bottom, y1 = BASE + top;
+      for (const y of [y0, y1 - Math.min(config.transom, (top - bottom) / 3), y1]) frames.push(bar([from[0], y, from[1]], [to[0], y, to[1]], .055));
+      for (let column = 0; column <= config.columns; column++) {
+        const point = lerp(from, to, column / config.columns);
+        frames.push(bar([point[0], y0, point[1]], [point[0], y1, point[1]], .055));
+      }
+    }
+  }
+  return { glass: combined(glass, false), frames: combined(frames, false) };
 }
 
 export function gymRoofHeight(height: number, progress: number) {
