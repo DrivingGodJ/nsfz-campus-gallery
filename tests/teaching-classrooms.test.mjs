@@ -106,10 +106,10 @@ test('the exposed return has rails from the second floor, without blocking eithe
 test('the marked front face has no guard rails on any floor while the side corridor retains them', () => {
   const info = buildingLevels(building), geometry = teachingRailGeometry(building, info.sections, info.floorHeight);
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); mesh.updateMatrixWorld();
-  const a = vector(connector.points[1]), direction = vector(connector.points[2]).sub(a).normalize();
+  const a = vector(connector.points[0]), b = vector(connector.points[1]), length = a.distanceTo(b), direction = b.clone().sub(a).normalize();
   const normal = new THREE.Vector3(-direction.z, 0, direction.x);
   assert.equal(connector.railEdges[0].length, 2, 'Only the side edge has a railing route');
-  for (let level = 0; level < info.sections[0].floors; level++) for (const along of [.5, 1.5, 2.5]) {
+  for (let level = 0; level < info.sections[0].floors; level++) for (const along of [length * .2, length * .5, length * .8]) {
     const point = a.clone().addScaledVector(direction, along).addScaledVector(normal, -.5);
     point.y = .12 + level * info.floorHeight + .25 + 1.05;
     assert.equal(new THREE.Raycaster(point, normal, 0, 1).intersectObject(mesh).length, 0, 'No horizontal rail or post crosses the marked front edge');
