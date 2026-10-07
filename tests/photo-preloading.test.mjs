@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PhotoImageCache } from '../src/photo-image-cache.ts';
 import { backgroundPhotoLoadingAllowed, PhotoPreloadVisibility } from '../src/photo-preloading.ts';
-import { photoDisplayFile } from '../src/photo-image.ts';
+import { photoDisplayFile, photoLoadFiles } from '../src/photo-image.ts';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function fixture(t, limit = 8, bytes = 12_000_000) {
@@ -24,12 +24,51 @@ test('popular/visible images preload serially, and selecting a photo immediately
   assert.deepEqual(requests.map(r => r.url), ['popular1']);
   requests[0].finish(); await flush();
   assert.deepEqual(requests.map(r => r.url), ['popular1', 'popular2']);
-  cache.select(['selected', 'selected-depth']);
+  cache.select(['selected-thumbnail', 'selected-depth', 'selected-display']);
   assert.equal(requests[1].signal.aborted, true);
-  assert.deepEqual(requests.slice(2).map(r => [r.url, r.priority]), [['selected', 'high'], ['selected-depth', 'high']]);
-  requests[2].finish(); requests[3].finish(); await flush();
-  assert.equal(requests.length, 4, 'popular3 does not compete with the selected photo');
+  assert.deepEqual(requests.slice(2).map(r => [r.url, r.priority]), [['selected-thumbnail', 'high']]);
+  const consumer = new AbortController(), display = cache.acquire('selected-display', consumer.signal);
+  assert.equal(requests.length, 3, 'the preview cannot start the display before depth');
+  requests[2].finish(); await flush();
+  assert.equal(requests[3].url, 'selected-depth');
+  requests[3].finish(); await flush();
+  assert.equal(requests[4].url, 'selected-display');
+  requests[4].finish(); await display; consumer.abort(); await flush();
+  assert.equal(requests.length, 5, 'popular3 does not compete with the selected photo');
   assert.equal(cache.peek('popular1'), 'blob:popular1', 'finished preloads are retained');
+});
+
+test('popular and visible photos preload thumbnail, depth and display in that order without evicting each other', async t => {
+  const { cache, requests } = fixture(t, 24);
+  const urls = Array.from({ length: 6 }, (_, i) => photoLoadFiles({ files: {
+    thumbnail: `${i}-thumbnail`, depth: `${i}-depth`, display: `${i}-display`, download: `${i}-original`,
+  } })).flat();
+  cache.setBackground(urls);
+  for (let i = 0; i < urls.length; i++) {
+    assert.equal(requests.length, i + 1);
+    assert.equal(requests[i].url, urls[i]);
+    requests[i].finish(); await flush();
+  }
+  cache.setBackground(urls); await flush();
+  assert.equal(requests.length, urls.length, 'completed assets do not cycle through eviction and download');
+  urls.forEach(url => assert.equal(cache.peek(url), 'blob:' + url));
+  assert.deepEqual(photoLoadFiles({ files: { thumbnail: 'only-thumbnail', download: 'original' } }), ['only-thumbnail']);
+});
+
+test('switching photos cancels queued depth/display requests, and a failed prerequisite does not deadlock the next tier', async t => {
+  const { cache, requests } = fixture(t);
+  cache.select(['old-thumbnail', 'old-depth', 'old-display']);
+  const consumer = new AbortController(), display = cache.acquire('old-display', consumer.signal);
+  const rejected = assert.rejects(display, { name: 'AbortError' });
+  cache.select(['new-thumbnail', 'new-depth', 'new-display']);
+  await rejected; consumer.abort(); await flush();
+  assert.deepEqual(requests.map(r => r.url), ['old-thumbnail', 'new-thumbnail']);
+  requests[1].fail(); await flush();
+  assert.equal(requests[2].url, 'new-depth');
+  requests[2].finish(); await flush();
+  assert.equal(requests[3].url, 'new-display');
+  requests[3].finish(); await flush();
+  assert.equal(cache.peek('new-display'), 'blob:new-display');
 });
 
 test('clicking an image already being prefetched keeps its download, and the card and overlay share it', async t => {

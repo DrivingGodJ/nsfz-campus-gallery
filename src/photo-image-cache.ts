@@ -38,7 +38,8 @@ export class PhotoImageCache {
   private loader: Loader;
   private limit: number;
   private byteLimit: number;
-  constructor(loader: Loader = fetchImage, limit = 8, byteLimit = 12_000_000) { this.loader = loader; this.limit = limit; this.byteLimit = byteLimit; }
+  // Popular/visible preloads now hold three assets per photo within the same byte budget.
+  constructor(loader: Loader = fetchImage, limit = 24, byteLimit = 12_000_000) { this.loader = loader; this.limit = limit; this.byteLimit = byteLimit; }
 
   peek(url: string) { return this.entries.get(url)?.resource?.src; }
   progress(url: string) { return this.entries.get(url)?.progress ?? 0; }
@@ -104,9 +105,16 @@ export class PhotoImageCache {
     const controller = new AbortController();
     const entry: Entry = { controller, promise: Promise.resolve(''), users: 0, touched: ++this.sequence, progress: 0 };
     this.entries.set(url, entry);
-    entry.promise = this.loader(url, controller.signal, priority, fraction => {
-      if (!controller.signal.aborted && Number.isFinite(fraction)) entry.progress = Math.max(entry.progress, Math.min(.99, Math.max(0, fraction)));
-    }).then(resource => {
+    const order = [...this.focus], index = order.indexOf(url);
+    const previous = index > 0 ? this.start(order[index - 1], priority) : undefined;
+    const download = () => {
+      if (controller.signal.aborted) throw cancelled();
+      return this.loader(url, controller.signal, priority, fraction => {
+        if (!controller.signal.aborted && Number.isFinite(fraction)) entry.progress = Math.max(entry.progress, Math.min(.99, Math.max(0, fraction)));
+      });
+    };
+    // Acquiring the large image cannot bypass its thumbnail/depth prerequisites.
+    entry.promise = (previous && !previous.resource ? previous.promise.catch(() => {}).then(download) : download()).then(resource => {
       if (controller.signal.aborted || this.entries.get(url) !== entry) { resource.dispose(); throw cancelled(); }
       entry.resource = resource; entry.progress = 1; this.failed.delete(url); this.trim(); return resource.src;
     }, error => {

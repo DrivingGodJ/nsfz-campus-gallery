@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { asset, type Photo } from './types';
-import { photoDepthFile, photoDisplayFile } from './photo-image';
+import { photoLoadFiles } from './photo-image';
 import { photoImageCache } from './photo-image-cache';
 import { sortPhotos, type PhotoLikes } from './photo-sort';
 import { backgroundPhotoLoadingAllowed, PHOTO_PRELOAD_POPULAR_COUNT, PhotoPreloadVisibility } from './photo-preloading';
 
 export function prioritizePhoto(photo: Photo | null) {
-  const depth = photo && photoDepthFile(photo);
-  photoImageCache.select(photo ? [asset(photoDisplayFile(photo)), ...(depth ? [asset(depth)] : [])] : []);
+  photoImageCache.select(photo ? photoLoadFiles(photo).map(asset) : []);
 }
 
 export function usePhotoPreloading(photos: Photo[] | undefined, selected: Photo | null, likes: PhotoLikes, likesReady: boolean, galleryOpen: boolean, catalogPhotos: Photo[]) {
@@ -37,7 +36,7 @@ export function usePhotoPreloading(photos: Photo[] | undefined, selected: Photo 
       photoImageCache.setAllowed(backgroundPhotoLoadingAllowed({ hidden: document.hidden, online: navigator.onLine, saveData: connection?.saveData, effectiveType: connection?.effectiveType }));
       const popular = likesReady ? ranked.slice(0, PHOTO_PRELOAD_POPULAR_COUNT) : [];
       const visible = new Set(visibility.current.candidates(ranked.map(photo => photo.id), performance.now()));
-      photoImageCache.setBackground(selected ? [] : [...popular, ...ranked.filter(photo => visible.has(photo.id))].map(photo => asset(photoDisplayFile(photo))));
+      photoImageCache.setBackground(selected ? [] : [...popular, ...ranked.filter(photo => visible.has(photo.id))].flatMap(photo => photoLoadFiles(photo).map(asset)));
     };
     update();
     const timer = window.setInterval(update, 250);

@@ -34,7 +34,7 @@ test('wipe progress has smooth bounded endpoints', () => {
   assert.equal(overlayProgress(9000, 1600), 1);
 });
 
-test('a thumbnail starts entry immediately while incoming display bytes limit its progress', () => {
+test('after depth is ready, the thumbnail starts entry while incoming display bytes limit its progress', () => {
   const normal = advanceOverlayClock({ elapsed: 0, rate: 1 }, 800, 1);
   const waiting = advanceOverlayClock({ elapsed: 0, rate: 1 }, 800, 0);
   assert.equal(normal.elapsed, 800);
@@ -48,7 +48,7 @@ test('a thumbnail starts entry immediately while incoming display bytes limit it
   assert.ok(overlayProgress(decoding.elapsed, 1600) < 1, 'reserve the end until the display image has decoded');
 });
 
-test('the initial 10% plays at normal speed even when the display and depth have received no bytes', () => {
+test('after depth is ready, the initial 10% plays at normal speed even when the display has received no bytes', () => {
   for (const frameTime of [8, 16, 33, 100]) {
     let clock = { elapsed: 0, rate: 1 };
     const partial = advanceOverlayClock(clock, 160, 0);

@@ -7,3 +7,8 @@ export const photoDisplayFile = (photo: Pick<Photo, 'files'>) => photo.files.dis
 // Paired depth images are imported with the photograph. Replacing one changes
 // its version so an existing browser cache cannot keep the previous map.
 export const photoDepthFile = (photo: Pick<Photo, 'files' | 'depthUpdatedAt'>) => photo.files.depth ? photo.files.depth + '?v=' + encodeURIComponent(photo.depthUpdatedAt || '1') : null;
+
+export function photoLoadFiles(photo: Pick<Photo, 'files' | 'depthUpdatedAt'>) {
+  const depth = photoDepthFile(photo);
+  return [...new Set([photo.files.thumbnail, ...(depth ? [depth] : []), photoDisplayFile(photo)])];
+}
