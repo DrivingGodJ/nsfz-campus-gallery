@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { MapPhoto } from './MapCameraRig';
 import { MAP_PHOTO_FOCUS_DISTANCE } from './map-card-viewport.ts';
+import { acceleratePhotoOccluder, isPhotoOccluder } from './photo-occlusion.ts';
 
 export const PHOTO_MERGE_METERS = 2;
 export const PHOTO_MARKER_LIFT = 1.8;
@@ -26,7 +27,7 @@ function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: {
   if (!occluders.length) return true;
   ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), camera);
   ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
-  return !ray.intersectObjects(occluders, false).some(hit => {
+  return !ray.intersectObjects(occluders.filter(object => object instanceof THREE.Mesh && isPhotoOccluder(object)), false).some(hit => {
     const mesh = hit.object as THREE.Mesh;
     const blockingFace = mesh.geometry?.userData.photoOcclusionMask?.[hit.faceIndex ?? -1] !== 0;
     return blockingFace && mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite));
@@ -47,10 +48,11 @@ export function visiblePhotoPoints(photos: MapPhoto[], camera: THREE.Camera, siz
 export function photoOccluders(scene: THREE.Scene) {
   const meshes: THREE.Object3D[] = [];
   scene.updateMatrixWorld();
-  scene.traverse(object => {
+  scene.traverseVisible(object => {
     if (!(object instanceof THREE.Mesh)) return;
+    if (!isPhotoOccluder(object)) return;
     for (let parent = object.parent; parent; parent = parent.parent) {
-      if (parent.userData.photoOccluder) { meshes.push(object); break; }
+      if (parent.userData.photoOccluder) { acceleratePhotoOccluder(object); meshes.push(object); break; }
     }
   });
   return meshes;

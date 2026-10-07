@@ -1,19 +1,41 @@
 import { useMapColor } from './MapTheme';
-import { useMemo, type RefObject } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { Feature } from './types';
 import { LocationHtml, LocationName } from './LocationSelection';
 
-export function Trees({ trees }: { trees: Feature['trees'] }) {
+export const Trees = memo(function Trees({ trees }: { trees: Feature['trees'] }) {
   const mapColor = useMapColor();
-  return <>{trees?.map((tree, i) => {
-    const canopyHeight = tree.height - 1.6;
-    return <group key={i} position={[tree.position[0], .12, tree.position[1]]}>
-      <mesh position={[0, tree.height * .24, 0]} raycast={() => null}><cylinderGeometry args={[.17, .23, tree.height * .48, 5]} /><meshStandardMaterial color={mapColor('#93806a')} roughness={1} /></mesh>
-      <mesh position={[0, 1.6 + canopyHeight / 2, 0]} scale={[tree.radius, canopyHeight / 2, tree.radius]} rotation={[0, i * .7, 0]} raycast={() => null}><icosahedronGeometry args={[1, 0]} /><meshStandardMaterial color={mapColor(['#798e65', '#84966d', '#718b66'][i % 3])} roughness={1} flatShading /></mesh>
-    </group>;
-  })}</>;
-}
+  const trunks = useRef<THREE.InstancedMesh>(null), crowns = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    if (!trunks.current || !crowns.current) return;
+    const transform = new THREE.Object3D(), color = new THREE.Color();
+    trees?.forEach((tree, i) => {
+      const canopyHeight = tree.height - 1.6;
+      transform.position.set(tree.position[0], .12 + tree.height * .24, tree.position[1]);
+      transform.rotation.set(0, 0, 0); transform.scale.set(1, tree.height * .48, 1);
+      transform.updateMatrix(); trunks.current!.setMatrixAt(i, transform.matrix);
+      transform.position.y = .12 + 1.6 + canopyHeight / 2;
+      transform.rotation.y = i * .7; transform.scale.set(tree.radius, canopyHeight / 2, tree.radius);
+      transform.updateMatrix(); crowns.current!.setMatrixAt(i, transform.matrix);
+      crowns.current!.setColorAt(i, color.set(mapColor(['#798e65', '#84966d', '#718b66'][i % 3])));
+    });
+    for (const mesh of [trunks.current, crowns.current]) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+  }, [trees, mapColor]);
+  if (!trees?.length) return null;
+  return <>
+    <instancedMesh key={'trunks/' + trees.length} ref={trunks} args={[undefined, undefined, trees.length]} raycast={() => null}>
+      <cylinderGeometry args={[.17, .23, 1, 5]} /><meshStandardMaterial color={mapColor('#93806a')} roughness={1} />
+    </instancedMesh>
+    <instancedMesh key={'crowns/' + trees.length} ref={crowns} args={[undefined, undefined, trees.length]} raycast={() => null}>
+      <icosahedronGeometry args={[1, 0]} /><meshStandardMaterial roughness={1} flatShading />
+    </instancedMesh>
+  </>;
+});
 
 export default function Forest({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();

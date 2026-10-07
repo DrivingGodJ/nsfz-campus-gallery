@@ -1,6 +1,6 @@
 import { useMapColor } from './MapTheme';
 import { Line } from '@react-three/drei';
-import { useMemo, type RefObject } from 'react';
+import { memo, useMemo, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { Feature, Shape } from './types';
 import { basketballSurfaces } from './basketball-geometry';
@@ -15,7 +15,7 @@ function CourtSurface({ data, color }: { data: Shape; color: string }) {
   }, [data]);
   return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .16, 0]} renderOrder={1}><shapeGeometry args={[shape]} /><meshStandardMaterial color={mapColor(color)} roughness={1} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>;
 }
-export default function BasketballCourts({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
+export default memo(function BasketballCourts({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
   const { courts, surround } = useMemo(() => basketballSurfaces(feature), [feature]);
   return <group>
@@ -26,4 +26,4 @@ export default function BasketballCourts({ feature, labelPortal }: { feature: Fe
     </group>)}
     <LocationHtml portal={labelPortal} position={[feature.courts!.center[0], 4, feature.courts!.center[1]]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name!} /></LocationHtml>
   </group>;
-}
+});

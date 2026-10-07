@@ -1,12 +1,13 @@
 import { useMapColor } from './MapTheme';
 import { Line } from '@react-three/drei';
-import { useEffect, useMemo, type RefObject } from 'react';
+import { memo, useEffect, useMemo, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { Building, BuildingOverride, Feature, Point, Shape } from './types';
 import { bridgeHeight, bridgeSurfaceHeight, curvedStairPoint, curvedStairTreads, straightStairTreads } from './structure-geometry';
 import { undergroundFootprints, undergroundLayout, type PassageOpening } from './underground-geometry';
 import { undergroundBoundaryLines, undergroundVolume } from './underground-mesh';
-import { BRIDGE_DECK_THICKNESS, bridgeLayout, bridgeRailPosts, bridgeSupports, type RailPoint } from './bridge-geometry';
+import { BRIDGE_DECK_THICKNESS, bridgeLayout, bridgeSupports, type RailPoint } from './bridge-geometry';
+import { bridgeRailGeometry } from './bridge-rail-geometry';
 import { archedBridgeGeometry } from './bridge-mesh';
 import { LocationHtml, LocationName } from './LocationSelection';
 import GateLandmark from './GateLandmark';
@@ -22,25 +23,14 @@ function Segment({ from, to, width, y, thickness, color, ghost = false }: { from
     <meshStandardMaterial color={mapColor(color)} roughness={.9} transparent={ghost} opacity={ghost ? .25 : 1} depthTest={!ghost} depthWrite={!ghost} />
   </mesh>;
 }
-function RailBar({ from, to, radius, color }: { from: RailPoint; to: RailPoint; radius: number; color: string }) {
-  const mapColor = useMapColor();
-  const geometry = useMemo(() => {
-    const direction = new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
-    return { length: direction.length(), rotation: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()) };
-  }, [from, to]);
-  if (geometry.length < 1e-6) return null;
-  return <mesh position={from.map((n, i) => (n + to[i]) / 2) as RailPoint} quaternion={geometry.rotation}><cylinderGeometry args={[radius, radius, geometry.length, 8]} /><meshStandardMaterial color={mapColor(color)} roughness={.9} /></mesh>;
-}
 function BridgeRails({ chains, smooth = false }: { chains: RailPoint[][]; smooth?: boolean }) {
   const mapColor = useMapColor();
-  const posts = useMemo(() => bridgeRailPosts(chains, 3, smooth), [chains, smooth]);
-  const corners = useMemo(() => [...new Map(chains.flat().map(point => [point.map(n => n.toFixed(6)).join(','), point])).values()], [chains]);
+  const geometry = useMemo(() => bridgeRailGeometry(chains, smooth), [chains, smooth]);
+  useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
   return <group>
-    {[{ offset: 1, radius: .065, color: '#5c7866' }, { offset: .48, radius: .04, color: '#738979' }].map(rail => <group key={rail.offset}>
-      {chains.map((chain, i) => <group key={i}>{chain.slice(1).map((to, j) => <RailBar key={j} from={[chain[j][0], chain[j][1] + rail.offset, chain[j][2]]} to={[to[0], to[1] + rail.offset, to[2]]} radius={rail.radius} color={rail.color} />)}</group>)}
-      {corners.map((point, i) => <mesh key={i} position={[point[0], point[1] + rail.offset, point[2]]}><sphereGeometry args={[rail.radius, 8, 6]} /><meshStandardMaterial color={mapColor(rail.color)} roughness={.9} /></mesh>)}
-    </group>)}
-    {posts.map((point, i) => <mesh key={i} position={[point[0], point[1] + .5, point[2]]}><boxGeometry args={[.13, 1, .13]} /><meshStandardMaterial color={mapColor('#5c7866')} roughness={.9} /></mesh>)}
+    <mesh geometry={geometry.upper}><meshStandardMaterial color={mapColor('#5c7866')} roughness={.9} /></mesh>
+    <mesh geometry={geometry.lower}><meshStandardMaterial color={mapColor('#738979')} roughness={.9} /></mesh>
+    <mesh geometry={geometry.posts}><meshStandardMaterial color={mapColor('#5c7866')} roughness={.9} /></mesh>
   </group>;
 }
 function BridgeDeck({ shapes, height }: { shapes: { outer: Point[]; holes: Point[][] }[]; height: number }) {
@@ -152,7 +142,7 @@ function UndergroundRunway({ feature, labelPortal }: { feature: Feature; labelPo
     <LocationHtml portal={labelPortal} position={[(from[0] + to[0]) / 2, floor + 4.4, (from[1] + to[1]) / 2]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name!} underground /></LocationHtml>
   </group>;
 }
-export default function CampusStructures({ features, buildings, overrides, underground, labelPortal }: { features: Feature[]; buildings: Building[]; overrides: Record<string, BuildingOverride>; underground: boolean; labelPortal: RefObject<HTMLDivElement> }) {
+export default memo(function CampusStructures({ features, buildings, overrides, underground, labelPortal }: { features: Feature[]; buildings: Building[]; overrides: Record<string, BuildingOverride>; underground: boolean; labelPortal: RefObject<HTMLDivElement> }) {
   const layout = useMemo(() => undergroundLayout(features), [features]);
   return <>{features.map(feature => {
     if (feature.type === 'mottoStone' && feature.stone) return <MottoStone key={feature.id} feature={feature} />;
@@ -169,4 +159,4 @@ export default function CampusStructures({ features, buildings, overrides, under
     if (feature.type === 'tunnelEntrance') return <Entrance key={feature.id} feature={feature} underground={underground} labelPortal={labelPortal} />;
     return null;
   })}</>;
-}
+});

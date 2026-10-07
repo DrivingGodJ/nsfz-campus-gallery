@@ -1,6 +1,6 @@
 import { useMapColor } from './MapTheme';
 import { Line } from '@react-three/drei';
-import { useMemo, type RefObject } from 'react';
+import { memo, useMemo, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { Feature, Point, Shape } from './types';
 import { stadiumRing, stadiumSurfaces } from './structure-geometry';
@@ -38,7 +38,7 @@ function FieldLine({ points }: { points: Point[] }) {
   const mapColor = useMapColor();
   return <Line points={points.map(([x, z]) => [x, LINE_HEIGHT, z])} color={mapColor('#edf0da')} lineWidth={1.2} {...lineDepth} />;
 }
-export default function SportsGround({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
+export default memo(function SportsGround({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
   const track = feature.track!;
   const surfaces = useMemo(() => stadiumSurfaces(track), [track]);
@@ -64,4 +64,4 @@ export default function SportsGround({ feature, labelPortal }: { feature: Featur
       <LocationHtml portal={labelPortal} position={[0, 4, 0]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name!} /></LocationHtml>
     </group>
   </group>;
-}
+});

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html, Line } from '@react-three/drei';
+import { Matrix4 } from 'three';
 import { asset } from './types';
 import { useMapColor } from './MapTheme';
 import type { MapPhoto } from './MapCameraRig';
@@ -17,19 +18,21 @@ function MarkerFade({ visible, children }: { visible: boolean; children: (shown:
   return children(presence.visible && visible);
 }
 
-export default function PhotoMarkers({ photos, selected, compact, labelPortal, onSelect, onPick, onExpand, direction, onVisiblePhotos, visibleViewport = FULL_MAP_VIEWPORT }: {
+export default function PhotoMarkers({ photos, selected, compact, labelPortal, onSelect, onPick, onExpand, direction, onVisiblePhotos, visibleViewport = FULL_MAP_VIEWPORT, occlusionRevision }: {
   photos: MapPhoto[]; selected?: MapPhoto | null; compact: boolean; labelPortal: RefObject<HTMLDivElement>;
   onSelect: (photo: MapPhoto) => void; onPick: (cluster: PhotoCluster, trigger: HTMLButtonElement) => void;
   onExpand: (focus: { target: [number, number, number]; distance: number }) => void;
   direction: (photo: MapPhoto) => ReactNode;
   onVisiblePhotos?: (ids: string[]) => void; visibleViewport?: MapViewport;
+  occlusionRevision?: string;
 }) {
-  const { camera, size, scene } = useThree(), mapColor = useMapColor();
+  const { camera, size, scene, invalidate } = useThree(), mapColor = useMapColor();
   const spots = useMemo(() => permanentPhotoSpots(photos), [photos]);
   const [markers, setMarkers] = useState<{ clusters: PhotoCluster[]; points: MapPhoto[] }>({ clusters: [], points: [] });
   const fadingClusters = useFadingItems(markers.clusters);
   const signature = useRef('');
   const visibleSignature = useRef('');
+  const lastView = useRef({ checked: false, world: new Matrix4(), projection: new Matrix4() });
   const updateMarkers = () => {
     const occluders = photoOccluders(scene);
     const clusters = cameraPhotoClusters(spots, camera, size, occluders, { compact, selectedId: selected?.id });
@@ -46,8 +49,18 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
       if (next !== visibleSignature.current) { visibleSignature.current = next; onVisiblePhotos(visible); }
     }
   };
-  useEffect(() => { signature.current = ''; updateMarkers(); }, [spots, scene, size.width, size.height, compact, selected?.id]);
-  useFrame(updateMarkers);
+  useEffect(() => {
+    signature.current = ''; lastView.current.checked = false; invalidate();
+  }, [spots, scene, size.width, size.height, compact, selected?.id, occlusionRevision, visibleViewport, onVisiblePhotos, invalidate]);
+  useFrame(() => {
+    camera.updateMatrixWorld();
+    const previous = lastView.current;
+    // UI fades and form changes can request a frame without moving the camera.
+    // Keep the last visibility result until the view or geometry really changes.
+    if (previous.checked && previous.world.equals(camera.matrixWorld) && previous.projection.equals(camera.projectionMatrix)) return;
+    updateMarkers();
+    previous.checked = true; previous.world.copy(camera.matrixWorld); previous.projection.copy(camera.projectionMatrix);
+  });
   useEffect(() => () => onVisiblePhotos?.([]), [onVisiblePhotos]);
   // New photo/filter data must not briefly leave old entries clickable.
   const currentIds = new Set(photos.map(photo => photo.id));
