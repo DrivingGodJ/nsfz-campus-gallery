@@ -79,6 +79,30 @@ test('floor cutaways clip flights, supports and handrails, and the thin staircas
   }
 });
 
+test('stairs sit beside the classroom wall, with enclosed outer rooms from the second floor and an open ground entrance', () => {
+  for (const [override, cutaway] of [[site.buildingOverrides[building.id]], [{ floors: 7, floorHeight: 4.2 }], [site.buildingOverrides[building.id], 1], [site.buildingOverrides[building.id], 3]]) {
+    const info = buildingLevels(building, override), section = info.sections[0], height = Math.min(section.height, (cutaway || section.floors) * info.floorHeight);
+    const body = buildingGeometry(section, height, info.floorHeight, building.groundPassages,
+      building.floorCorridors.filter(c => c.partId === section.id), building.stairwells, building.classroomWindows, building.solidCores, building.cutouts);
+    const model = mesh(body, true); model.material.side = THREE.DoubleSide;
+    for (let level = 0; level < (cutaway || section.floors); level++) {
+      for (const u of [stair.landingDepth, 3, stair.landingDepth * 2 + stair.run]) {
+        const wall = new THREE.Raycaster(point(u, stair.width / 2, .12 + level * info.floorHeight + .55), new THREE.Vector3(across[0], 0, across[1]), 0, 1).intersectObject(model)[0];
+        assert.ok(wall && wall.distance > .08 && wall.distance < .2, 'The flight is close to the classroom wall without penetrating it');
+      }
+      for (const u of [2, 3, 5]) {
+        const room = new THREE.Raycaster(point(u, -2.4, .12 + (level + .5) * info.floorHeight), new THREE.Vector3(-across[0], 0, -across[1]), 0, 5).intersectObject(model)[0];
+        assert.equal(!!room, level > 0, 'The outer room is closed on every upper floor, while the ground-floor entrance remains open');
+        if (room) {
+          assert.ok(Math.abs(room.distance - .55) < 1e-4, 'A clear gap separates the room wall from the stair shaft');
+          assert.equal(body.userData.photoOcclusionMask[room.faceIndex], 1, 'The room walls are solid photo occluders');
+        }
+      }
+    }
+    body.dispose(); model.material.dispose();
+  }
+});
+
 test('stair calibration survives map refresh without changing the photo records or creating a selectable landmark', async () => {
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   assert.deepEqual(applyCampusCorrections(campus, corrections), campus);

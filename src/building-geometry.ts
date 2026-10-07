@@ -3,7 +3,7 @@ import polygonClipping from 'polygon-clipping';
 import { passageFootprint } from './underground-geometry.ts';
 import { stairwellShaft } from './teaching-stairs.ts';
 import { classroomWallFootprint, classroomWindowLayout } from './teaching-classrooms.ts';
-import type { BuildingStairwell, ClassroomWindows, FloorCorridor, GroundPassage, Point, Shape } from './types';
+import type { BuildingSolidCore, BuildingStairwell, ClassroomWindows, FloorCorridor, GroundPassage, Point, Shape } from './types';
 
 const CORRIDOR_SLAB_THICKNESS = .25;
 
@@ -121,13 +121,14 @@ export function buildingCoreFootprint(section: Shape, passages: GroundPassage[],
   return cuts.length ? polygonClipping.difference(polygon, cuts[0], ...cuts.slice(1)) : [polygon];
 }
 
-function corridorGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[], corridors: FloorCorridor[], stairs: BuildingStairwell[], windows?: ClassroomWindows, solidCores: Shape[] = [], cutouts: Shape[] = []) {
+function corridorGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[], corridors: FloorCorridor[], stairs: BuildingStairwell[], windows?: ClassroomWindows, solidCores: BuildingSolidCore[] = [], cutouts: Shape[] = []) {
   const polygon = [section.outer, ...section.holes];
   const corridorCuts = corridors.map(corridor => [corridorFootprint(section, corridor, passages).outer]);
   const infills = corridors.flatMap(corridor => corridor.slabInfill ? [[corridor.slabInfill.outer, ...corridor.slabInfill.holes]] : []);
   const stairCuts = stairs.map(stair => [stair.opening.outer, ...stair.opening.holes]);
   const openings = [...corridorCuts, ...stairCuts];
   const solids = solidCores.map(core => [core.outer, ...core.holes]);
+  const solidStarts = solidCores.map(core => Math.max(0, ((core.startFloor ?? 1) - 1) * floorHeight));
   const openArea = openings.length ? polygonClipping.union(openings[0], ...openings.slice(1), ...infills) : [];
   const corridorArea = solids.length ? polygonClipping.difference(openArea, solids[0], ...solids.slice(1)) : openArea;
   // Stitch the small imported facade notch at slab levels only. The open
@@ -151,11 +152,13 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     const bottom = level * floorHeight;
     slabs.push([bottom, Math.min(bottom + slabThickness, height)]);
   }
-  const levels = [...new Set([0, height, Math.min(floorHeight, height), ...slabs.flat(), ...glazing.flatMap(window => [window.bottom, window.top])])].sort((a, b) => a - b);
+  const levels = [...new Set([0, height, Math.min(floorHeight, height), ...solidStarts.filter(bottom => bottom > 0 && bottom < height), ...slabs.flat(), ...glazing.flatMap(window => [window.bottom, window.top])])].sort((a, b) => a - b);
   const layers = levels.slice(0, -1).map((bottom, i) => {
     const top = levels[i + 1], middle = (bottom + top) / 2;
     const slab = slabs.some(([a, b]) => middle >= a && middle <= b);
-    let footprint = slab ? slabFootprint : solids.length ? polygonClipping.union(walls, solids[0], ...solids.slice(1)) : walls;
+    // Upper-storey rooms leave the entrance beneath them open.
+    const activeSolids = solids.filter((_, index) => middle >= solidStarts[index]);
+    let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(walls, activeSolids[0], ...activeSolids.slice(1)) : walls;
     const openWindows = !slab && glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut);
     if (openWindows && openWindows.length) footprint = polygonClipping.difference(footprint, openWindows[0], ...openWindows.slice(1));
     // Retain the ground base, rounded floor edges and roof; open the actual
@@ -234,7 +237,7 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
 
 // Geometry stays in the same local extrusion coordinates as ordinary buildings:
 // x / -map z on the footprint, and local z for height above the building base.
-export function buildingGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[] = [], corridors: FloorCorridor[] = [], stairs: BuildingStairwell[] = [], windows?: ClassroomWindows, solidCores: Shape[] = [], cutouts: Shape[] = []) {
+export function buildingGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[] = [], corridors: FloorCorridor[] = [], stairs: BuildingStairwell[] = [], windows?: ClassroomWindows, solidCores: BuildingSolidCore[] = [], cutouts: Shape[] = []) {
   if (corridors.length || stairs.length || windows || solidCores.length || cutouts.length) return corridorGeometry(section, height, floorHeight, passages, corridors, stairs, windows, solidCores, cutouts);
   const polygon = [section.outer, ...section.holes];
   const cuts = passages.map(passage => {
