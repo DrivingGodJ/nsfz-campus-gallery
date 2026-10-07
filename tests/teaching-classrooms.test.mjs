@@ -23,7 +23,7 @@ function model(floor, override) {
   return { info, bodies, dispose: () => bodies.forEach(mesh => { mesh.geometry.dispose(); mesh.material.dispose(); }) };
 }
 
-test('only the blue side passage opens on every floor, with no concrete or glass across the corridor', () => {
+test('the marked blue passage opens on every floor, with no concrete or glass across the corridor', () => {
   for (const floor of [undefined, 1, 3]) {
     const { info, bodies, dispose } = model(floor);
     const details = teachingWindowGeometry(building, info.sections, info.floorHeight, floor && floor * info.floorHeight);
@@ -45,15 +45,20 @@ test('only the blue side passage opens on every floor, with no concrete or glass
           assert.equal(hit.object.geometry.userData.photoOcclusionMask[hit.faceIndex], 0, 'Open corridor slabs do not hide photos');
         }
       }
-      // Traverse the inside of the corner instead of testing disconnected strips.
-      const turn = vector(connector.points[1]); turn.y = .12 + (level + .5) * info.floorHeight;
-      assert.equal(new THREE.Raycaster(turn.clone().add(new THREE.Vector3(-2, 0, 1)), new THREE.Vector3(0, 0, 1), 0, 4).intersectObjects(bodies).length, 0);
+      // Follow the passage back into the atrium, beside the shorter elevator.
+      const direction = vector(connector.points[1]).sub(vector(connector.points[0])).normalize();
+      const inward = new THREE.Vector3(-direction.z, 0, direction.x);
+      const turn = vector(connector.points[0]).addScaledVector(direction, 1.6).addScaledVector(inward, 1.5);
+      turn.y = .12 + (level + .5) * info.floorHeight;
+      const ray = new THREE.Raycaster(turn, direction.negate(), 0, 4);
+      assert.equal(ray.intersectObjects(bodies).length, 0, 'The shorter elevator leaves the turn back into the atrium open');
+      assert.equal(ray.intersectObject(glass).length, 0);
     }
     for (const geometry of Object.values(details)) geometry.dispose(); glass.material.dispose(); dispose();
   }
 });
 
-test('the green elevator stays solid while the red classroom row is no longer cut through', () => {
+test('the marked red elevator stays solid while the adjacent classroom row remains enclosed', () => {
   const { info, bodies, dispose } = model();
   const shaft = building.solidCores[0], center = vector(shaft.outer[0]).lerp(vector(shaft.outer[2]), .5);
   for (let floor = 0; floor < info.sections[0].floors; floor++) {
@@ -78,45 +83,72 @@ test('the green elevator stays solid while the red classroom row is no longer cu
   dispose();
 });
 
-test('the red end facade stays at the original classroom boundary on every floor', () => {
+test('the blue strip opens the last three metres of the north classroom end, leaving the rest enclosed', () => {
   const section = building.parts.find(part => part.id === 'main');
   const a = vector(section.outer[9]), b = vector(section.outer[10]), direction = b.clone().sub(a).normalize();
   const inward = new THREE.Vector3(-direction.z, 0, direction.x);
   for (const selectedFloor of [undefined, 1, 3]) {
     const { info, bodies, dispose } = model(selectedFloor);
-    for (let floor = 0; floor < (selectedFloor || section.floors || building.floors); floor++) for (const t of [.1, .5, .9]) {
-      const point = a.clone().lerp(b, t).addScaledVector(inward, -.5); point.y = .12 + floor * info.floorHeight + .55;
-      const hit = new THREE.Raycaster(point, inward, 0, 4).intersectObjects(bodies)[0];
-      assert.ok(hit && Math.abs(hit.distance - .5) < 1e-4, 'The end is a complete classroom wall, not a recessed open balcony');
+    for (let floor = 0; floor < (selectedFloor || section.floors || building.floors); floor++) {
+      for (const distance of [4, 6, 9]) {
+        const point = b.clone().addScaledVector(direction, -distance).addScaledVector(inward, -.5); point.y = .12 + floor * info.floorHeight + .55;
+        const hit = new THREE.Raycaster(point, inward, 0, 4).intersectObjects(bodies)[0];
+        assert.ok(hit && Math.abs(hit.distance - .5) < 1e-4, 'The unmarked classroom facade keeps its original boundary');
+      }
+      const point = b.clone().addScaledVector(direction, -1.5).addScaledVector(inward, -.5); point.y = .12 + (floor + .5) * info.floorHeight;
+      assert.equal(new THREE.Raycaster(point, inward, 0, 4).intersectObjects(bodies).length, 0, 'The blue strip has an open end, rather than a classroom wall');
     }
     dispose();
   }
 });
 
-test('the small elevator has a sealed roof and a continuous connection to the classroom body', () => {
+test('the straight corridor keeps removed bays empty while a thin wall links the elevator and classrooms on every floor', () => {
   const shaft = building.solidCores[0].outer, section = building.parts.find(part => part.id === 'main');
-  const width = vector(shaft[1]).sub(vector(shaft[0])), depth = vector(shaft[3]).sub(vector(shaft[0]));
-  assert.ok(Math.abs(width.length() - 1.5386214687945683) < 1e-6);
-  assert.ok(Math.abs(depth.length() - 2.4) < 1e-6, 'Joining the wall does not enlarge the shaft again');
+  const origin = vector(section.outer[11]), across = vector(section.outer[10]).sub(origin).normalize();
+  const along = new THREE.Vector3(-across.z, 0, across.x);
+  const at = (u, v) => origin.clone().addScaledVector(across, u).addScaledVector(along, v);
+  const local = p => { const delta = vector(p).sub(origin); return [delta.dot(across), delta.dot(along)]; };
+  const corners = shaft.slice(0, 4).map(local);
+  assert.ok(corners.every(([u,v]) => u >= -3.161 && u <= .001 && v >= .599 && v <= 3.001), 'The elevator occupies the red area above old A, on the left of old B');
+  assert.ok(Math.abs(corners[1][0] - corners[0][0] - 3.16) < 1e-6);
+  assert.ok(Math.abs(corners[3][1] - corners[0][1] - 2.4) < 1e-6);
+  assert.ok(connector.points.every(p => local(p)[1] < -3.32 && local(p)[1] > -3.35), 'The corridor continues the neighbouring facade without its old 34 cm step');
+  assert.equal(connector.slabInfill, undefined, 'The removed right-hand platform is not recreated by an infill');
+  const wall = building.solidCores[2], wallWidth = vector(wall.outer[2]).distanceTo(vector(wall.outer[1]));
+  assert.ok(wallWidth < .01, 'Blanking the existing wall must not add another elevator-sized volume');
+  const connection = building.solidCores[3].outer.map(local);
+  assert.ok(Math.abs(connection[1][0] - connection[0][0] - .28) < 1e-6, 'The new connection is an ordinary 28 cm wall');
+  assert.ok(Math.abs(connection[0][1] - 3) < 1e-6 && connection[2][1] > 5.89, 'The wall joins the elevator to the lower classroom row');
   for (const selectedFloor of [undefined, 1, 3]) {
     const { info, bodies, dispose } = model(selectedFloor);
-    for (const u of [.05, .5, .95]) for (const v of [.05, .5, .95]) {
-      const point = vector(shaft[0]).addScaledVector(width, u).addScaledVector(depth, v); point.y = 100;
-      const hit = new THREE.Raycaster(point, new THREE.Vector3(0, -1, 0)).intersectObjects(bodies)[0];
-      assert.ok(hit && Math.abs(hit.point.y - (.12 + (selectedFloor || info.sections[0].floors) * info.floorHeight)) < 1e-4, 'Every part of the top is capped, including a floor cutaway');
-    }
-    const mouthStart = vector(connector.railEdges[1][1]), mouthEnd = vector(shaft[0]);
-    for (const t of [.1, .5, .9]) {
-      const point = mouthStart.clone().lerp(mouthEnd, t).addScaledVector(width, .5); point.y = 100;
-      const hit = new THREE.Raycaster(point, new THREE.Vector3(0, -1, 0)).intersectObjects(bodies)[0];
-      assert.ok(hit && Math.abs(hit.point.y - (.12 + (selectedFloor || info.sections[0].floors) * info.floorHeight)) < 1e-4, 'The narrow gap at the elevator mouth is closed by a continuous cap');
-    }
-    const join = vector(section.outer[12]).addScaledVector(width, .5), direction = depth.clone().normalize();
+    const windows = teachingWindowGeometry(building, info.sections, info.floorHeight, selectedFloor && selectedFloor * info.floorHeight);
+    const glass = new THREE.Mesh(windows.glass, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); glass.updateMatrixWorld();
     for (let floor = 0; floor < (selectedFloor || info.sections[0].floors); floor++) {
-      const point = join.clone().addScaledVector(direction, -.08); point.y = .12 + floor * info.floorHeight + .55;
-      assert.equal(new THREE.Raycaster(point, direction, 0, .09).intersectObjects(bodies).length, 0, 'The shared rear face has no gap or detached wall between shaft and classroom');
+      const y = .12 + (floor + .5) * info.floorHeight;
+      for (const [u,v] of [[2.5,1.5],[-1.5,4.2],[-1.5,.3]]) {
+        const point = at(u,v); point.y = y;
+        for (const direction of [new THREE.Vector3(0,1,0),new THREE.Vector3(0,-1,0),across]) {
+          assert.equal(new THREE.Raycaster(point,direction,0,direction.y ? 100 : .8).intersectObjects(bodies).length, 0, 'Black areas lose their walls, floors and roof rather than only their facade');
+          assert.equal(new THREE.Raycaster(point,direction,0,direction.y ? 100 : .8).intersectObject(glass).length, 0, 'No glass floats over the removed bays');
+        }
+      }
+      // The requested wall bridges the removed bay and continues the classroom wall.
+      for (const v of [3.1, 4.2, 5.7, 8, 12]) {
+        const start = at(-3.7,v); start.y = y;
+        const ray = new THREE.Raycaster(start, across, 0, 1.2), hit = ray.intersectObjects(bodies)[0];
+        assert.ok(hit && hit.distance < .6, 'The marked black line is a continuous concrete wall');
+        assert.equal(ray.intersectObject(glass).length, 0, 'The black wall has no leftover glazing');
+        const inner = at(-2.4,v); inner.y = y;
+        const reverse = new THREE.Raycaster(inner, across.clone().negate(), 0, 1.2).intersectObjects(bodies)[0];
+        assert.ok(reverse && reverse.distance > .45, 'The wall retains ordinary classroom wall thickness');
+      }
     }
-    dispose();
+    const top = at(-3.03, 4.2); top.y = 100;
+    const cap = new THREE.Raycaster(top, new THREE.Vector3(0, -1, 0)).intersectObjects(bodies)[0];
+    const height = selectedFloor ? selectedFloor * info.floorHeight : info.sections[0].height;
+    assert.ok(cap && Math.abs(cap.point.y - height - .12) < 1e-4, 'The connecting wall remains sealed at the roof and selected-floor cutaways');
+    assert.equal(cap.object.geometry.userData.photoOcclusionMask[cap.faceIndex], 1, 'The wall cap is opaque');
+    for (const geometry of Object.values(windows)) geometry.dispose(); glass.material.dispose(); dispose();
   }
 });
 
@@ -129,20 +161,20 @@ test('the exposed return has rails from the second floor, without blocking eithe
     for (let floor = 0; floor < info.sections[0].floors; floor++) for (const t of [.1, .5, .9]) {
       const point = vector(a).lerp(vector(b), t).addScaledVector(normal, -.5); point.y = .12 + floor * info.floorHeight + .25 + 1.05;
       const hits = new THREE.Raycaster(point, normal, 0, 1).intersectObject(rail);
-      assert.equal(hits.length > 0, floor > 0, 'Both the long exposed side and the three-metre return are guarded on every upper floor');
+      assert.equal(hits.length > 0, floor > 0, 'The straight corridor end and its exposed front are guarded on every upper floor');
     }
   }
   geometry.dispose(); rail.material.dispose();
 });
 
-test('the marked front face has no guard rails on any floor while the side corridor retains them', () => {
+test('the classroom front has no rails while the newly opened blue end is guarded above the ground floor', () => {
   const info = buildingLevels(building), geometry = teachingRailGeometry(building, info.sections, info.floorHeight);
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); mesh.updateMatrixWorld();
   const section = building.parts.find(part => part.id === 'main');
   const a = vector(section.outer[9]), b = vector(section.outer[10]), length = a.distanceTo(b), direction = b.clone().sub(a).normalize();
   const normal = new THREE.Vector3(-direction.z, 0, direction.x);
   assert.ok(connector.railEdges[0].length >= 3, 'The side guard turns around the exposed end, without extending along the classroom front');
-  for (let level = 0; level < info.sections[0].floors; level++) for (const along of [length * .2, length * .5, length * .8]) {
+  for (let level = 0; level < info.sections[0].floors; level++) for (const along of [length * .2, length * .4, length * .6]) {
     const point = a.clone().addScaledVector(direction, along).addScaledVector(normal, -.5);
     point.y = .12 + level * info.floorHeight + .25 + 1.05;
     assert.equal(new THREE.Raycaster(point, normal, 0, 1).intersectObject(mesh).length, 0, 'No horizontal rail or post crosses the marked front edge');
