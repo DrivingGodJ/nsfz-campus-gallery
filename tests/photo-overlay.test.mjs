@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceOverlayClock, overlayPhotoAlpha, overlayProgress } from '../src/photo-overlay.ts';
+import { advanceOverlayClock, OVERLAY_INITIAL_PROGRESS, overlayPhotoAlpha, overlayProgress } from '../src/photo-overlay.ts';
 import { depthHistogram, depthTransitionFrame, revealFront } from '../src/depth-transition.ts';
 
 test('both depth fronts advance far to near, and exit grows the model instead of retracting the photo', () => {
@@ -40,12 +40,24 @@ test('a thumbnail starts entry immediately while incoming display bytes limit it
   assert.equal(normal.elapsed, 800);
   assert.ok(waiting.elapsed > 0, 'the thumbnail can start before any display bytes arrive');
   const stalled = advanceOverlayClock(waiting, 6400, 0);
-  assert.ok(stalled.elapsed <= 160, 'a stalled download cannot finish the transition');
+  assert.ok(Math.abs(overlayProgress(stalled.elapsed, 1600) - OVERLAY_INITIAL_PROGRESS) < 1e-12, 'a stalled download still reveals an actual 10% of the photo');
   const downloading = advanceOverlayClock(stalled, 6400, .6);
   assert.ok(downloading.elapsed > stalled.elapsed);
   assert.ok(downloading.elapsed <= 1600 * .6 * .95);
   const decoding = advanceOverlayClock(downloading, 6400, .99);
   assert.ok(overlayProgress(decoding.elapsed, 1600) < 1, 'reserve the end until the display image has decoded');
+});
+
+test('the initial 10% plays at normal speed even when the display and depth have received no bytes', () => {
+  for (const frameTime of [8, 16, 33, 100]) {
+    let clock = { elapsed: 0, rate: 1 };
+    const partial = advanceOverlayClock(clock, 160, 0);
+    assert.equal(partial.elapsed, 160, 'the curiosity preview must not slow before reaching 10%');
+    for (let elapsed = 0; elapsed < 2000; elapsed += frameTime) clock = advanceOverlayClock(clock, frameTime, 0);
+    assert.ok(Math.abs(overlayProgress(clock.elapsed, 1600) - .1) < 1e-12);
+    const stillWaiting = advanceOverlayClock(clock, 16000, 0);
+    assert.equal(stillWaiting.elapsed, clock.elapsed, 'do not reveal the rest until download progress permits it');
+  }
 });
 
 test('the display becoming ready restores speed continuously without skipping or rewinding', () => {
