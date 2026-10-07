@@ -65,6 +65,9 @@ function splitFacade(section: Shape, corners: Point[]): Shape {
 }
 
 function corridorFootprint(section: Shape, corridor: FloorCorridor, passages: GroundPassage[]): Shape {
+  // A calibrated outside walkway has its own boundary. Buffering its facade
+  // centreline on both sides would cut through the adjacent classrooms.
+  if (corridor.footprint) return corridor.footprint;
   // Explicit routes follow the facade: cut the stated depth into the building
   // and across the outer edge, including small imported facade protrusions.
   if ('points' in corridor) return passageFootprint(corridor.points, corridor.depth * 2);

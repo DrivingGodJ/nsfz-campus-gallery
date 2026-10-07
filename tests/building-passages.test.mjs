@@ -10,6 +10,21 @@ const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json'
 const building = campus.buildings.find(item => item.id === 'way/855459420');
 const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
 
+function onShape(shape, x, z) {
+  if (!shape) return false;
+  const locate = ring => {
+    let inside = false;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [a, b] = [ring[i], ring[i + 1]], dx = b[0] - a[0], dz = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz)));
+      if (Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t) < 1e-4) return 0;
+      if ((a[1] > z) !== (b[1] > z) && x < a[0] + (z - a[1]) * dx / dz) inside = !inside;
+    }
+    return inside ? 1 : -1;
+  };
+  return locate(shape.outer) >= 0 && shape.holes.every(hole => locate(hole) <= 0);
+}
+
 function model(override, selectedFloor) {
   const info = buildingLevels(building, override);
   const meshes = info.sections.map(section => {
@@ -47,6 +62,9 @@ test('both teaching-building roads remain open, with slabs above and continuous 
           const z = -vertices.getY(i) * (1 - t) - vertices.getY(i + 1) * t;
           const onCorridor = building.floorCorridors?.some(corridor => {
             if ('passageIndex' in corridor) return false; // Covered by the ground-passage footprint check below.
+            // Calibrated outside walks and the short elevator-mouth landing
+            // have explicit slab boundaries beyond a centreline buffer.
+            if (onShape(corridor.footprint, x, z) || onShape(corridor.slabInfill, x, z)) return true;
             if ('points' in corridor) return corridor.points.slice(1).some((to, i) => {
               const from = corridor.points[i], dx = to[0] - from[0], dz = to[1] - from[1];
               const t = Math.max(0, Math.min(1, ((x - from[0]) * dx + (z - from[1]) * dz) / (dx * dx + dz * dz)));
