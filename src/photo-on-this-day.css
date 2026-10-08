@@ -1,0 +1,9 @@
+.on-this-day{padding:0 23px 18px}
+.on-this-day-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.on-this-day-heading h2{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:550}
+.on-this-day-heading p{font-size:10px;color:var(--muted);white-space:nowrap}
+.on-this-day .gallery-grid{display:flex;gap:12px;padding:3px 3px 8px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
+.on-this-day .gallery-card{flex:0 0 114px}
+.on-this-day .gallery-card img{aspect-ratio:1.4}
+.on-this-day .gallery-card strong{margin-top:6px}
+@media(max-width:760px){.on-this-day{padding:0 20px 12px}.on-this-day .gallery-card{flex-basis:104px}}

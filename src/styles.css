@@ -190,6 +190,14 @@ button.comparison-image{cursor:zoom-in}
 .map-photo.aerial.selected{border-color:var(--photo-selected)}
 .map-photo.mixed:not(.selected){border-color:transparent;background-image:linear-gradient(135deg,var(--photo-accent) 50%,var(--thumb-border,#faf9f4) 50%)}
 .map-photo.aerial .cluster-count{background:var(--photo-accent)}
+/* Likes warm the photo frame without changing selection, grouping or image size. */
+.map-photo{--photo-frame-base:var(--thumb-border,#faf9f4)}
+.map-photo.selected{--photo-frame-base:var(--selected,#4a6a51)}
+.map-photo.aerial{--photo-frame-base:var(--photo-accent)}
+.map-photo.aerial.selected{--photo-frame-base:var(--photo-selected)}
+.map-photo,.map-photo.selected,.map-photo.aerial,.map-photo.aerial.selected{border-color:color-mix(in srgb,var(--photo-frame-base),#dc3e43 var(--photo-like-red,0%))}
+.map-photo.mixed:not(.selected){border-color:transparent;background-image:linear-gradient(135deg,color-mix(in srgb,var(--photo-accent),#dc3e43 var(--photo-like-red,0%)) 50%,color-mix(in srgb,var(--thumb-border,#faf9f4),#dc3e43 var(--photo-like-red,0%)) 50%)}
+.gallery-card img,.cluster-picker-photo img{box-shadow:0 0 0 2px color-mix(in srgb,transparent,#dc3e43 var(--photo-like-red,0%));transition:box-shadow .18s}
 .map-photo.compact{width:44px;height:36px}
 .map-photo.collage.compact{width:60px;height:48px}
 .map-photo::before{content:"";position:absolute;inset:-6px}

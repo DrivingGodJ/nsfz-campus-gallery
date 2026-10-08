@@ -19,13 +19,13 @@ export function usePhotoPreloading(photos: Photo[] | undefined, selected: Photo 
     const root = catalog.current;
     visibility.current.update('catalog', [], performance.now());
     if (!root || !galleryOpen || typeof IntersectionObserver === 'undefined') return;
-    const visible = new Set<string>();
+    const visible = new Set<HTMLElement>();
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
-        const id = (entry.target as HTMLElement).dataset.preloadPhotoId!;
-        if (entry.isIntersecting && entry.intersectionRatio >= .6) visible.add(id); else visible.delete(id);
+        const element = entry.target as HTMLElement;
+        if (entry.isIntersecting && entry.intersectionRatio >= .6) visible.add(element); else visible.delete(element);
       }
-      visibility.current.update('catalog', [...visible], performance.now());
+      visibility.current.update('catalog', [...new Set([...visible].map(element => element.dataset.preloadPhotoId!))], performance.now());
     }, { root, threshold: [.6] });
     root.querySelectorAll('[data-preload-photo-id]').forEach(node => observer.observe(node));
     return () => { observer.disconnect(); visibility.current.update('catalog', [], performance.now()); };

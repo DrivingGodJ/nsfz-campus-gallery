@@ -12,19 +12,22 @@ import { PHOTO_FADE_MS } from './fading-items';
 import { isAerialPhoto } from './locations';
 import { photoMarkerColors } from './photo-marker-colors';
 import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
+import type { PhotoLikes } from './photo-sort';
+import { photoLikeFrame } from './photo-like-frame';
 
 function MarkerFade({ visible, children }: { visible: boolean; children: (shown: boolean) => ReactNode }) {
   const presence = useAnimatedPresence(visible, PHOTO_FADE_MS, true);
   return children(presence.visible && visible);
 }
 
-export default function PhotoMarkers({ photos, selected, compact, labelPortal, onSelect, onPick, onExpand, direction, onVisiblePhotos, visibleViewport = FULL_MAP_VIEWPORT, occlusionRevision }: {
+export default function PhotoMarkers({ photos, selected, compact, labelPortal, onSelect, onPick, onExpand, direction, onVisiblePhotos, visibleViewport = FULL_MAP_VIEWPORT, occlusionRevision, photoLikes }: {
   photos: MapPhoto[]; selected?: MapPhoto | null; compact: boolean; labelPortal: RefObject<HTMLDivElement>;
   onSelect: (photo: MapPhoto) => void; onPick: (cluster: PhotoCluster, trigger: HTMLButtonElement) => void;
   onExpand: (focus: { target: [number, number, number]; distance: number }) => void;
   direction: (photo: MapPhoto) => ReactNode;
   onVisiblePhotos?: (ids: string[]) => void; visibleViewport?: MapViewport;
   occlusionRevision?: string;
+  photoLikes?: PhotoLikes;
 }) {
   const { camera, size, scene, invalidate } = useThree(), mapColor = useMapColor();
   const spots = useMemo(() => permanentPhotoSpots(photos), [photos]);
@@ -75,12 +78,13 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
     const aerialColors = photoMarkerColors(cluster.photos.find(isAerialPhoto) || photo);
     const position = cluster.position;
     const visible = expiresAt === null && cluster.photos.every(photo => currentIds.has(photo.id));
+    const likes = Math.max(0, ...cluster.photos.map(photo => photoLikes?.[photo.id]?.count || 0));
     return <group key={cluster.id}>
       {!active && !grouped && direction(photo)}
       <Line points={[[position.x, Math.min(position.y, ...cluster.photos.map(photo => photo.pointHeight ?? photo.position.height)), position.z], [position.x, position.y + PHOTO_MARKER_LIFT, position.z]]} color={mapColor(active ? colors.selected : allAerial ? colors.stem : '#989b83')} lineWidth={1.5} />
       <Html portal={labelPortal} position={[position.x, position.y + PHOTO_MARKER_LIFT, position.z]} center zIndexRange={[18, 10]} style={{ pointerEvents: 'none' }}>
         <MarkerFade visible={visible}>{shown => <button className={'map-photo ' + (grouped ? 'collage ' : '') + (active ? 'selected ' : '') + (allAerial ? 'aerial ' : mixed ? 'mixed ' : '') + (compact && !active ? 'compact' : '')}
-          style={{ opacity: shown ? 1 : 0, pointerEvents: shown ? 'auto' : 'none', '--photo-accent': mapColor(aerialColors.border), '--photo-selected': mapColor(colors.selected), borderColor: active && isAerialPhoto(photo) ? mapColor(colors.selected) : undefined } as CSSProperties} disabled={!visible} aria-hidden={!visible}
+          style={{ ...photoLikeFrame(likes), opacity: shown ? 1 : 0, pointerEvents: shown ? 'auto' : 'none', '--photo-accent': mapColor(aerialColors.border), '--photo-selected': mapColor(colors.selected) } as CSSProperties} disabled={!visible} aria-hidden={!visible}
           data-photo-count={cluster.photos.length} data-spot-count={cluster.spots.length} data-photo-ids={cluster.photos.map(photo => photo.id).join(',')}
           data-photo-capture={allAerial ? 'aerial' : mixed ? 'mixed' : 'ground'}
           aria-pressed={active}
