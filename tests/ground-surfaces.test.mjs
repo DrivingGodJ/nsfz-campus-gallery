@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import * as THREE from 'three';
 import { groundSurfaces } from '../src/ground-geometry.ts';
+import { buildingGeometry } from '../src/building-geometry.ts';
 import { passageFootprint } from '../src/underground-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
@@ -11,8 +12,8 @@ const polygon = shape => [shape.outer, ...(shape.holes || [])];
 const polygons = shapes => shapes.map(polygon);
 const ringArea = ring => Math.abs(ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0) / 2);
 const area = geometry => geometry.reduce((sum, [outer, ...holes]) => sum + ringArea(outer) - holes.reduce((n, ring) => n + ringArea(ring), 0), 0);
-const roads = campus.features.filter(feature => feature.type === 'path' && feature.points && !feature.representedBy).flatMap(feature =>
-  feature.points.slice(1).map((to, i) => passageFootprint([feature.points[i], to], feature.width || 3)));
+const roads = campus.features.filter(feature => feature.type === 'path' && feature.points && !feature.representedBy)
+  .map(feature => passageFootprint(feature.points, feature.width || 3));
 roads.push(...campus.features.filter(feature => feature.type === 'bridge' && !feature.archRise && feature.deckHeight <= .12)
   .map(feature => passageFootprint(feature.points, feature.width)));
 const roadMask = polygonClipping.union(...roads.map(polygon));
@@ -97,4 +98,23 @@ test('the unlabeled forecourt is paved once without overlapping water, roads, bu
     ...campus.features.filter(feature => ['green', 'sport'].includes(feature.type)).flatMap(feature => layout.features.get(feature.id) || [])];
   for (const surface of underlying) assert.ok(area(polygonClipping.intersection(paving, polygon(surface))) < 1e-7,
     'Plaza and differently colored ground faces never cover the same area');
+});
+
+test('joined road bends cover their full width and the bridge approach meets the fork without a gap', () => {
+  const routes = [ { points:[[0,0],[10,0],[10,10]],width:4 }, ...campus.features.filter(f=>['way/855459414','local/bridge-upper-approach'].includes(f.id)) ];
+  const targets=routes.map(route=>{
+    const result=new THREE.Mesh(buildingGeometry(passageFootprint(route.points,route.width),.04,3.6),new THREE.MeshBasicMaterial());
+    result.rotation.x=-Math.PI/2; result.position.y=.075; result.updateMatrixWorld(); return result;
+  });
+  try {
+    const fork=routes[1].points[1], entrance=routes[2].points[0];
+    for(const [point,meshes] of [[[11, -1],[targets[0]]],[[9,1],[targets[0]]],[fork,targets.slice(1)],[entrance,targets.slice(1)]]) {
+      const hits=new THREE.Raycaster(new THREE.Vector3(point[0],1,point[1]),new THREE.Vector3(0,-1,0),0,2).intersectObjects(meshes);
+      assert.ok(hits.length,'There is a road surface at each outside miter, inside bend and shared entrance');
+      assert.ok(Math.abs(hits[0].point.y-.115)<1e-6,'The repaired road retains its original surface height');
+    }
+    const layout=groundSurfaces({ boundary:[[-5,-5],[15,-5],[15,15],[-5,15],[-5,-5]],buildings:[],features:[{id:'bend',type:'path',...routes[0]}] });
+    const rendered=polygon(passageFootprint(routes[0].points,4));
+    assert.ok(area(polygonClipping.intersection(rendered,polygons(layout.campus)))<1e-7,'Ground cuts use the same joined boundary as the visible road');
+  } finally { targets.forEach(target=>{target.geometry.dispose();target.material.dispose();}); }
 });

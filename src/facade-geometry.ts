@@ -51,9 +51,9 @@ export function dormitoryProfile(building: Building) {
   return { shape: { outer, holes: building.holes }, curve };
 }
 
-export function dormitoryBodyGeometry(building: Building, height: number, floorHeight: number) {
+export function dormitoryBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
   const { shape, curve } = dormitoryProfile(building);
-  const geometry = buildingGeometry(shape, height, floorHeight, building.groundPassages);
+  const geometry = buildingGeometry(shape, height, floorHeight, building.groundPassages, [], [], undefined, [], [], cutaway);
   return smoothSideNormals(geometry, shape, curve);
 }
 
@@ -153,12 +153,12 @@ function flatCap(shape: Shape, height: number, downward: boolean) {
 }
 const polygonArea = (ring: Point[]) => Math.abs(ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0)) / 2;
 
-export function cafeteriaBodyGeometry(building: Building, height: number, floorHeight: number) {
+export function cafeteriaBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
   const lower = cafeteriaLowerProfile(building).shape, boundary = Math.min(height, 2 * floorHeight);
-  if (height <= boundary) return smoothSideNormals(buildingGeometry(lower, height, floorHeight), lower, outline(lower));
+  if (height <= boundary) return smoothSideNormals(buildingGeometry(lower, height, floorHeight, [], [], [], undefined, [], [], cutaway), lower, outline(lower));
   const positions: number[] = [];
-  const append = (shape: Shape, depth: number, bottom: number, skipBottom: boolean, skipTop: boolean) => {
-    const geometry = buildingGeometry(shape, depth, floorHeight), p = geometry.getAttribute('position');
+  const append = (shape: Shape, depth: number, bottom: number, skipBottom: boolean, skipTop: boolean, openTop = false) => {
+    const geometry = buildingGeometry(shape, depth, floorHeight, [], [], [], undefined, [], [], openTop), p = geometry.getAttribute('position');
     for (let i = 0; i < p.count; i += 3) {
       if (skipBottom && [0, 1, 2].every(j => Math.abs(p.getZ(i + j)) < 1e-5) || skipTop && [0, 1, 2].every(j => Math.abs(p.getZ(i + j) - depth) < 1e-5)) continue;
       for (let j = 0; j < 3; j++) positions.push(p.getX(i + j), p.getY(i + j), p.getZ(i + j) + bottom);
@@ -166,7 +166,7 @@ export function cafeteriaBodyGeometry(building: Building, height: number, floorH
     geometry.dispose();
   };
   append(lower, boundary, 0, false, true);
-  append(building, height - boundary, boundary, true, false);
+  append(building, height - boundary, boundary, true, false, cutaway);
   const original = [building.outer, ...building.holes], rounded = [lower.outer, ...lower.holes];
   for (const [outer, ...holes] of polygonClipping.difference(rounded, original)) if (polygonArea(outer) > 1e-6) positions.push(...flatCap({ outer, holes }, boundary, false));
   for (const [outer, ...holes] of polygonClipping.difference(original, rounded)) if (polygonArea(outer) > 1e-6) positions.push(...flatCap({ outer, holes }, boundary, true));
@@ -176,7 +176,7 @@ export function cafeteriaBodyGeometry(building: Building, height: number, floorH
 
 // Only the dormitory entry, plaque and observatory have local details. The
 // cafeteria uses its body geometry alone, with no glass or facade frames.
-export function facadeGeometry(building: Building, floors: number, floorHeight: number, visibleHeight = floors * floorHeight) {
+export function facadeGeometry(building: Building, floors: number, floorHeight: number, visibleHeight = floors * floorHeight, cutaway = false) {
   const model = building.facade!, height = floors * floorHeight, top = FACADE_BASE + Math.min(height, visibleHeight);
   const complete = visibleHeight >= height - 1e-6, edges = edgesOf(outline(building));
   const vertices: Record<Material, number[]> = { glass: [], frame: [], stone: [], metal: [], emblem: [] };
@@ -233,21 +233,23 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
       panel('stone', edge, along, plaqueY + plaqueHeight * .03, plaqueWidth * .38, plaqueHeight * .045, .35, .02);
       panel('stone', edge, along, plaqueY - plaqueHeight * .11, plaqueWidth * .28, plaqueHeight * .045, .35, .02);
       plaque = { center: at(edge, along, plaqueY, .3), width: plaqueWidth + .22, height: plaqueHeight + .22 };
-      const center = at(edge, along, 0, -3.1), radius = floorHeight * .77;
-      const base = top + floorHeight * .4 + .01, domeRise = floorHeight * .73;
-      box('stone', [center[0], top + floorHeight * .2 + .01, center[2]], [6.4, floorHeight * .4, 6.4], edge.axis);
-      const sphere = new THREE.SphereGeometry(radius, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-      sphere.scale(1, domeRise / radius, 1); sphere.translate(center[0], base, center[2]); append('stone', sphere);
-      for (let i = 0; i < 20; i++) {
-        const theta = i * Math.PI / 10;
-        const curve = new THREE.CurvePath<THREE.Vector3>();
-        for (let j = 0; j < 12; j++) {
-          const p = (s: number) => new THREE.Vector3(center[0] + (radius + .025) * Math.sin(s) * Math.cos(theta), base + domeRise * Math.cos(s) + .025, center[2] + (radius + .025) * Math.sin(s) * Math.sin(theta));
-          curve.add(new THREE.LineCurve3(p(j * Math.PI / 24), p((j + 1) * Math.PI / 24)));
+      if (!cutaway) {
+        const center = at(edge, along, 0, -3.1), radius = floorHeight * .77;
+        const base = top + floorHeight * .4 + .01, domeRise = floorHeight * .73;
+        box('stone', [center[0], top + floorHeight * .2 + .01, center[2]], [6.4, floorHeight * .4, 6.4], edge.axis);
+        const sphere = new THREE.SphereGeometry(radius, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+        sphere.scale(1, domeRise / radius, 1); sphere.translate(center[0], base, center[2]); append('stone', sphere);
+        for (let i = 0; i < 20; i++) {
+          const theta = i * Math.PI / 10;
+          const curve = new THREE.CurvePath<THREE.Vector3>();
+          for (let j = 0; j < 12; j++) {
+            const p = (s: number) => new THREE.Vector3(center[0] + (radius + .025) * Math.sin(s) * Math.cos(theta), base + domeRise * Math.cos(s) + .025, center[2] + (radius + .025) * Math.sin(s) * Math.sin(theta));
+            curve.add(new THREE.LineCurve3(p(j * Math.PI / 24), p((j + 1) * Math.PI / 24)));
+          }
+          append('metal', new THREE.TubeGeometry(curve, 24, .023, 4, false));
         }
-        append('metal', new THREE.TubeGeometry(curve, 24, .023, 4, false));
+        dome = { center: [center[0], center[2]], base, peak: base + domeRise + .05, radius };
       }
-      dome = { center: [center[0], center[2]], base, peak: base + domeRise + .05, radius };
     }
   }
   const geometries = Object.entries(vertices).filter(([, p]) => p.length).map(([kind, positions]) => {

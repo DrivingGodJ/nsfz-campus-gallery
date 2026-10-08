@@ -24,10 +24,13 @@ function strip(from: Point, to: Point, normal: Point, start: number, end: number
 
 // Hollow only the classroom cores. Corridor and stair openings have already
 // been removed; complete concrete slabs keep classrooms closed above and below.
-export function classroomWallFootprint(core: MultiPolygon, thickness: number): MultiPolygon {
-  const walls = wallEdges(core).map(({ from, to, normal }) => strip(from, to, normal, -.001, thickness));
+// Dense curved outlines can supply the same coordinate snapping used by their
+// slab layers, so near-coincident strip edges remain stable through both booleans.
+export function classroomWallFootprint(core: MultiPolygon, thickness: number, stabilize: (polygons: MultiPolygon) => MultiPolygon = polygons => polygons): MultiPolygon {
+  core = stabilize(core);
+  const walls = stabilize(wallEdges(core).map(({ from, to, normal }) => strip(from, to, normal, -.001, thickness)));
   if (!walls.length) return [];
-  return polygonClipping.intersection(core, polygonClipping.union(walls[0], ...walls.slice(1)));
+  return polygonClipping.intersection(core, stabilize(polygonClipping.union(walls[0], ...walls.slice(1))));
 }
 
 export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = []): ClassroomWindow[] {

@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import polygonClipping from 'polygon-clipping';
+import { snapFootprint } from './building-geometry.ts';
+import { laboratoryLayout } from './laboratory-geometry.ts';
 import type { Building, BuildingPart, Point } from './types';
 
 export const SKYLIGHT_BASE = .12;
@@ -10,13 +13,21 @@ type Section = BuildingPart & { height: number };
 export function buildingSkylightGeometry(building: Building, sections: Section[], cutawayHeight?: number) {
   return (building.skylights || []).flatMap((skylight, index) => {
     const section = sections.find(section => section.id === skylight.partId);
-    const hole = skylight.outline === 'outer' ? section?.outer : section?.holes[skylight.holeIndex ?? -1];
+    let hole = skylight.outline === 'outer' ? section?.outer : section?.holes[skylight.holeIndex ?? -1];
     // A roof belongs to its original section. It must not move down onto a
     // selected lower floor, or cover the neighbouring open courtyard.
-    if (!section || !hole?.length || cutawayHeight !== undefined && cutawayHeight < section.height) return [];
+    if (!section || !hole?.length || cutawayHeight !== undefined && cutawayHeight <= section.height) return [];
+    const laboratory = building.facade?.type === 'laboratory';
+    if (laboratory && skylight.outline === 'outer') {
+      const { at, seam } = laboratoryLayout(building);
+      const span = Math.max(...hole.map(p => Math.hypot(p[0] - at(0, 0)[0], p[1] - at(0, 0)[1]))) * 2;
+      const boundary = [seam(-span), at(span, -span), at(span, span), seam(span), seam(-span)];
+      hole = polygonClipping.intersection(snapFootprint([[hole]]), snapFootprint([[boundary]]))[0]?.[0] as Point[];
+      if (!hole?.length) return [];
+    }
     const ring = hole[0][0] === hole.at(-1)![0] && hole[0][1] === hole.at(-1)![1] ? hole.slice(0, -1) : hole;
     if (ring.length < 3) return [];
-    const y = SKYLIGHT_BASE + section.height + .03;
+    const y = SKYLIGHT_BASE + section.height + (laboratory ? .18 : .03);
     const shape = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
     const glass = new THREE.ExtrudeGeometry(shape, { depth: SKYLIGHT_THICKNESS, bevelEnabled: false });
     glass.rotateX(-Math.PI / 2);

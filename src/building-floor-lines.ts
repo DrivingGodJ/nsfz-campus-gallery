@@ -9,6 +9,7 @@ type Section = BuildingPart & { height: number; floors: number };
 // One line geometry per building keeps floor divisions inexpensive at campus scale.
 export function buildingFloorLineGeometry(building: Building, sections: Section[], floorHeight: number, cutawayFloor?: number) {
   const positions: number[] = [];
+  const labWalls = building.facade?.type === 'laboratory' ? laboratoryLayout(building).walls : undefined;
   const curved = building.facade?.type === 'dormitory' ? dormitoryProfile(building).shape : undefined;
   const lower = building.facade?.type === 'cafeteria' ? cafeteriaLowerProfile(building).shape : undefined;
   const addRing = (ring: Point[], y: number, hole: boolean) => {
@@ -25,8 +26,8 @@ export function buildingFloorLineGeometry(building: Building, sections: Section[
   for (const section of sections) {
     const levels = Math.min(section.floors, cutawayFloor || section.floors);
     for (let level = 1; level < levels; level++) {
-      if (building.facade?.type === 'laboratory') {
-        for (const wall of laboratoryLayout(building, level >= 4).walls) {
+      if (labWalls) {
+        for (const wall of labWalls) {
           addRing(wall.outer, .12 + level * floorHeight, false);
           wall.holes.forEach(ring => addRing(ring, .12 + level * floorHeight, true));
         }

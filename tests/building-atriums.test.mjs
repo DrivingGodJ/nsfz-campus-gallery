@@ -80,7 +80,7 @@ test('the glass roof covers only the main hole and follows its section height wi
     assert.equal(down(center(info.sections.find(section => section.id !== 'main').holes[0])).intersectObjects([glass, frame], false).length, 0, 'The smaller courtyard stays open');
     assert.deepEqual(buildingSkylightGeometry(building, info.sections, main.height - info.floorHeight), [], 'A lower floor view has no relocated glass roof');
     const topFloor = buildingSkylightGeometry(building, info.sections, main.height);
-    assert.equal(topFloor.length, 1, 'The glass remains when selecting the actual roof floor');
+    assert.equal(topFloor.length, 0, 'Selecting the top floor also removes its glass ceiling');
     disposeRoofs(topFloor);
     dispose([glass, frame]);
   }

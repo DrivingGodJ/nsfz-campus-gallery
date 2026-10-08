@@ -215,7 +215,7 @@ export function gymArchitecture(building: Building, height: number, floorHeight:
   parts.push(extrudedWorld({ outer: building.outer, holes: [] }, 0, Math.min(.16, shown), floorHeight));
   const body = combined(parts), roofPositions: number[] = [];
   const glassParts: THREE.BufferGeometry[] = [], frameParts: THREE.BufferGeometry[] = [];
-  const roofVisible = shown >= height - 1e-6;
+  const roofVisible = cutawayHeight === undefined || cutawayHeight > height + 1e-6;
   if (roofVisible) {
     for (let i = 0; i < 24; i++) {
       const u0 = length * i / 24, u1 = length * (i + 1) / 24;

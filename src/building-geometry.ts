@@ -7,7 +7,7 @@ import type { BuildingSolidCore, BuildingStairwell, ClassroomWindows, FloorCorri
 
 const CORRIDOR_SLAB_THICKNESS = .25;
 
-function snapFootprint(polygons: polygonClipping.MultiPolygon): polygonClipping.MultiPolygon {
+export function snapFootprint(polygons: polygonClipping.MultiPolygon): polygonClipping.MultiPolygon {
   return polygons.flatMap(polygon => {
     const rings = polygon.map(ring => {
       const points = ring.map(([x, z]): Point => [Math.round(x * 1e5) / 1e5, Math.round(z * 1e5) / 1e5])
@@ -121,7 +121,7 @@ export function buildingCoreFootprint(section: Shape, passages: GroundPassage[],
   return cuts.length ? polygonClipping.difference(polygon, cuts[0], ...cuts.slice(1)) : [polygon];
 }
 
-function corridorGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[], corridors: FloorCorridor[], stairs: BuildingStairwell[], windows?: ClassroomWindows, solidCores: BuildingSolidCore[] = [], cutouts: Shape[] = []) {
+function corridorGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[], corridors: FloorCorridor[], stairs: BuildingStairwell[], windows?: ClassroomWindows, solidCores: BuildingSolidCore[] = [], cutouts: Shape[] = [], cutaway = false) {
   const polygon = [section.outer, ...section.holes];
   const corridorCuts = corridors.map(corridor => [corridorFootprint(section, corridor, passages).outer]);
   const infills = corridors.flatMap(corridor => corridor.slabInfill ? [[corridor.slabInfill.outer, ...corridor.slabInfill.holes]] : []);
@@ -129,6 +129,7 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   const openings = [...corridorCuts, ...stairCuts];
   const solids = solidCores.map(core => [core.outer, ...core.holes]);
   const solidStarts = solidCores.map(core => Math.max(0, ((core.startFloor ?? 1) - 1) * floorHeight));
+  const coreShells = cutaway ? solids.map(solid => snapFootprint(classroomWallFootprint([solid], .25, snapFootprint))) : [];
   const openArea = openings.length ? polygonClipping.union(openings[0], ...openings.slice(1), ...infills) : [];
   const corridorArea = solids.length ? polygonClipping.difference(openArea, solids[0], ...solids.slice(1)) : openArea;
   // Stitch the small imported facade notch at slab levels only. The open
@@ -140,6 +141,10 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   const slabFootprint = removed.length ? polygonClipping.difference(originalSlabs, removed[0], ...removed.slice(1)) : originalSlabs;
   const core = buildingCoreFootprint(section, passages, corridors, stairs, solidCores, cutouts);
   const classrooms = windows ? classroomWallFootprint(core, windows.wallThickness) : core;
+  // Simple massing has no modelled interior. Open just the selected storey as
+  // an exterior wall shell so removing its ceiling reveals a usable floor.
+  const cutawayBottom = Math.max(0, (Math.ceil(height / floorHeight - 1e-8) - 1) * floorHeight);
+  const cutawayWalls = cutaway && !windows ? snapFootprint(classroomWallFootprint(core, .25, snapFootprint)) : undefined;
   // Imported corridor boundaries can leave a millimetre-wide concrete sliver
   // behind the new glass. Clear that seam while retaining the adjoining walls.
   const elevatorSeams = solidCores.filter(core => core.elevator).flatMap(core => core.outer.slice(1).map((to, i) => [passageFootprint([core.outer[i], to], .1).outer]));
@@ -151,7 +156,7 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   });
   const glazing = windows ? classroomWindowLayout(core, windows, height, floorHeight, passageCuts, solids) : [];
   const slabThickness = Math.min(CORRIDOR_SLAB_THICKNESS, floorHeight * .1, height * .1);
-  const slabs = [[0, slabThickness], [height - slabThickness, height]];
+  const slabs = [[0, slabThickness], ...(!cutaway ? [[height - slabThickness, height]] : [])];
   for (let level = 1; level * floorHeight < height - 1e-8; level++) {
     const bottom = level * floorHeight;
     slabs.push([bottom, Math.min(bottom + slabThickness, height)]);
@@ -161,8 +166,10 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     const top = levels[i + 1], middle = (bottom + top) / 2;
     const slab = slabs.some(([a, b]) => middle >= a && middle <= b);
     // Upper-storey rooms leave the entrance beneath them open.
-    const activeSolids = solids.filter((_, index) => !solidCores[index].elevator && middle >= solidStarts[index]);
-    let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(walls, activeSolids[0], ...activeSolids.slice(1)) : walls;
+    const activeSolids = solids.flatMap((solid, index) => solidCores[index].elevator || middle < solidStarts[index] ? [] :
+      cutaway && middle >= cutawayBottom ? coreShells[index] : [solid]);
+    const storeyWalls = cutawayWalls && middle >= cutawayBottom ? cutawayWalls : walls;
+    let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(storeyWalls, activeSolids[0], ...activeSolids.slice(1)) : storeyWalls;
     const openWindows = !slab && glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut);
     if (openWindows && openWindows.length) footprint = polygonClipping.difference(footprint, openWindows[0], ...openWindows.slice(1));
     // Retain the base and roof; stairs and glass elevator shafts remain open
@@ -172,7 +179,7 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     if (middle < floorHeight && passageCuts.length) footprint = polygonClipping.difference(footprint, passageCuts[0], ...passageCuts.slice(1));
     // Window jambs and wall shells share the same boundary. Weld microscopic
     // clipping differences before subtracting adjacent layers for their caps.
-    return { bottom, top, footprint: windows ? snapFootprint(footprint) : footprint, slab };
+    return { bottom, top, footprint: windows || cutaway ? snapFootprint(footprint) : footprint, slab };
   });
   const positions: number[] = [], occlusionMask: number[] = [];
   const corners = [...new Map(layers.flatMap(layer => layer.footprint.flat(2)).map(point => [point.join(','), point])).values()];
@@ -241,8 +248,8 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
 
 // Geometry stays in the same local extrusion coordinates as ordinary buildings:
 // x / -map z on the footprint, and local z for height above the building base.
-export function buildingGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[] = [], corridors: FloorCorridor[] = [], stairs: BuildingStairwell[] = [], windows?: ClassroomWindows, solidCores: BuildingSolidCore[] = [], cutouts: Shape[] = []) {
-  if (corridors.length || stairs.length || windows || solidCores.length || cutouts.length) return corridorGeometry(section, height, floorHeight, passages, corridors, stairs, windows, solidCores, cutouts);
+export function buildingGeometry(section: Shape, height: number, floorHeight: number, passages: GroundPassage[] = [], corridors: FloorCorridor[] = [], stairs: BuildingStairwell[] = [], windows?: ClassroomWindows, solidCores: BuildingSolidCore[] = [], cutouts: Shape[] = [], cutaway = false) {
+  if (cutaway || corridors.length || stairs.length || windows || solidCores.length || cutouts.length) return corridorGeometry(section, height, floorHeight, passages, corridors, stairs, windows, solidCores, cutouts, cutaway);
   const polygon = [section.outer, ...section.holes];
   const cuts = passages.map(passage => {
     const shape = passageShape(passage);

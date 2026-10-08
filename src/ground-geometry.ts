@@ -12,11 +12,8 @@ const featureShape = (feature: Feature): Shape => ({ outer: feature.outer!, hole
 export function groundSurfaces(campus: Campus) {
   const waters = campus.features.filter(feature => feature.type === 'water' && feature.outer);
   const waterMask = union(waters.map(featureShape));
-  const roads = campus.features.filter(feature => feature.type === 'path' && feature.points && !feature.representedBy).flatMap(feature =>
-    feature.points!.slice(1).flatMap((to, i) => {
-      const from = feature.points![i];
-      return Math.hypot(to[0] - from[0], to[1] - from[1]) > 1e-8 ? [passageFootprint([from, to], feature.width || 3)] : [];
-    }));
+  const roads = campus.features.filter(feature => feature.type === 'path' && feature.points && !feature.representedBy)
+    .map(feature => passageFootprint(feature.points!, feature.width || 3));
   // Road-level bridges replace their source paths. Cut water below their decks
   // too, so the nearly coplanar faces cannot flicker at distant camera angles.
   const lowBridges = campus.features.filter(feature => feature.type === 'bridge' && feature.points

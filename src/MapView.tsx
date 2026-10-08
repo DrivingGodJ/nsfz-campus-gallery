@@ -24,6 +24,7 @@ import BasketballCourts from './BasketballCourts';
 import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from './LocationSelection';
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
 import { groundSurfaces } from './ground-geometry';
+import { passageFootprint } from './underground-geometry';
 import { isAerialPhoto, photoLocationId, photoMapHeight } from './locations';
 import { mapLocationTarget } from './location-geometry';
 import { photoPlacementPoint } from './photo-placement';
@@ -71,12 +72,19 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
   const cutawayHeight = selected && floor ? floor * info.floorHeight : undefined;
   const gym = useMemo(() => building.id === GYM_ID ? gymArchitecture(building, info.height, info.floorHeight, bridge, cutawayHeight) : undefined, [building, info.height, info.floorHeight, bridge, cutawayHeight]);
   useEffect(() => () => { if (gym) for (const geometry of Object.values(gym)) geometry.dispose(); }, [gym]);
-  const geometries = useMemo(() => info.sections.map(section => gym ? gym.body : building.facade?.type === 'laboratory' ? laboratoryBodyGeometry(building,
-    selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : building.facade?.type === 'cafeteria' ? cafeteriaBodyGeometry(building,
-    selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : building.facade?.type === 'dormitory' ? dormitoryBodyGeometry(building,
-    selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : buildingGeometry(section,
-    selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height,
-    info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id), building.stairwells?.filter(stair => stair.partId === section.id), building.classroomWindows, building.solidCores?.filter(core => core.partId === section.id), building.cutouts?.filter(cut => cut.partId === section.id))), [building, site.buildingOverrides[building.id], selected, floor, gym]);
+  const geometries = useMemo(() => info.sections.map(section => {
+    const height = Math.min(section.height, cutawayHeight ?? section.height);
+    const cutaway = cutawayHeight !== undefined && cutawayHeight <= section.height + 1e-6;
+    if (gym) return gym.body;
+    if (building.facade?.type === 'laboratory') return laboratoryBodyGeometry(building, height, info.floorHeight, cutaway);
+    if (building.facade?.type === 'cafeteria') return cafeteriaBodyGeometry(building, height, info.floorHeight, cutaway);
+    if (building.facade?.type === 'dormitory') return dormitoryBodyGeometry(building, height, info.floorHeight, cutaway);
+    return buildingGeometry(section, height, info.floorHeight, building.groundPassages,
+      building.floorCorridors?.filter(corridor => corridor.partId === section.id),
+      building.stairwells?.filter(stair => stair.partId === section.id), building.classroomWindows,
+      building.solidCores?.filter(core => core.partId === section.id),
+      building.cutouts?.filter(cut => cut.partId === section.id), cutaway);
+  }), [building, info, cutawayHeight, gym]);
   useEffect(() => () => { if (!gym) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;
   const color = selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
@@ -90,7 +98,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
   });
   return <group position={[0, info.baseElevation, 0]} userData={{ photoOccluder: true }}>
     {building.appearance?.type === 'glass-pavilion' ? <group onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }} onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
-      <HistoryPavilion building={building} height={height} color={color} selected={selected} />
+      <HistoryPavilion building={building} height={height} color={color} selected={selected} cutaway={cutawayHeight !== undefined && cutawayHeight <= info.height + 1e-6} />
     </group> : <group
       onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }}
       onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
@@ -109,10 +117,9 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
 });
 function Roads({ points, width }: { points: Point[]; width: number }) {
   const mapColor = useMapColor();
-  return <group>{points.slice(1).map((point, i) => {
-    const previous = points[i], dx = point[0] - previous[0], dz = point[1] - previous[1];
-    return <mesh key={i} position={[(point[0] + previous[0]) / 2, .095, (point[1] + previous[1]) / 2]} rotation={[0, Math.atan2(dx, dz), 0]}><boxGeometry args={[width, .04, Math.hypot(dx, dz)]} /><meshStandardMaterial color={mapColor('#e9e4d4')} roughness={1} /></mesh>;
-  })}</group>;
+  const geometry = useMemo(() => buildingGeometry(passageFootprint(points, width), .04, 3.6), [points, width]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, .075, 0]}><meshStandardMaterial color={mapColor('#e9e4d4')} roughness={1} /></mesh>;
 }
 function Direction({ photo, editing = false, compact = false, onHeading, labelPortal }: { photo: MapPhoto; editing?: boolean; compact?: boolean; onHeading?: (heading: number) => void; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();

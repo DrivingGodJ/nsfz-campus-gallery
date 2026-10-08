@@ -372,7 +372,8 @@ export async function exportStaticContent(root, destination) {
       if (stats.size > 100 * 1024 * 1024) throw new UserError('存在超过 GitHub 单文件限制的图片。');
     }
   }
-  if (total > 900 * 1024 * 1024) throw new UserError('图片总大小超过 900 MB，请减少下载文件体积后发布。');
+  // Reserve 20 MB for the application below GitHub Pages' 1 GB site limit.
+  if (total > 980 * 1000 * 1000) throw new UserError('图片总大小超过 980 MB，请减少下载文件体积后发布。');
   await fs.mkdir(path.join(destination, 'data'), { recursive: true });
   await writeJSON(path.join(destination, 'data/site.json'), { ...site, photos, buildingOverrides });
   await writeJSON(path.join(destination, 'data/campus.json'), map);
