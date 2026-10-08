@@ -9,7 +9,7 @@ export default function BuildingSkylights({ building, sections, cutawayHeight }:
   const roofs = useMemo(() => buildingSkylightGeometry(building, sections, cutawayHeight), [building, sections, cutawayHeight]);
   useEffect(() => () => roofs.forEach(roof => { roof.glass.dispose(); roof.frame.dispose(); }), [roofs]);
   return <group>{roofs.map(roof => <group key={roof.id}>
-    <mesh geometry={roof.glass} renderOrder={3}><meshBasicMaterial color={mapColor('#348bac')} transparent opacity={.92} depthWrite side={THREE.DoubleSide} forceSinglePass toneMapped={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>
+    <mesh geometry={roof.glass} renderOrder={3}><meshBasicMaterial color={mapColor(roof.opacity < .9 ? '#87a6ad' : '#348bac')} transparent opacity={roof.opacity} depthWrite={roof.opacity >= .9} side={THREE.DoubleSide} forceSinglePass toneMapped={false} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>
     <mesh geometry={roof.frame}><meshStandardMaterial color={mapColor('#b6c9cc')} roughness={.65} metalness={.2} /></mesh>
   </group>)}</group>;
 }

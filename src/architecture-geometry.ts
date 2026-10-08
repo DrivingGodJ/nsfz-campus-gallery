@@ -38,10 +38,37 @@ function windowPanel(from: Point, to: Point, bottom: number, top: number) {
   return geometry.translate((from[0] + to[0]) / 2, BASE + (bottom + top) / 2, (from[1] + to[1]) / 2);
 }
 
+// Ground-floor guards must leave the same openings as the road and walls.
+function outsideOpenings(from: Point, to: Point, openings: Shape[]): [Point, Point][] {
+  const dx = to[0] - from[0], dz = to[1] - from[1], cuts = [0, 1];
+  const inside = (p: Point, ring: Point[]) => {
+    let result = false;
+    for (let i = 1; i < ring.length; i++) {
+      const a = ring[i - 1], b = ring[i];
+      if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) result = !result;
+    }
+    return result;
+  };
+  for (const shape of openings) for (const ring of [shape.outer, ...shape.holes]) for (let i = 1; i < ring.length; i++) {
+    const a = ring[i - 1], b = ring[i], ex = b[0] - a[0], ez = b[1] - a[1], divisor = dx * ez - dz * ex;
+    if (Math.abs(divisor) < 1e-8) continue;
+    const ax = a[0] - from[0], az = a[1] - from[1];
+    const t = (ax * ez - az * ex) / divisor, s = (ax * dz - az * dx) / divisor;
+    if (t > 0 && t < 1 && s >= 0 && s <= 1) cuts.push(t);
+  }
+  cuts.sort((a, b) => a - b);
+  return cuts.slice(1).flatMap((end, i) => {
+    const start = cuts[i], middle = lerp(from, to, (start + end) / 2);
+    return end - start < 1e-8 || openings.some(shape => inside(middle, shape.outer) && !shape.holes.some(hole => inside(middle, hole)))
+      ? [] : [[lerp(from, to, start), lerp(from, to, end)] as [Point, Point]];
+  });
+}
+
 // Adapt the archive's guard rails to the existing recessed corridors. Two thin
 // rails and widely spaced posts keep the campus overview light and inexpensive.
 export function teachingRailGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
   const parts: THREE.BufferGeometry[] = [];
+  const groundOpenings = (building.groundPassages || []).map(passageShape);
   for (const corridor of building.floorCorridors || []) {
     const section = sections.find(section => section.id === corridor.partId);
     if (!section || 'passageIndex' in corridor) continue;
@@ -51,7 +78,7 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
     const area = ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0);
     const inset = 'points' in corridor ? -.09 : .09 * (area >= 0 ? 1 : -1) * ('holeIndex' in corridor ? 1 : -1);
     const height = Math.min(section.height, cutawayHeight ?? section.height);
-    for (let floor = 1; floor * floorHeight + 1.3 < height; floor++) {
+    for (let floor = (corridor.startFloor ?? 2) - 1; floor * floorHeight + 1.3 < height; floor++) {
       const y = BASE + floor * floorHeight + .25;
       const posts = new Map<string, Point>();
       for (const [a, b] of segments) {
@@ -59,11 +86,13 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
         if (length < .05) continue;
         const offset: Point = [(b[1] - a[1]) / length * inset, -(b[0] - a[0]) / length * inset];
         const from = a.map((v, i) => v + offset[i]) as Point, to = b.map((v, i) => v + offset[i]) as Point;
-        for (const rise of [.5, 1.05]) parts.push(bar([from[0], y + rise, from[1]], [to[0], y + rise, to[1]], .055));
-        const count = Math.max(1, Math.ceil(length / 2.7));
-        for (let i = 0; i <= count; i++) {
-          const point = lerp(from, to, i / count);
-          posts.set(point.map(v => v.toFixed(2)).join(','), point);
+        for (const [start, end] of outsideOpenings(from, to, floor === 0 ? groundOpenings : [])) {
+          for (const rise of [.5, 1.05]) parts.push(bar([start[0], y + rise, start[1]], [end[0], y + rise, end[1]], .055));
+          const count = Math.max(1, Math.ceil(Math.hypot(end[0] - start[0], end[1] - start[1]) / 2.7));
+          for (let i = 0; i <= count; i++) {
+            const point = lerp(start, end, i / count);
+            posts.set(point.map(v => v.toFixed(2)).join(','), point);
+          }
         }
       }
       for (const [x, z] of posts.values()) parts.push(bar([x, y, z], [x, y + 1.075, z], .055));

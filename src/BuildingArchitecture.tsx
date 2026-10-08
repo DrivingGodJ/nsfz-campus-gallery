@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useMapColor } from './MapTheme';
 import { ARCHITECTURE_COLORS, GYM_ID, gymArchitecture, teachingElevatorGeometry, teachingRailGeometry, teachingWindowGeometry } from './architecture-geometry';
 import { teachingStairGeometry } from './teaching-stairs';
+import { laboratoryLayout } from './laboratory-geometry';
 import type { Building, BuildingPart } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -12,8 +13,13 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   gym?: ReturnType<typeof gymArchitecture>;
 }) {
   const mapColor = useMapColor();
-  const rails = useMemo(() => teachingRailGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
-  const stairs = useMemo(() => teachingStairGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
+  const structure = useMemo(() => {
+    if (building.facade?.type !== 'laboratory') return building;
+    const layout = laboratoryLayout(building);
+    return { ...building, floorCorridors: layout.corridors, stairwells: [layout.stair] };
+  }, [building]);
+  const rails = useMemo(() => teachingRailGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
+  const stairs = useMemo(() => teachingStairGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
   const windows = useMemo(() => teachingWindowGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
   const elevator = useMemo(() => teachingElevatorGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
   useEffect(() => () => rails.dispose(), [rails]);

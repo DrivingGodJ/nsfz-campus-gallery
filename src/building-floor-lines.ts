@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { cafeteriaLowerProfile, dormitoryProfile } from './facade-geometry.ts';
+import { laboratoryLayout } from './laboratory-geometry.ts';
 import type { Building, BuildingPart, Point, Shape } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -24,6 +25,13 @@ export function buildingFloorLineGeometry(building: Building, sections: Section[
   for (const section of sections) {
     const levels = Math.min(section.floors, cutawayFloor || section.floors);
     for (let level = 1; level < levels; level++) {
+      if (building.facade?.type === 'laboratory') {
+        for (const wall of laboratoryLayout(building, level >= 4).walls) {
+          addRing(wall.outer, .12 + level * floorHeight, false);
+          wall.holes.forEach(ring => addRing(ring, .12 + level * floorHeight, true));
+        }
+        continue;
+      }
       const contour: Shape = curved || (level <= 2 && lower) || section;
       addRing(contour.outer, .12 + level * floorHeight, false);
       contour.holes.forEach(ring => addRing(ring, .12 + level * floorHeight, true));

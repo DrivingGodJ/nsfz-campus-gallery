@@ -17,6 +17,7 @@ import BuildingArchitecture from './BuildingArchitecture';
 import { GYM_ID, gymArchitecture } from './architecture-geometry';
 import { buildingGeometry } from './building-geometry';
 import { cafeteriaBodyGeometry, dormitoryBodyGeometry } from './facade-geometry';
+import { laboratoryBodyGeometry } from './laboratory-geometry';
 import { buildingFloorLineGeometry } from './building-floor-lines';
 import { photoMapSeason, type PhotoSeason } from './photo-season';
 import BasketballCourts from './BasketballCourts';
@@ -70,7 +71,8 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
   const cutawayHeight = selected && floor ? floor * info.floorHeight : undefined;
   const gym = useMemo(() => building.id === GYM_ID ? gymArchitecture(building, info.height, info.floorHeight, bridge, cutawayHeight) : undefined, [building, info.height, info.floorHeight, bridge, cutawayHeight]);
   useEffect(() => () => { if (gym) for (const geometry of Object.values(gym)) geometry.dispose(); }, [gym]);
-  const geometries = useMemo(() => info.sections.map(section => gym ? gym.body : building.facade?.type === 'cafeteria' ? cafeteriaBodyGeometry(building,
+  const geometries = useMemo(() => info.sections.map(section => gym ? gym.body : building.facade?.type === 'laboratory' ? laboratoryBodyGeometry(building,
+    selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : building.facade?.type === 'cafeteria' ? cafeteriaBodyGeometry(building,
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : building.facade?.type === 'dormitory' ? dormitoryBodyGeometry(building,
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height, info.floorHeight) : buildingGeometry(section,
     selected && floor ? Math.min(section.height, floor * info.floorHeight) : section.height,
@@ -99,7 +101,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     </group>)}
     <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>
     {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor ? floor * info.floorHeight : undefined} />}
-    {(building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
+    {(building.facade?.type === 'laboratory' || building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
     {building.facade?.type === 'dormitory' && <BuildingFacade building={building} floors={info.floors} floorHeight={info.floorHeight} height={height} selected={selected} cutaway={!!(selected && floor)} />}
     </group>}
     {(selected || !!building.name || !!site.buildingOverrides[building.id]?.name) && <LocationHtml portal={labelPortal} key={info.name} position={[info.center[0], height + 3, info.center[1]]} center zIndexRange={[5, 1]}><LocationName id={building.id} name={info.name} building /></LocationHtml>}

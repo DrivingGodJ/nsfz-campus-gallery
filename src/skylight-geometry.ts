@@ -10,7 +10,7 @@ type Section = BuildingPart & { height: number };
 export function buildingSkylightGeometry(building: Building, sections: Section[], cutawayHeight?: number) {
   return (building.skylights || []).flatMap((skylight, index) => {
     const section = sections.find(section => section.id === skylight.partId);
-    const hole = section?.holes[skylight.holeIndex];
+    const hole = skylight.outline === 'outer' ? section?.outer : section?.holes[skylight.holeIndex ?? -1];
     // A roof belongs to its original section. It must not move down onto a
     // selected lower floor, or cover the neighbouring open courtyard.
     if (!section || !hole?.length || cutawayHeight !== undefined && cutawayHeight < section.height) return [];
@@ -21,6 +21,7 @@ export function buildingSkylightGeometry(building: Building, sections: Section[]
     const glass = new THREE.ExtrudeGeometry(shape, { depth: SKYLIGHT_THICKNESS, bevelEnabled: false });
     glass.rotateX(-Math.PI / 2);
     glass.translate(0, y, 0);
+    if ((skylight.opacity ?? .92) < .9) glass.userData.photoOcclusionMask = new Uint8Array(glass.getAttribute('position').count / 3);
     const beams: THREE.BufferGeometry[] = [];
     const beam = (a: Point, b: Point, width: number, height: number, centerY: number) => {
       const dx = b[0] - a[0], dz = b[1] - a[1];
@@ -42,6 +43,7 @@ export function buildingSkylightGeometry(building: Building, sections: Section[]
     }
     const frame = mergeGeometries(beams)!;
     beams.forEach(beam => beam.dispose());
-    return [{ id: `${skylight.partId}-${index}`, glass, frame }];
+    if ((skylight.opacity ?? .92) < .9) frame.userData.photoOcclusionMask = new Uint8Array((frame.index?.count ?? frame.getAttribute('position').count) / 3);
+    return [{ id: `${skylight.partId}-${index}`, glass, frame, opacity: skylight.opacity ?? .92 }];
   });
 }
