@@ -6,7 +6,7 @@ import polygonClipping from 'polygon-clipping';
 import { buildingGeometry, buildingCoreFootprint, passageShape } from '../src/building-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
 import { classroomWindowLayout } from '../src/teaching-classrooms.ts';
-import { teachingRailGeometry, teachingWindowGeometry } from '../src/architecture-geometry.ts';
+import { teachingElevatorGeometry, teachingRailGeometry, teachingWindowGeometry } from '../src/architecture-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const building = campus.buildings.find(b => b.id === 'way/855459420');
@@ -58,14 +58,17 @@ test('the marked blue passage opens on every floor, with no concrete or glass ac
   }
 });
 
-test('the marked red elevator stays solid while the adjacent classroom row remains enclosed', () => {
+test('the observation elevator has no concrete sides or intermediate floors while adjacent classrooms remain enclosed', () => {
   const { info, bodies, dispose } = model();
   const shaft = building.solidCores[0], center = vector(shaft.outer[0]).lerp(vector(shaft.outer[2]), .5);
   for (let floor = 0; floor < info.sections[0].floors; floor++) {
     center.y = .12 + (floor + .5) * info.floorHeight;
-    for (const direction of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)]) {
-      assert.ok(new THREE.Raycaster(center, direction, 0, 5).intersectObjects(bodies).length, 'All elevator sides are opaque on every floor');
+    for (let edge = 0; edge < shaft.outer.length - 1; edge++) {
+      const target = vector(shaft.outer[edge]).lerp(vector(shaft.outer[edge + 1]), .5); target.y = center.y;
+      assert.equal(new THREE.Raycaster(center, target.clone().sub(center).normalize(), 0, center.distanceTo(target) + .1).intersectObjects(bodies).length, 0, 'Glass replaces the complete concrete elevator enclosure');
     }
+    const roof = new THREE.Raycaster(center, new THREE.Vector3(0, 1, 0)).intersectObjects(bodies)[0];
+    assert.ok(Math.abs(roof.point.y - (.12 + info.sections[0].height - .25)) < 1e-4, 'The shaft stays open through intermediate floors');
     const start = new THREE.Vector3(135, .12 + floor * info.floorHeight + .55, 42);
     const first = new THREE.Raycaster(start, new THREE.Vector3(0, 0, 1), 0, 9).intersectObjects(bodies)[0];
     assert.ok(first && first.distance < 4.2, 'The red facade is a classroom wall again, rather than an open three-metre corridor');
@@ -77,10 +80,46 @@ test('the marked red elevator stays solid while the adjacent classroom row remai
   const classroomPoint = [[[139.9, 45.9], [140.1, 45.9], [140.1, 46.1], [139.9, 46.1], [139.9, 45.9]]];
   assert.ok(polygonClipping.intersection(core, classroomPoint).length, 'The red classroom remains a room, rather than becoming part of the open route');
   const windows = classroomWindowLayout(core, building.classroomWindows, section.height, info.floorHeight, [], solids.map(c => [c.outer, ...c.holes]));
-  assert.ok(windows.every(w => !polygonClipping.intersection(w.cut, [shaft.outer]).length), 'No pane or window opening is placed in the elevator');
+  assert.ok(windows.every(w => !polygonClipping.intersection(w.cut, [shaft.outer]).length), 'Classroom windows do not overlap the dedicated elevator glazing');
   const down = new THREE.Raycaster(new THREE.Vector3(center.x, 100, center.z), new THREE.Vector3(0, -1, 0)).intersectObjects(bodies)[0];
   assert.equal(down.object.geometry.userData.photoOcclusionMask[down.faceIndex], 1, 'The elevator roof remains a solid photo occluder');
   dispose();
+});
+
+test('observation elevator glass covers every side with double doors facing the corridor at each floor', () => {
+  const shaft = building.solidCores[0], origin = vector(shaft.outer[3]), end = vector(shaft.outer[4]);
+  const along = end.clone().sub(origin).normalize(), inward = new THREE.Vector3(-along.z, 0, along.x);
+  const middle = origin.clone().lerp(end, .5), original = JSON.stringify(building);
+  for (const selectedFloor of [undefined, 1, 3]) for (const floorHeight of [3.6, 4.2]) {
+    const info = buildingLevels(building, { floors: 7, floorHeight }), shown = selectedFloor || info.sections[0].floors;
+    const details = teachingElevatorGeometry(building, info.sections, floorHeight, selectedFloor && selectedFloor * floorHeight);
+    const objects = Object.fromEntries(Object.entries(details).map(([key, geometry]) => {
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); mesh.updateMatrixWorld(); return [key, mesh];
+    }));
+    assert.equal(shaft.elevator.doorEdge, 3, 'Doors face the continuous atrium corridor on the left of the shaft');
+    for (let floor = 0; floor < shown; floor++) {
+      const y = .12 + floor * floorHeight + 1.3;
+      for (let edge = 0; edge < 4; edge++) {
+        const a = vector(shaft.outer[edge]), b = vector(shaft.outer[edge + 1]), direction = b.clone().sub(a).normalize();
+        const normal = new THREE.Vector3(-direction.z, 0, direction.x), point = a.clone().lerp(b, .35).addScaledVector(normal, -.2); point.y = y;
+        const ray = new THREE.Raycaster(point, normal, 0, .4);
+        assert.ok(ray.intersectObjects([objects.glass, objects.doors]).length, 'All four sides contain transparent panes');
+        assert.equal(ray.intersectObject(objects.doors).length > 0, edge === 3, 'Only the corridor-facing side contains a door');
+      }
+      const seam = middle.clone().addScaledVector(inward, -.2); seam.y = y;
+      assert.ok(new THREE.Raycaster(seam, inward, 0, .4).intersectObject(objects.frames).length, 'The two sliding leaves have a slim vertical meeting seam');
+      const leaf = seam.clone().addScaledVector(along, .3);
+      assert.equal(new THREE.Raycaster(leaf, inward, 0, .4).intersectObject(objects.frames).length, 0, 'No horizontal bar crosses the middle of a door');
+    }
+    for (const geometry of Object.values(details)) {
+      geometry.computeBoundingBox();
+      assert.ok(geometry.boundingBox.max.y < .12 + shown * floorHeight, 'Glazing and doors stop below selected-floor cutaways');
+      assert.ok(geometry.userData.photoOcclusionMask.every(value => value === 0), 'Transparent elevator details do not hide photo markers');
+      geometry.dispose();
+    }
+    Object.values(objects).forEach(mesh => mesh.material.dispose());
+  }
+  assert.equal(JSON.stringify(building), original, 'Generating elevator details keeps the calibrated footprint unchanged');
 });
 
 test('the blue strip opens the last three metres of the north classroom end, leaving the rest enclosed', () => {

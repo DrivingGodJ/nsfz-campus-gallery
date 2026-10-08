@@ -93,6 +93,37 @@ export function teachingWindowGeometry(building: Building, sections: Section[], 
   return { glass: combined(glass, false), frames: combined(frames, false) };
 }
 
+export function teachingElevatorGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
+  const glass: THREE.BufferGeometry[] = [], doors: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [];
+  for (const core of building.solidCores || []) {
+    if (!core.elevator) continue;
+    const section = sections.find(section => section.id === core.partId);
+    if (!section) continue;
+    const height = Math.min(section.height, cutawayHeight ?? section.height), bottom = ((core.startFloor ?? 1) - 1) * floorHeight + .25, top = height - .25;
+    if (top <= bottom) continue;
+    for (let edge = 0; edge < core.outer.length - 1; edge++) {
+      const from = core.outer[edge], to = core.outer[edge + 1];
+      frames.push(bar([from[0], BASE + bottom, from[1]], [from[0], BASE + top, from[1]], .07));
+      frames.push(bar([from[0], BASE + top, from[1]], [to[0], BASE + top, to[1]], .06));
+      for (let floor = core.startFloor ?? 1; (floor - 1) * floorHeight + .25 < top; floor++) {
+        const y0 = (floor - 1) * floorHeight + .25, y1 = Math.min(floor * floorHeight + .25, top);
+        frames.push(bar([from[0], BASE + y0, from[1]], [to[0], BASE + y0, to[1]], .06));
+        if (edge !== core.elevator.doorEdge) { glass.push(windowPanel(from, to, y0, y1)); continue; }
+        const length = Math.hypot(to[0] - from[0], to[1] - from[1]), width = Math.min(1.4, length * .7);
+        const a = lerp(from, to, .5 - width / length / 2), b = lerp(from, to, .5 + width / length / 2), middle = lerp(a, b, .5);
+        const doorTop = Math.min(y0 + 2.2, y1);
+        glass.push(windowPanel(from, a, y0, y1), windowPanel(b, to, y0, y1));
+        if (doorTop < y1) glass.push(windowPanel(a, b, doorTop, y1));
+        doors.push(windowPanel(a, middle, y0, doorTop), windowPanel(middle, b, y0, doorTop));
+        frames.push(bar([a[0], BASE + doorTop, a[1]], [b[0], BASE + doorTop, b[1]], .09));
+        for (const p of [a, b]) frames.push(bar([p[0], BASE + y0, p[1]], [p[0], BASE + doorTop, p[1]], .08));
+        frames.push(bar([middle[0], BASE + y0, middle[1]], [middle[0], BASE + doorTop, middle[1]], .035));
+      }
+    }
+  }
+  return { glass: combined(glass, false), doors: combined(doors, false), frames: combined(frames, false) };
+}
+
 export function gymRoofHeight(height: number, progress: number) {
   const rise = Math.min(1.45, height * .1);
   return height - rise + (rise + 1.2) * Math.sin(Math.PI * THREE.MathUtils.clamp(progress, 0, 1));

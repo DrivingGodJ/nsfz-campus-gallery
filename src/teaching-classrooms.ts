@@ -44,8 +44,8 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
         const top = Math.min(floor * floorHeight + Math.min(config.top, floorHeight - .35), height - .25);
         if (top <= bottom) continue;
         const cut = strip(a, b, normal, -.04, config.wallThickness + .04);
-        // Elevator shafts remain concrete, including the boundary shared with
-        // a classroom. Never put a pane or an opening into that solid volume.
+        // Core enclosures have their own appearance (including glass elevators).
+        // Never replace them with generic classroom windows or openings.
         if (solidCores.some(solid => polygonClipping.intersection(cut, solid).length)) continue;
         if (!floor && groundOpenings.some(opening => polygonClipping.intersection(cut, opening).length)) continue;
         result.push({ from: inset(a), to: inset(b), cut, bottom, top });

@@ -1119,6 +1119,7 @@
       "solidCores": [
         {
           "partId": "main",
+          "elevator": { "doorEdge": 3 },
           "outer": [
             [
               120.75875061800889,

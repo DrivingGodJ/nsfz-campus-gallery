@@ -139,8 +139,12 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   const removed = cutouts.map(cut => [cut.outer, ...cut.holes]);
   const slabFootprint = removed.length ? polygonClipping.difference(originalSlabs, removed[0], ...removed.slice(1)) : originalSlabs;
   const core = buildingCoreFootprint(section, passages, corridors, stairs, solidCores, cutouts);
-  const walls = windows ? classroomWallFootprint(core, windows.wallThickness) : core;
-  const shafts = stairs.map(stair => [stairwellShaft(stair).outer]);
+  const classrooms = windows ? classroomWallFootprint(core, windows.wallThickness) : core;
+  // Imported corridor boundaries can leave a millimetre-wide concrete sliver
+  // behind the new glass. Clear that seam while retaining the adjoining walls.
+  const elevatorSeams = solidCores.filter(core => core.elevator).flatMap(core => core.outer.slice(1).map((to, i) => [passageFootprint([core.outer[i], to], .1).outer]));
+  const walls = elevatorSeams.length ? polygonClipping.difference(classrooms, elevatorSeams[0], ...elevatorSeams.slice(1)) : classrooms;
+  const shafts = [...stairs.map(stair => [stairwellShaft(stair).outer]), ...solidCores.filter(core => core.elevator).map(core => [core.outer, ...core.holes])];
   const passageCuts = passages.map(passage => {
     const shape = passageShape(passage);
     return [shape.outer, ...shape.holes];
@@ -157,12 +161,12 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     const top = levels[i + 1], middle = (bottom + top) / 2;
     const slab = slabs.some(([a, b]) => middle >= a && middle <= b);
     // Upper-storey rooms leave the entrance beneath them open.
-    const activeSolids = solids.filter((_, index) => middle >= solidStarts[index]);
+    const activeSolids = solids.filter((_, index) => !solidCores[index].elevator && middle >= solidStarts[index]);
     let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(walls, activeSolids[0], ...activeSolids.slice(1)) : walls;
     const openWindows = !slab && glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut);
     if (openWindows && openWindows.length) footprint = polygonClipping.difference(footprint, openWindows[0], ...openWindows.slice(1));
-    // Retain the ground base, rounded floor edges and roof; open the actual
-    // flight shaft through intermediate slabs so stairs can connect the floors.
+    // Retain the base and roof; stairs and glass elevator shafts remain open
+    // through intermediate slabs so they can connect the floors.
     if (slab && middle > slabThickness && middle < height - slabThickness && shafts.length) footprint = polygonClipping.difference(footprint, shafts[0], ...shafts.slice(1));
     // Existing ground roads stay open across the full width, including the slabs.
     if (middle < floorHeight && passageCuts.length) footprint = polygonClipping.difference(footprint, passageCuts[0], ...passageCuts.slice(1));
