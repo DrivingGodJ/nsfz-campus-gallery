@@ -1,5 +1,6 @@
 import { buildingLevels } from './building-model';
 import { photoLocationText } from './locations';
+import { assetURL } from './asset-url';
 
 export type Point = [number, number];
 export type Shape = { outer: Point[]; holes: Point[][] };
@@ -51,7 +52,7 @@ export type Photo = {
 export type BuildingOverride = { name: string; floors: number; floorHeight: number; partFloors?: Record<string, number> };
 export type Site = { schemaVersion: number; revision: number; photos: Photo[]; buildingOverrides: Record<string, BuildingOverride> };
 export type EditorState = { reviewImports?: {id:string;photoId:string;published:boolean;synced?:boolean;rejected?:boolean}[]; site: Site; drafts: Photo[]; map: Campus };
-export const asset = (file: string) => import.meta.env.BASE_URL + file;
+export const asset = (file: string) => assetURL(file, import.meta.env.BASE_URL, import.meta.env.VITE_MEDIA_BASE_URL, import.meta.env.DEV);
 export function buildingInfo(building: Building, site: Site, index = 0) {
   const override = site.buildingOverrides[building.id];
   return { ...building, name: override?.name || building.name || '未命名建筑 ' + String(index + 1).padStart(2, '0'),

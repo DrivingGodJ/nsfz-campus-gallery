@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { extractPhotoMetadata, validCaptureTime } from './photo-metadata.mjs';
 import { resolveLocationId } from './campus-corrections.mjs';
 import { automaticPhotoPlacement } from './photo-geolocation.mjs';
-import { createPhotoPreview, createPhotoDisplay } from './photo-preview.mjs';
+import { createPhotoPreview, createPhotoDisplay, createPhotoDownload, PHOTO_DOWNLOAD_MAX_BYTES } from './photo-preview.mjs';
 import { PHOTO_DEPTH_FILE, normalizePhotoDepth } from './photo-depth.mjs';
 
 export const ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -140,7 +140,7 @@ export function createStore(root, { generateDepth } = {}) {
           image().resize({ width: 420, height: 420, fit: 'inside', withoutEnlargement: true }).webp({ quality: 78 }).toFile(path.join(directory, 'thumbnail.webp')),
           createPhotoPreview(bytes, path.join(directory, 'preview.webp')),
           createPhotoDisplay(bytes, path.join(directory, 'display.webp')),
-          image().jpeg({ quality: 95, mozjpeg: true }).toFile(path.join(directory, 'download.jpg'))
+          createPhotoDownload(bytes, path.join(directory, 'download.jpg'))
         ]);
         const download = await sharp(path.join(directory, 'download.jpg')).metadata();
         const stats = await fs.stat(path.join(directory, 'download.jpg'));
@@ -355,7 +355,13 @@ export function createStore(root, { generateDepth } = {}) {
   };
   return store;
 }
-export async function exportStaticContent(root, destination) {
+export async function exportStaticContent(root, destination, { mediaBaseURL = '' } = {}) {
+  const externalMedia = !!mediaBaseURL;
+  if (externalMedia) {
+    let url;
+    try { url = new URL(mediaBaseURL); } catch { throw new UserError('图片仓库地址不正确。'); }
+    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new UserError('图片仓库地址不正确。');
+  }
   const { site, map } = await createStore(root).state();
   const buildingOverrides = validateOverrides(site.buildingOverrides, map);
   const ids = new Set();
@@ -365,20 +371,23 @@ export async function exportStaticContent(root, destination) {
     if (!ID_PATTERN.test(photo.id) || ids.has(photo.id)) throw new UserError('存在无效或重复的照片编号。');
     ids.add(photo.id);
     photos.push(validatePhoto(photo, photo, map));
+    if (!Number.isInteger(photo.downloadBytes) || photo.downloadBytes <= 0 || photo.downloadBytes > PHOTO_DOWNLOAD_MAX_BYTES) throw new UserError('下载图片资料超过 5 MB 或大小无效，请先压缩后发布。');
+    if (!ASSET_PATTERN.test(photo.files?.download)) throw new UserError('照片文件路径不正确。');
     for (const file of Object.values(photo.files)) {
       if (!ASSET_PATTERN.test(file) || !file.startsWith('media/' + photo.id + '/')) throw new UserError('照片文件路径不正确。');
+      if (externalMedia) continue;
       const stats = await fs.stat(path.join(root, 'public', file));
       total += stats.size;
+      if (file === photo.files.download && stats.size > PHOTO_DOWNLOAD_MAX_BYTES) throw new UserError('下载图片超过 5 MB，请先压缩后发布。');
       if (stats.size > 100 * 1024 * 1024) throw new UserError('存在超过 GitHub 单文件限制的图片。');
     }
   }
-  // Reserve 20 MB for the application below GitHub Pages' 1 GB site limit.
-  if (total > 980 * 1000 * 1000) throw new UserError('图片总大小超过 980 MB，请减少下载文件体积后发布。');
+  if (total > 900 * 1024 * 1024) throw new UserError('图片总大小超过 900 MB，请减少下载文件体积后发布。');
   await fs.mkdir(path.join(destination, 'data'), { recursive: true });
   await writeJSON(path.join(destination, 'data/site.json'), { ...site, photos, buildingOverrides });
   await writeJSON(path.join(destination, 'data/campus.json'), map);
   await fs.copyFile(path.join(root, 'public/favicon.svg'), path.join(destination, 'favicon.svg'));
-  for (const photo of site.photos) for (const file of Object.values(photo.files)) {
+  if (!externalMedia) for (const photo of site.photos) for (const file of Object.values(photo.files)) {
     const target = path.join(destination, file);
     await fs.mkdir(path.dirname(target), { recursive: true });
     // APFS can clone immutable build assets without duplicating every original.
@@ -389,9 +398,9 @@ export async function exportStaticContent(root, destination) {
   console.log('静态内容已导出：' + site.photos.length + ' 张照片；仅包含已保存内容。');
 }
 export function staticContentPlugin() {
-  let root, outDir;
+  let root, outDir, mediaBaseURL;
   return { name: 'nsfz-static-content', apply: 'build',
-    configResolved(config) { root = config.root; outDir = path.resolve(root, config.build.outDir); },
-    async writeBundle() { await exportStaticContent(root, outDir); }
+    configResolved(config) { root = config.root; outDir = path.resolve(root, config.build.outDir); mediaBaseURL = config.env.VITE_MEDIA_BASE_URL; },
+    async writeBundle() { await exportStaticContent(root, outDir, { mediaBaseURL }); }
   };
 }

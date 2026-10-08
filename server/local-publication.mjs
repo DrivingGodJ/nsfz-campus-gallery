@@ -1,13 +1,17 @@
 import fs from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
-import { UserError, writeJSON } from './storage.mjs';
+import { ASSET_PATTERN, UserError, writeJSON } from './storage.mjs';
+import { PHOTO_DOWNLOAD_MAX_BYTES } from './photo-preview.mjs';
 
 export const PUBLIC_SITE = 'https://drivinggodj.github.io/nsfz-campus-gallery/';
 export const LIKES_API = 'https://likes.drivinggodj.dpdns.org/api/likes';
 const REPOSITORY = 'DrivingGodJ/nsfz-campus-gallery';
+const MEDIA_REPOSITORY = 'DrivingGodJ/nsfz-campus-media';
+const MEDIA_BASE_URL = 'https://raw.githubusercontent.com/' + MEDIA_REPOSITORY + '/main/';
 const CONTENT = /^(public\/data\/site\.json|public\/media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg|depth\.webp))$/;
 export const contentPath = value => CONTENT.test(value);
 export function changedPaths(porcelain) {
@@ -63,12 +67,28 @@ export function runCommand(command, args, { cwd, env = process.env, timeout = 18
     });
   });
 }
-export function createPublicationService(root, { run = runCommand, fetcher = fetch, wait = delay, pollMs = 6000, maxPolls = 150 } = {}) {
+async function fileHash(file) {
+  const hash = crypto.createHash('sha256');
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  return hash.digest('hex');
+}
+export function createPublicationService(root, { run = runCommand, fetcher = fetch, wait = delay, pollMs = 6000, maxPolls = 150, mediaRoot = path.resolve(root, '../nsfz-campus-media') } = {}) {
   const directory = path.join(root, '.local/publication'), lockFile = path.join(directory, 'lock.json');
-  let active = null;
+  const hashes = new Map();
+  let active = null, latestPlan = null;
   const command = (tool, args, options = {}) => run(tool, args, { cwd: root, ...options });
   const git = (...args) => command('git', args);
+  const mediaGit = (...args) => command('git', args, { cwd: mediaRoot });
   const gh = (...args) => command('gh', args);
+  const externalMedia = () => fs.access(path.join(mediaRoot, '.git')).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
+  async function hash(file, fresh) {
+    const stat = await fs.stat(file), key = [stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs].join(':');
+    const cached = hashes.get(file);
+    if (!fresh && cached?.key === key) return cached.value;
+    const value = await fileHash(file);
+    hashes.set(file, { key, value });
+    return value;
+  }
   const npm = async (script, args = [], env = {}) => {
     const cli = process.env.CAMPUS_NPM_CLI || path.resolve(path.dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js');
     return command(process.execPath, [cli, 'run', script, ...args], { timeout: 600000, env: { ...process.env, ...env }, onOutput: text => { if (active) fs.appendFile(path.join(directory, active.id + '.log'), text).catch(() => {}); } });
@@ -88,7 +108,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       return saved;
     } catch { return { running: false, status: 'idle', message: '' }; }
   }
-  async function plan() {
+  async function plan(fresh = false) {
     const paths = changedPaths(await git('status', '--porcelain=v1', '-z', '--untracked-files=all'));
     const branch = (await git('branch', '--show-current')).trim();
     const remote = (await git('remote', 'get-url', 'origin')).trim();
@@ -109,10 +129,57 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       try { fingerprint.update(await fs.readFile(path.join(root, file))); }
       catch (error) { if (error.code !== 'ENOENT') throw error; fingerprint.update('deleted'); }
     }
-    return { ...photoChanges(JSON.parse(previousText), current), files: paths, fingerprint: fingerprint.digest('hex'), saved: current.photos.length, drafts: drafts.length, ahead, siteURL: PUBLIC_SITE };
+    let media;
+    const useExternalMedia = await externalMedia();
+    if (!useExternalMedia) {
+      const ignored = await fs.readFile(path.join(root, '.gitignore'), 'utf8').catch(error => { if (error.code === 'ENOENT') return ''; throw error; });
+      if (/^\/?public\/media\/?\s*$/m.test(ignored)) throw new UserError('图片库未就绪，请先恢复项目旁的 nsfz-campus-media 图片内容库后再上线。');
+    }
+    if (useExternalMedia) {
+      const [mediaBranch, mediaRemote, mediaCounts, mediaStatus, mediaHead] = await Promise.all([
+        mediaGit('branch', '--show-current'), mediaGit('remote', 'get-url', 'origin'),
+        mediaGit('rev-list', '--left-right', '--count', 'HEAD...origin/main'),
+        mediaGit('status', '--porcelain=v1', '-z', '--untracked-files=all'), mediaGit('rev-parse', 'HEAD')
+      ]);
+      if (mediaBranch.trim() !== 'main' || !/^https:\/\/github\.com\/DrivingGodJ\/nsfz-campus-media(?:\.git)?\/?$/i.test(mediaRemote.trim())) throw new UserError('图片内容库不正确，请选择附中影像图片仓库的 main 分支。');
+      const [mediaAhead, mediaBehind] = mediaCounts.trim().split(/\s+/).map(Number);
+      if (mediaBehind) throw new UserError('GitHub 图片库已有更新，请先同步图片库后再上线。');
+      if (current.photos.some(photo => !Number.isInteger(photo.downloadBytes) || photo.downloadBytes <= 0 || photo.downloadBytes > PHOTO_DOWNLOAD_MAX_BYTES || !ASSET_PATTERN.test(photo.files?.download))) throw new UserError('下载图片资料超过 5 MB 或路径无效，请先压缩后发布。');
+      const assets = [...new Set(current.photos.flatMap(photo => Object.values(photo.files ?? {})))].sort();
+      if (assets.some(file => !ASSET_PATTERN.test(file))) throw new UserError('照片文件路径不正确，未上传任何私人原片。');
+      const mediaPaths = changedPaths(mediaStatus);
+      const unrelated = mediaPaths.filter(file => !ASSET_PATTERN.test(file) && file !== 'README.md');
+      if (unrelated.length) throw new UserError('图片内容库还有其他修改，请先处理：' + unrelated.slice(0, 5).join('、'));
+      const files = [];
+      fingerprint.update(mediaHead).update(mediaStatus);
+      for (const file of assets) {
+        let localHash;
+        try {
+          const localFile = path.join(root, 'public', file);
+          if (file.endsWith('/download.jpg') && (await fs.stat(localFile)).size > PHOTO_DOWNLOAD_MAX_BYTES) throw new UserError('下载图片超过 5 MB，请先压缩后发布。');
+          localHash = await hash(localFile, fresh);
+        }
+        catch (error) { if (error.code !== 'ENOENT') throw error; throw new UserError('缺少已审核的照片文件：' + file); }
+        let storedHash = 'missing';
+        try { storedHash = await hash(path.join(mediaRoot, file), fresh); }
+        catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (mediaPaths.includes(file) && localHash !== storedHash) throw new UserError('图片库中的照片文件有未同步的修改，未覆盖。请先核对：' + file);
+        // Ignored public/media files must still participate in the publication check.
+        fingerprint.update(file).update(localHash).update(storedHash);
+        if (localHash !== storedHash || mediaPaths.includes(file)) files.push(file);
+      }
+      if (mediaPaths.includes('README.md')) {
+        try { fingerprint.update(await hash(path.join(mediaRoot, 'README.md'), fresh)); files.push('README.md'); }
+        catch (error) { if (error.code !== 'ENOENT') throw error; throw new UserError('图片内容库的说明文件已删除，请先恢复后再上线。'); }
+      }
+      media = { assets, files, ahead: mediaAhead, baseURL: MEDIA_BASE_URL };
+    }
+    latestPlan = { ...photoChanges(JSON.parse(previousText), current), files: media ? paths.filter(file => !file.startsWith('public/media/')) : paths, media, fingerprint: fingerprint.digest('hex'), saved: current.photos.length, drafts: drafts.length, ahead, siteURL: PUBLIC_SITE };
+    return latestPlan;
   }
   async function status() {
     const publication = await snapshot();
+    if (publication.running && latestPlan) return { publication, plan: latestPlan, problem: '' };
     try { return { publication, plan: await plan(), problem: '' }; }
     catch (error) { return { publication, plan: null, problem: error.message }; }
   }
@@ -134,17 +201,22 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       catch (error) { if (error.code === 'EEXIST') throw new UserError('另一窗口正在上线，请等待完成。', 409); throw error; }
     }
   }
-  async function verifyWebsite(expected, changed) {
+  async function verifyWebsite(expected, prepared) {
     const local = JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'), 'utf8'));
     for (let attempt = 0; attempt < 10; attempt++) {
       const response = await fetcher(PUBLIC_SITE + 'data/site.json?review=' + expected, { cache: 'no-store', signal: AbortSignal.timeout(25000) });
       // Static validation may reorder fields (for example aerial altitude).
       // Compare the entire library while ignoring JSON object key order.
       if (response.ok && isDeepStrictEqual(await response.json().catch(() => null), local)) {
-        for (const file of changed.filter(file => file.startsWith('public/media/'))) {
-          const asset = await fetcher(PUBLIC_SITE + file.slice(7) + '?review=' + expected, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(25000) });
-          if (!asset.ok) throw new UserError('网站已发布，但有照片文件尚未加载成功。请稍后重新上线。');
-        }
+        const assets = prepared.media ? prepared.media.assets : prepared.files.filter(file => file.startsWith('public/media/')).map(file => file.slice(7));
+        let next = 0;
+        await Promise.all(Array.from({ length: Math.min(6, assets.length) }, async () => {
+          while (next < assets.length) {
+            const file = assets[next++];
+            const asset = await fetcher((prepared.media?.baseURL || PUBLIC_SITE) + file + '?review=' + expected, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(25000) });
+            if (!asset.ok) throw new UserError('网站已发布，但有照片文件尚未加载成功。请稍后重新上线。');
+          }
+        }));
         return;
       }
       await wait(pollMs);
@@ -177,16 +249,34 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       await update({ step: 0, message: '正在核对 GitHub、登录状态与最新内容…' });
       await gh('auth', 'status', '--hostname', 'github.com');
       await git('fetch', 'origin', 'main');
-      const prepared = await plan();
+      if (await externalMedia()) await mediaGit('fetch', 'origin', 'main');
+      const prepared = await plan(true);
+      if (prepared.media) {
+        const variable = JSON.parse(await gh('api', `repos/${REPOSITORY}/actions/variables/MEDIA_BASE_URL`));
+        if (variable.value !== prepared.media.baseURL) throw new UserError('网站的图片库地址尚未配置正确，请先同步 GitHub 的 MEDIA_BASE_URL 设置。');
+      }
       await command(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'whoami', '--config', 'worker/wrangler.jsonc']);
       await update({ step: 1, message: '正在检查照片、模型与网站功能…' });
       await npm('test');
       await npm('likes:check');
-      await npm('build', ['--', '--outDir', path.join(directory, active.id, 'build')], { PAGES_BASE_PATH: '/nsfz-campus-gallery/', VITE_LIKES_API_URL: 'https://likes.drivinggodj.dpdns.org/api/likes' });
+      await npm('build', ['--', '--outDir', path.join(directory, active.id, 'build')], { PAGES_BASE_PATH: '/nsfz-campus-gallery/', VITE_LIKES_API_URL: 'https://likes.drivinggodj.dpdns.org/api/likes', ...(prepared.media ? { VITE_MEDIA_BASE_URL: prepared.media.baseURL } : {}) });
       // Check again before staging, including edits made outside this window.
-      const checked = await plan();
+      const checked = await plan(true);
       if (checked.fingerprint !== prepared.fingerprint) throw new UserError('检查过程中内容库发生变化。请重新核对后上线。');
       await update({ step: 2, message: '正在保存上线记录并提交到 GitHub…' });
+      if (prepared.media) {
+        for (const file of prepared.media.files.filter(file => ASSET_PATTERN.test(file))) {
+          const destination = path.join(mediaRoot, file);
+          await fs.mkdir(path.dirname(destination), { recursive: true });
+          await fs.copyFile(path.join(root, 'public', file), destination);
+        }
+        if (prepared.media.files.length) {
+          await mediaGit('add', '--', ...prepared.media.files);
+          await mediaGit('commit', '-m', 'Publish reviewed campus photos', '--', ...prepared.media.files);
+        }
+        // A previous failed push may have already committed the matching files.
+        if (prepared.media.files.length || prepared.media.ahead) await mediaGit('push', 'origin', 'main');
+      }
       if (prepared.files.length) {
         await git('add', '--', ...prepared.files);
         await git('commit', '-m', 'Publish reviewed campus photos');
@@ -212,7 +302,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       }
       if (!completed) throw new UserError('GitHub 仍在发布。请查看发布记录；稍后可以重试，内容已保留。');
       await update({ step: 4, message: '正在确认网站已更新，并同步照片点赞名单…' });
-      await verifyWebsite(commit, prepared.files);
+      await verifyWebsite(commit, prepared);
       await update({ websiteVerified: true });
       try { await npm('likes:deploy:only'); }
       catch (error) { throw new UserError('网站已发布，但点赞服务同步失败。照片已保留，可以重试上线。\n' + publicationError(error.message)); }
@@ -227,7 +317,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     }
   }
   async function start() {
-    await plan();
+    await plan(true);
     await acquire();
     active = { id: crypto.randomUUID(), running: true, status: 'running', step: 0, message: '正在准备上线…', startedAt: new Date().toISOString(), siteURL: PUBLIC_SITE };
     await update({});

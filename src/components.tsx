@@ -7,6 +7,7 @@ import { PhotoPerspectiveButton } from './PhotoPerspective';
 import { photoPerspectiveIssue } from './photo-perspective';
 import { photoDisplayFile } from './photo-image';
 import PhotoImage from './PhotoImage';
+import { downloadPhotoFile, externalPhotoDownload } from './photo-download';
 
 export function Brand({ editor = false, href }: { editor?: boolean; href?: string }) {
   return <a className="brand" href={href || (editor ? './editor.html' : './')} aria-label={editor ? '附中影像本地编辑器' : '附中影像首页'}>
@@ -22,6 +23,19 @@ export function EmptyPhotos({ editor = false }: { editor?: boolean }) {
 }
 export function Notice({ children, kind = 'info', action }: { children: ReactNode; kind?: string; action?: ReactNode }) {
   return <div className={'notice ' + kind} role={kind === 'error' ? 'alert' : 'status'}>{children}{action}</div>;
+}
+export function PhotoDownloadLink({ photo, className, children }: { photo: Photo; className: string; children: ReactNode }) {
+  const [pending, setPending] = useState(false), [error, setError] = useState('');
+  const href = asset(photo.files.download), filename = photo.title.replace(/[\\/:*?"<>|]/g, '_') + '.jpg';
+  return <><a className={className} href={href} download={filename} aria-busy={pending} aria-disabled={pending || undefined} onClick={async event => {
+    if (!externalPhotoDownload(href, window.location.href)) return;
+    event.preventDefault();
+    if (pending) return;
+    setPending(true); setError('');
+    try { await downloadPhotoFile(href, filename); }
+    catch { setError('下载失败，请检查网络后重试。'); }
+    finally { setPending(false); }
+  }}>{pending ? '正在下载…' : children}</a>{error && <Notice kind="error">{error}</Notice>}</>;
 }
 export function PhotoMetadataView({ photo, editor = false }: { photo: Photo; editor?: boolean }) {
   const m = photo.metadata || {};
@@ -56,7 +70,7 @@ export function PhotoDetails({ photo, campus, site, onOpen, showImage = true, ph
       <dl className="photo-facts">{isAerialPhoto(photo) && photo.altitude ? <div><dt>{altitudeLabel(photo)}</dt><dd>{photo.altitude.meters.toFixed(1)} m</dd></div> : !isAerialPhoto(photo) && <div><dt>所在楼层</dt><dd>{photo.floor > 0 ? photo.floor + ' 楼' : layer}</dd></div>}<div><dt>镜头朝向</dt><dd>{headingText(photo.heading)}</dd></div><div><dt>仰俯角</dt><dd>{photo.pitch > 0 ? '仰拍 ' : photo.pitch < 0 ? '俯拍 ' : '平拍 '}{Math.abs(photo.pitch)}°</dd></div><div><dt>图片尺寸</dt><dd>{photo.width} × {photo.height}</dd></div></dl>
       {view && <div className="photo-view-summary"><strong>水平视角约 {view.horizontal.toFixed(1)}°</strong><span>{viewSourceText(view)}</span></div>}
       <PhotoMetadataView photo={photo} />
-      <a className="button secondary download-link" href={asset(photo.files.download)} download={photo.title.replace(/[\\/:*?"<>|]/g, '_') + '.jpg'}><Download size={16} />下载高清 JPEG<span>{sizeText(photo.downloadBytes)}</span></a>
+      <PhotoDownloadLink photo={photo} className="button secondary download-link"><Download size={16} />下载高清 JPEG<span>{sizeText(photo.downloadBytes)}</span></PhotoDownloadLink>
     </div>
   </article>;
 }
@@ -111,6 +125,6 @@ export function Lightbox({ photo, onClose, onPhotoPerspective }: { photo: Photo;
       onPointerCancel={e => { pointers.current.delete(e.pointerId); lastDistance.current = 0; }}>
       <PhotoImage src={asset(photoDisplayFile(photo))} managed fallbackSrc={asset(photo.files.thumbnail)} alt={photo.title} loadingText="次高清照片加载中…" style={{ transform: 'translate(' + pan.x + 'px,' + pan.y + 'px) scale(' + zoom + ')' }} />
     </div>
-    <div className="lightbox-bottom"><div className="zoom-controls"><button className="icon-button inverse" onClick={() => changeZoom(zoom - .5)} disabled={zoom <= 1} aria-label="缩小照片"><Minus size={18} /></button><span>{Math.round(zoom * 100)}%</span><button className="icon-button inverse" onClick={() => changeZoom(zoom + .5)} disabled={zoom >= 5} aria-label="放大照片"><Plus size={18} /></button><button className="icon-button inverse" onClick={() => changeZoom(1)} aria-label="适应窗口"><RotateCcw size={17} /></button></div>{onPhotoPerspective && <button type="button" className="button light" onClick={onPhotoPerspective} disabled={!!photoPerspectiveIssue(photo)} title={photoPerspectiveIssue(photo) || undefined}><Camera size={16} />进入照片视角</button>}<a className="button light" href={asset(photo.files.download)} download={photo.title.replace(/[\\/:*?"<>|]/g, '_') + '.jpg'}><Download size={16} />下载高清 JPEG</a></div>
+    <div className="lightbox-bottom"><div className="zoom-controls"><button className="icon-button inverse" onClick={() => changeZoom(zoom - .5)} disabled={zoom <= 1} aria-label="缩小照片"><Minus size={18} /></button><span>{Math.round(zoom * 100)}%</span><button className="icon-button inverse" onClick={() => changeZoom(zoom + .5)} disabled={zoom >= 5} aria-label="放大照片"><Plus size={18} /></button><button className="icon-button inverse" onClick={() => changeZoom(1)} aria-label="适应窗口"><RotateCcw size={17} /></button></div>{onPhotoPerspective && <button type="button" className="button light" onClick={onPhotoPerspective} disabled={!!photoPerspectiveIssue(photo)} title={photoPerspectiveIssue(photo) || undefined}><Camera size={16} />进入照片视角</button>}<PhotoDownloadLink photo={photo} className="button light"><Download size={16} />下载高清 JPEG</PhotoDownloadLink></div>
   </div>;
 }

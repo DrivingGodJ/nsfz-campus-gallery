@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowLeft, Camera, Download, Heart, Images, MapPin, X } from 'lucide-react';
-import { Brand, EmptyPhotos, Lightbox, Notice, PhotoDetails } from './components';
+import { Brand, EmptyPhotos, Lightbox, Notice, PhotoDetails, PhotoDownloadLink } from './components';
 import { asset, buildingInfo, loadContent, photoLocation, type Campus, type Photo, type Site } from './types';
 import { AERIAL_LOCATION_FILTER, campusFilterLocations, campusLocations, isAerialPhoto, photoLocationId, photosAtLocation, samePhotoSpot } from './locations';
 import LocationOptions from './LocationOptions';
@@ -154,7 +154,7 @@ function App() {
       </main>}
     {immersiveActive && selected && <footer className={'immersive-actions' + (immersive === 'shown' ? ' is-visible' : '')} aria-label="沉浸照片操作" aria-hidden={immersive !== 'shown'} inert={immersive !== 'shown'}>
       <button className="button secondary" onClick={requestImmersiveExit}><ArrowLeft size={16} />返回校园</button>
-      <a className="button primary" href={asset(selected.files.download)} download={selected.title.replace(/[\\/:*?"<>|]/g, '_') + '.jpg'}><Download size={16} />下载原图</a>
+      <PhotoDownloadLink photo={selected} className="button primary"><Download size={16} />下载原图</PhotoDownloadLink>
     </footer>}
     {large && selected && <Lightbox photo={selected} onClose={closeLarge} onPhotoPerspective={() => { setLarge(false); if (!photoPerspective) togglePhotoPerspective(); }} />}
   </div>;

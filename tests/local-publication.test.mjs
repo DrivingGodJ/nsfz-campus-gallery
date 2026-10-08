@@ -20,15 +20,37 @@ async function fixture(t, options = {}) {
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, 'public/data'), { recursive: true });
   await fs.mkdir(path.join(root, '.local'), { recursive: true });
-  const previous = { photos: [], buildingOverrides: {} }, current = { photos: [{ id: 'approved', title: '校园照片' }], buildingOverrides: {} };
+  const previous = { photos: [], buildingOverrides: {} }, current = options.current || { photos: [{ id: 'approved', title: '校园照片' }], buildingOverrides: {} };
   const bytes = Buffer.from(JSON.stringify(current) + '\n');
   await fs.writeFile(path.join(root, 'public/data/site.json'), bytes);
   await fs.writeFile(path.join(root, '.local/drafts.json'), JSON.stringify([{ id: 'private-draft' }]));
-  const commands = [], requests = [];
-  const run = async (tool, args) => {
+  const mediaRoot = path.join(root, '.local/media-repo');
+  if (options.media) {
+    await fs.mkdir(path.join(mediaRoot, '.git'), { recursive: true });
+    for (const photo of current.photos) for (const file of Object.values(photo.files ?? {})) {
+      const local = path.join(root, 'public', file);
+      await fs.mkdir(path.dirname(local), { recursive: true });
+      await fs.writeFile(local, file);
+      if (options.mediaStored) {
+        await fs.mkdir(path.dirname(path.join(mediaRoot, file)), { recursive: true });
+        await fs.copyFile(local, path.join(mediaRoot, file));
+      }
+    }
+  }
+  const commands = [], commandOptions = [], requests = [];
+  const run = async (tool, args, settings) => {
     commands.push([tool, ...args]);
-    if (options.onCommand) await options.onCommand(tool, args, root);
+    commandOptions.push(settings);
+    if (options.onCommand) await options.onCommand(tool, args, root, settings);
     if (tool === 'git') {
+      if (settings.cwd === mediaRoot) {
+        if (args[0] === 'status') return options.mediaDirty || '';
+        if (args[0] === 'branch') return 'main\n';
+        if (args[0] === 'remote') return 'https://github.com/DrivingGodJ/nsfz-campus-media.git\n';
+        if (args[0] === 'rev-list') return (options.mediaAhead || 0) + '\t0\n';
+        if (args[0] === 'rev-parse') return 'b'.repeat(40) + '\n';
+        return '';
+      }
       if (args[0] === 'status') return options.dirty ?? ' M public/data/site.json\0';
       if (args[0] === 'branch') return options.branch ?? 'main\n';
       if (args[0] === 'remote') return 'https://github.com/DrivingGodJ/nsfz-campus-gallery.git\n';
@@ -36,11 +58,16 @@ async function fixture(t, options = {}) {
       if (args[0] === 'rev-list') return '0\t0\n';
       if (args[0] === 'rev-parse') return 'a'.repeat(40) + '\n';
     }
-    if (tool === 'gh' && args[0] === 'api') return JSON.stringify({ workflow_runs: [{ head_sha: 'a'.repeat(40), created_at: new Date().toISOString(), status: 'completed', conclusion: options.conclusion || 'success', html_url: 'https://github.com/DrivingGodJ/nsfz-campus-gallery/actions/runs/1' }] });
+    if (tool === 'gh' && args[0] === 'api') {
+      if (args[1].endsWith('/actions/variables/MEDIA_BASE_URL')) return JSON.stringify({ value: 'https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/' });
+      return JSON.stringify({ workflow_runs: [{ head_sha: 'a'.repeat(40), created_at: new Date().toISOString(), status: 'completed', conclusion: options.conclusion || 'success', html_url: 'https://github.com/DrivingGodJ/nsfz-campus-gallery/actions/runs/1' }] });
+    }
     return '';
   };
   const fetcher = async (url, settings) => {
     requests.push([url, settings?.method || 'GET']);
+    if (options.onRequest) await options.onRequest(url, settings);
+    if (settings?.method === 'HEAD') return new Response(null, { status: options.assetStatus || 200 });
     if (url.startsWith(LIKES_API)) {
       const { photoIds } = JSON.parse(settings.body);
       return Response.json({ likes: Object.fromEntries(photoIds.map(id => [id, { count: 0, liked: false, ...(options.unsynced ? { available: false } : {}) }])) }, { status: options.likesStatus || 200 });
@@ -48,8 +75,8 @@ async function fixture(t, options = {}) {
     const published = options.remoteLibrary || current;
     return new Response(JSON.stringify(published), { status: options.responseStatus || 200 });
   };
-  const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3 });
-  return { root, service, commands, requests };
+  const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3, mediaRoot });
+  return { root, mediaRoot, service, commands, commandOptions, requests };
 }
 async function finished(service) {
   for (let i = 0; i < 200; i++) {
@@ -86,6 +113,120 @@ test('paired depth maps publish with the photo library and are checked online', 
   assert.equal((await finished(service)).status, 'completed');
   assert.deepEqual(commands.find(row => row[0] === 'git' && row[1] === 'add'), ['git', 'add', '--', 'public/data/site.json', depth]);
   assert.ok(requests.some(([url, method]) => method === 'HEAD' && url.includes('/media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.webp')));
+});
+
+const separateMediaPhoto = {
+  id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: '校园照片', downloadBytes: 80,
+  files: { thumbnail: 'media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/thumbnail.webp', depth: 'media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.webp', download: 'media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/download.jpg' }
+};
+const separateMediaLibrary = { photos: [separateMediaPhoto], buildingOverrides: {} };
+
+test('separate media publication copies referenced assets and pushes them before the Pages site', async t => {
+  const orphan = 'media/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/download.jpg';
+  const { root, mediaRoot, service, commands, commandOptions, requests } = await fixture(t, { media: true, current: separateMediaLibrary, mediaDirty: '?? ' + orphan + '\0' });
+  await fs.writeFile(path.join(root, '.local/original.jpg'), 'private-original');
+  await fs.mkdir(path.dirname(path.join(mediaRoot, orphan)), { recursive: true });
+  await fs.writeFile(path.join(mediaRoot, orphan), 'orphan-photo');
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  const mediaPush = commands.findIndex((row, index) => row[0] === 'git' && row[1] === 'push' && commandOptions[index].cwd === mediaRoot);
+  const mainPush = commands.findIndex((row, index) => row[0] === 'git' && row[1] === 'push' && commandOptions[index].cwd === root);
+  assert.ok(mediaPush >= 0 && mainPush > mediaPush);
+  const mediaAdd = commands.find((row, index) => row[0] === 'git' && row[1] === 'add' && commandOptions[index].cwd === mediaRoot);
+  assert.deepEqual(mediaAdd.slice(3), Object.values(separateMediaPhoto.files).sort());
+  const mainAdd = commands.find((row, index) => row[0] === 'git' && row[1] === 'add' && commandOptions[index].cwd === root);
+  assert.deepEqual(mainAdd, ['git', 'add', '--', 'public/data/site.json']);
+  const buildIndex = commands.findIndex(row => row[2] === 'run' && row[3] === 'build');
+  assert.equal(commandOptions[buildIndex].env.VITE_MEDIA_BASE_URL, 'https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/');
+  assert.equal(requests.filter(([, method]) => method === 'HEAD').length, 3);
+  assert.ok(requests.filter(([, method]) => method === 'HEAD').every(([url]) => url.startsWith('https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/media/')));
+  for (const file of Object.values(separateMediaPhoto.files)) assert.equal(await fs.readFile(path.join(mediaRoot, file), 'utf8'), file);
+  assert.equal(await fs.readFile(path.join(mediaRoot, orphan), 'utf8'), 'orphan-photo');
+  assert.equal(await fs.readFile(path.join(root, '.local/original.jpg'), 'utf8'), 'private-original');
+});
+
+test('ignored media edits during checks stop publication before either repository is changed', async t => {
+  const { service, commands } = await fixture(t, { media: true, current: separateMediaLibrary, onCommand: async (_tool, args, root) => {
+    if (args[1] === 'run' && args[2] === 'test') await fs.writeFile(path.join(root, 'public', separateMediaPhoto.files.depth), 'new-depth');
+  } });
+  await service.start();
+  assert.match((await finished(service)).message, /内容库发生变化/);
+  assert.ok(!commands.some(row => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1])));
+});
+
+test('failed media pushes stop the main publication and matching committed media can be retried', async t => {
+  const failed = await fixture(t, { media: true, current: separateMediaLibrary, onCommand: async (tool, args, _root, settings) => {
+    if (tool === 'git' && args[0] === 'push' && settings.cwd.endsWith('/media-repo')) throw new Error('media push failed');
+  } });
+  await failed.service.start();
+  assert.equal((await finished(failed.service)).status, 'failed');
+  assert.ok(!failed.commands.some((row, index) => row[0] === 'git' && row[1] === 'push' && failed.commandOptions[index].cwd === failed.root));
+  const retry = await fixture(t, { media: true, mediaStored: true, mediaAhead: 1, current: separateMediaLibrary });
+  await retry.service.start();
+  assert.equal((await finished(retry.service)).status, 'completed');
+  assert.ok(retry.commands.some((row, index) => row[0] === 'git' && row[1] === 'push' && retry.commandOptions[index].cwd === retry.mediaRoot));
+  assert.ok(!retry.commands.some((row, index) => row[0] === 'git' && row[1] === 'commit' && retry.commandOptions[index].cwd === retry.mediaRoot));
+  assert.equal(retry.requests.filter(([, method]) => method === 'HEAD').length, 3);
+});
+
+test('conflicting media checkout edits are preserved while matching dirty copies can publish', async t => {
+  const depth = separateMediaPhoto.files.depth;
+  const conflict = await fixture(t, { media: true, mediaStored: true, current: separateMediaLibrary, mediaDirty: ' M ' + depth + '\0' });
+  await fs.writeFile(path.join(conflict.mediaRoot, depth), 'edited-in-media-checkout');
+  await assert.rejects(conflict.service.start(), /未同步的修改，未覆盖/);
+  assert.equal(await fs.readFile(path.join(conflict.mediaRoot, depth), 'utf8'), 'edited-in-media-checkout');
+  assert.equal(await fs.readFile(path.join(conflict.root, 'public', depth), 'utf8'), depth);
+  assert.ok(!conflict.commands.some(row => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1])));
+  const matching = await fixture(t, { media: true, mediaStored: true, current: separateMediaLibrary, mediaDirty: ' M ' + depth + '\0' });
+  await matching.service.start();
+  assert.equal((await finished(matching.service)).status, 'completed');
+  const add = matching.commands.find((row, index) => row[0] === 'git' && row[1] === 'add' && matching.commandOptions[index].cwd === matching.mediaRoot);
+  assert.deepEqual(add, ['git', 'add', '--', depth]);
+});
+
+test('a split project cannot publish without its sibling media checkout', async t => {
+  const { root, service, commands } = await fixture(t);
+  await fs.writeFile(path.join(root, '.gitignore'), '.local/\npublic/media/\n');
+  await assert.rejects(service.start(), /图片库未就绪/);
+  assert.ok(!commands.some(row => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1])));
+});
+
+test('external media requires every local asset and rejects downloads over five megabytes', async t => {
+  const missing = await fixture(t, { media: true, current: separateMediaLibrary });
+  await fs.rm(path.join(missing.root, 'public', separateMediaPhoto.files.depth));
+  await assert.rejects(missing.service.start(), /缺少已审核的照片文件/);
+  const oversized = await fixture(t, { media: true, current: separateMediaLibrary });
+  await fs.writeFile(path.join(oversized.root, 'public', separateMediaPhoto.files.download), Buffer.alloc(5_000_001));
+  await assert.rejects(oversized.service.start(), /下载图片超过 5 MB/);
+  assert.ok(!oversized.commands.some(row => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1])));
+});
+
+test('a successful Pages run does not hide a missing image in the separate media repository', async t => {
+  const { service, commands, requests } = await fixture(t, { media: true, mediaStored: true, mediaAhead: 1, current: separateMediaLibrary, assetStatus: 404 });
+  await service.start();
+  const result = await finished(service);
+  assert.equal(result.status, 'failed');
+  assert.match(result.message, /照片文件尚未加载成功/);
+  assert.ok(requests.some(([url, method]) => method === 'HEAD' && url.startsWith('https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/')));
+  assert.ok(!commands.flat().includes('likes:deploy:only'));
+});
+
+test('all matching referenced assets are verified with at most six simultaneous requests', async t => {
+  const photos = Array.from({ length: 4 }, (_, index) => {
+    const id = '0000000' + index + '-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    return { ...separateMediaPhoto, id, files: Object.fromEntries(Object.entries(separateMediaPhoto.files).map(([key, file]) => [key, file.replace(separateMediaPhoto.id, id)])) };
+  });
+  let active = 0, maximum = 0;
+  const { service, requests } = await fixture(t, { media: true, mediaStored: true, current: { ...separateMediaLibrary, photos }, onRequest: async (_url, settings) => {
+    if (settings?.method !== 'HEAD') return;
+    active++; maximum = Math.max(maximum, active);
+    await new Promise(resolve => setTimeout(resolve, 3));
+    active--;
+  } });
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.equal(requests.filter(([, method]) => method === 'HEAD').length, 12);
+  assert.ok(maximum > 1 && maximum <= 6);
 });
 
 test('unrelated program changes and wrong branches cannot be committed by the review app', async t => {
