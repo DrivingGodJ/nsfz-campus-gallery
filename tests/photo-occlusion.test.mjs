@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildingGeometry } from '../src/building-geometry.ts';
+import { laboratoryBodyGeometry, laboratoryLayout } from '../src/laboratory-geometry.ts';
 import { acceleratePhotoOccluder } from '../src/photo-occlusion.ts';
-import { cameraPhotoClusters, permanentPhotoSpots, photoOccluders, photoPointPosition, photoPointVisible, visiblePhotoPoints } from '../src/photo-clusters.ts';
+import { cameraPhotoClusters, permanentPhotoSpots, photoOccluders, photoPointOpacity, photoPointPosition, photoPointVisible, visiblePhotoPoints } from '../src/photo-clusters.ts';
 
 test('accelerated photo visibility preserves triangle masks and sees opaque walls behind nonblocking corridor slabs', () => {
   const slab = new THREE.PlaneGeometry(10, 10), wall = new THREE.PlaneGeometry(10, 10);
@@ -49,7 +52,7 @@ test('glass, hidden groups and deliberately non-interactive details retain their
   mesh.geometry.dispose(); material.dispose();
 });
 
-test('interior photo points and thumbnails ignore their own building shell while other buildings still block them', () => {
+test('photo points fade through buildings while thumbnails retain their own-shell exemption and other-building occlusion', () => {
   const scene = new THREE.Scene(), building = new THREE.Group(), nested = new THREE.Group();
   building.userData = { photoOccluder: true, buildingId: 'own-building' };
   const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
@@ -72,17 +75,103 @@ test('interior photo points and thumbnails ignore their own building shell while
     ray.set(camera.position, photoPointPosition(photos[0]).sub(camera.position).normalize());
     assert.ok(ray.intersectObjects(occluders, false).length, 'The actual opaque building mesh lies between camera and interior point');
     assert.equal(photoPointVisible(new THREE.Vector3(0, 1.6, 0), camera, size, occluders), false, 'The building still occludes without an ownership exemption');
-    assert.deepEqual(visiblePhotoPoints(photos, camera, size, occluders).map(photo => photo.id), ['interior-legacy', 'interior-location']);
+    const points = visiblePhotoPoints(photos, camera, size, occluders);
+    assert.deepEqual(points.map(photo => photo.id), photos.map(photo => photo.id));
+    assert.ok(points.every(photo => photo.pointOpacity > 0 && photo.pointOpacity < .85), 'An opaque shell dims points without hiding them');
     assert.deepEqual(cameraPhotoClusters(spots, camera, size, occluders).flatMap(cluster => cluster.photos.map(photo => photo.id)).sort(), ['interior-legacy', 'interior-location']);
   }
   camera.position.set(0, 3.4, 20); camera.lookAt(0, 3.4, 0); camera.updateMatrixWorld();
   const otherBuilding = new THREE.Group(), otherBody = new THREE.Mesh(new THREE.BoxGeometry(6, 12, 2), material);
   otherBuilding.userData = { photoOccluder: true, buildingId: 'other-building' };
   otherBody.position.set(0, 6, 10); otherBuilding.add(otherBody); scene.add(otherBuilding);
-  assert.deepEqual(visiblePhotoPoints(photos, camera, size, photoOccluders(scene)), [], 'An intervening different building continues to hide interior points');
+  const behindBoth = visiblePhotoPoints(photos, camera, size, photoOccluders(scene));
+  assert.deepEqual(behindBoth.map(photo => photo.id), photos.map(photo => photo.id), 'Points also remain available behind another building');
   assert.deepEqual(cameraPhotoClusters(spots, camera, size, photoOccluders(scene)), [], 'Own-shell exemptions cannot bypass another building for thumbnails');
   otherBuilding.visible = false;
-  assert.deepEqual(visiblePhotoPoints(photos, camera, size, photoOccluders(scene)).map(photo => photo.id), ['interior-legacy', 'interior-location']);
+  const behindOwn = visiblePhotoPoints(photos, camera, size, photoOccluders(scene));
+  assert.deepEqual(behindOwn.map(photo => photo.id), photos.map(photo => photo.id));
+  assert.ok(behindBoth.every((photo, index) => photo.pointOpacity < behindOwn[index].pointOpacity), 'Each additional physical wall makes the point softer');
   assert.equal(JSON.stringify(photos), before, 'Visibility never rewrites persisted location or coordinates');
   body.geometry.dispose(); otherBody.geometry.dispose(); material.dispose();
+});
+
+test('physical slab layers fade points progressively, deduplicating faces and counting opaque corridor floors and ground', () => {
+  const scene = new THREE.Scene(), building = new THREE.Group();
+  building.userData = { photoOccluder: true, buildingId: 'building' }; scene.add(building);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000), size = { width: 900, height: 600 };
+  camera.position.set(.7, 24, .3); camera.lookAt(.7, -2, .3); camera.updateMatrixWorld();
+  const anchor = new THREE.Vector3(.7, -2, .3);
+  assert.equal(photoPointOpacity(anchor, camera, []), .85);
+  const slabs = [];
+  for (const y of [9, 6, 3]) {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(10, .25, 10), material);
+    slab.position.y = y; slabs.push(slab); building.add(slab);
+    const occluders = photoOccluders(scene);
+    assert.ok(Math.abs(photoPointOpacity(anchor, camera, occluders) - .85 * .62 ** slabs.length) < 1e-10, 'Upper/lower faces and duplicate diagonal triangles are one physical slab');
+  }
+  const duplicate = slabs[0].clone(); building.add(duplicate);
+  assert.ok(Math.abs(photoPointOpacity(anchor, camera, photoOccluders(scene)) - .85 * .62 ** 3) < 1e-10, 'A coincident mesh does not introduce another layer');
+  const fourth = new THREE.Mesh(new THREE.BoxGeometry(10, .25, 10), material);
+  fourth.position.y = 12; building.add(fourth);
+  assert.equal(photoPointOpacity(anchor, camera, photoOccluders(scene)), .14, 'Deeply occluded points retain a restrained visibility floor');
+  building.remove(fourth); fourth.geometry.dispose();
+  slabs[1].geometry.userData.photoOcclusionMask = new Uint8Array(12);
+  assert.ok(Math.abs(photoPointOpacity(anchor, camera, photoOccluders(scene)) - .85 * .62 ** 3) < 1e-10, 'Corridor floors remain real opacity layers even when exempt from hard thumbnail hiding');
+  assert.equal(photoPointVisible(anchor, camera, size, [slabs[1]]), true, 'Hard thumbnail visibility still skips masked slab faces');
+  building.visible = false;
+  const ground = new THREE.Group(); ground.userData.photoOpacityOccluder = true; scene.add(ground);
+  const groundMeshes = [.02, .06].map(y => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), material);
+    mesh.rotation.x = -Math.PI / 2; mesh.position.y = y; ground.add(mesh); return mesh;
+  });
+  const noPicking = () => null; groundMeshes[0].raycast = noPicking;
+  let occluders = photoOccluders(scene);
+  assert.equal(occluders.length, 2, 'Tagged ground surfaces join the shared opacity rays');
+  assert.ok(Math.abs(photoPointOpacity(anchor, camera, occluders) - .85 * .62) < 1e-10, 'Adjacent ground render layers count as one physical layer');
+  assert.equal(groundMeshes[0].raycast, noPicking, 'Opacity raycasts preserve the forest ground custom pointer handler');
+  const pointer = new THREE.Raycaster(camera.position, anchor.clone().sub(camera.position).normalize());
+  assert.deepEqual(pointer.intersectObject(groundMeshes[0]), [], 'A ground mesh remains non-interactive for actual picking');
+  assert.equal(photoPointVisible(anchor, camera, size, occluders), true, 'Ground dims underground points without hiding thumbnails');
+  const photo = { id: 'underground', position: { x: .7, z: .3, height: -2 } };
+  assert.ok(visiblePhotoPoints([photo], camera, size, occluders)[0].pointOpacity < .85);
+  building.visible = true;
+  occluders = photoOccluders(scene);
+  assert.ok(photoPointOpacity(anchor, camera, occluders) < .85 * .62, 'Underground points account for both ground and building floors');
+  groundMeshes[1].userData.photoOccluder = true;
+  delete ground.userData.photoOpacityOccluder;
+  assert.ok(photoOccluders(scene).includes(groundMeshes[1]), 'Meshes tagged as occluders themselves are collected, including raised platforms');
+  const offscreen = { ...photo, id: 'offscreen', position: { x: 1000, z: .3, height: -2 } };
+  assert.deepEqual(visiblePhotoPoints([offscreen], camera, size, occluders), [], 'Soft occlusion never overrides the camera frustum');
+  const obliqueSlab = new THREE.Mesh(new THREE.BoxGeometry(100, .25, 100), material); scene.add(obliqueSlab);
+  camera.position.set(0, .8, 30); camera.lookAt(0, -.8, -30); camera.updateMatrixWorld(); scene.updateMatrixWorld();
+  assert.ok(Math.abs(photoPointOpacity(new THREE.Vector3(0, -.8, -30), camera, [obliqueSlab]) - .85 * .62) < 1e-10, 'Oblique rays still count a slab once even when its two hits are many metres apart');
+  obliqueSlab.geometry.dispose();
+  for (const mesh of [...slabs, ...groundMeshes]) mesh.geometry.dispose();
+  material.dispose();
+});
+
+test('real teaching and laboratory corridor slabs dim a third-floor point behind three floors', async () => {
+  const shape = { outer: [[0, 0], [12, 0], [12, 9], [0, 9], [0, 0]], holes: [] };
+  const corridor = { partId: 'main', footprint: { outer: [[0, 0], [12, 0], [12, 3], [0, 3], [0, 0]], holes: [] }, points: [[0, 0], [12, 0]], depth: 3 };
+  const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
+  const laboratory = campus.buildings.find(building => building.id === 'way/855459411');
+  const at = laboratoryLayout(laboratory).at;
+  const cases = [
+    [buildingGeometry(shape, 21.6, 3.6, [], [corridor]), [6, 1.5]],
+    [laboratoryBodyGeometry(laboratory, 21.6, 3.6), at(16, 13.1)],
+  ];
+  for (const [geometry, [x, z]] of cases) {
+    const scene = new THREE.Scene(), body = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    body.rotation.x = -Math.PI / 2; body.userData.photoOccluder = true; scene.add(body);
+    const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000);
+    camera.position.set(x, 20, z); camera.lookAt(x, 9.2, z); camera.updateMatrixWorld();
+    const occluders = photoOccluders(scene), anchor = new THREE.Vector3(x, 9.2, z), ray = new THREE.Raycaster(camera.position, new THREE.Vector3(0, -1, 0), 0, 10.7);
+    const hits = ray.intersectObjects(occluders, false);
+    assert.ok(hits.length >= 6, 'The actual model includes both faces of three intermediate floor slabs');
+    assert.ok(hits.every(hit => geometry.userData.photoOcclusionMask[hit.faceIndex] === 0), 'The actual corridor floors carry only hard-visibility exemptions');
+    assert.equal(photoPointVisible(anchor, camera, { width: 900, height: 600 }, occluders), true);
+    assert.ok(Math.abs(photoPointOpacity(anchor, camera, occluders) - .85 * .62 ** 3) < 1e-10, 'All three actual floor layers soften the third-floor point');
+    geometry.dispose(); body.material.dispose();
+  }
 });

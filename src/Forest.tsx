@@ -43,7 +43,7 @@ export default function Forest({ feature, labelPortal }: { feature: Feature; lab
   const corners = feature.outer!.slice(0, -1);
   const center = corners.reduce((sum, point) => [sum[0] + point[0] / corners.length, sum[1] + point[1] / corners.length], [0, 0]);
   return <group>
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .075, 0]} raycast={() => null}>
+    <mesh userData={{ photoOpacityOccluder: true }} rotation={[-Math.PI / 2, 0, 0]} position={[0, .075, 0]} raycast={() => null}>
       <shapeGeometry args={[shape]} /><meshStandardMaterial color={mapColor('#b4c29e')} roughness={1} side={THREE.DoubleSide} />
     </mesh>
     <Trees trees={feature.trees} />

@@ -78,7 +78,7 @@ test('merged thumbnails retain every original shooting point, including permanen
   const clusters = cameraPhotoClusters(permanentPhotoSpots(photos), camera, size);
   assert.equal(clusters.length, 1);
   assert.equal(clusters[0].spots.length, 2);
-  assert.deepEqual(visiblePhotoPoints(photos, camera, size), photos);
+  assert.deepEqual(visiblePhotoPoints(photos, camera, size), photos.map(photo => ({ ...photo, pointOpacity: .85 })));
   assert.deepEqual(visiblePhotoPoints(photos, cameraAt(40), size).map(photo => photo.position.x), [-10, -9, 10]);
   assert.equal(JSON.stringify(photos), before, 'Point display cannot replace coordinates with cluster centres');
 });
@@ -141,8 +141,13 @@ test('behind-camera, offscreen and building-occluded photos never join visible s
   const shots = [photo('occluded', 0), photo('visible', 6), photo('behind', 0, 30), photo('outside', 100)];
   const clusters = cameraPhotoClusters(permanentPhotoSpots(shots), camera, size, [wall]);
   assert.deepEqual(clusters.flatMap(cluster => cluster.photos.map(photo => photo.id)), ['visible']);
-  assert.deepEqual(visiblePhotoPoints(shots, camera, size, [wall]).map(photo => photo.id), ['visible']);
+  const points = visiblePhotoPoints(shots, camera, size, [wall]);
+  assert.deepEqual(points.map(photo => photo.id), ['occluded', 'visible']);
+  assert.ok(points[0].pointOpacity < points[1].pointOpacity, 'Occluded photo points fade instead of disappearing');
   assert.equal(photoPointVisible(new THREE.Vector3(0, 1.6, 0), camera, size, [wall]), false);
+  wall.geometry.userData.photoOcclusionMask = new Uint8Array(12);
+  assert.equal(photoPointVisible(new THREE.Vector3(0, 1.6, 0), camera, size, [wall]), true, 'A hard-visibility exemption keeps thumbnails visible');
+  assert.ok(visiblePhotoPoints(shots, camera, size, [wall])[0].pointOpacity < .85, 'A thumbnail exemption does not remove the physical layer from point fading');
   wall.material.transparent = true; wall.material.depthWrite = false;
   assert.equal(photoPointVisible(new THREE.Vector3(0, 1.6, 0), camera, size, [wall]), true, 'Ghost overlays do not hide photos');
   wall.geometry.dispose(); wall.material.dispose();

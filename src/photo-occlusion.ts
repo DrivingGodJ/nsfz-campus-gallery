@@ -35,3 +35,19 @@ export function isOwnBuildingOccluder(mesh: THREE.Mesh, buildingId?: string) {
   }
   return false;
 }
+
+// Ground surfaces dim underground points without hiding photo thumbnails.
+export function isPhotoOpacityOnlyOccluder(mesh: THREE.Mesh) {
+  for (let parent: THREE.Object3D | null = mesh; parent; parent = parent.parent) {
+    if (parent.userData.photoOpacityOccluder) return true;
+  }
+  return false;
+}
+
+export function photoOpacityRaycast(mesh: THREE.Mesh, ray: THREE.Raycaster, hits: THREE.Intersection[]) {
+  // Some ground meshes disable pointer picking. Their actual surface still
+  // dims underground markers, without replacing their custom picking handler.
+  const cast = isPhotoOpacityOnlyOccluder(mesh) && mesh.raycast !== acceleratedRaycast && mesh.raycast !== THREE.Mesh.prototype.raycast
+    ? THREE.Mesh.prototype.raycast : mesh.raycast;
+  if (ray.layers.test(mesh.layers)) cast.call(mesh, ray, hits);
+}

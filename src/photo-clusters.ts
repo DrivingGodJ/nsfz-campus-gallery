@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { MapPhoto } from './MapCameraRig';
 import { MAP_PHOTO_FOCUS_DISTANCE } from './map-card-viewport.ts';
-import { acceleratePhotoOccluder, isOwnBuildingOccluder, isPhotoOccluder } from './photo-occlusion.ts';
+import { acceleratePhotoOccluder, isOwnBuildingOccluder, isPhotoOccluder, isPhotoOpacityOnlyOccluder, photoOpacityRaycast } from './photo-occlusion.ts';
 import { isAerialPhoto, photoLocationId } from './locations.ts';
 
 export const PHOTO_MERGE_METERS = 2;
@@ -29,11 +29,34 @@ function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: {
   if (!occluders.length) return true;
   ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), camera);
   ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
-  return !ray.intersectObjects(occluders.filter(object => object instanceof THREE.Mesh && isPhotoOccluder(object) && !isOwnBuildingOccluder(object, buildingId)), false).some(hit => {
+  return !ray.intersectObjects(occluders.filter(object => object instanceof THREE.Mesh && isPhotoOccluder(object) && !isPhotoOpacityOnlyOccluder(object) && !isOwnBuildingOccluder(object, buildingId)), false).some(hit => {
     const mesh = hit.object as THREE.Mesh;
     const blockingFace = mesh.geometry?.userData.photoOcclusionMask?.[hit.faceIndex ?? -1] !== 0;
     return blockingFace && mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite));
   });
+}
+
+export function photoPointOpacity(anchor: THREE.Vector3, camera: THREE.Camera, occluders: THREE.Object3D[], ray = new THREE.Raycaster()) {
+  const projected = anchor.clone().project(camera);
+  ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), camera);
+  ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
+  const layers: { point: THREE.Vector3; normal: THREE.Vector3 }[] = [];
+  const hits: THREE.Intersection[] = [];
+  for (const mesh of occluders) if (mesh instanceof THREE.Mesh && isPhotoOccluder(mesh)) photoOpacityRaycast(mesh, ray, hits);
+  hits.sort((a, b) => a.distance - b.distance);
+  for (const hit of hits) {
+    const mesh = hit.object as THREE.Mesh;
+    // The thumbnail mask lets corridor photos stay clickable, but the real
+    // opaque slabs still contribute to the softer marker's depth cue.
+    if (!hit.face) continue;
+    const normal = hit.face.normal.clone().transformDirection(mesh.matrixWorld);
+    // One physical wall/slab includes both faces and any coincident triangles.
+    // Compare thickness along the face normal so oblique views do not count a
+    // thin slab twice merely because the ray travels far between its faces.
+    if (layers.some(layer => Math.abs(normal.dot(layer.normal)) > .95 && Math.abs(hit.point.clone().sub(layer.point).dot(layer.normal)) < .5)) continue;
+    layers.push({ point: hit.point, normal });
+  }
+  return Math.max(.14, .85 * .62 ** layers.length);
 }
 
 export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = [], ray = new THREE.Raycaster(), halfSize: [number, number] = [32.5, 24], buildingId?: string) {
@@ -44,7 +67,11 @@ export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera,
 export function visiblePhotoPoints(photos: MapPhoto[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = []): MapPhoto[] {
   camera.updateMatrixWorld();
   const ray = new THREE.Raycaster();
-  return photos.filter(photo => photoAnchorVisible(photoPointPosition(photo), camera, size, occluders, ray, [4, 4], photoBuildingId(photo)));
+  return photos.flatMap(photo => {
+    const anchor = photoPointPosition(photo);
+    if (!photoAnchorVisible(anchor, camera, size, [], ray, [3, 3])) return [];
+    return [{ ...photo, pointOpacity: photoPointOpacity(anchor, camera, occluders, ray) }];
+  });
 }
 
 export function photoOccluders(scene: THREE.Scene) {
@@ -53,8 +80,8 @@ export function photoOccluders(scene: THREE.Scene) {
   scene.traverseVisible(object => {
     if (!(object instanceof THREE.Mesh)) return;
     if (!isPhotoOccluder(object)) return;
-    for (let parent = object.parent; parent; parent = parent.parent) {
-      if (parent.userData.photoOccluder) { acceleratePhotoOccluder(object); meshes.push(object); break; }
+    for (let parent: THREE.Object3D | null = object; parent; parent = parent.parent) {
+      if (parent.userData.photoOccluder || parent.userData.photoOpacityOccluder) { acceleratePhotoOccluder(object); meshes.push(object); break; }
     }
   });
   return meshes;

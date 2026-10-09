@@ -40,7 +40,7 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
     const occluders = photoOccluders(scene);
     const clusters = cameraPhotoClusters(spots, camera, size, occluders, { compact, selectedId: selected?.id });
     const points = visiblePhotoPoints(photos, camera, size, occluders);
-    const key = clusters.map(cluster => cluster.photos.map(photo => photo.id).join(',')).join('|') + '/' + points.map(photo => photo.id).join(',');
+    const key = clusters.map(cluster => cluster.photos.map(photo => photo.id).join(',')).join('|') + '/' + points.map(photo => photo.id + ':' + photo.pointOpacity).join(',');
     if (key !== signature.current) { signature.current = key; setMarkers({ clusters, points }); }
     if (onVisiblePhotos) {
       const visible = clusters.filter(cluster => {
@@ -69,7 +69,7 @@ export default function PhotoMarkers({ photos, selected, compact, labelPortal, o
   const currentIds = new Set(photos.map(photo => photo.id));
   return <>{markers.points.filter(photo => currentIds.has(photo.id)).map(photo => <Html key={'point/' + photo.id} portal={labelPortal}
     position={photoPointPosition(photo)} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}>
-    <span aria-hidden="true" data-photo-point-id={photo.id} className={'map-photo-point' + (photo.id === selected?.id ? ' selected' : '')} style={{ backgroundColor: mapColor(photoMarkerColors(photo).point) }} />
+    <span aria-hidden="true" data-photo-point-id={photo.id} className={'map-photo-point' + (photo.id === selected?.id ? ' selected' : '')} style={{ backgroundColor: mapColor(photoMarkerColors(photo).point), opacity: photo.pointOpacity ?? .85 }} />
   </Html>)}{fadingClusters.map(({ item: cluster, expiresAt }) => {
     const photo = cluster.photos.find(photo => photo.id === selected?.id) || cluster.photos[0];
     const active = cluster.photos.some(photo => photo.id === selected?.id), grouped = cluster.photos.length > 1;

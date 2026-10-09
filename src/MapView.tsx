@@ -65,7 +65,7 @@ function makeShape(data: Shape) {
 function Surface({ data, color, height = .06, stableDepth = false, unlit = false }: { data: Shape; color: string; height?: number; stableDepth?: boolean; unlit?: boolean }) {
   const mapColor = useMapColor();
   const shape = useMemo(() => makeShape(data), [data]);
-  return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, height, 0]} renderOrder={stableDepth ? 1 : 0}><shapeGeometry args={[shape]} />{unlit ? <meshBasicMaterial color={mapColor(color)} toneMapped={false} /> : <meshStandardMaterial color={mapColor(color)} side={THREE.DoubleSide} roughness={1} polygonOffset={stableDepth} polygonOffsetFactor={-1} polygonOffsetUnits={-1} />}</mesh>;
+  return <mesh userData={{ photoOpacityOccluder: true }} rotation={[-Math.PI / 2, 0, 0]} position={[0, height, 0]} renderOrder={stableDepth ? 1 : 0}><shapeGeometry args={[shape]} />{unlit ? <meshBasicMaterial color={mapColor(color)} toneMapped={false} /> : <meshStandardMaterial color={mapColor(color)} side={THREE.DoubleSide} roughness={1} polygonOffset={stableDepth} polygonOffsetFactor={-1} polygonOffsetUnits={-1} />}</mesh>;
 }
 const BuildingMesh = memo(function BuildingMesh({ building, site, index, selected, floor, onClick, placing, labelPortal, bridge }: { building: Campus['buildings'][number]; site: Site; index: number; selected: boolean; floor?: number; onClick?: (id: string) => void; placing?: boolean; labelPortal: RefObject<HTMLDivElement>; bridge?: Campus['features'][number] }) {
   const mapColor = useMapColor();
@@ -121,7 +121,7 @@ function Roads({ points, width }: { points: Point[]; width: number }) {
   const mapColor = useMapColor();
   const geometry = useMemo(() => buildingGeometry(passageFootprint(points, width), .04, 3.6), [points, width]);
   useEffect(() => () => geometry.dispose(), [geometry]);
-  return <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, .075, 0]}><meshStandardMaterial color={mapColor('#e9e4d4')} roughness={1} /></mesh>;
+  return <mesh userData={{ photoOpacityOccluder: true }} geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, .075, 0]}><meshStandardMaterial color={mapColor('#e9e4d4')} roughness={1} /></mesh>;
 }
 function Direction({ photo, editing = false, compact = false, onHeading, labelPortal }: { photo: MapPhoto; editing?: boolean; compact?: boolean; onHeading?: (heading: number) => void; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
@@ -274,7 +274,7 @@ export default function MapView(props: Props) {
         {campus.features.map(feature => feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'path' && feature.points && !feature.representedBy ? <Roads key={feature.id} points={feature.points} width={feature.width || 3} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
         <Line points={campus.boundary.map(([x, z]) => [x, .2, z])} color={mapColor('#97a188')} lineWidth={1.5} />
         {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
-        <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground={underground} labelPortal={labelPortal} />
+        <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground={underground} labelPortal={labelPortal} occlusionRevision={[selectedLocation, cutawayFloor, underground].join(':')} />
         <FeatureTargets campus={campus} site={site} underground={underground} labelPortal={labelPortal} />
         {!viewingPhoto && <PhotoMarkers occlusionRevision={[selectedLocation, cutawayFloor, underground].join(':')} photos={photos} photoLikes={props.photoLikes} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}

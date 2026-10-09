@@ -1,6 +1,7 @@
 import { useMapColor } from './MapTheme';
 import { Line } from '@react-three/drei';
-import { memo, useEffect, useMemo, type RefObject } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { memo, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { Building, BuildingOverride, Feature, Point, Shape } from './types';
 import { bridgeHeight, bridgeSurfaceHeight, curvedStairPoint, curvedStairTreads, straightStairTreads } from './structure-geometry';
@@ -15,6 +16,41 @@ import LakeGarden from './LakeGarden';
 import MottoStone from './MottoStone';
 import FlagPlatform from './FlagPlatform';
 import { garageRampGeometry } from './garage-ramp-geometry';
+import { photoOccluders, photoPointOpacity } from './photo-clusters';
+
+function UndergroundFade({ anchor, occlusionRevision, children }: { anchor: THREE.Vector3; occlusionRevision?: string; children: ReactNode }) {
+  const { scene, invalidate } = useThree();
+  const group = useRef<THREE.Group>(null);
+  const bases = useRef(new WeakMap<THREE.Material, number>());
+  const materials = useRef<THREE.Material[]>([]), occluders = useRef<THREE.Object3D[]>([]);
+  const ray = useRef(new THREE.Raycaster());
+  const previous = useRef({ checked: false, world: new THREE.Matrix4(), projection: new THREE.Matrix4() });
+  useEffect(() => {
+    materials.current = [];
+    group.current?.traverse(object => {
+      const material = (object as THREE.Mesh).material;
+      if (!material) return;
+      for (const item of Array.isArray(material) ? material : [material]) {
+        if (!item.transparent) continue;
+        if (!bases.current.has(item)) bases.current.set(item, item.opacity);
+        materials.current.push(item);
+      }
+    });
+    occluders.current = photoOccluders(scene);
+    previous.current.checked = false;
+    invalidate();
+  }, [scene, anchor, children, occlusionRevision, invalidate]);
+  useFrame(({ camera }) => {
+    camera.updateMatrixWorld();
+    const last = previous.current;
+    if (last.checked && last.world.equals(camera.matrixWorld) && last.projection.equals(camera.projectionMatrix)) return;
+    // Preserve each underground material's original translucency when nothing covers it.
+    const multiplier = photoPointOpacity(anchor, camera, occluders.current, ray.current) / .85;
+    for (const material of materials.current) material.opacity = bases.current.get(material)! * multiplier;
+    last.checked = true; last.world.copy(camera.matrixWorld); last.projection.copy(camera.projectionMatrix);
+  });
+  return <group ref={group}>{children}</group>;
+}
 
 function GarageEntrance({ feature }: { feature: Feature }) {
   const mapColor = useMapColor();
@@ -112,7 +148,7 @@ function Entrance({ feature, underground, labelPortal }: { feature: Feature; und
 }
 const NO_CONNECTIONS: Feature[] = [];
 const NO_OPENINGS: PassageOpening[] = [];
-function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, openings = NO_OPENINGS, labelPortal }: { feature: Feature; connections?: Feature[]; footprints?: Shape[]; openings?: PassageOpening[]; labelPortal: RefObject<HTMLDivElement> }) {
+function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, openings = NO_OPENINGS, labelPortal, occlusionRevision }: { feature: Feature; connections?: Feature[]; footprints?: Shape[]; openings?: PassageOpening[]; labelPortal: RefObject<HTMLDivElement>; occlusionRevision?: string }) {
   const mapColor = useMapColor();
   const floor = feature.height ?? -3, wallHeight = feature.wallHeight || 2.4;
   const corridor = feature.type === 'undergroundCorridor' || feature.type === 'tunnelJunction', tunnel = feature.type === 'tunnel';
@@ -121,8 +157,10 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
   const shapes = useMemo(() => (footprints || undergroundFootprints(feature, connections)).map(footprint => {
     const shape = new THREE.Shape(footprint.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
     shape.holes = footprint.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
-    return { shape, volume: undergroundVolume(footprint, wallHeight, openings), boundaries: undergroundBoundaryLines(footprint, openings) };
-  }), [feature, connections, footprints, openings, wallHeight]);
+    const points = footprint.outer.slice(0, -1);
+    const anchor = new THREE.Vector3(points.reduce((sum, p) => sum + p[0], 0) / points.length, floor + .04, points.reduce((sum, p) => sum + p[1], 0) / points.length);
+    return { shape, anchor, volume: undergroundVolume(footprint, wallHeight, openings), boundaries: undergroundBoundaryLines(footprint, openings) };
+  }), [feature, connections, footprints, openings, wallHeight, floor]);
   useEffect(() => () => shapes.forEach(item => item.volume.dispose()), [shapes]);
   const labelPosition = (item: Feature): [number, number, number] => {
     const points = item.points || item.outer!.slice(0, -1);
@@ -132,29 +170,32 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
     return [center[0], floor + wallHeight + 2, center[1]];
   };
   return <group>
-    {shapes.map(({ shape, volume, boundaries }, n) => <group key={n}>
+    {shapes.map(({ shape, anchor, volume, boundaries }, n) => <UndergroundFade key={n} anchor={anchor} occlusionRevision={occlusionRevision}>
       <mesh geometry={volume} position={[0, floor, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}><meshStandardMaterial color={mapColor(color)} transparent opacity={.1} depthTest={false} depthWrite={false} /></mesh>
       <mesh position={[0, floor + .04, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={23}><shapeGeometry args={[shape]} /><meshBasicMaterial color={mapColor(color)} side={THREE.DoubleSide} transparent opacity={.24} depthTest={false} depthWrite={false} /></mesh>
       {boundaries.map((ring, i) => <Line key={i} points={ring.map(([x, z]) => [x, floor + .08, z])} color={mapColor(lineColor)} lineWidth={1.2} transparent opacity={.7} dashed dashSize={2} gapSize={1} depthTest={false} depthWrite={false} renderOrder={24} />)}
-    </group>)}
+    </UndergroundFade>)}
     {[feature, ...connections].filter(item => !item.hideLabel && item.name?.trim()).map(item => <LocationHtml key={item.id} portal={labelPortal} position={labelPosition(item)} center zIndexRange={[5, 1]}><LocationName id={item.id} name={item.name!} underground /></LocationHtml>)}
   </group>;
 }
-function UndergroundRunway({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
+function UndergroundRunway({ feature, labelPortal, occlusionRevision }: { feature: Feature; labelPortal: RefObject<HTMLDivElement>; occlusionRevision?: string }) {
   const mapColor = useMapColor();
   const [from, to] = feature.points!, width = feature.width || 5, floor = feature.height ?? -3;
   const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
   const side: Point = [dz / length, -dx / length];
+  const anchor = useMemo(() => new THREE.Vector3((from[0] + to[0]) / 2, floor + .04, (from[1] + to[1]) / 2), [from, to, floor]);
   return <group>
+    <UndergroundFade anchor={anchor} occlusionRevision={occlusionRevision}>
     <Segment from={from} to={to} width={width} y={floor + .04} thickness={.12} color="#b98060" ghost />
     {Array.from({ length: 5 }, (_, i) => {
       const offset = (i / 4 - .5) * width;
       return <Line key={i} points={[[from[0] + side[0] * offset, floor + .12, from[1] + side[1] * offset], [to[0] + side[0] * offset, floor + .12, to[1] + side[1] * offset]]} color={mapColor('#faf0dc')} lineWidth={1} transparent opacity={.8} depthTest={false} depthWrite={false} renderOrder={24} />;
     })}
+    </UndergroundFade>
     <LocationHtml portal={labelPortal} position={[(from[0] + to[0]) / 2, floor + 4.4, (from[1] + to[1]) / 2]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name!} underground /></LocationHtml>
   </group>;
 }
-export default memo(function CampusStructures({ features, buildings, overrides, underground, labelPortal }: { features: Feature[]; buildings: Building[]; overrides: Record<string, BuildingOverride>; underground: boolean; labelPortal: RefObject<HTMLDivElement> }) {
+export default memo(function CampusStructures({ features, buildings, overrides, underground, labelPortal, occlusionRevision }: { features: Feature[]; buildings: Building[]; overrides: Record<string, BuildingOverride>; underground: boolean; labelPortal: RefObject<HTMLDivElement>; occlusionRevision?: string }) {
   const layout = useMemo(() => undergroundLayout(features), [features]);
   return <>{features.map(feature => {
     if (feature.type === 'mottoStone' && feature.stone) return <MottoStone key={feature.id} feature={feature} />;
@@ -163,11 +204,11 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
     if (feature.type === 'landmark' && feature.landmark) return <GateLandmark key={feature.id} feature={feature} labelPortal={labelPortal} />;
     if (['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction'].includes(feature.type)) {
       const area = layout.areas.get(feature.id);
-      return underground && area ? <UndergroundArea key={feature.id} {...area} labelPortal={labelPortal} /> : null;
+      return underground && area ? <UndergroundArea key={feature.id} {...area} labelPortal={labelPortal} occlusionRevision={occlusionRevision} /> : null;
     }
     if (!feature.points || feature.points.length < 2) return null;
     if (feature.type === 'garageEntrance' && feature.ramp && feature.points.length === 2) return <GarageEntrance key={feature.id} feature={feature} />;
-    if (feature.type === 'undergroundTrack') return underground ? <UndergroundRunway key={feature.id} feature={feature} labelPortal={labelPortal} /> : null;
+    if (feature.type === 'undergroundTrack') return underground ? <UndergroundRunway key={feature.id} feature={feature} labelPortal={labelPortal} occlusionRevision={occlusionRevision} /> : null;
     if (feature.type === 'bridge') return <Bridge key={feature.id} feature={feature} buildings={buildings} overrides={overrides} labelPortal={labelPortal} />;
     if (feature.type === 'tunnelEntrance') return <Entrance key={feature.id} feature={feature} underground={underground} labelPortal={labelPortal} />;
     return null;

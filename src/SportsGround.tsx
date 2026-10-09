@@ -18,7 +18,7 @@ function Ground({ data, color }: { data: Shape; color: string }) {
     result.holes = data.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
     return result;
   }, [data]);
-  return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, SURFACE_HEIGHT, 0]} renderOrder={1}><shapeGeometry args={[shape]} /><meshStandardMaterial color={mapColor(color)} roughness={1} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>;
+  return <mesh userData={{ photoOpacityOccluder: true }} rotation={[-Math.PI / 2, 0, 0]} position={[0, SURFACE_HEIGHT, 0]} renderOrder={1}><shapeGeometry args={[shape]} /><meshStandardMaterial color={mapColor(color)} roughness={1} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>;
 }
 
 function RaisedPlatform({ feature }: { feature: Feature }) {
@@ -29,7 +29,7 @@ function RaisedPlatform({ feature }: { feature: Feature }) {
     result.holes = data.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
     return result;
   }, [feature]);
-  return <mesh rotation={[-Math.PI / 2, 0, 0]} userData={{ photoOccluder: true }}>
+  return <mesh rotation={[-Math.PI / 2, 0, 0]} userData={{ photoOccluder: true, photoOpacityOccluder: true }}>
     <extrudeGeometry args={[shape, { depth: feature.height! + .06, bevelEnabled: false, steps: 1 }]} />
     <meshStandardMaterial color={mapColor('#bdc9ac')} roughness={1} />
   </mesh>;

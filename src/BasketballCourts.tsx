@@ -13,7 +13,7 @@ function CourtSurface({ data, color }: { data: Shape; color: string }) {
     shape.holes = data.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
     return shape;
   }, [data]);
-  return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .16, 0]} renderOrder={1}><shapeGeometry args={[shape]} /><meshStandardMaterial color={mapColor(color)} roughness={1} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>;
+  return <mesh userData={{ photoOpacityOccluder: true }} rotation={[-Math.PI / 2, 0, 0]} position={[0, .16, 0]} renderOrder={1}><shapeGeometry args={[shape]} /><meshStandardMaterial color={mapColor(color)} roughness={1} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>;
 }
 export default memo(function BasketballCourts({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
