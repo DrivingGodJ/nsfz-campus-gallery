@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 692,
+  "revision": 695,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -70,12 +70,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 151.97542210945002,
-        "z": 1.1682903334479136
+        "x": 153.6412683484574,
+        "z": 3.757967639141638
       },
       "placed": true,
-      "heading": 80.01708228209031,
-      "pitch": -10.554254749533019,
+      "heading": 24.84225135683795,
+      "pitch": -9.17109144181679,
       "width": 3942,
       "height": 7008,
       "downloadBytes": 4983860,
@@ -89,7 +89,8 @@
       "locationId": "",
       "author": "DrivingGodJ",
       "copyright": "DGJ",
-      "depthUpdatedAt": "4e8b3544-20b9-4549-9f8a-872c33f3fdd7"
+      "depthUpdatedAt": "4e8b3544-20b9-4549-9f8a-872c33f3fdd7",
+      "cameraHeight": 1.2999999999999998
     },
     {
       "id": "5680b7f7-73b1-4563-a7d9-64babbaebb82",
@@ -1178,8 +1179,8 @@
         "z": 35.72302462906981
       },
       "placed": true,
-      "heading": 354.2966205492912,
-      "pitch": 1.0462789157053078,
+      "heading": 354.42523521000203,
+      "pitch": 0.8401971708134066,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 4740319,
