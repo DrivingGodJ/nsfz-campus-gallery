@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { buildingGeometry, snapFootprint } from './building-geometry.ts';
+import { buildingGeometry, passageShape, snapFootprint } from './building-geometry.ts';
 import { classroomWindowLayout, type ClassroomWindow } from './teaching-classrooms.ts';
-import type { Building, Point, Shape } from './types';
+import type { Building, ClassroomWindows, Point, Shape } from './types';
 
 export const FACADE_BASE = .12;
 export const FACADE_COLORS = { glass: '#647b7e', frame: '#566663', stone: '#dddacb', metal: '#adb7ae', emblem: '#68766a' };
@@ -60,10 +60,29 @@ export function dormitoryObservatory(building: Building, floorHeight: number) {
   return {center:shifted(shifted(edge.from,edge.axis,edge.length*entry.at),edge.normal,-3.1),radius:floorHeight*.77,drumRise:floorHeight*.4};
 }
 
+const dormitoryDoorArch = (floorHeight: number) => ({ half: floorHeight * .42, bottom: .04, spring: floorHeight * .57, rise: floorHeight * .42 * .66 });
+
 export function dormitoryBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
   const { shape, curve } = dormitoryProfile(building);
   const observatory=!cutaway && height>=(building.floors??6)*floorHeight-.001?dormitoryObservatory(building,floorHeight):undefined;
-  const body = buildingGeometry(shape, height, floorHeight, building.groundPassages, [], [], building.classroomWindows, [], [], cutaway||!!observatory);
+  const config = building.classroomWindows;
+  const windows = config && classroomWindowLayout([[shape.outer, ...shape.holes]], config, height, floorHeight,
+    (building.groundPassages ?? []).map(passage => { const opening = passageShape(passage); return [opening.outer, ...opening.holes]; }));
+  const entry = building.facade?.entry;
+  if (windows && entry) {
+    const edge = edgesOf(outline(building))[entry.edge], center = shifted(edge.from, edge.axis, edge.length * entry.at), arch = dormitoryDoorArch(floorHeight);
+    // Use the same one-storey arch as the existing door pane. Thin stepped
+    // cuts stay behind its stone surround, rather than opening a whole passage.
+    const levels = [arch.bottom, arch.spring, ...Array.from({ length: 8 }, (_, i) => arch.spring + arch.rise * (i + 1) / 8)];
+    for (let i = 0; i < levels.length - 1; i++) {
+      const bottom = levels[i], top = Math.min(height, levels[i + 1]);
+      if (top <= bottom) continue;
+      const half = arch.half * Math.sqrt(1 - Math.max(0, (bottom - arch.spring) / arch.rise) ** 2);
+      const from = shifted(center, edge.axis, -half), to = shifted(center, edge.axis, half), move = (point: Point, depth: number) => shifted(point, edge.normal, depth);
+      windows.push({ from, to, bottom, top, cut: [[move(from, .2), move(to, .2), move(to, -config!.wallThickness - .3), move(from, -config!.wallThickness - .3), move(from, .2)]] });
+    }
+  }
+  const body = buildingGeometry(shape, height, floorHeight, building.groundPassages, [], [], config, [], [], cutaway||!!observatory, windows);
   let geometry=body;
   if(observatory) {
     // The telescope room rises into the existing dome. A generic top-floor
@@ -164,6 +183,15 @@ export function cafeteriaLowerProfile(building: Building) {
   return { profile, shape: { outer, holes: building.holes }, start, end, peak };
 }
 
+export function cafeteriaLowerWindowsConfig(building: Building, floorHeight: number): ClassroomWindows | undefined {
+  if (!building.classroomWindows) return undefined;
+  // The photographed curtain wall is the projecting front curve only. Keep
+  // its real profile chords so glass and wall apertures use identical faces.
+  const front = cafeteriaLowerProfile(building).profile.filter(point => point.projecting).map(point => point.point);
+  return { ...building.classroomWindows, facadeLines: [front], pierWidth: .08, bayWidth: 2.5, windowWidth: 2.42,
+    columns: 1, sill: .2, top: floorHeight - .35, startFloor: 1, endFloor: 2 };
+}
+
 function flatCap(shape: Shape, height: number, downward: boolean) {
   const s = new THREE.Shape(shape.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
   s.holes = shape.holes.map(r => new THREE.Path(r.map(([x, z]) => new THREE.Vector2(x, -z))));
@@ -200,7 +228,7 @@ export function cafeteriaUpperWindows(building: Building, height: number, floorH
 
 export function cafeteriaBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
   const lower = cafeteriaLowerProfile(building).shape, boundary = Math.min(height, 2 * floorHeight);
-  const lowerWindows = building.classroomWindows ? { ...building.classroomWindows, bayWidth: 2.5, windowWidth: 2.35, sill: .2, top: floorHeight - .35, columns: 1 } : undefined;
+  const lowerWindows = cafeteriaLowerWindowsConfig(building, floorHeight);
   if (height <= boundary) return smoothSideNormals(buildingGeometry(lower, height, floorHeight, [], [], [], lowerWindows, [], [], cutaway), lower, outline(lower));
   const positions: number[] = [];
   const append = (shape: Shape, depth: number, bottom: number, skipBottom: boolean, skipTop: boolean, openTop = false) => {
@@ -244,6 +272,7 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
   const panel = (kind: Material, edge: Edge, along: number, y: number, width: number, panelHeight: number, offset = .1, depth = .07) => box(kind, at(edge, along, y, offset), [width, panelHeight, depth], edge.axis);
   let dome: { center: Point; base: number; peak: number; radius: number } | undefined;
   let plaque: { center: [number, number, number]; width: number; height: number } | undefined;
+  let crown: { line: Point[]; base: number; height: number; thickness: number } | undefined;
 
   if (model.type === 'dormitory' && model.entry) {
     const edge = edges[model.entry.edge], along = edge.length * model.entry.at;
@@ -255,7 +284,7 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
       }
       return points;
     };
-    const inner = arch(floorHeight * .42, FACADE_BASE + .04, FACADE_BASE + floorHeight * .57);
+    const opening = dormitoryDoorArch(floorHeight), inner = arch(opening.half, FACADE_BASE + opening.bottom, FACADE_BASE + opening.spring);
     const transform = new THREE.Matrix4().makeBasis(new THREE.Vector3(edge.axis[0], 0, edge.axis[1]), new THREE.Vector3(0, 1, 0), new THREE.Vector3(edge.normal[0], 0, edge.normal[1]));
     transform.setPosition(...at(edge, along, 0, .08));
     const frame = new THREE.Shape(arch(floorHeight * .56, FACADE_BASE, FACADE_BASE + floorHeight * .59));
@@ -264,8 +293,33 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
     const door = transform.clone(); door.setPosition(...at(edge, along, 0, .1));
     append('glass', new THREE.ShapeGeometry(new THREE.Shape(inner)), door);
     panel('frame', edge, along, FACADE_BASE + floorHeight * .34, .075, floorHeight * .65, .15, .045);
-    if (complete) {
-      const plaqueHeight = floorHeight * .8, plaqueWidth = floorHeight * .7, plaqueY = top - floorHeight * .55;
+    if (complete && !cutaway) {
+      // 000013410013 shows five ordinary rows above the ground arcade. The
+      // opaque crest wall is a separate roof crown, not the sixth-storey wall.
+      const { curve } = dormitoryProfile(building), path = curve.length ? curve : [edge.from, shifted(edge.from, edge.axis, edge.length)];
+      const anchor = at(edge, along, 0, 0), stations = [0];
+      for (let i = 1; i < path.length; i++) stations.push(stations[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+      const centerIndex = path.reduce((nearest, point, i) => Math.hypot(point[0] - anchor[0], point[1] - anchor[2]) < Math.hypot(path[nearest][0] - anchor[0], path[nearest][1] - anchor[2]) ? i : nearest, 0);
+      const halfWidth = floorHeight * .77 * 1.9, start = stations[centerIndex] - halfWidth, end = stations[centerIndex] + halfWidth;
+      const line = path.slice(1).flatMap((to, i) => {
+        const first = Math.max(start, stations[i]), last = Math.min(end, stations[i + 1]);
+        if (last <= first) return [];
+        const length = stations[i + 1] - stations[i], direction: Point = [(to[0] - path[i][0]) / length, (to[1] - path[i][1]) / length];
+        return [shifted(path[i], direction, first - stations[i]), shifted(path[i], direction, last - stations[i])];
+      }).filter((point, i, points) => !i || Math.hypot(point[0] - points[i - 1][0], point[1] - points[i - 1][1]) > 1e-6);
+      const sign = edge.axis[1] * edge.normal[0] - edge.axis[0] * edge.normal[1], thickness = .28, rise = floorHeight * .42;
+      const inner = line.map((point, i) => {
+        const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)], length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        return shifted(point, [(b[1] - a[1]) / length * sign, -(b[0] - a[0]) / length * sign], -thickness);
+      });
+      const outer = [...line, ...inner.reverse(), line[0]];
+      append('stone', buildingGeometry({ outer, holes: [] }, rise, floorHeight).rotateX(-Math.PI / 2).translate(0, top, 0));
+      crown = { line, base: top, height: rise, thickness };
+      const plaqueHeight = floorHeight * .5, plaqueWidth = floorHeight * .4, plaqueY = top + floorHeight * .53;
+      // The taller central crest has masonry behind its whole height, joined
+      // to the roof and curved crown; its upper half must not float in the air.
+      const backingTop = plaqueY + plaqueHeight / 2 + .11;
+      panel('stone', edge, along, (top + backingTop) / 2, plaqueWidth + .22, backingTop - top, -.1, .32);
       panel('stone', edge, along, plaqueY, plaqueWidth + .22, plaqueHeight + .22, .12, .18);
       panel('metal', edge, along, plaqueY, plaqueWidth, plaqueHeight, .23, .06);
       panel('stone', edge, along, plaqueY, plaqueWidth - .16, plaqueHeight - .16, .27, .04);
@@ -306,5 +360,5 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere(); return { kind: kind as Material, geometry };
   });
-  return { geometries, dome, plaque, height, visibleHeight: Math.min(height, visibleHeight) };
+  return { geometries, dome, plaque, crown, height, visibleHeight: Math.min(height, visibleHeight) };
 }

@@ -125,5 +125,19 @@ export function laboratoryWindows(building: Building, height: number, floorHeigh
   const layout = laboratoryLayout(building), classrooms = layout.rooms.at(-1)!;
   const seam = passageFootprint([classrooms.outer[0], classrooms.outer.at(-2)!], .7);
   const groundOpenings = [...(building.groundPassages || []).map(passageShape), ...(building.groundFloorOpenings || [])].map(polygon);
-  return classroomWindowLayout(snapFootprint(layout.rooms.slice(1).map(polygon)), building.classroomWindows, height, floorHeight, groundOpenings, [polygon(seam), polygon(layout.stair.opening)]);
+  const classroomsWindows = classroomWindowLayout(snapFootprint(layout.rooms.slice(1).map(polygon)), building.classroomWindows, height, floorHeight, groundOpenings, [polygon(seam), polygon(layout.stair.opening)]);
+  // _DSC8919 confirms the sixth-floor stair's rear window. The explicit wall
+  // allowlist, not the stair opening or an unlabelled exterior photo, controls
+  // whether this separate enclosure gets glazing.
+  const stairWindows = building.classroomWindows.facadeLines
+    ? classroomWindowLayout(snapFootprint([polygon(layout.stair.opening)]), building.classroomWindows, height, floorHeight)
+    : [];
+  for (const window of stairWindows) {
+    // The stair enclosure meets the surrounding classroom shell back-to-back.
+    // Pierce both wall leaves without moving the observed frame or glazing.
+    const ring = window.cut[0], dx = ring[3][0] - ring[0][0], dz = ring[3][1] - ring[0][1], length = Math.hypot(dx, dz);
+    const out = (point: Point): Point => [point[0] - dx / length * WALL, point[1] - dz / length * WALL];
+    window.cut = [[out(ring[0] as Point), out(ring[1] as Point), ring[2], ring[3], out(ring[0] as Point)]];
+  }
+  return [...classroomsWindows, ...stairWindows];
 }

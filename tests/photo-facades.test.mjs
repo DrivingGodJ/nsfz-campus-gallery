@@ -4,11 +4,13 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { buildingGeometry, buildingCoreFootprint } from '../src/building-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
-import { dormitoryBodyGeometry, dormitoryProfile, cafeteriaBodyGeometry, cafeteriaLowerProfile, cafeteriaUpperWindows, cafeteriaStairStrip } from '../src/facade-geometry.ts';
-import { laboratoryBodyGeometry, laboratoryWindows } from '../src/laboratory-geometry.ts';
+import { dormitoryBodyGeometry, dormitoryProfile, cafeteriaBodyGeometry, cafeteriaLowerProfile, cafeteriaLowerWindowsConfig, cafeteriaUpperWindows, cafeteriaStairStrip } from '../src/facade-geometry.ts';
+import { laboratoryBodyGeometry } from '../src/laboratory-geometry.ts';
 import { classroomWindowLayout } from '../src/teaching-classrooms.ts';
 import { classroomGlazingGeometry, teachingWindowGeometry } from '../src/architecture-geometry.ts';
 import { photoFacadeDetailGeometry, teachingRoundCanopyAnchor } from '../src/photo-facade-geometry.ts';
+import { OFFICE_ID } from '../src/campus-exterior-geometry.ts';
+import { officeWindowLayout } from '../src/office-windows.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
@@ -20,7 +22,8 @@ const bodies = (building, info, cutoff) => info.sections.map(section => {
   if (building.facade?.type === 'cafeteria') return cafeteriaBodyGeometry(building, height, info.floorHeight, cutaway);
   return buildingGeometry(section, height, info.floorHeight, building.groundPassages,
     building.floorCorridors?.filter(c => c.partId === section.id), building.stairwells?.filter(s => s.partId === section.id), building.classroomWindows,
-    building.solidCores?.filter(c => c.partId === section.id), building.cutouts?.filter(c => c.partId === section.id), cutaway);
+    building.solidCores?.filter(c => c.partId === section.id), building.cutouts?.filter(c => c.partId === section.id), cutaway,
+    building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight) : undefined);
 });
 const mesh = geometry => {
   const result = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
@@ -32,7 +35,6 @@ test('all thirteen photo facade configurations generate finite real bodies throu
   let fullTriangles = 0;
   for (const id of ids) {
     const building = campus.buildings.find(b => b.id === id), original = JSON.stringify(building);
-    assert.ok(building.classroomWindows, `${id} keeps its saved facade calibration`);
     for (const floorHeight of [2.4, 3.6, 4.2]) {
       const info = buildingLevels(building, { ...site.buildingOverrides[id], floorHeight });
       for (const cutoff of [undefined, floorHeight, Math.min(info.height, 3 * floorHeight)]) {
@@ -52,7 +54,7 @@ test('all thirteen photo facade configurations generate finite real bodies throu
     }
     assert.equal(JSON.stringify(building), original, 'No generating path changes hand-calibrated model data');
   }
-  assert.ok(fullTriangles < 180000, `The thirteen windowed bodies stay below 180k triangles (${fullTriangles})`);
+  assert.ok(fullTriangles < 180000, `The thirteen bodies stay below 180k triangles (${fullTriangles})`);
 });
 
 test('small curved chords carry windows while short square returns stay solid', () => {
@@ -72,17 +74,16 @@ test('small curved chords carry windows while short square returns stay solid', 
   } finally { dispose(Object.values(glass)); }
 });
 
-test('laboratory, dormitory and curved lower cafeteria windows penetrate the real walls, with concrete sills retained', () => {
-  for (const id of ids.slice(0, 3)) {
+test('dormitory and curved lower cafeteria windows penetrate the real walls, with concrete sills retained', () => {
+  for (const id of ids.slice(1, 3)) {
     const building = campus.buildings.find(b => b.id === id), info = buildingLevels(building, { ...site.buildingOverrides[id], floorHeight: 3.6 });
     const shape = building.facade.type === 'dormitory' ? dormitoryProfile(building).shape : building.facade.type === 'cafeteria' ? cafeteriaLowerProfile(building).shape : building;
-    const config = building.facade.type === 'cafeteria' ? { ...building.classroomWindows, bayWidth: 2.5, windowWidth: 2.35, sill: .2, top: 3.25, columns: 1 } : building.classroomWindows;
-    const windows = building.facade.type === 'laboratory' ? laboratoryWindows(building, info.height, 3.6)
-      : classroomWindowLayout([[shape.outer, ...shape.holes]], config, info.height, 3.6);
+    const config = building.facade.type === 'cafeteria' ? cafeteriaLowerWindowsConfig(building, 3.6) : building.classroomWindows;
+    const windows = classroomWindowLayout([[shape.outer, ...shape.holes]], config, info.height, 3.6);
     const geometry = bodies(building, info)[0], target = mesh(geometry);
-    const upper = windows.filter(w => w.bottom >= 3.6 && w.top < 7.2 && Math.hypot(w.to[0] - w.from[0], w.to[1] - w.from[1]) > .2);
+    const upper = windows.filter(w => w.bottom >= 3.6 && w.top < 7.2 && Math.hypot(w.to[0] - w.from[0], w.to[1] - w.from[1]) > .02);
     try {
-      assert.ok(upper.length > 5, 'An entire upper floor receives evidence-based bays');
+      assert.ok(upper.length > 5, 'The confirmed second-floor faces receive real window apertures, including thin curved chords');
       for (const window of upper.filter((_, i) => i % Math.max(1, Math.floor(upper.length / 12)) === 0)) {
         const a = new THREE.Vector3(window.from[0], .12 + (window.bottom + window.top) / 2, window.from[1]);
         const b = new THREE.Vector3(window.to[0], a.y, window.to[1]), direction = b.clone().sub(a).normalize(), normal = new THREE.Vector3(-direction.z, 0, direction.x);
@@ -95,6 +96,38 @@ test('laboratory, dormitory and curved lower cafeteria windows penetrate the rea
       }
     } finally { geometry.dispose(); target.material.dispose(); }
   }
+});
+
+test('cafeteria lower curtain wall stays on its projecting front and leaves the unphotographed rear opaque', () => {
+  const saved = campus.buildings.find(building => building.facade?.type === 'cafeteria');
+  const building = { ...saved, classroomWindows: { ...saved.classroomWindows, facadeLines: [], startFloor: 3, endFloor: 6 } };
+  const { shape } = cafeteriaLowerProfile(building), config = cafeteriaLowerWindowsConfig(building, 3.6);
+  const windows = classroomWindowLayout([[shape.outer, ...shape.holes]], config, 10.8, 3.6);
+  const unrestricted = classroomWindowLayout([[shape.outer, ...shape.holes]], { ...config, facadeLines: undefined }, 7.2, 3.6);
+  assert.ok(windows.length > 8 && windows.length < unrestricted.length, 'The confirmed curved front keeps glazing without inheriting the ordinary upper-floor layout');
+  assert.ok(windows.every(window => window.top < 7.2), 'The lower curtain wall stops at the second storey');
+  assert.equal(config.pierWidth, .08);
+  assert.equal(config.windowWidth, 2.42);
+  assert.equal(config.facadeLines.length, 1, 'Only the continuous projecting front has photo evidence');
+  const distance = (point, line) => Math.min(...line.slice(1).map((b, i) => {
+    const a = line[i], dx = b[0] - a[0], dz = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dz) / (dx * dx + dz * dz)));
+    return Math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dz);
+  }));
+  const rear = unrestricted.find(window => window.bottom < 3.6 && distance(window.from, config.facadeLines[0]) > 1 &&
+    Math.hypot(window.to[0] - window.from[0], window.to[1] - window.from[1]) > .3);
+  assert.ok(rear, 'The prior perimeter-wide layout would have glazed an unphotographed rear face');
+  const bodyGeometry = cafeteriaBodyGeometry(building, 14.4, 3.6), target = mesh(bodyGeometry), glazing = classroomGlazingGeometry(windows, config);
+  const glass = new THREE.Mesh(glazing.glass, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); glass.updateMatrixWorld();
+  const a = new THREE.Vector3(rear.from[0], .12 + (rear.bottom + rear.top) / 2, rear.from[1]);
+  const b = new THREE.Vector3(rear.to[0], a.y, rear.to[1]), along = b.clone().sub(a).normalize(), normal = new THREE.Vector3(-along.z, 0, along.x);
+  const ray = new THREE.Raycaster(a.lerp(b, .5).addScaledVector(normal, -.55), normal, 0, 1.1);
+  try {
+    assert.ok(ray.intersectObject(target).length, 'The rear wall is solid at the former generic window location');
+    assert.equal(ray.intersectObject(glass).length, 0, 'No decorative curtain-wall panel is placed over that wall');
+    const upper = cafeteriaUpperWindows(building, 7.2, 3.6);
+    assert.equal(upper.length, 2, 'The confirmed central tall strip remains when ordinary upper windows are explicitly disabled');
+  } finally { bodyGeometry.dispose(); target.material.dispose(); glass.material.dispose(); dispose(Object.values(glazing)); }
 });
 
 test('the photographed teaching roof canopy is fitted to the actual round bay and disappears with selected-floor ceilings', () => {

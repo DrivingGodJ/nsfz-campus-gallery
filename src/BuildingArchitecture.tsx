@@ -5,9 +5,11 @@ import { useMapColor } from './MapTheme';
 import { ARCHITECTURE_COLORS, GYM_ID, architectureBatch, classroomGlazingGeometry, gymArchitecture, teachingElevatorGeometry, teachingRailGeometry, teachingWindowGeometry } from './architecture-geometry';
 import { teachingStairGeometry } from './teaching-stairs';
 import { laboratoryLayout, laboratoryWindows } from './laboratory-geometry';
-import { cafeteriaLowerProfile, cafeteriaUpperWindows, dormitoryProfile } from './facade-geometry';
+import { cafeteriaLowerProfile, cafeteriaLowerWindowsConfig, cafeteriaUpperWindows, dormitoryProfile } from './facade-geometry';
 import { TEACHING_ID, teachingDetailGeometry } from './teaching-details';
 import { teachingClassroomFurniture } from './teaching-classroom-furniture';
+import { OFFICE_ID } from './campus-exterior-geometry';
+import { officeWindowLayout } from './office-windows';
 import type { Building, BuildingPart } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -25,6 +27,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   const stairs = useMemo(() => teachingStairGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
   const windows = useMemo(() => {
     const visibleHeight = Math.min(Math.max(...sections.map(section => section.height)), cutawayHeight ?? Infinity);
+    if (building.id === OFFICE_ID) return classroomGlazingGeometry(officeWindowLayout(building, visibleHeight, floorHeight), building.classroomWindows);
     if (building.facade?.type === 'laboratory') return classroomGlazingGeometry(laboratoryWindows(building, visibleHeight, floorHeight), building.classroomWindows);
     if (building.facade?.type === 'dormitory') {
       const shape = dormitoryProfile(building).shape;
@@ -32,7 +35,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
     }
     if (building.facade?.type === 'cafeteria' && building.classroomWindows) {
       const boundary = Math.min(visibleHeight, 2 * floorHeight), shape = cafeteriaLowerProfile(building).shape;
-      const config = { ...building.classroomWindows, bayWidth: 2.5, windowWidth: 2.35, sill: .2, top: floorHeight - .35, columns: 1 };
+      const config = cafeteriaLowerWindowsConfig(building, floorHeight);
       const lower = teachingWindowGeometry({ ...building, ...shape, classroomWindows: config }, [{ ...sections[0], ...shape, height: boundary }], floorHeight);
       const upper = classroomGlazingGeometry(cafeteriaUpperWindows(building, Math.max(0, visibleHeight - boundary), floorHeight), building.classroomWindows);
       for (const geometry of Object.values(upper)) geometry.translate(0, boundary, 0);
@@ -88,7 +91,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
         <mesh geometry={teaching.units} raycast={() => null}><meshStandardMaterial color={mapColor('#d2d6cc')} roughness={.85} /></mesh>
         <mesh geometry={teaching.vents} raycast={() => null}><meshStandardMaterial color={mapColor('#89968c')} roughness={.85} /></mesh>
       </>}
-      <mesh geometry={windows.frames} raycast={() => null}><meshStandardMaterial color={mapColor('#d2d6cc')} roughness={.8} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={windows.frames} raycast={() => null}><meshStandardMaterial color={mapColor(building.classroomWindows?.frameColor ?? '#d2d6cc')} roughness={.8} side={THREE.DoubleSide} /></mesh>
       <mesh geometry={elevator.frames} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.frame)} roughness={.5} metalness={.2} /></mesh>
       <mesh geometry={stairs.rails} raycast={() => null}><meshStandardMaterial color={mapColor('#5e99ac')} roughness={.85} /></mesh>
       {gym && <mesh geometry={gym.stairRails} raycast={() => null}><meshStandardMaterial color={mapColor('#879690')} roughness={.65} /></mesh>}

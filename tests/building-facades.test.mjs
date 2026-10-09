@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { buildingLevels } from '../src/building-model.ts';
+import { classroomWindowLayout } from '../src/teaching-classrooms.ts';
 import { cafeteriaLowerProfile, cafeteriaBodyGeometry, dormitoryProfile, dormitoryBodyGeometry, facadeGeometry, FACADE_BASE } from '../src/facade-geometry.ts';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 
@@ -43,7 +44,7 @@ test('the observatory and doorway align with the existing projecting bay, while 
     assert.ok(!model.geometries.some(p => ['roof', 'red', 'wall'].includes(p.kind)), 'No full-building roof, colored bands, or window rows');
     const plaque = new THREE.Vector3(...model.plaque.center);
     assert.ok(Math.abs(plaque.clone().sub(new THREE.Vector3(a[0], 0, a[1])).dot(axis) - length * entry.at) < 1e-6, 'Plaque is centered below the observatory');
-    assert.ok(plaque.y + model.plaque.height / 2 < FACADE_BASE + 6 * floorHeight);
+    assert.ok(plaque.y - model.plaque.height / 2 > FACADE_BASE + 6 * floorHeight, 'The crest is entirely above the five ordinary window rows');
     assert.ok(plaque.clone().sub(new THREE.Vector3(a[0], 0, a[1])).dot(out) > 0, 'The crest is on the outward facing surface');
     assert.ok(model.geometries.some(p => p.kind === 'emblem'), 'The plaque includes a raised crest');
     const rayPoint = new THREE.Vector3(a[0], FACADE_BASE + floorHeight * .35, a[1]).addScaledVector(axis, length * entry.at);
@@ -52,6 +53,83 @@ test('the observatory and doorway align with the existing projecting bay, while 
     mesh.updateMatrixWorld(); assert.ok(ray.intersectObject(mesh).length);
     mesh.material.dispose(); dispose(model);
   }
+});
+
+test('the dormitory opaque crown follows its real curved front above five window rows and leaves with a top-floor cut', () => {
+  const original = JSON.stringify(dorm), info = buildingLevels(dorm, site.buildingOverrides[dorm.id]);
+  const model = facadeGeometry(dorm, info.floors, info.floorHeight), sliced = facadeGeometry(dorm, info.floors, info.floorHeight, info.height, true);
+  const body = dormitoryBodyGeometry(dorm, info.height, info.floorHeight);
+  const front = dormitoryProfile(dorm).shape.outer;
+  const meshes = model.geometries.filter(p => p.kind === 'stone').map(p => { const mesh = new THREE.Mesh(p.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); mesh.updateMatrixWorld(); return mesh; });
+  try {
+    assert.equal(dorm.classroomWindows.startFloor, 2);
+    assert.equal(dorm.classroomWindows.endFloor, 6, 'The photographed five ordinary rows occupy floors 2–6');
+    assert.equal(model.crown.base, FACADE_BASE + info.height);
+    assert.ok(model.crown.line.length > 10, 'The crown uses the actual curved wall, rather than a flat rectangle');
+    for (const point of model.crown.line) {
+      const distance = Math.min(...front.slice(1).map((b, i) => {
+        const a = front[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dz) / (dx * dx + dz * dz)));
+        return Math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dz);
+      }));
+      assert.ok(distance < 1e-6, 'Every crown front point lies on the retained curved footprint');
+    }
+    const line = model.crown.line, a = line[2], b = line[3], dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz);
+    const normal = new THREE.Vector3(dz / length, 0, -dx / length), center = new THREE.Vector3((a[0] + b[0]) / 2, model.crown.base + model.crown.height / 2, (a[1] + b[1]) / 2);
+    assert.ok(new THREE.Raycaster(center.addScaledVector(normal, .5), normal.clone().negate(), 0, 1).intersectObjects(meshes).length, 'The roof crown is opaque masonry');
+    body.computeBoundingBox();
+    assert.ok(Math.abs(body.boundingBox.max.z - info.height) < 1e-4, 'The six-storey roof height is unchanged');
+    const entry = dorm.facade.entry, x = dorm.outer[entry.edge], z = dorm.outer[entry.edge + 1];
+    const span = Math.hypot(z[0] - x[0], z[1] - x[1]), area = dorm.outer.slice(1).reduce((sum, p, i) => sum + dorm.outer[i][0] * p[1] - p[0] * dorm.outer[i][1], 0), sign = Math.sign(area);
+    const expected = [x[0] + (z[0] - x[0]) * entry.at - 3.1 * (z[1] - x[1]) / span * sign, x[1] + (z[1] - x[1]) * entry.at + 3.1 * (z[0] - x[0]) / span * sign];
+    assert.ok(Math.hypot(model.dome.center[0] - expected[0], model.dome.center[1] - expected[1]) < 1e-6, 'The dome retains its original horizontal anchor');
+    const outward = new THREE.Vector3((z[1] - x[1]) / span * sign, 0, -(z[0] - x[0]) / span * sign), along = new THREE.Vector3((z[0] - x[0]) / span, 0, (z[1] - x[1]) / span);
+    for (const horizontal of [-.35, 0, .35]) for (const vertical of [-.4, .4]) {
+      const eye = new THREE.Vector3(x[0] + (z[0] - x[0]) * entry.at, model.plaque.center[1] + model.plaque.height * vertical, x[1] + (z[1] - x[1]) * entry.at)
+        .addScaledVector(along, model.plaque.width * horizontal).addScaledVector(outward, -.5);
+      assert.ok(new THREE.Raycaster(eye, outward, 0, .4).intersectObjects(meshes).length, 'Solid masonry backs both the lower and upper crest before the outward plaque plates');
+    }
+    assert.equal(model.dome.base, FACADE_BASE + info.height + info.floorHeight * .4 + .01, 'The dome retains its original elevation');
+    assert.equal(sliced.crown, undefined);
+    assert.equal(sliced.plaque, undefined);
+    assert.equal(sliced.dome, undefined);
+    for (const { geometry } of sliced.geometries) { geometry.computeBoundingBox(); assert.ok(geometry.boundingBox.max.y <= FACADE_BASE + info.height + 1e-5); }
+    assert.equal(JSON.stringify(dorm), original, 'No floor, footprint or camera calibration is modified');
+  } finally { meshes.forEach(mesh => mesh.material.dispose()); body.dispose(); dispose(model); dispose(sliced); }
+});
+
+test('the photographed dormitory arch door opens through the first-floor wall without removing its jambs, lintel or upper window walls', () => {
+  const original = JSON.stringify(dorm), info = buildingLevels(dorm, site.buildingOverrides[dorm.id]);
+  const entry = dorm.facade.entry, a = dorm.outer[entry.edge], b = dorm.outer[entry.edge + 1];
+  const axis = new THREE.Vector3(b[0] - a[0], 0, b[1] - a[1]).normalize(), normal = new THREE.Vector3(axis.z, 0, -axis.x);
+  const center = new THREE.Vector3(a[0] + (b[0] - a[0]) * entry.at, 0, a[1] + (b[1] - a[1]) * entry.at);
+  const body = dormitoryBodyGeometry(dorm, info.height, info.floorHeight), sliced = dormitoryBodyGeometry(dorm, info.floorHeight, info.floorHeight, true);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(body, material), cut = new THREE.Mesh(sliced, material);
+  for (const target of [mesh, cut]) { target.rotation.x = -Math.PI / 2; target.position.y = FACADE_BASE; target.updateMatrixWorld(); }
+  const hits = (target, along, y) => {
+    const eye = center.clone().addScaledVector(axis, along).addScaledVector(normal, .55); eye.y = FACADE_BASE + y;
+    return new THREE.Raycaster(eye, normal.clone().negate(), 0, 1.1).intersectObject(target).length;
+  };
+  try {
+    const half = info.floorHeight * .42, spring = info.floorHeight * .57, rise = half * .66;
+    for (const target of [mesh, cut]) {
+      for (const x of [-half * .8, 0, half * .8]) assert.equal(hits(target, x, 1.26), 0, 'The real af300476 door position has no masonry behind its glass');
+      assert.equal(hits(target, 0, spring + rise * .9), 0, 'The upper arch, beyond a rectangular door, is hollow too');
+      for (const x of [-half - .22, half + .22]) assert.ok(hits(target, x, 1.26), 'The two door jamb walls remain');
+      assert.ok(hits(target, half * .93, spring + rise * .6), 'Masonry remains outside the curved arch shoulder');
+      assert.ok(hits(target, 0, spring + rise + .15), 'The arch lintel wall remains below the next floor');
+    }
+    const shape = dormitoryProfile(dorm).shape;
+    const ordinary = classroomWindowLayout([[shape.outer, ...shape.holes]], dorm.classroomWindows, info.height, info.floorHeight)
+      .filter(window => window.bottom >= info.floorHeight && window.bottom < 2 * info.floorHeight)
+      .sort((u, v) => Math.hypot(u.from[0] - center.x, u.from[1] - center.z) - Math.hypot(v.from[0] - center.x, v.from[1] - center.z))[0];
+    const dx = ordinary.to[0] - ordinary.from[0], dz = ordinary.to[1] - ordinary.from[1], out = new THREE.Vector3(dz, 0, -dx).normalize();
+    const eye = new THREE.Vector3((ordinary.from[0] + ordinary.to[0]) / 2, FACADE_BASE + (ordinary.bottom + ordinary.top) / 2, (ordinary.from[1] + ordinary.to[1]) / 2).addScaledVector(out, .55);
+    assert.equal(new THREE.Raycaster(eye, out.clone().negate(), 0, 1.1).intersectObject(mesh).length, 0, 'The second floor still uses its ordinary photographed window aperture');
+    eye.y = FACADE_BASE + ordinary.bottom - .15;
+    assert.ok(new THREE.Raycaster(eye, out.clone().negate(), 0, 1.1).intersectObject(mesh).length, 'The second-floor sill remains solid, rather than extending the ground door upstairs');
+    assert.equal(JSON.stringify(dorm), original, 'The entrance fix changes neither ground passages, outline nor saved model data');
+  } finally { body.dispose(); sliced.dispose(); material.dispose(); }
 });
 
 test('the dormitory bay blends smoothly into both wings and retains the same outline at every floor', () => {

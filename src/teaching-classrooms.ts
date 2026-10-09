@@ -2,8 +2,33 @@ import polygonClipping from 'polygon-clipping';
 import type { BuildingSolidCore, ClassroomWindows, Point } from './types';
 
 type MultiPolygon = polygonClipping.MultiPolygon;
-export type ClassroomWindow = { from: Point; to: Point; cut: polygonClipping.Polygon; bottom: number; top: number; mullions?: number[] };
+export type ClassroomWindow = { from: Point; to: Point; cut: polygonClipping.Polygon; bottom: number; top: number; mullions?: number[]; upperMullions?: number[] };
 const lerp = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+// Match the actual wall boundary, before the glazing's half-wall inset. Only
+// tiny coordinate-rounding differences are allowed; a nearby parallel wall is
+// not evidence. Joined/reversed survey segments may cover one complete pane.
+export function confirmedFacade(from: Point, to: Point, edges: { from: Point; to: Point }[]) {
+  const epsilon = 1e-4, length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  const dx = (to[0] - from[0]) / length, dz = (to[1] - from[1]) / length;
+  const station = (p: Point) => (p[0] - from[0]) * dx + (p[1] - from[1]) * dz;
+  const distance = (p: Point) => Math.abs((p[0] - from[0]) * dz - (p[1] - from[1]) * dx);
+  const intervals = edges.flatMap(edge => {
+    const edgeLength = Math.hypot(edge.to[0] - edge.from[0], edge.to[1] - edge.from[1]);
+    if (edgeLength < epsilon || distance(edge.from) > epsilon || distance(edge.to) > epsilon ||
+      Math.abs((edge.to[0] - edge.from[0]) * dz - (edge.to[1] - edge.from[1]) * dx) / edgeLength > epsilon) return [];
+    const a = station(edge.from), b = station(edge.to);
+    const start = Math.max(0, Math.min(a, b)), end = Math.min(length, Math.max(a, b));
+    return end > start ? [[start, end]] : [];
+  }).sort((a, b) => a[0] - b[0]);
+  let covered = 0;
+  for (const [start, end] of intervals) {
+    if (start > covered + epsilon) return false;
+    covered = Math.max(covered, end);
+    if (covered >= length - epsilon) return true;
+  }
+  return false;
+}
 
 function wallEdges(core: MultiPolygon) {
   return core.flatMap(polygon => polygon.flatMap((ring, index) => {
@@ -55,25 +80,34 @@ export function classroomWallFootprint(core: MultiPolygon, thickness: number, st
 
 export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = []): ClassroomWindow[] {
   const result: ClassroomWindow[] = [];
+  const facadeEdges = config.facadeLines?.flatMap(points => points.slice(1).map((to, i) => ({ from: points[i], to })));
+  if (facadeEdges && !facadeEdges.length) return result;
   for (const run of windowRuns(core)) {
     const length = run.reduce((sum, edge) => sum + edge.length, 0);
     if (length < 3.2) continue;
     const count = Math.max(1, Math.floor(length / config.bayWidth));
-    const bay = length / count, width = Math.min(config.windowWidth, bay - .9);
+    const bay = length / count, width = Math.min(config.windowWidth, bay - (config.pierWidth ?? .9));
+    if (width <= 1e-6) continue;
     for (let i = 0; i < count; i++) {
       const center = bay * (i + .5), start = center - width / 2, end = center + width / 2;
-      let station = 0;
+      let station = 0, confirmed = true;
       const segments = run.flatMap(edge => {
         const first = Math.max(start, station), last = Math.min(end, station + edge.length), origin = station;
         station += edge.length;
         if (last - first < 1e-6) return [];
         const a = lerp(edge.from, edge.to, (first - origin) / edge.length), b = lerp(edge.from, edge.to, (last - origin) / edge.length);
+        if (facadeEdges && !confirmedFacade(a, b, facadeEdges)) confirmed = false;
         const inset = (p: Point): Point => [p[0] + edge.normal[0] * config.wallThickness / 2, p[1] + edge.normal[1] * config.wallThickness / 2];
-        const mullions = Array.from({ length: config.columns + 1 }, (_, column) => start + width * column / config.columns)
+        const divisions = (columns: number) => Array.from({ length: columns + 1 }, (_, column) => start + width * column / columns)
           .filter(at => at >= first - 1e-6 && at <= last + 1e-6).map(at => Math.max(0, Math.min(1, (at - first) / (last - first))));
-        return [{ from: inset(a), to: inset(b), cut: strip(a, b, edge.normal, -.04, config.wallThickness + .04), mullions }];
+        return [{ from: inset(a), to: inset(b), cut: strip(a, b, edge.normal, -.04, config.wallThickness + .04), mullions: divisions(config.columns),
+          ...(config.upperColumns ? { upperMullions: divisions(config.upperColumns) } : {}) }];
       });
+      // A curved bay must be confirmed in full; do not leave a partial pane
+      // wrapping into an unknown adjoining facade or inner wall.
+      if (!confirmed) continue;
       for (let floor = 0; floor * floorHeight < height; floor++) {
+        if (floor + 1 < (config.startFloor ?? 1) || floor + 1 > (config.endFloor ?? Infinity)) continue;
         const bottom = floor * floorHeight + Math.min(config.sill, floorHeight * .3);
         const top = Math.min(floor * floorHeight + Math.min(config.top, floorHeight - .35), height - .25);
         if (top <= bottom) continue;

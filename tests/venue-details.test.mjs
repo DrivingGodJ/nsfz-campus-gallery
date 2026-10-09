@@ -47,8 +47,8 @@ test('stands have real ascending terraces, clear stair aisles, a partial canopy,
   const entry = frame.at(frame.length * .5, -1);
   assert.equal(new THREE.Raycaster(new THREE.Vector3(entry[0], 1.6, entry[1]), new THREE.Vector3(frame.across[0], 0, frame.across[1]), 0, 1.5).intersectObjects([body, mesh(model.glass)]).length, 0, 'A glass window never closes a room doorway');
   const towerEye = frame.at(1.55, -1), towerRay = new THREE.Raycaster(new THREE.Vector3(towerEye[0], .12 + info.floorHeight + 1.2, towerEye[1]), new THREE.Vector3(frame.across[0], 0, frame.across[1]), 0, 1.6);
-  assert.equal(towerRay.intersectObject(body).length, 0, 'The tower has real window openings above the seating level');
-  assert.ok(towerRay.intersectObject(mesh(model.glass)).length, 'Tower glazing fills those openings');
+  assert.ok(towerRay.intersectObject(body).length, 'Unconfirmed tower faces remain solid above the seating level');
+  assert.equal(towerRay.intersectObject(mesh(model.glass)).length, 0, 'No guessed tower glazing is added');
   assert.ok(Object.values(model).reduce((sum, geometry) => sum + geometry.getAttribute('position').count / 3, 0) < 7000);
   assert.equal(JSON.stringify(stands), original);
   dispose(model);

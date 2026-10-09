@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import polygonClipping from 'polygon-clipping';
-import { gymRoofHeight, teachingWindowGeometry } from './architecture-geometry.ts';
+import { gymRoofHeight } from './architecture-geometry.ts';
 import { gymFrame, gymStairLayout } from './gym-interior.ts';
 import { buildingGeometry } from './building-geometry.ts';
 import type { Building, GroundPassage, Point, Shape } from './types';
@@ -101,12 +101,8 @@ export function standsArchitecture(building: Building, height: number, floorHeig
   const towerWidth = 6.2, tower: Shape = { outer: [at(0, 0), at(towerWidth, 0), at(towerWidth, width), at(0, width), at(0, 0)], holes: [] };
   if (shown > floorHeight) {
     const towerHeight = shown - floorHeight;
-    const classroomWindows = { wallThickness: .3, bayWidth: 3.1, windowWidth: 2.15, sill: .55, top: floorHeight - .42, columns: 2, transom: .3 };
-    const geometry = buildingGeometry(tower, towerHeight, floorHeight, [], [], [], classroomWindows, [], [], cutawayHeight !== undefined);
+    const geometry = buildingGeometry(tower, towerHeight, floorHeight, [], [], [], undefined, [], [], cutawayHeight !== undefined);
     geometry.translate(0, 0, floorHeight); bodyParts.push(geometry);
-    const windows = teachingWindowGeometry({ ...building, ...tower, floorCorridors: [], classroomWindows }, [{ ...tower, id: 'main', name: '', height: towerHeight, floors: Math.ceil(towerHeight / floorHeight) }], floorHeight);
-    windows.glass.translate(0, floorHeight, 0); windows.frames.translate(0, floorHeight, 0);
-    glass.push(windows.glass); frames.push(windows.frames);
   }
   const rows = 10, deck = floorHeight, tread = (width - 2.1) / rows, rise = Math.min(.32, floorHeight / rows), aisles = [length * .27, length * .53, length * .78];
   if (shown > deck + .001) {

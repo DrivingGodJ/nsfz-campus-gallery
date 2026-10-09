@@ -26,19 +26,6 @@ export function campusExteriorGeometry(building: Building, floors: number, floor
     parts[kind].push(new THREE.BoxGeometry(width, top - bottom, depth).rotateY(-Math.atan2(u[1], u[0]))
       .translate(a[0] + u[0] * at + n[0] * offset, (bottom + top) / 2, a[1] + u[1] * at + n[1] * offset));
   };
-  const window = (edge: number, at: number, width: number, bottom: number, top: number, divisions = 2) => {
-    box(edge, at, width, bottom, top, 'glass');
-    for (const y of [bottom, top]) box(edge, at, width + .1, y - .045, y + .045, 'frame', .16, .09);
-    for (let i = 0; i <= divisions; i++) box(edge, at - width / 2 + width * i / divisions, .075, bottom, top, 'frame', .16, .09);
-    box(edge, at, width, top - .47, top - .4, 'frame', .16, .09);
-  };
-  const bays = (edge: number, levels: number, width: number, bay: number) => {
-    const length = face(edge).length, count = Math.max(1, Math.floor(length / bay));
-    for (let floor = 0; floor < levels; floor++) for (let i = 0; i < count; i++) {
-      window(edge, length * (i + .5) / count, Math.min(width, length / count - .6), .12 + floor * floorHeight + .9,
-        .12 + floor * floorHeight + Math.min(2.5, floorHeight - .45));
-    }
-  };
   if (building.id === OFFICE_ID && building.outer.length > 15) {
     // DSC06615 / DSC8181 view this exact front face; DSC8913 faces edge 6.
     const length = face(13).length, height = .12 + floors * floorHeight;
@@ -53,24 +40,13 @@ export function campusExteriorGeometry(building: Building, floors: number, floor
       }
     } else {
       box(13, length * .19, length * .38 - .2, .12, height - .25, 'accent', .055);
-      for (let floor = 0; floor < floors; floor++) window(13, length * .19, 1.65, .12 + floor * floorHeight + 1.2, .12 + floor * floorHeight + 2.35);
     }
-    const stripAt = length * .48, stripWidth = 1.9;
-    box(13, stripAt, stripWidth, .12, height - .25, 'glass', .12);
-    for (const side of [-1, 1]) box(13, stripAt + side * stripWidth / 2, .12, .12, height - .2, 'frame', .19, .13);
-    for (let floor = 0; floor <= floors; floor++) {
-      const y = Math.min(.12 + floor * floorHeight, height - .22);
-      box(13, stripAt, stripWidth, y, y + .09, 'frame', .19, .13);
-    }
-    if (!building.classroomWindows) { bays(14, floors, 2.3, 3.8); bays(6, floors, 2.2, 4.5); }
+    // Ordinary windows and the tall strip have one shared aperture/glazing
+    // layout. This shallow detail layer supplies only the observed brickwork.
   } else if (building.id === LIBRARY_ID && building.outer.length > 14) {
     const levels = annexFloors ?? building.parts?.find(part => part.id === 'curved-annex')?.floors ?? 3;
-    // DSC9722 looks through edge 1; editor overrides also cap its facade height.
-    for (const edge of building.classroomWindows ? [1, 2] : [0, 1, 2, 12, 13, 14]) {
-      const length = face(edge).length;
-      for (let floor = 0; floor < levels; floor++) window(edge, length / 2, length - .4,
-        .12 + floor * floorHeight + .25, .12 + (floor + 1) * floorHeight - .2, Math.max(2, Math.round(length / 1.8)));
-    }
+    // Glazing belongs to the evidence-gated aperture layout. Missing window
+    // data must leave the body solid, rather than paste glass over its walls.
     // White diagonal steel visible beside the entry. Stop each brace at a floor.
     for (const edge of [1, 2]) {
       const { a, u, n, length } = face(edge);

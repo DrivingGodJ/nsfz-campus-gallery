@@ -142,14 +142,22 @@ export function classroomGlazingGeometry(windows: ClassroomWindow[], config?: Cl
     }
     return geometry.rotateY(-Math.atan2(dz, dx)).translate((from[0] + to[0]) / 2, BASE + (bottom + top) / 2, (from[1] + to[1]) / 2);
   };
-  if (config) for (const { from, to, bottom, top, mullions } of windows) {
+  if (config) for (const { from, to, bottom, top, mullions, upperMullions } of windows) {
       glass.push(panel(from, to, bottom, top));
-      for (const y of [bottom, top - Math.min(config.transom, (top - bottom) / 3), top]) frames.push(panel(from, to, y - .0275, y + .0275, true));
+      const transoms = config.transomFractions
+        ? config.transomFractions.filter(f => Number.isFinite(f) && f > 0 && f < 1).map(f => bottom + (top - bottom) * f)
+        : [top - Math.min(config.transom, (top - bottom) / 3)];
+      for (const y of [bottom, ...transoms, top]) frames.push(panel(from, to, y - .0275, y + .0275, true));
       const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
-      for (const fraction of mullions ?? Array.from({ length: config.columns + 1 }, (_, column) => column / config.columns)) {
+      const lower = mullions ?? Array.from({ length: config.columns + 1 }, (_, column) => column / config.columns);
+      const divider = top - Math.min(config.transom, (top - bottom) / 3);
+      const verticals = upperMullions
+        ? [...lower.map(fraction => ({ fraction, low: bottom, high: divider })), ...upperMullions.map(fraction => ({ fraction, low: divider, high: top }))]
+        : lower.map(fraction => ({ fraction, low: bottom, high: top }));
+      for (const { fraction, low, high } of verticals) {
         const point = lerp(from, to, fraction);
         const left: Point = [point[0] - dx / length * .0275, point[1] - dz / length * .0275], right: Point = [point[0] + dx / length * .0275, point[1] + dz / length * .0275];
-        frames.push(panel(left, right, bottom, top, true, true));
+        frames.push(panel(left, right, low, high, true, true));
       }
   }
   return { glass: combined(glass, false), frames: combined(frames, false) };
