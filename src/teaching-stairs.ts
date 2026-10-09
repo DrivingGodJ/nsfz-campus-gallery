@@ -90,19 +90,20 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
       for (const v of [v0 + .06, v1 - .06]) guard(u0, u1, v, bottom, bottom + rise);
     };
     const half = stair.width / 2, gap = .24, near = stair.landingDepth, far = near + stair.run;
+    const left: [number, number] = [-half, -gap / 2], right: [number, number] = [gap / 2, half];
+    const [first, second] = stair.firstFlight === 'left' ? [left, right] : [right, left];
     // Each storey uses the same two flights with a shared half-height landing.
     // There is no extra flight from the top floor through the retained roof.
     for (let level = 0; level < section.floors - 1 && level * floorHeight + SLAB < shown; level++) {
       const bottom = level * floorHeight + SLAB, middle = bottom + floorHeight / 2;
-      // Start on the right-hand flight, then turn back onto the left-hand flight.
-      flight(near, far, gap / 2, half, bottom);
+      flight(near, far, ...first, bottom);
       box(far, far + stair.landingDepth, -half, half, middle - .22, middle);
-      flight(far, near, -half, -gap / 2, middle);
+      flight(far, near, ...second, middle);
       for (const v of [-half + .06, half - .06]) guard(far, far + stair.landingDepth - .06, v, middle, middle);
       for (const rise of [.48, RAIL_HEIGHT]) bar(point(far + stair.landingDepth - .06, -half + .06, middle + rise), point(far + stair.landingDepth - .06, half - .06, middle + rise));
     }
     // Thin front supports, kept off the two flights, hold the rounded floor edge.
-    for (const u of [.35, stair.landingDepth * 2 + stair.run - .35]) box(u - .15, u + .15, -half - .65, -half - .35, SLAB, shown);
+    if (!stair.internal) for (const u of [.35, stair.landingDepth * 2 + stair.run - .35]) box(u - .15, u + .15, -half - .65, -half - .35, SLAB, shown);
     if (stair.entry) {
       const { edge, depth, steps } = stair.entry, a = section.outer[edge], b = section.outer[edge + 1];
       const length = Math.hypot(b[0] - a[0], b[1] - a[1]), direction: Point = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];

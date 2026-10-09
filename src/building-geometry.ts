@@ -154,7 +154,8 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     const shape = passageShape(passage);
     return [shape.outer, ...shape.holes];
   });
-  const glazing = windows ? classroomWindowLayout(core, windows, height, floorHeight, passageCuts, solids) : [];
+  const windowExclusions = [...solids, ...stairs.filter(stair => stair.internal).map(stair => [stair.opening.outer, ...stair.opening.holes])];
+  const glazing = windows ? classroomWindowLayout(core, windows, height, floorHeight, passageCuts, windowExclusions) : [];
   const slabThickness = Math.min(CORRIDOR_SLAB_THICKNESS, floorHeight * .1, height * .1);
   const slabs = [[0, slabThickness], ...(!cutaway ? [[height - slabThickness, height]] : [])];
   for (let level = 1; level * floorHeight < height - 1e-8; level++) {

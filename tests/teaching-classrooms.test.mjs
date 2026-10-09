@@ -226,7 +226,8 @@ test('classroom windows are actual openings with transparent panes, opaque sills
   const grounds = building.groundPassages.map(p => { const shape = passageShape(p); return [shape.outer, ...shape.holes]; });
   for (const [index, section] of info.sections.entries()) {
     const core = buildingCoreFootprint(section, building.groundPassages, building.floorCorridors.filter(c => c.partId === section.id), building.stairwells.filter(s => s.partId === section.id), building.solidCores.filter(s => s.partId === section.id), building.cutouts.filter(s => s.partId === section.id));
-    const windows = classroomWindowLayout(core, building.classroomWindows, section.height, info.floorHeight, grounds, building.solidCores.filter(s => s.partId === section.id).map(s => [s.outer, ...s.holes]));
+    const enclosures = [...building.solidCores.filter(s => s.partId === section.id).map(s => [s.outer, ...s.holes]), ...building.stairwells.filter(s => s.partId === section.id && s.internal).map(s => [s.opening.outer, ...s.opening.holes])];
+    const windows = classroomWindowLayout(core, building.classroomWindows, section.height, info.floorHeight, grounds, enclosures);
     assert.ok(windows.length > section.floors * 5, 'Both wings receive repeated windows on all floors');
     for (const window of windows) {
       const along = vector(window.to).sub(vector(window.from)).normalize(), normal = new THREE.Vector3(-along.z, 0, along.x);
