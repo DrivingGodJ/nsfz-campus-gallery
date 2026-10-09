@@ -52,11 +52,11 @@ export function publicationError(message) {
 function redact(value) {
   return String(value).replace(/\x1b\[[0-9;]*m/g, '').replace(/\bgh[pousr]_[A-Za-z0-9_]+/g, '[已隐藏凭证]').replace(/(Bearer\s+)\S+/gi, '$1[已隐藏凭证]');
 }
-export function runCommand(command, args, { cwd, env = process.env, timeout = 180000, onOutput = () => {} } = {}) {
+export function runCommand(command, args, { cwd, env = process.env, timeout = 180000, onOutput = () => {}, maxOutputChars = 250000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], shell: false });
     let output = '', expired = false;
-    const read = chunk => { const text = redact(chunk.toString()); output = (output + text).slice(-250000); onOutput(text); };
+    const read = chunk => { const text = redact(chunk.toString()); output = (output + text).slice(-maxOutputChars); onOutput(text); };
     child.stdout.on('data', read); child.stderr.on('data', read);
     const timer = setTimeout(() => { expired = true; child.kill('SIGTERM'); }, timeout);
     child.on('error', error => { clearTimeout(timer); reject(new UserError(error.code === 'ENOENT' ? '找不到上线所需的工具，请重新安装审核应用或检查项目。' : error.message)); });
@@ -118,7 +118,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     const [current, drafts, previousText, counts] = await Promise.all([
       fs.readFile(path.join(root, 'public/data/site.json'), 'utf8').then(JSON.parse),
       fs.readFile(path.join(root, '.local/drafts.json'), 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return []; throw error; }),
-      git('show', 'origin/main:public/data/site.json'),
+      command('git', ['show', 'origin/main:public/data/site.json'], { maxOutputChars: Infinity }),
       git('rev-list', '--left-right', '--count', 'HEAD...origin/main')
     ]);
     const [ahead, behind] = counts.trim().split(/\s+/).map(Number);

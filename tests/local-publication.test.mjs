@@ -54,7 +54,7 @@ async function fixture(t, options = {}) {
       if (args[0] === 'status') return options.dirty ?? ' M public/data/site.json\0';
       if (args[0] === 'branch') return options.branch ?? 'main\n';
       if (args[0] === 'remote') return 'https://github.com/DrivingGodJ/nsfz-campus-gallery.git\n';
-      if (args[0] === 'show') return JSON.stringify(previous);
+      if (args[0] === 'show') return options.runShow ? options.runShow(settings) : JSON.stringify(previous);
       if (args[0] === 'rev-list') return '0\t0\n';
       if (args[0] === 'rev-parse') return 'a'.repeat(40) + '\n';
     }
@@ -295,6 +295,31 @@ test('another local process sees the publish lock and cannot start a competing t
 test('subprocesses use literal arguments and redact credentials from errors and progress', async () => {
   const output = await runCommand(process.execPath, ['-e', 'process.stdout.write(process.argv[1]+" gho_dummy123 Bearer secret123")', '$(do-not-execute)']);
   assert.match(output, /\$\(do-not-execute\)/); assert.ok(!output.includes('gho_dummy123')); assert.ok(!output.includes('secret123'));
+});
+
+test('subprocess logs stay bounded while structured output can be captured in full', async () => {
+  const args = ['-e', 'process.stdout.write(JSON.stringify({ value: "x".repeat(300000) }))'];
+  const bounded = await runCommand(process.execPath, args);
+  assert.equal(bounded.length, 250000);
+  assert.throws(() => JSON.parse(bounded));
+  const complete = await runCommand(process.execPath, args, { maxOutputChars: Infinity });
+  assert.equal(JSON.parse(complete).value.length, 300000);
+  await assert.rejects(runCommand(process.execPath, ['-e', 'process.stdout.write("x".repeat(300000)); process.exitCode=1'], { maxOutputChars: Infinity }), error => error.message.length === 2500);
+});
+
+test('publication reads the complete previous library when its JSON exceeds the log limit', async t => {
+  const previous = { photos: [{ id: 'approved', title: 'old', description: 'x'.repeat(300000) }], buildingOverrides: {} };
+  const current = { ...previous, photos: [{ ...previous.photos[0], title: 'new' }] };
+  let previousFile;
+  const { root, service } = await fixture(t, { current, runShow: settings => runCommand(process.execPath,
+    ['-e', 'process.stdout.write(require("node:fs").readFileSync(process.argv[1], "utf8"))', previousFile], settings) });
+  previousFile = path.join(root, '.local/previous-site.json');
+  await fs.writeFile(previousFile, JSON.stringify(previous));
+  const { plan, problem } = await service.status();
+  assert.equal(problem, '');
+  assert.equal(plan.added, 0); assert.equal(plan.updated, 1); assert.equal(plan.removed, 0);
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
 });
 
 test('successful deployment is not reported complete until every photo can read likes', async t => {
