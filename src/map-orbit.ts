@@ -16,16 +16,16 @@ export function mapObjectInView(camera: Camera, point: Vector3, bounds?: MapObje
 
 // The level ground continues beyond campus and the finite model footprint.
 // Only a forward hit counts; looking at the horizon or sky stays an in-place turn.
-export function mapGroundOrbitTarget(camera: Camera, viewport: MapViewport = FULL_MAP_VIEWPORT) {
+export function mapGroundOrbitTarget(camera: Camera, viewport: MapViewport = FULL_MAP_VIEWPORT, groundHeight = 0) {
   camera.updateMatrixWorld();
   const raycaster = new Raycaster();
   raycaster.setFromCamera(new Vector2(2 * (viewport.left + viewport.width / 2) - 1, 1 - 2 * (viewport.top + viewport.height / 2)), camera);
   const { origin, direction } = raycaster.ray;
   if (Math.abs(direction.y) < 1e-6) return null;
-  const distance = -origin.y / direction.y;
+  const distance = (groundHeight - origin.y) / direction.y;
   if (!Number.isFinite(distance) || distance < .01) return null;
   const target = origin.clone().addScaledVector(direction, distance);
-  target.y = 0;
+  target.y = groundHeight;
   return target;
 }
 

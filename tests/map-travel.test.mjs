@@ -47,6 +47,21 @@ test('forward travel follows a new heading and near-ground markers use actual vi
   close(camera.position.distanceTo(before), 0);
 });
 
+test('basement travel and panning scales match the same view above ground', () => {
+  const { camera, target } = fixture(), ground = -3.8;
+  const step = mapTravelStep(camera), distance = mapGroundViewDistance(camera);
+  const panDepth = retargetMapPan(camera, target), gaze = camera.quaternion.clone();
+  camera.position.y += ground; target.y += ground; camera.updateMatrixWorld();
+  close(mapTravelStep(camera, ground), step);
+  close(mapGroundViewDistance(camera, ground), distance);
+  close(retargetMapPan(camera, target, undefined, ground), panDepth);
+  close(camera.quaternion.angleTo(gaze), 0, 1e-7);
+  camera.position.set(0, ground + 1.6, 0); camera.lookAt(new THREE.Vector3(0, ground + 1.6, -100));
+  const horizonDepth = retargetMapPan(camera, target, undefined, ground);
+  close(horizonDepth, 16);
+  assert.equal(mapTravelStep(camera, ground), 2);
+});
+
 test('pan speed is independent of a stale tiny or distant target and retargeting does not move the view', () => {
   for (const viewport of [{left:0,top:0,width:1,height:1},{left:.4,top:0,width:.6,height:1},{left:0,top:0,width:1,height:.35}]) {
     let expected;

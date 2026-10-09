@@ -22,6 +22,20 @@ test('ground orbit uses the forward centre ray after travel, without moving or t
   assert.ok(intersection.distanceTo(camera.position) < target.distanceTo(camera.position));
 });
 
+test('underground ground pivots use the basement plane while preserving exposed-area framing', () => {
+  const ground = -3.8, { camera, target } = fixture([0, ground + 60, 100], [20, ground, 10]);
+  travelAlongView(camera, target, 30, ground);
+  const orientation = camera.quaternion.clone();
+  close(mapGroundOrbitTarget(camera, undefined, ground).distanceTo(new THREE.Vector3(20, ground, 10)), 0);
+  for (const viewport of [{left:.4,top:0,width:.6,height:1},{left:0,top:0,width:1,height:.35}]) {
+    const pivot = mapGroundOrbitTarget(camera, viewport, ground), projected = pivot.clone().project(camera);
+    close(pivot.y, ground);
+    close(projected.x, 2 * (viewport.left + viewport.width / 2) - 1);
+    close(projected.y, 1 - 2 * (viewport.top + viewport.height / 2));
+  }
+  close(camera.quaternion.angleTo(orientation), 0);
+});
+
 test('horizon, sky and intersections behind the camera choose in-place look', () => {
   for (const [position, gaze] of [
     [[0, 60, 100], [0, 60, 0]],

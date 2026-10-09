@@ -4,16 +4,29 @@ import type { PassageOpening } from './underground-geometry';
 import { pointOnStairTread } from './structure-geometry.ts';
 
 export type UndergroundViewSpace = { floor: number; height: number; footprints: Shape[] };
+export type UndergroundInspectionMode = 'surface' | 'underground';
+export type UndergroundMaterialView = 'inside' | 'nearby' | 'plan' | 'surface' | 'overview';
 export function undergroundCameraInside(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace) {
   return camera.y >= space.floor - .02 && camera.y < space.floor + space.height - .025 && space.footprints.some(shape => pointOnStairTread([camera.x,camera.z],shape.outer) && !shape.holes.some(hole=>pointOnStairTread([camera.x,camera.z],hole)));
 }
-export function undergroundMaterialView(material: THREE.Material, mode: 'inside' | 'nearby' | 'plan', ghostOpacity: number, translucent = false) {
-  const transparent = mode !== 'inside' || translucent;
+export function undergroundViewMode(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace, spaces: UndergroundViewSpace[], mode: UndergroundInspectionMode, photoPerspective = false): UndergroundMaterialView {
+  const inside = undergroundCameraInside(camera, space);
+  if (photoPerspective) return inside ? 'inside' : spaces.some(item => undergroundCameraInside(camera, item)) ? 'nearby' : 'plan';
+  return mode === 'surface' ? 'surface' : inside ? 'inside' : 'overview';
+}
+export function undergroundPartVisible(part: 'volume' | 'plan' | 'ceiling', mode: UndergroundMaterialView, cameraHeight: number, ceilingHeight: number) {
+  if (part === 'volume') return mode === 'plan' || mode === 'nearby';
+  if (part === 'plan') return mode === 'plan';
+  return mode === 'inside' || ((mode === 'plan' || mode === 'nearby') && cameraHeight < ceilingHeight - .1);
+}
+export function undergroundMaterialView(material: THREE.Material, mode: UndergroundMaterialView, ghostOpacity: number, translucent = false) {
+  const solid = mode === 'inside' || mode === 'overview';
+  const transparent = !solid || translucent;
   if(material.transparent!==transparent) {material.transparent=transparent;material.needsUpdate=true;}
   material.userData.inside = mode !== 'plan';
-  material.opacity = mode==='inside' && !translucent ? 1 : ghostOpacity;
+  material.opacity = mode === 'surface' ? Math.min(.045, ghostOpacity * .06) : solid && !translucent ? 1 : ghostOpacity;
   material.depthTest = mode !== 'plan';
-  material.depthWrite = mode==='inside' && !translucent;
+  material.depthWrite = solid && !translucent;
 }
 
 export function undergroundBoundaryLines(shape: Shape, openings: PassageOpening[]) {

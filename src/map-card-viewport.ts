@@ -16,12 +16,12 @@ function viewportRay(fov: number, aspect: number, viewport: MapViewport) {
 
 // Every selection starts with a level 45-degree downward view, matching photos.
 // Place the camera behind the exposed centre ray rather than underneath the object.
-export function photoMapFocusPose(pose: CameraPose, object: Vector3, aspect: number, viewport: MapViewport): CameraPose {
+export function photoMapFocusPose(pose: CameraPose, object: Vector3, aspect: number, viewport: MapViewport, groundHeight = 0): CameraPose {
   const yaw = new Euler().setFromQuaternion(pose.quaternion, 'YXZ').y;
   const quaternion = new Quaternion().setFromEuler(new Euler(-Math.PI / 4, yaw, 0, 'YXZ'));
   const direction = viewportRay(pose.fov, aspect, viewport).applyQuaternion(quaternion);
   // Only a point too far underground to frame at 40 m needs extra clearance.
-  const distance = Math.max(MAP_PHOTO_FOCUS_DISTANCE, (MAP_CAMERA_GROUND_HEIGHT - object.y) / -direction.y);
+  const distance = Math.max(MAP_PHOTO_FOCUS_DISTANCE, (groundHeight + MAP_CAMERA_GROUND_HEIGHT - object.y) / -direction.y);
   const position = object.clone().addScaledVector(direction, -distance);
   return { ...pose, position, quaternion, target: position.clone().add(new Vector3(0, 0, -distance).applyQuaternion(quaternion)) };
 }

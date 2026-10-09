@@ -5,47 +5,47 @@ import { mapGroundOrbitTarget } from './map-orbit.ts';
 import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport.ts';
 
 // Translate the target too: orbit dolly would otherwise stop at its centre.
-export function travelAlongView(camera: Camera, target: Vector3, distance: number) {
+export function travelAlongView(camera: Camera, target: Vector3, distance: number, groundHeight = 0) {
   if (!Number.isFinite(distance) || !distance) return;
-  const movement = aboveGroundMovement(camera.position, camera.getWorldDirection(new Vector3()).multiplyScalar(distance));
+  const movement = aboveGroundMovement(camera.position, camera.getWorldDirection(new Vector3()).multiplyScalar(distance), groundHeight);
   camera.position.add(movement);
   target.add(movement);
-  keepMapCameraAboveGround(camera, target);
+  keepMapCameraAboveGround(camera, target, false, groundHeight);
   camera.updateMatrixWorld();
 }
 
-export function mapTravelStep(camera: Camera) {
+export function mapTravelStep(camera: Camera, groundHeight = 0) {
   // Forward distance stays unlimited; at ground level it slides along the surface.
-  return Math.max(2, Math.min(120, Math.abs(camera.position.y) * .3));
+  return Math.max(2, Math.min(120, Math.abs(camera.position.y - groundHeight) * .3));
 }
 
-export function mapGroundViewDistance(camera: Camera) {
+export function mapGroundViewDistance(camera: Camera, groundHeight = 0) {
   const direction = camera.getWorldDirection(new Vector3());
-  return Math.abs(camera.position.y) / Math.max(.01, Math.abs(direction.y));
+  return Math.abs(camera.position.y - groundHeight) / Math.max(.01, Math.abs(direction.y));
 }
 
 // OrbitControls scales pan by its target distance. That target is synthetic and
 // may be very close after a cancelled camera journey or a previous ground orbit.
 // Refresh it from the scenery at gesture start without moving or turning the eye.
-export function retargetMapPan(camera: PerspectiveCamera, target: Vector3, viewport: MapViewport = FULL_MAP_VIEWPORT) {
+export function retargetMapPan(camera: PerspectiveCamera, target: Vector3, viewport: MapViewport = FULL_MAP_VIEWPORT, groundHeight = 0) {
   const direction = camera.getWorldDirection(new Vector3());
-  const ground = mapGroundOrbitTarget(camera, viewport);
+  const ground = mapGroundOrbitTarget(camera, viewport, groundHeight);
   // Grazing rays can meet the plane kilometres away. Cap their pan scale by
   // altitude, smoothly matching the fallback when the view crosses the horizon.
-  const horizonDistance = Math.max(MAP_CAMERA_GROUND_HEIGHT, camera.position.y) * 10;
+  const horizonDistance = Math.max(MAP_CAMERA_GROUND_HEIGHT, camera.position.y - groundHeight) * 10;
   const depth = ground ? ground.sub(camera.position).dot(direction) : horizonDistance;
   const distance = Math.max(2, Math.min(camera.far, horizonDistance, depth));
   target.copy(camera.position).addScaledVector(direction, distance);
   return distance;
 }
 
-export function panMapView(camera: PerspectiveCamera, target: Vector3, dx: number, dy: number, viewportHeight: number) {
+export function panMapView(camera: PerspectiveCamera, target: Vector3, dx: number, dy: number, viewportHeight: number, groundHeight = 0) {
   camera.updateMatrixWorld();
   const scale = 2 * camera.position.distanceTo(target) * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, viewportHeight);
   const movement = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(-dx * scale)
     .add(new Vector3().setFromMatrixColumn(camera.matrixWorld, 1).multiplyScalar(dy * scale));
-  aboveGroundMovement(camera.position, movement);
-  camera.position.add(movement); target.add(movement); keepMapCameraAboveGround(camera, target); camera.updateMatrixWorld();
+  aboveGroundMovement(camera.position, movement, groundHeight);
+  camera.position.add(movement); target.add(movement); keepMapCameraAboveGround(camera, target, false, groundHeight); camera.updateMatrixWorld();
 }
 
 // Wheel, trackpad pinch, touch pinch and middle-button drag all use the same

@@ -5,9 +5,12 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Edges, Html, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
-import { ArrowDown, ArrowUp, Crosshair, Layers } from 'lucide-react';
+import { ArrowDown, ArrowUp, Crosshair } from 'lucide-react';
 import { buildingInfo, type Campus, type Photo, type Point, type Shape, type Site } from './types';
 import CampusStructures from './CampusStructures';
+import MapModelLayer from './MapModelLayer';
+import MapLevelSwitch, { type MapLevelMode } from './MapLevelSwitch';
+import { isUndergroundFeature, isUndergroundPhoto } from './map-level-mode';
 import SportsGround from './SportsGround';
 import Forest, { Trees } from './Forest';
 import RiverLandscape from './RiverLandscape';
@@ -238,9 +241,17 @@ export default function MapView(props: Props) {
   const [command, setCommand] = useState<MapCommand>({ type: 'initial', sequence: 0 });
   const [compact, setCompact] = useState(false);
   const [azimuth, setAzimuth] = useState(0);
-  const [underground, setUnderground] = useState(true);
+  const [levelMode, setLevelMode] = useState<MapLevelMode>('surface');
+  const undergroundFloor = Math.min(-3.8, ...campus.features.filter(isUndergroundFeature).map(feature => feature.height ?? -3.8));
   const entranceSelected = campus.features.some(feature => feature.id === props.selectedLocation && feature.type === 'tunnelEntrance');
-  useEffect(() => { if (entranceSelected) setUnderground(true); }, [entranceSelected, placing]);
+  useEffect(() => {
+    const photo = props.editPhoto || props.selectedPhoto;
+    const id = photo ? photoLocationId(photo, campus) : props.selectedLocation;
+    const feature = campus.features.find(item => item.id === id);
+    if (!id) return;
+    if (photo ? isUndergroundPhoto(photo, campus, site) : isUndergroundFeature(feature)) setLevelMode('underground');
+    else if (photo || props.selectedLocation) setLevelMode('surface');
+  }, [props.editPhoto?.id, props.selectedPhoto?.id, props.selectedLocation, campus]);
   const [moving, setMoving] = useState(false);
   const [picker, setPicker] = useState<PhotoCluster | null>(null);
   const pickerTrigger = useRef<HTMLButtonElement | null>(null);
@@ -258,10 +269,15 @@ export default function MapView(props: Props) {
   // the directory filters. Closing it restores the user's season and time.
   const mapColor = useMapColor(theme, environmentSeason, environmentTime);
   const viewingPhoto = !!preview || moving;
+  const undergroundView = levelMode === 'underground' && !viewingPhoto && !props.photoPreview;
+  const sceneMode: MapLevelMode = undergroundView ? 'underground' : 'surface';
+  const mapPhotos = useMemo(() => photos.filter(photo => isUndergroundPhoto(photo, campus, site) === undergroundView), [photos, campus, site, undergroundView]);
+  const focusPhoto = selectedPhoto && (viewingPhoto || !!props.photoPreview || isUndergroundPhoto(selectedPhoto, campus, site) === undergroundView) ? selectedPhoto : null;
   const locationSelection = useMemo(() => ({ selectedId: selectedLocation, onSelect: viewingPhoto ? undefined : onLocation, placing, featuresSelectable: props.featuresSelectable, selectableIds }), [selectedLocation, viewingPhoto, onLocation, placing, props.featuresSelectable, selectableIds]);
   // Selection cuts above its floor; preview restores the building throughout the camera transition.
   const cutawayFloor = props.photoPreview || viewingPhoto ? undefined : floor;
   const selectedObject = useMemo(() => mapLocationTarget(campus, site, selectedLocation, cutawayFloor), [campus, site, selectedLocation, cutawayFloor]);
+  const focusObject = viewingPhoto || props.photoPreview || isUndergroundFeature(campus.features.find(feature => feature.id === selectedLocation)) === undergroundView ? selectedObject : null;
   const labelPortal = useRef<HTMLDivElement>(null!);
   useEffect(() => {
     if (!props.photoPerspective) return;
@@ -286,25 +302,29 @@ export default function MapView(props: Props) {
     const point = photoPlacementPoint(e.ray, props.editPhoto || null, campus, site);
     if (point) onPlace(point);
   };
-  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-season={environmentSeason || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
+  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-level-mode={sceneMode} data-season={environmentSeason || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
     <MapTheme.Provider value={theme}><MapSeason.Provider value={environmentSeason}><MapTime.Provider value={environmentTime}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
       <color attach="background" args={[mapColor('#eeeee5')]} />
-      <SkyEnvironment theme={theme} season={environmentSeason} time={environmentTime} />
+      <SkyEnvironment underground={undergroundView} theme={theme} season={environmentSeason} time={environmentTime} />
       <LocationSelection.Provider value={locationSelection}><Suspense fallback={null}><group onClick={clickBackground}>
-        {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={-.08} unlit />)}
+        {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={(undergroundView ? undergroundFloor : 0) - .08} unlit />)}
+        <MapModelLayer underground={undergroundView}>
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}
         {campus.features.map(feature => feature.waterfall ? <BoundaryWaterGarden key={feature.id} feature={feature} /> : feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} features={campus.features} labelPortal={labelPortal} /> : feature.type === 'path' && feature.points && !feature.representedBy ? <Roads key={feature.id} points={feature.points} width={feature.width || 3} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
         <Line points={campus.boundary.map(([x, z]) => [x, .2, z])} color={mapColor('#97a188')} lineWidth={1.5} />
         {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
-        <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground={underground} labelPortal={labelPortal} occlusionRevision={[selectedLocation, cutawayFloor, underground].join(':')} />
         <RiverLandscape features={campus.features} buildings={campus.buildings} />
-        <FeatureTargets campus={campus} site={site} underground={underground} labelPortal={labelPortal} />
-        {!viewingPhoto && <PhotoMarkers occlusionRevision={[selectedLocation, cutawayFloor, underground].join(':')} photos={photos} photoLikes={props.photoLikes} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
-        {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}
+        </MapModelLayer>
+        <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground mode={sceneMode} photoPerspective={viewingPhoto || !!props.photoPreview} labelPortal={labelPortal} occlusionRevision={[selectedLocation, cutawayFloor, sceneMode].join(':')} />
+        <MapModelLayer underground={undergroundView}><FeatureTargets campus={campus} site={site} underground={false} labelPortal={labelPortal} /></MapModelLayer>
+        {undergroundView && <FeatureTargets campus={{ ...campus, features: campus.features.filter(isUndergroundFeature) }} site={site} underground labelPortal={labelPortal} />}
+        {!viewingPhoto && <PhotoMarkers occlusionRevision={[selectedLocation, cutawayFloor, sceneMode].join(':')} photos={mapPhotos} photoLikes={props.photoLikes} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
+        {!viewingPhoto && focusPhoto && !editPhoto && <Direction photo={focusPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
-      </group><MapCameraRig command={command} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto && !props.photoViewDisabled} photoHeightRange={photoHeightRange} smoothPhotoFraming={props.smoothPhotoFraming} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={adjustPhotoView} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>
+      </group><MapCameraRig groundHeight={levelMode === 'underground' ? undergroundFloor : 0} command={command} selectedObjectTarget={focusObject?.target} selectedObjectBounds={focusObject?.bounds} selected={focusPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto && !props.photoViewDisabled} photoHeightRange={photoHeightRange} smoothPhotoFraming={props.smoothPhotoFraming} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={adjustPhotoView} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>
     </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
-    {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
+    {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button></div>}
+    {!viewingPhoto && !props.photoPreview && <MapLevelSwitch mode={levelMode} onChange={mode => { setPicker(null); setLevelMode(mode); }} />}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {/* The map is isolated below viewer cards; place the chooser alongside them so the catalog cannot cover it. */}
     {labelPortal.current && createPortal(<PhotoClusterPicker photos={!viewingPhoto && picker ? picker.photos : null} photoLikes={props.photoLikes} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}

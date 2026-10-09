@@ -21,9 +21,16 @@ export function photoSkyTime(mapTime: PhotoTime | '', photo?: Pick<Photo, 'captu
   return captured === 'unknown' ? mapTime : captured;
 }
 
-export function skyEnvironment(theme: Theme, season: PhotoSeason | '', time: PhotoTime | '') {
+export function skyEnvironment(theme: Theme, season: PhotoSeason | '', time: PhotoTime | '', underground = false) {
   const period = skyTime(theme, time);
-  return { period, ...SKY_PALETTES[period], ground: timeMapColor(theme, season, time, '#eeeee5') };
+  if (underground) {
+    const dark = period === 'night';
+    // A quiet soil horizon replaces the open sky without darkening the lit
+    // underground interiors or adding a plane across their usable floors.
+    return { period, ...SKY_PALETTES[period], zenith: dark ? '#2a3530' : '#bcbeb7', horizon: dark ? '#3b4238' : '#cfcec3',
+      ground: dark ? '#15261e' : '#d9d6cc', stars: 0, moon: 0, cloudAmount: 0, celestialAmount: 0 };
+  }
+  return { period, ...SKY_PALETTES[period], ground: timeMapColor(theme, season, time, '#eeeee5'), celestialAmount: 1 };
 }
 
 export function skyTransitionBlend(delta: number, firstFrame: boolean, reducedMotion = false) {

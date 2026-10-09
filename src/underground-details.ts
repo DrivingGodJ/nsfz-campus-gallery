@@ -4,9 +4,9 @@ import { undergroundFootprints, type PassageOpening } from './underground-geomet
 import { undergroundWallPanels } from './underground-mesh.ts';
 import type { Feature, Point, Shape } from './types';
 
-type Kind = 'floor' | 'walls' | 'tiles' | 'metal' | 'lights' | 'pipes' | 'glass' | 'green' | 'wood' | 'paint' | 'nets' | 'ceiling' | 'fittings';
+type Kind = 'floor' | 'walls' | 'tiles' | 'metal' | 'lights' | 'pipes' | 'glass' | 'skylights' | 'green' | 'wood' | 'paint' | 'nets' | 'ceiling' | 'fittings';
 type Vector = [number, number, number];
-export const UNDERGROUND_COLORS: Record<Kind, string> = { floor: '#7a9799', walls: '#b6beb8', tiles: '#546566', metal: '#777d78', lights: '#f4eccc', pipes: '#a45342', glass: '#abc9cb', green: '#278778', wood: '#c89e66', paint: '#ede8d2', nets: '#a3afa2', ceiling: '#525d5b', fittings: '#56819a' };
+export const UNDERGROUND_COLORS: Record<Kind, string> = { floor: '#7a9799', walls: '#b6beb8', tiles: '#546566', metal: '#777d78', lights: '#f4eccc', pipes: '#a45342', glass: '#abc9cb', skylights: '#abc9cb', green: '#278778', wood: '#c89e66', paint: '#ede8d2', nets: '#a3afa2', ceiling: '#525d5b', fittings: '#56819a' };
 
 export function undergroundRoomFrame(feature: Feature) {
   const ring = feature.outer!, origin = ring[0], short = ring[1], long = ring.at(-2)!;
@@ -114,7 +114,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       segment(from, to, floor + .065, .025, .2, 'tiles');
     }
     if (lightwell) {
-      segment(at(.1, -width / 4), at(length - .1, -width / 4), top - .05, .045, width / 2 - .25, 'glass');
+      segment(at(.1, -width / 4), at(length - .1, -width / 4), top - .05, .045, width / 2 - .25, 'skylights');
       segment(at(.1, width / 4), at(length - .1, width / 4), top - .12, .08, width / 2, 'ceiling');
     } else segment(at(.1), at(length - .1), top - .12, .08, width - .2, 'ceiling');
     if (feature.type === 'tunnel') {

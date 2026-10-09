@@ -8,7 +8,7 @@ import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-
 import { bindPhotoLookControls, type PhotoOrientation, type PhotoViewAdjustment } from './photo-look-controls';
 import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, retargetMapPan, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
-import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
+import { aboveGroundMovement, keepMapCameraAboveGround, shiftMapCameraGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
 import { FULL_MAP_VIEWPORT, frameMapTarget, photoMapFocusPose, type MapViewport } from './map-card-viewport';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number }; pointHeight?: number; pointOpacity?: number };
@@ -27,11 +27,12 @@ function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
   camera.updateMatrixWorld();
 }
 
-export default function MapCameraRig({ command, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, photoHeightRange, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
+export default function MapCameraRig({ command, selectedObjectTarget, selectedObjectBounds, selected, preview, groundHeight = 0, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, photoHeightRange, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
   selectedObjectTarget?: [number, number, number] | null;
   selectedObjectBounds?: MapObjectBounds | null;
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
   canAdjustPhotoView?: boolean; smoothPhotoFraming?: boolean;
+  groundHeight?: number;
   photoHeightRange?: { min: number; max: number };
   visibleViewport?: MapViewport;
   onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
@@ -52,12 +53,26 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
   const touchOrbit = useRef<{ rotate: boolean; pan: boolean } | null>(null);
   const objectBounds = selected ? null : selectedObjectBounds;
   const viewportKey = JSON.stringify(visibleViewport);
-  const live = useRef({ size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, photoHeightRange, onMoving, onPhotoOrientation, onSelectionOutOfView });
-  live.current = { size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, photoHeightRange, onMoving, onPhotoOrientation, onSelectionOutOfView };
+  const live = useRef({ size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, groundHeight, photoHeightRange, onMoving, onPhotoOrientation, onSelectionOutOfView });
+  live.current = { size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, groundHeight, photoHeightRange, onMoving, onPhotoOrientation, onSelectionOutOfView };
+  const lastGround = useRef(0);
   const pendingFocus = useRef(false);
   const dismissedObjectKey = useRef('');
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
   const fitDistance = OVERVIEW_DISTANCE / Math.min(1, size.width / Math.max(1, size.height));
+
+  const switchGroundReference = useCallback(() => {
+    const control = controls.current, current = live.current;
+    if (!control || current.preview || motion.current.inPhotoView || motion.current.photoTransition || lastGround.current === current.groundHeight) return;
+    motion.current.cancelFocus();
+    stopOrbitMomentum(camera, control);
+    shiftMapCameraGround(camera, control.target, lastGround.current, current.groundHeight);
+    lastGround.current = current.groundHeight;
+    gesturePivot.current = null;
+    invalidate();
+  }, [camera, invalidate]);
+
+  useEffect(() => { switchGroundReference(); }, [groundHeight, switchGroundReference]);
 
   useEffect(() => {
     const control = controls.current;
@@ -81,7 +96,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
     stopOrbitMomentum(camera, control);
     const target = new THREE.Vector3(...current.objectTarget);
     // Photos, buildings and areas share the same fixed approach and exposed centre.
-    const pose = photoMapFocusPose(readCameraPose(camera, control.target), target, camera.aspect, current.visibleViewport);
+    const pose = photoMapFocusPose(readCameraPose(camera, control.target), target, camera.aspect, current.visibleViewport, current.groundHeight);
     pendingFocus.current = false;
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -96,7 +111,8 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
     if (returning || focusing) {
       pendingFocus.current = false;
       stopOrbitMomentum(camera, control);
-      keepMapCameraAboveGround(camera, control.target);
+      switchGroundReference();
+      keepMapCameraAboveGround(camera, control.target, false, live.current.groundHeight);
       // Interpolated targets and orientations can disagree partway through a
       // journey. Resume orbit along the current gaze rather than snapping to it.
       control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), Math.max(1, camera.position.distanceTo(control.target)));
@@ -107,7 +123,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
     // last frame. Check the current journey rather than losing the next down.
     control.enabled = !motion.current.moving && !motion.current.photoTransition;
     return control.enabled;
-  }, [camera, invalidate]);
+  }, [camera, invalidate, switchGroundReference]);
 
   useEffect(() => {
     const surface = gl.domElement.closest?.('.map-stage') || gl.domElement;
@@ -122,27 +138,27 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
     travel: steps => {
       const control = controls.current;
       if (!control) return;
-      travelAlongView(camera, control.target, steps * mapTravelStep(camera));
+      travelAlongView(camera, control.target, steps * mapTravelStep(camera, live.current.groundHeight), live.current.groundHeight);
       control.update(); invalidate();
     },
     pan: (dx, dy) => {
       const control = controls.current;
       if (!control || !(camera instanceof THREE.PerspectiveCamera)) return;
-      panMapView(camera, control.target, dx, dy, live.current.size.height);
+      panMapView(camera, control.target, dx, dy, live.current.size.height, live.current.groundHeight);
       control.update(); invalidate();
     },
     panStart: () => {
       const control = controls.current;
       if (!control || !(camera instanceof THREE.PerspectiveCamera)) return;
       stopOrbitMomentum(camera, control);
-      retargetMapPan(camera, control.target, live.current.visibleViewport);
+      retargetMapPan(camera, control.target, live.current.visibleViewport, live.current.groundHeight);
     },
     multiTouch: active => {
       const control = controls.current;
       if (!control) return;
       if (active) {
         stopOrbitMomentum(camera, control);
-        if (camera instanceof THREE.PerspectiveCamera) retargetMapPan(camera, control.target, live.current.visibleViewport);
+        if (camera instanceof THREE.PerspectiveCamera) retargetMapPan(camera, control.target, live.current.visibleViewport, live.current.groundHeight);
         touchOrbit.current = { rotate: control.enableRotate, pan: control.enablePan };
         control.enableRotate = false; control.enablePan = false;
       } else if (touchOrbit.current) {
@@ -158,7 +174,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
         gesturePivot.current = live.current.objectTarget ? new THREE.Vector3(...live.current.objectTarget) : null;
         if (gesturePivot.current && !mapObjectInView(camera, gesturePivot.current, live.current.objectBounds, live.current.visibleViewport)) gesturePivot.current = null;
         if (!gesturePivot.current) {
-          gesturePivot.current = mapGroundOrbitTarget(camera, live.current.visibleViewport);
+          gesturePivot.current = mapGroundOrbitTarget(camera, live.current.visibleViewport, live.current.groundHeight);
           if (gesturePivot.current) {
             // The exposed centre is off-axis. Retarget along the existing gaze
             // rather than snapping the whole canvas centre onto its ground hit.
@@ -172,7 +188,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
         const control = controls.current!;
         if (gesturePivot.current) orbitMapObject(camera, control.target, gesturePivot.current, dx, dy, live.current.size.height);
         else turnMapView(camera, control.target, dx, dy, live.current.size.height);
-        keepMapCameraAboveGround(camera, control.target);
+        keepMapCameraAboveGround(camera, control.target, false, live.current.groundHeight);
         control.update(); invalidate();
       },
       finish: () => { gesturePivot.current = null; if (controls.current) controls.current.enableRotate = true; }
@@ -191,8 +207,11 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
       invalidate();
     }
     if (preview || motion.current.inPhotoView || motion.current.photoTransition) return;
+    // A mode change during a photograph waits until its exact return pose has
+    // finished. The calibrated photo and its camera journey remain untouched.
+    switchGroundReference();
     if (pendingFocus.current) focusSelectedObject();
-    if (keepMapCameraAboveGround(camera, control.target)) {
+    if (keepMapCameraAboveGround(camera, control.target, false, live.current.groundHeight)) {
       stopOrbitMomentum(camera, control);
       invalidate();
     }
@@ -203,7 +222,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
       current.onSelectionOutOfView();
     }
     const target = control.target;
-    const compact = mapGroundViewDistance(camera) > 360;
+    const compact = mapGroundViewDistance(camera, live.current.groundHeight) > 360;
     if (compact !== lastCompact.current) { lastCompact.current = compact; onCompact(compact); }
     const center = target.clone().project(camera), north = target.clone().add(new THREE.Vector3(0, 0, -10)).project(camera);
     const angle = Math.round(Math.atan2((north.x - center.x) * size.width, (north.y - center.y) * size.height) * 180 / Math.PI);
@@ -216,11 +235,12 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
     stopOrbitMomentum(camera, control);
     let pose = readCameraPose(camera, control.target);
     const offset = camera.position.clone().sub(control.target);
-    if (command.type === 'reset') { pose.target.set(0, 0, 0); pose.position.fromArray(OVERVIEW_POSITION).normalize().multiplyScalar(fitDistance); }
+    const surface = live.current.groundHeight;
+    if (command.type === 'reset') { pose.target.set(0, surface, 0); pose.position.fromArray(OVERVIEW_POSITION).normalize().multiplyScalar(fitDistance); pose.position.y += surface; }
     if (command.type === 'north') { const length = offset.length(); pose.position.copy(pose.target).add(new THREE.Vector3(0, length * .72, length * .7)); }
-    if (command.type === 'top') { pose.target.set(0, 0, 0); pose.position.set(0, fitDistance, .5); }
+    if (command.type === 'top') { pose.target.set(0, surface, 0); pose.position.set(0, fitDistance + surface, .5); }
     if (command.type === 'in' || command.type === 'out') {
-      const movement = aboveGroundMovement(camera.position, camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(mapTravelStep(camera) * (command.type === 'in' ? 1 : -1)));
+      const movement = aboveGroundMovement(camera.position, camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(mapTravelStep(camera, surface) * (command.type === 'in' ? 1 : -1)), surface);
       pose.position.add(movement); pose.target.add(movement);
       // Retarget from the current frame, so repeated or opposite presses stay continuous.
       control.enabled = false;
@@ -228,9 +248,9 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
       invalidate(); return;
     }
     if (command.type === 'cluster' && command.target) {
-      pose = photoMapFocusPose(pose, new THREE.Vector3(...command.target), camera.aspect, live.current.visibleViewport);
+      pose = photoMapFocusPose(pose, new THREE.Vector3(...command.target), camera.aspect, live.current.visibleViewport, surface);
     } else {
-      pose.position.y = Math.max(MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
+      pose.position.y = Math.max(surface + MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
       const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);
       pose.quaternion.copy(oriented.quaternion);
       if (command.type === 'reset') pose = frameMapTarget(pose, pose.target, camera.aspect, live.current.visibleViewport);

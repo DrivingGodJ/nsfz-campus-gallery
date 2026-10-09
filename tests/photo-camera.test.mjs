@@ -407,6 +407,67 @@ const testServer = async () => {
   return { server, close: async () => { await server.close(); await fs.rm(cacheDir, { recursive: true, force: true }); } };
 };
 
+test('the real map camera switches basement reference reversibly and defers it throughout fixed photo views', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const canvas = testCanvas();
+  const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let root;
+  try {
+    const { default: Rig } = await environment.server.ssrLoadModule('/src/MapCameraRig.tsx');
+    globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
+    root = createRoot(canvas);
+    await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
+    const props = { command: { type: 'initial', sequence: 0 }, selected: null, preview: null, onCompact() {}, onAzimuth() {}, onMoving() {} };
+    let store;
+    const render = async additions => { await act(async () => { store = root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, ...additions }))); }); };
+    await render({});
+    const state = store.getState(), camera = state.camera, control = state.controls;
+    let timeline = 0;
+    const advance = async (frames = 120) => { await act(async () => { for (let n = 0; n < frames; n++) state.advance(timeline += 1 / 60, false); }); };
+    camera.position.set(0, 1.6, 30); control.target.set(0, 0, 0); camera.lookAt(control.target); control.update();
+    const surfacePose = readCameraPose(camera, control.target);
+    await render({ groundHeight: -3.8 });
+    vectorClose(camera.position, surfacePose.position.clone().add(new THREE.Vector3(0, -3.8, 0)));
+    vectorClose(control.target, surfacePose.target.clone().add(new THREE.Vector3(0, -3.8, 0)));
+    close(camera.quaternion.angleTo(surfacePose.quaternion), 0, 1e-7);
+    await render({ groundHeight: 0 });
+    vectorClose(camera.position, surfacePose.position); vectorClose(control.target, surfacePose.target);
+    await render({ groundHeight: -3.8 });
+    wheelEvent(canvas, -100000); await advance();
+    close(camera.position.y, -2.2);
+    assert.ok(camera.position.z < -1000, 'Underground forward movement is free along its own floor');
+    await render({ groundHeight: -3.8, command: { type: 'reset', sequence: 1 } }); await advance();
+    close(control.target.y, -3.8);
+    const undergroundPose = readCameraPose(camera, control.target);
+    const preview = { ...photo, position: { ...photo.position, height: -6.2 } };
+    await render({ groundHeight: -3.8, preview }); await advance(10);
+    await render({ groundHeight: 0, preview }); await advance();
+    const calibrated = photoCameraPose(preview, -6.2, camera.aspect);
+    vectorClose(camera.position, calibrated.position); vectorClose(control.target, calibrated.target);
+    close(camera.quaternion.angleTo(calibrated.quaternion), 0, 1e-7); close(camera.fov, calibrated.fov); close(camera.near, calibrated.near);
+    await render({ groundHeight: 0 }); await advance();
+    vectorClose(camera.position, undergroundPose.position.clone().add(new THREE.Vector3(0, 3.8, 0)));
+    vectorClose(control.target, undergroundPose.target.clone().add(new THREE.Vector3(0, 3.8, 0)));
+    close(camera.quaternion.angleTo(undergroundPose.quaternion), 0, 1e-7);
+    close(camera.fov, undergroundPose.fov); close(camera.near, undergroundPose.near);
+    assert.equal(control.enabled, true);
+    await render({ groundHeight: 0, preview }); await advance();
+    await render({ groundHeight: -3.8, preview }); await advance();
+    await render({ groundHeight: -3.8 }); await advance(15);
+    const interruptedPosition = camera.position.clone();
+    wheelEvent(canvas, 0);
+    vectorClose(camera.position, interruptedPosition.clone().add(new THREE.Vector3(0, -3.8, 0)));
+    await advance();
+    vectorClose(camera.position, interruptedPosition.clone().add(new THREE.Vector3(0, -3.8, 0)));
+    close(camera.fov, undergroundPose.fov); close(camera.near, undergroundPose.near);
+  } finally {
+    if (root) await act(async () => root.unmount());
+    globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
+    await environment.close();
+  }
+});
+
 test('photo details, lightbox and draft preview expose enter/return actions, explain unavailable states and carry the transition overlay', async () => {
   const environment = await testServer();
   try {

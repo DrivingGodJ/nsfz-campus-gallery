@@ -18,7 +18,7 @@ const vertexShader = `
 const fragmentShader = `
   varying vec3 skyDirection;
   uniform vec3 zenith, horizon, ground, glow, clouds, celestial, celestialDirection;
-  uniform float stars, moon, cloudAmount;
+  uniform float stars, moon, cloudAmount, celestialAmount;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float noise(vec2 p) {
     vec2 i = floor(p), f = fract(p);
@@ -31,7 +31,7 @@ const fragmentShader = `
     float elevation = max(dir.y, 0.0);
     vec3 color = mix(horizon, zenith, pow(smoothstep(0.0, 1.0, elevation), .48));
     float facing = max(dot(dir, normalize(celestialDirection)), 0.0);
-    color = mix(color, glow, pow(facing, 12.0) * (1.0 - moon) * .46);
+    color = mix(color, glow, pow(facing, 12.0) * (1.0 - moon) * .46 * celestialAmount);
 
     // Soft, stationary cloud banks: no texture download or ongoing animation.
     vec2 cloudUV = dir.xz / (elevation + .3) * 3.0;
@@ -52,10 +52,10 @@ const fragmentShader = `
 
     float disk = smoothstep(cos(.012), cos(.009), facing);
     float halo = pow(facing, 700.0) * mix(.16, .035, moon);
-    color += celestial * halo;
+    color += celestial * halo * celestialAmount;
     // A restrained moon surface gives the night disk some depth.
     float lunarShade = .8 + .2 * noise(dir.xz * 600.0);
-    color = mix(color, celestial * mix(1.0, lunarShade, moon), disk);
+    color = mix(color, celestial * mix(1.0, lunarShade, moon), disk * celestialAmount);
 
     // A level horizon and matching lower hemisphere continue the finite map
     // ground without adding geometry over underground spaces or photo points.
@@ -66,13 +66,13 @@ const fragmentShader = `
 `;
 
 const colorNames = ['zenith', 'horizon', 'ground', 'glow', 'clouds', 'celestial'] as const;
-const numberNames = ['stars', 'moon', 'cloudAmount'] as const;
+const numberNames = ['stars', 'moon', 'cloudAmount', 'celestialAmount'] as const;
 type SkyColors = Record<typeof colorNames[number], THREE.Color>;
 type SkyColorUniforms = Record<typeof colorNames[number], THREE.IUniform<THREE.Color>>;
 type SkyNumberUniforms = Record<typeof numberNames[number], THREE.IUniform<number>>;
 
-export default function SkyEnvironment({ theme, season, time }: { theme: Theme; season: PhotoSeason | ''; time: PhotoTime | '' }) {
-  const environment = useMemo(() => skyEnvironment(theme, season, time), [theme, season, time]);
+export default function SkyEnvironment({ theme, season, time, underground = false }: { theme: Theme; season: PhotoSeason | ''; time: PhotoTime | ''; underground?: boolean }) {
+  const environment = useMemo(() => skyEnvironment(theme, season, time, underground), [theme, season, time, underground]);
   const dome = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.ShaderMaterial>(null);
   const ambient = useRef<THREE.AmbientLight>(null), sunlight = useRef<THREE.DirectionalLight>(null);

@@ -42,6 +42,18 @@ test('the four skies are distinct, with low morning/evening sun and a night moon
   assert.equal(SKY_PALETTES.night.moon, 1);
 });
 
+test('underground views replace sky objects with a neutral soil horizon and restore the selected sky', () => {
+  for (const theme of ['light', 'dark']) for (const period of ['dawn', 'day', 'dusk', 'night']) {
+    const surface = skyEnvironment(theme, 'autumn', period), underground = skyEnvironment(theme, 'autumn', period, true);
+    assert.equal(underground.period, period);
+    assert.equal(underground.stars, 0); assert.equal(underground.moon, 0);
+    assert.equal(underground.cloudAmount, 0); assert.equal(underground.celestialAmount, 0);
+    assert.notEqual(underground.zenith, surface.zenith); assert.notEqual(underground.ground, surface.ground);
+    assert.deepEqual(skyEnvironment(theme, 'autumn', period, false), surface);
+    assert.equal(surface.celestialAmount, 1);
+  }
+});
+
 test('the camera-centred dome fits the clipping range at both near and distant viewpoints', () => {
   for (const [near, far] of [[.5, 4000], [.1, 500], [1, 10000]]) {
     const radius = skyDomeRadius(near, far);
