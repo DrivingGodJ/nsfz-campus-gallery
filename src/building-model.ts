@@ -6,7 +6,8 @@ export function buildingLevels(building: Building, override?: BuildingOverride) 
   const baseHeight = baseFloors * floorHeight;
   const sections = (building.parts?.length ? building.parts : [{ id: 'main', name: building.name, outer: building.outer, holes: building.holes }]).map(part => {
     const floors = part.id === 'main' ? baseFloors : override?.partFloors?.[part.id] ?? part.floors ?? baseFloors;
-    return { ...part, floors, height: floors * floorHeight };
+    // A walkable roof meets the next storey's floor slab, including its thickness.
+    return { ...part, floors, height: floors * floorHeight + (part.roofTerrace ? Math.min(.25, floorHeight * .1) : 0) };
   });
   return { baseFloors, floorHeight, baseHeight, baseElevation: building.baseElevation ?? 0, sections,
     floors: Math.max(...sections.map(part => part.floors)),

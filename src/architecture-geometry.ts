@@ -69,7 +69,10 @@ function outsideOpenings(from: Point, to: Point, openings: Shape[]): [Point, Poi
 export function teachingRailGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
   const parts: THREE.BufferGeometry[] = [];
   const groundOpenings = (building.groundPassages || []).map(passageShape);
-  for (const corridor of building.floorCorridors || []) {
+  const corridors = [...(building.floorCorridors || []), ...sections.filter(section => section.roofTerrace).map(section => ({
+    partId: section.id, depth: 0, startFloor: section.floors + 1, points: [] as Point[], railEdges: section.roofTerrace!.railEdges, rooftop: true,
+  }))];
+  for (const corridor of corridors) {
     const section = sections.find(section => section.id === corridor.partId);
     if (!section || 'passageIndex' in corridor) continue;
     const ring = 'holeIndex' in corridor ? section.holes[corridor.holeIndex] : section.outer;
@@ -77,9 +80,10 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
     const segments = 'points' in corridor ? (corridor.railEdges || []).flatMap(points => points.slice(1).map((to, i) => [points[i], to])) : edges.map(edge => [ring[edge], ring[edge + 1]]);
     const area = ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0);
     const inset = 'points' in corridor ? -.09 : .09 * (area >= 0 ? 1 : -1) * ('holeIndex' in corridor ? 1 : -1);
-    const height = Math.min(section.height, cutawayHeight ?? section.height);
+    const rooftop = 'rooftop' in corridor;
+    const height = Math.min(section.height + (rooftop ? floorHeight : 0), cutawayHeight ?? Infinity);
     for (let floor = (corridor.startFloor ?? 2) - 1; floor * floorHeight + 1.3 < height; floor++) {
-      const y = BASE + floor * floorHeight + .25;
+      const y = BASE + (rooftop ? section.height : floor * floorHeight + .25);
       const posts = new Map<string, Point>();
       for (const [a, b] of segments) {
         const length = Math.hypot(b[0] - a[0], b[1] - a[1]);

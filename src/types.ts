@@ -4,7 +4,7 @@ import { assetURL } from './asset-url';
 
 export type Point = [number, number];
 export type Shape = { outer: Point[]; holes: Point[][] };
-export type BuildingPart = Shape & { id: string; name: string; floors?: number };
+export type BuildingPart = Shape & { id: string; name: string; floors?: number; roofTerrace?: { railEdges: Point[][] } };
 export type GlassPavilion = { type: 'glass-pavilion'; center: Point; radius: number; canopyRadius: number; canopyStartAngle: number; canopySweep: number; rearDepth?: number };
 export type GroundPassage = { id: string; sourcePathId: string; points: Point[]; width: number };
 export type FloorCorridor = { partId: string; depth: number; startFloor?: number; footprint?: Shape; slabInfill?: Shape } & ({ edge: number } | { edges: number[] } | { holeIndex: number } | { passageIndex: number } | { points: Point[]; railEdges?: Point[][] });

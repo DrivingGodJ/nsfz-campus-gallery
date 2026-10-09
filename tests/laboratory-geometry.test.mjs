@@ -127,7 +127,7 @@ test('the white connection is part of the theatre outline, with the recess road 
   const info = buildingLevels(theatre), connection = info.sections.find(p => p.id === 'laboratory-connection');
   assert.equal(connection.floors, 4);
   const main = info.sections.find(p => p.id === 'main');
-  assert.deepEqual(polygonClipping.union([main.outer, ...main.holes], [connection.outer, ...connection.holes]), polygonClipping.union([theatre.outer, ...theatre.holes]));
+  assert.deepEqual(polygonClipping.union(...info.sections.map(part => [part.outer, ...part.holes])), polygonClipping.union([theatre.outer, ...theatre.holes]));
   assert.ok(connection.outer.some(p => p[0] === wall[3][0] && p[1] === wall[3][1]));
   const { at } = laboratoryLayout(building), body = laboratoryBodyGeometry(building, 21.6, 3.6), target = mesh(body, true);
   const markedArea = { outer: [at(-14,22), at(-12,22), at(-12,23), at(-14,23), at(-14,22)], holes: [] };
