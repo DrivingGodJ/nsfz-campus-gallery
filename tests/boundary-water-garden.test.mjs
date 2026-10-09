@@ -4,12 +4,17 @@ import fs from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import { boundaryWaterGardenGeometry } from '../src/boundary-water-garden.ts';
 import { groundSurfaces } from '../src/ground-geometry.ts';
+import { campusLocations, campusFilterLocations } from '../src/locations.ts';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 
 test('boundary pond stays inside the campus, cuts the ground and keeps its photographed waterfall and plants in bounded batches', async () => {
   const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   const pond = campus.features.find(f => f.id === 'local/boundary-water-garden');
+  const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
+  for (const locations of [campusLocations(campus, site), campusFilterLocations(campus, site)]) {
+    assert.ok(!locations.some(location => location.id === pond.id), 'The scenery is not offered as a selectable destination');
+  }
   const previous = { ...campus, features: campus.features.filter(f => f.id !== pond.id) };
   assert.deepEqual(applyCampusCorrections(previous, corrections).features.find(f => f.id === pond.id), pond);
   assert.deepEqual(polygonClipping.difference([pond.outer], [campus.boundary]), [], 'The pool sits inside the unchanged campus border');
