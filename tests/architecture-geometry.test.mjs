@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as THREE from 'three';
-import { GYM_ID, gymArchitecture, teachingRailGeometry } from '../src/architecture-geometry.ts';
+import { GYM_ID, architectureBatch, classroomGlazingGeometry, gymArchitecture, teachingRailGeometry, teachingWindowGeometry } from '../src/architecture-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
+import { cafeteriaLowerProfile, cafeteriaLowerWindowsConfig, cafeteriaUpperWindows } from '../src/facade-geometry.ts';
 import { GYM_WALL, gymFrame, gymStairLayout } from '../src/gym-interior.ts';
 import { bridgeHeight } from '../src/structure-geometry.ts';
 
@@ -21,6 +22,48 @@ const mesh = (geometry, extrusion = false) => {
 const dispose = model => Object.values(model).forEach(geometry => geometry.dispose());
 const entryLevel = (building, floorHeight) => bridgeHeight(bridge, [building], {
   [building.id]: { name: building.name, floors: 4, floorHeight }
+});
+
+test('cafeteria floor cutaways merge real lower windows with empty upper batches without losing geometry or photo masks', () => {
+  const cafeteria = campus.buildings.find(building => building.facade?.type === 'cafeteria');
+  const original = JSON.stringify([cafeteria, site]), info = buildingLevels(cafeteria, site.buildingOverrides[cafeteria.id]);
+  for (const floor of [1, 2, undefined]) for (const reversed of [false, true]) {
+    const visibleHeight = floor ? floor * info.floorHeight : info.height, boundary = Math.min(visibleHeight, 2 * info.floorHeight);
+    const shape = cafeteriaLowerProfile(cafeteria).shape, config = cafeteriaLowerWindowsConfig(cafeteria, info.floorHeight);
+    const lower = teachingWindowGeometry({ ...cafeteria, ...shape, classroomWindows: config }, [{ ...info.sections[0], ...shape, height: boundary }], info.floorHeight);
+    const upper = classroomGlazingGeometry(cafeteriaUpperWindows(cafeteria, Math.max(0, visibleHeight - boundary), info.floorHeight), cafeteria.classroomWindows);
+    for (const geometry of Object.values(upper)) geometry.translate(0, boundary, 0);
+    for (const kind of ['glass', 'frames']) {
+      assert.ok(lower[kind].getAttribute('position').count > 0);
+      assert.equal(upper[kind].getAttribute('position').count === 0, floor !== undefined, 'The real first- and second-floor paths omit all upper glazing');
+      const parts = reversed ? [upper[kind], lower[kind]] : [lower[kind], upper[kind]];
+      const occupied = parts.filter(part => part.getAttribute('position').count);
+      const positions = occupied.flatMap(part => Array.from(part.getAttribute('position').array));
+      const normals = occupied.flatMap(part => Array.from(part.getAttribute('normal').array));
+      let disposed = 0;
+      parts.forEach(part => part.addEventListener('dispose', () => disposed++));
+      const merged = architectureBatch(parts, false);
+      try {
+        assert.deepEqual(Array.from(merged.getAttribute('position').array), positions, 'Empty batches never remove occupied panes or frames');
+        assert.deepEqual(Array.from(merged.getAttribute('normal').array), normals, 'The occupied geometry keeps its lighting normals');
+        assert.ok(positions.every(Number.isFinite));
+        assert.equal(merged.userData.photoOcclusionMask.length, positions.length / 9);
+        assert.ok(merged.userData.photoOcclusionMask.every(value => value === 0));
+        assert.equal(disposed, parts.length, 'Both occupied and empty inputs are released');
+      } finally { merged.dispose(); }
+    }
+  }
+  const empty = () => new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+  const parts = [empty(), empty()];
+  let disposed = 0;
+  parts.forEach(part => part.addEventListener('dispose', () => disposed++));
+  const merged = architectureBatch(parts, false);
+  try {
+    assert.equal(merged.getAttribute('position').count, 0);
+    assert.equal(merged.userData.photoOcclusionMask.length, 0);
+    assert.equal(disposed, parts.length);
+  } finally { merged.dispose(); }
+  assert.equal(JSON.stringify([cafeteria, site]), original, 'Floor selection never alters saved model or photo data');
 });
 
 test('walkway guard rails follow both courtyard rings, respect floor cutaways, and never hide photos', () => {

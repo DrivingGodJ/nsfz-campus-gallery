@@ -14,7 +14,7 @@ const BASE = .12;
 const lerp = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
 function combined(parts: THREE.BufferGeometry[], photoBlocking = true) {
-  const plain = parts.map(part => {
+  const plain = parts.filter(part => part.getAttribute('position')?.count).map(part => {
     const geometry = part.index ? part.toNonIndexed() : part.clone();
     geometry.deleteAttribute('uv');
     return geometry;
