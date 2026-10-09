@@ -27,3 +27,11 @@ export function isPhotoOccluder(mesh: THREE.Mesh) {
   return mesh.visible && !!mesh.parent && (Array.isArray(mesh.material) ? mesh.material : [mesh.material])
     .some(material => !material.transparent && material.depthWrite);
 }
+
+export function isOwnBuildingOccluder(mesh: THREE.Mesh, buildingId?: string) {
+  if (!buildingId) return false;
+  for (let parent: THREE.Object3D | null = mesh; parent; parent = parent.parent) {
+    if (parent.userData.photoOccluder && parent.userData.buildingId === buildingId) return true;
+  }
+  return false;
+}

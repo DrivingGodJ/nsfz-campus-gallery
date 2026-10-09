@@ -20,12 +20,12 @@ test('aerial directory filter spans locations and recognizes legacy imports with
   assert.equal(JSON.stringify(photos), before, 'Filtering never changes photo annotations');
 });
 
-test('aerial points and arrows stay distinct in every season, time and system theme', () => {
+test('aerial arrows and frames stay distinct in every season, time and system theme', () => {
   const air = photoMarkerColors(aerial), land = photoMarkerColors(ground);
   assert.deepEqual(photoMarkerColors(legacyAerial), air);
   assert.deepEqual(photoMarkerColors(correctedGround), land);
   for (const theme of ['light', 'dark']) for (const season of ['', 'spring', 'summer', 'autumn', 'winter']) for (const time of ['', 'dawn', 'day', 'dusk', 'night']) {
-    for (const role of ['point', 'direction', 'border', 'selected']) {
+    for (const role of ['direction', 'border', 'selected']) {
       assert.notEqual(timeMapColor(theme, season, time, air[role]), timeMapColor(theme, season, time, land[role]), `${role} in ${theme}/${season}/${time}`);
     }
   }

@@ -98,7 +98,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     const distance = Math.hypot(camera.position.x - info.center[0], camera.position.y - info.baseElevation - height / 2, camera.position.z - info.center[1]);
     if (floorLineMaterial.current) floorLineMaterial.current.opacity = THREE.MathUtils.clamp((800 - distance) / 500, 0, 1);
   });
-  return <group position={[0, info.baseElevation, 0]} userData={{ photoOccluder: true }}>
+  return <group position={[0, info.baseElevation, 0]} userData={{ photoOccluder: true, buildingId: building.id }}>
     {building.appearance?.type === 'glass-pavilion' ? <group onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }} onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
       <HistoryPavilion building={building} height={height} color={color} selected={selected} cutaway={cutawayHeight !== undefined && cutawayHeight <= info.height + 1e-6} />
     </group> : <group
@@ -164,7 +164,7 @@ function Direction({ photo, editing = false, compact = false, onHeading, labelPo
     document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
   };
   const origin: [number, number, number] = [photo.position.x, photo.position.height + .4, photo.position.z];
-  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={photoPointPosition(photo)} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor(color) }} /></Html>}
+  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={photoPointPosition(photo)} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor(colors.point) }} /></Html>}
     {rays.length > 0 && <><mesh geometry={sector} position={origin} renderOrder={28} raycast={() => null}><meshBasicMaterial color={mapColor(color)} transparent opacity={.17} side={THREE.DoubleSide} depthTest={false} depthWrite={false} /></mesh><Line points={[origin, ...rays.map(p => p.map((n, i) => n + origin[i]) as [number, number, number]), origin]} color={mapColor(color)} lineWidth={1.5} depthTest={false} depthWrite={false} renderOrder={29} raycast={() => null} /></>}
     {editing && onHeading && <Html portal={labelPortal} center position={[photo.position.x + Math.sin(yaw) * 22, photo.position.height + 2, photo.position.z - Math.cos(yaw) * 22]} zIndexRange={[20, 19]}><button className="direction-handle" aria-label="拖动调整拍摄方向" title="拖动调整拍摄方向" onPointerDown={beginDrag} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); onHeading((photo.heading + (e.key === 'ArrowRight' ? 5 : 355)) % 360); } }}>↔</button></Html>}
   </group>;
@@ -190,7 +190,7 @@ export default function MapView(props: Props) {
   const atMapHeight = (photo: Photo): MapPhoto => {
     const height = photoMapHeight(photo, campus, site);
     const onStairs = !isAerialPhoto(photo) && campus.features.some(feature => feature.id === photoLocationId(photo, campus) && feature.type === 'tunnelEntrance' && feature.curvedStair);
-    return { ...photo, position: { ...photo.position, height }, pointHeight: onStairs ? photoMapHeight({ ...photo, cameraHeight: .1 }, campus, site) - .1 + .08 : undefined };
+    return { ...photo, locationId: photoLocationId(photo, campus), position: { ...photo.position, height }, pointHeight: onStairs ? photoMapHeight({ ...photo, cameraHeight: .1 }, campus, site) - .1 + .08 : undefined };
   };
   const photos = useMemo(() => props.photos.map(atMapHeight), [props.photos, campus, site]);
   const selectedPhoto = props.selectedPhoto ? atMapHeight(props.selectedPhoto) : null;
