@@ -5,7 +5,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import type { Photo } from './types';
 import { PhotoCameraTransition, photoCameraPose, readCameraPose } from './photo-camera';
-import { bindPhotoLookControls, type PhotoOrientation } from './photo-look-controls';
+import { bindPhotoLookControls, type PhotoOrientation, type PhotoViewAdjustment } from './photo-look-controls';
 import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, retargetMapPan, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
 import { aboveGroundMovement, keepMapCameraAboveGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
@@ -27,20 +27,23 @@ function stopOrbitMomentum(camera: THREE.Camera, control: OrbitControlsImpl) {
   camera.updateMatrixWorld();
 }
 
-export default function MapCameraRig({ command, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
+export default function MapCameraRig({ command, selectedObjectTarget, selectedObjectBounds, selected, preview, visibleViewport = FULL_MAP_VIEWPORT, canAdjustPhotoView = false, photoHeightRange, smoothPhotoFraming = false, onMoving, onCompact, onAzimuth, onPhotoOrientation, onSelectionOutOfView }: {
   selectedObjectTarget?: [number, number, number] | null;
   selectedObjectBounds?: MapObjectBounds | null;
   command: MapCommand; selected?: MapPhoto | null; preview: MapPhoto | null;
   canAdjustPhotoView?: boolean; smoothPhotoFraming?: boolean;
+  photoHeightRange?: { min: number; max: number };
   visibleViewport?: MapViewport;
   onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
-  onPhotoOrientation?: (orientation: PhotoOrientation) => void;
+  onPhotoOrientation?: (orientation: PhotoViewAdjustment) => void;
   onSelectionOutOfView?: () => void;
 }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const motion = useRef(new PhotoCameraTransition());
   const { camera, invalidate, size, gl, get, setEvents } = useThree();
   const look = useRef<(PhotoOrientation & { id: string; sourceHeading: number; sourcePitch: number }) | null>(null);
+  const positionChanged = useRef(false);
+  const heightChanged = useRef(false);
   const lastPoseKey = useRef('');
   const lastShotKey = useRef('');
   const objectTarget: [number, number, number] | null = selected ? [selected.position.x, selected.position.height, selected.position.z] : selectedObjectTarget ?? null;
@@ -49,8 +52,8 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
   const touchOrbit = useRef<{ rotate: boolean; pan: boolean } | null>(null);
   const objectBounds = selected ? null : selectedObjectBounds;
   const viewportKey = JSON.stringify(visibleViewport);
-  const live = useRef({ size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView });
-  live.current = { size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, onMoving, onPhotoOrientation, onSelectionOutOfView };
+  const live = useRef({ size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, photoHeightRange, onMoving, onPhotoOrientation, onSelectionOutOfView });
+  live.current = { size, objectTarget, objectBounds, objectKey, selected, visibleViewport, preview, photoHeightRange, onMoving, onPhotoOrientation, onSelectionOutOfView };
   const pendingFocus = useRef(false);
   const dismissedObjectKey = useRef('');
   const lastCompact = useRef(false), lastAzimuth = useRef(NaN), previousFit = useRef(0);
@@ -260,6 +263,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
       }
       lastPoseKey.current = poseKey;
       lastShotKey.current = shotKey;
+      if (!resizing) { positionChanged.current = false; heightChanged.current = false; }
       if (!motion.current.inPhotoView && !motion.current.moving) {
         // Flush residual orbit momentum before saving the view to return to.
         stopOrbitMomentum(camera, control);
@@ -297,7 +301,20 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
         motion.current.orient(camera, control.target, orientation.heading, orientation.pitch);
         invalidate();
       },
-      commit: orientation => live.current.onPhotoOrientation?.(orientation)
+      move: (forward, right, up) => {
+        const yaw = look.current!.heading * Math.PI / 180;
+        const range = live.current.photoHeightRange;
+        const vertical = up && range ? THREE.MathUtils.clamp(camera.position.y + up, range.min, range.max) - camera.position.y : 0;
+        const movement = new THREE.Vector3(Math.sin(yaw) * forward + Math.cos(yaw) * right, vertical,
+          -Math.cos(yaw) * forward + Math.sin(yaw) * right);
+        camera.position.add(movement); control.target.add(movement);
+        camera.updateMatrixWorld(); positionChanged.current = true; heightChanged.current ||= !!vertical; invalidate();
+      },
+      commit: orientation => {
+        const adjustment: PhotoViewAdjustment = positionChanged.current ? { ...orientation, position: { x: camera.position.x, z: camera.position.z, ...(heightChanged.current ? { height: camera.position.y } : {}) } } : orientation;
+        positionChanged.current = false; heightChanged.current = false;
+        live.current.onPhotoOrientation?.(adjustment);
+      }
     }) : undefined;
     return () => { unbind?.(); setEvents({ enabled: eventsEnabled }); };
   }, [preview?.id, canAdjustPhotoView, camera, gl, get, setEvents, invalidate]);

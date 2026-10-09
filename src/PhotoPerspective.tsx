@@ -8,9 +8,9 @@ export function PhotoPerspectiveButton({ photo, active, editor = false, compact 
   const issue = photoPerspectiveIssue(photo);
   return <div className="photo-perspective-action">
     <button type="button" className={'button full-width ' + (active ? 'secondary' : 'primary')} aria-pressed={active} onClick={onClick} disabled={disabled || (!active && !!issue)} title={issue || undefined}>
-      {active ? <ArrowLeft size={16} /> : <Camera size={16} />}{active ? '返回地图视角' : editor ? '照片视角 · 调整角度' : '进入照片视角'}
+      {active ? <ArrowLeft size={16} /> : <Camera size={16} />}{active ? '返回地图视角' : editor ? '照片视角 · 校准位置与角度' : '进入照片视角'}
     </button>
-    {(!compact || issue) && <p className="field-help">{issue || (editor ? '进入照片视角后，对照原图拖动模型，校准方向和仰俯角；松手后角度会同步到这张照片。' : '从拍摄位置查看校园，镜头与照片保存的方向一致。')}</p>}
+    {(!compact || issue) && <p className="field-help">{issue || (editor ? '拖动模型校准方向和仰俯角；W/S 前后、A/D 左右、↑/↓ 高度，每次 0.1 米，Shift 为 0.5 米。点击模型后可继续使用键盘，松开后同步位置与角度。' : '从拍摄位置查看校园，镜头与照片保存的方向一致。')}</p>}
   </div>;
 }
 

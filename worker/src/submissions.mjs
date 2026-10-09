@@ -27,6 +27,7 @@ export function validateAnnotation(input, campus) {
   const captureType = p.captureType;
   if (!['ground','aerial'].includes(captureType)) throw new SubmissionError('拍摄方式无效。');
   if (!Number.isInteger(p.floor) || (captureType === 'ground' && buildingId ? p.floor < 1 || p.floor > 50 : p.floor !== 0)) throw new SubmissionError('楼层无效。');
+  if (p.cameraHeight !== undefined && (!Number.isFinite(p.cameraHeight) || p.cameraHeight < .1 || p.cameraHeight > 11.9)) throw new SubmissionError('拍摄高度需在 0.1 到 11.9 米之间。');
   const x = p.position?.x, z = p.position?.z;
   const [xmin,xmax,zmin,zmax] = campus.bounds;
   if (!Number.isFinite(x) || !Number.isFinite(z) || x < xmin || x > xmax || z < zmin || z > zmax) throw new SubmissionError('拍摄位置超出校园范围。');
@@ -49,7 +50,7 @@ export function validateAnnotation(input, campus) {
     view.cropFactor = p.view.cropFactor;
   }
   return { title, description: text(p.description || '', 10000, '描述'), capturedAt, locationId, buildingId, floor: p.floor,
-    captureType, ...(altitude ? { altitude } : {}), position: { x, z }, heading: p.heading % 360, pitch: p.pitch, placed: true,
+    captureType, ...(altitude ? { altitude } : {}), ...(p.cameraHeight !== undefined ? { cameraHeight: p.cameraHeight } : {}), position: { x, z }, heading: p.heading % 360, pitch: p.pitch, placed: true,
     author: text(p.author || '', 200, '作者'), copyright: text(p.copyright || '', 3000, '版权'), view };
 }
 /** @param {string} value */

@@ -25,7 +25,7 @@ import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from '.
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
 import { groundSurfaces } from './ground-geometry';
 import { passageFootprint } from './underground-geometry';
-import { isAerialPhoto, photoLocationId, photoMapHeight } from './locations';
+import { isAerialPhoto, photoCameraHeightRange, photoLocationId, photoMapHeight } from './locations';
 import { mapLocationTarget } from './location-geometry';
 import { photoPlacementPoint } from './photo-placement';
 import PhotoMarkers from './PhotoMarkers';
@@ -36,7 +36,7 @@ import MapCameraRig, { OVERVIEW_POSITION, type MapCommand, type MapPhoto } from 
 import { photoPerspectiveIssue } from './photo-perspective';
 import PhotoOverlay from './PhotoOverlay';
 import type { PhotoOverlayMode } from './photo-overlay';
-import type { PhotoOrientation } from './photo-look-controls';
+import type { PhotoViewAdjustment } from './photo-look-controls';
 import type { PhotoTime } from './photo-time';
 import SkyEnvironment from './SkyEnvironment';
 import { photoSkyTime, skyTime } from './sky-environment';
@@ -52,7 +52,7 @@ type Props = {
   season?: PhotoSeason | '';
   time?: PhotoTime | '';
   placing?: boolean; onPlace?: (point: { x: number; z: number }) => void; editPhoto?: Photo | null; onHeading?: (heading: number) => void;
-  photoPreview?: boolean; photoPerspective?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoOrientation) => void; photoImageSource?: string; photoDepthSource?: string;
+  photoPreview?: boolean; photoPerspective?: boolean; photoViewDisabled?: boolean; onExitPhotoPerspective?: () => void; onPhotoOrientation?: (orientation: PhotoViewAdjustment) => void; photoImageSource?: string; photoDepthSource?: string;
   smoothPhotoFraming?: boolean;
   photoOverlayMode?: PhotoOverlayMode; onPhotoOverlayEntered?: () => void; onPhotoOverlayExited?: () => void;
   visibleViewport?: MapViewport;
@@ -190,11 +190,27 @@ export default function MapView(props: Props) {
   const atMapHeight = (photo: Photo): MapPhoto => {
     const height = photoMapHeight(photo, campus, site);
     const onStairs = !isAerialPhoto(photo) && campus.features.some(feature => feature.id === photoLocationId(photo, campus) && feature.type === 'tunnelEntrance' && feature.curvedStair);
-    return { ...photo, position: { ...photo.position, height }, pointHeight: onStairs ? height - 1.6 + .08 : undefined };
+    return { ...photo, position: { ...photo.position, height }, pointHeight: onStairs ? photoMapHeight({ ...photo, cameraHeight: .1 }, campus, site) - .1 + .08 : undefined };
   };
   const photos = useMemo(() => props.photos.map(atMapHeight), [props.photos, campus, site]);
   const selectedPhoto = props.selectedPhoto ? atMapHeight(props.selectedPhoto) : null;
   const editPhoto = props.editPhoto ? atMapHeight(props.editPhoto) : null;
+  const cameraHeightRange = props.editPhoto ? photoCameraHeightRange(props.editPhoto, campus, site) : null;
+  const cameraHeight = props.editPhoto && cameraHeightRange ? THREE.MathUtils.clamp(props.editPhoto.cameraHeight ?? 1.6, cameraHeightRange.min, cameraHeightRange.max) : 1.6;
+  const floorBase = editPhoto ? editPhoto.position.height - cameraHeight : 0;
+  const photoHeightRange = editPhoto && cameraHeightRange ? isAerialPhoto(editPhoto)
+    ? editPhoto.altitude?.reference === 'takeoff' ? { min: -12000, max: 100000 } : undefined
+    : { min: floorBase + cameraHeightRange.min, max: floorBase + cameraHeightRange.max } : undefined;
+  const adjustPhotoView = (adjustment: PhotoViewAdjustment) => {
+    if (!props.editPhoto || !adjustment.position) { props.onPhotoOrientation?.(adjustment); return; }
+    const { x, z, height } = adjustment.position;
+    const update: PhotoViewAdjustment = { heading: adjustment.heading, pitch: adjustment.pitch, position: { ...props.editPhoto.position, x, z } };
+    if (height !== undefined && cameraHeightRange) {
+      if (isAerialPhoto(props.editPhoto)) update.altitude = { meters: height, reference: 'takeoff' };
+      else update.cameraHeight = THREE.MathUtils.clamp(height - floorBase, cameraHeightRange.min, cameraHeightRange.max);
+    }
+    props.onPhotoOrientation?.(update);
+  };
   // Display heights are derived; callbacks always return the original persisted record.
   const selectPhoto = (photo: Photo) => props.onSelectPhoto?.(props.photos.find(item => item.id === photo.id) || photo);
   const [command, setCommand] = useState<MapCommand>({ type: 'initial', sequence: 0 });
@@ -263,7 +279,7 @@ export default function MapView(props: Props) {
         {!viewingPhoto && <PhotoMarkers occlusionRevision={[selectedLocation, cutawayFloor, underground].join(':')} photos={photos} photoLikes={props.photoLikes} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
-      </group><MapCameraRig command={command} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto} smoothPhotoFraming={props.smoothPhotoFraming} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={props.onPhotoOrientation} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>
+      </group><MapCameraRig command={command} selectedObjectTarget={selectedObject?.target} selectedObjectBounds={selectedObject?.bounds} selected={selectedPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto && !props.photoViewDisabled} photoHeightRange={photoHeightRange} smoothPhotoFraming={props.smoothPhotoFraming} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={adjustPhotoView} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>
     </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button><span /><button className="icon-button" onClick={() => setUnderground(!underground)} aria-pressed={underground} aria-label="显示地下空间" title="地下通道、走廊、风雨跑道与羽毛球场"><Layers size={18} /></button></div>}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}

@@ -9,9 +9,10 @@ const MAX_MANIFEST_BYTES = MAX_PACKAGE_PHOTOS * 64 * 1024;
 export const MAX_PACKAGE_BYTES = MAX_PACKAGE_ORIGINAL_BYTES + MAX_MANIFEST_BYTES + 64 * 1024;
 const extensions = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' };
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-const annotationFields = ['title', 'description', 'capturedAt', 'locationId', 'buildingId', 'floor', 'captureType', 'altitude', 'position', 'heading', 'pitch', 'placed', 'author', 'copyright', 'view'];
+const annotationFields = ['title', 'description', 'capturedAt', 'locationId', 'buildingId', 'floor', 'captureType', 'altitude', 'cameraHeight', 'position', 'heading', 'pitch', 'placed', 'author', 'copyright', 'view'];
 
 export function packageAnnotation(photo) {
+  if (photo.cameraHeight !== undefined && (!Number.isFinite(photo.cameraHeight) || photo.cameraHeight < .1 || photo.cameraHeight > 11.9)) throw new Error('拍摄高度需在 0.1 到 11.9 米之间。');
   const annotation = Object.fromEntries(annotationFields.filter(key => photo[key] !== undefined).map(key => [key, photo[key]]));
   annotation.position = { x: photo.position?.x, z: photo.position?.z };
   return annotation;

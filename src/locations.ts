@@ -51,21 +51,28 @@ export const isAerialPhoto = (photo: Photo) => photo.captureType === 'aerial' ||
 export const AERIAL_LOCATION_FILTER = 'capture/aerial';
 export const altitudeLabel = (photo: Photo) => photo.altitude?.reference === 'seaLevel' ? '拍摄海拔' : '航拍高度（相对起飞点）';
 
+export function photoCameraHeightRange(photo: Photo, campus: Campus, site: Site) {
+  const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
+  return { min: .1, max: (building ? buildingLevels(building, site.buildingOverrides[id]).floorHeight : 3.6) - .1 };
+}
+
 export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {
   if (isAerialPhoto(photo)) {
     // Sea-level altitude cannot be converted to campus-relative height without a ground datum.
     return photo.altitude?.reference === 'takeoff' ? photo.altitude.meters : 1.6;
   }
+  const range = photoCameraHeightRange(photo, campus, site);
+  const cameraHeight = Math.min(range.max, Math.max(range.min, Number.isFinite(photo.cameraHeight) ? photo.cameraHeight! : 1.6));
   const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
   if (building) {
     const info = buildingLevels(building, site.buildingOverrides[id]);
-    return info.baseElevation + (Math.max(1, photo.floor) - 1) * info.floorHeight + 1.6;
+    return info.baseElevation + (Math.max(1, photo.floor) - 1) * info.floorHeight + cameraHeight;
   }
   const feature = campus.features.find(f => f.id === id);
-  if (!feature) return groundElevationAt(campus, [photo.position.x, photo.position.z]) + 1.6;
+  if (!feature) return groundElevationAt(campus, [photo.position.x, photo.position.z]) + cameraHeight;
   const surface = featureSurfaceHeight(feature, campus, site);
-  if (feature.type === 'tunnelEntrance' && feature.curvedStair) return curvedStairSurfaceHeight(feature.curvedStair, [photo.position.x, photo.position.z]) + 1.6;
-  return (feature.type === 'bridge' ? bridgeSurfaceHeight(feature, surface, [photo.position.x, photo.position.z]) : surface) + 1.6;
+  if (feature.type === 'tunnelEntrance' && feature.curvedStair) return curvedStairSurfaceHeight(feature.curvedStair, [photo.position.x, photo.position.z]) + cameraHeight;
+  return (feature.type === 'bridge' ? bridgeSurfaceHeight(feature, surface, [photo.position.x, photo.position.z]) : surface) + cameraHeight;
 }
 
 export function samePhotoSpot(a: Photo, b: Photo, campus: Campus, site: Site) {
@@ -93,7 +100,7 @@ export function assignPhotoLocation(photo: Photo, id: string, campus: Campus, si
   const location = campusLocations(campus, site).find(item => item.id === id);
   if (id && !location) throw new Error('找不到所选拍摄地点，请重新选择。');
   return { ...photo, locationId: id, buildingId: location?.building?.id || '', floor: !isAerialPhoto(photo) && location?.building ? 1 : 0,
-    position: { x: photo.position.x, z: photo.position.z } };
+    cameraHeight: undefined, position: { x: photo.position.x, z: photo.position.z } };
 }
 
 export function photosAtLocation(photos: Photo[], id: string, floor = 0, campus?: Campus) {

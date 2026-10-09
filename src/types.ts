@@ -42,6 +42,7 @@ export type Photo = {
   id: string; title: string; description: string; capturedAt: string; buildingId: string; locationId?: string; floor: number;
   captureType?: 'ground' | 'aerial';
   altitude?: { meters: number; reference: 'takeoff' | 'seaLevel' };
+  cameraHeight?: number; // Meters above the selected floor or ground surface; defaults to 1.6.
   // height is accepted only for old records; new ordinary photos store their floor.
   position: { x: number; z: number; height?: number }; heading: number; pitch: number; placed: boolean;
   width: number; height: number; downloadBytes: number;

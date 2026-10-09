@@ -424,7 +424,8 @@ test('photo details, lightbox and draft preview expose enter/return actions, exp
     assert.match(render(Lightbox,{photo:renditions,onClose(){}}), /href="[^\"]*full\.jpg" download=/);
     assert.match(details, /进入照片视角/); assert.match(details, /aria-pressed="false"/);
     assert.match(render(Lightbox, { photo, onClose() {}, onPhotoPerspective() {} }), /进入照片视角/);
-    assert.match(render(PhotoPerspectiveButton, { photo, active: false, editor: true, onClick() {} }), /照片视角 · 调整角度/);
+    const editorAction = render(PhotoPerspectiveButton, { photo, active: false, editor: true, onClick() {} });
+    assert.match(editorAction, /照片视角 · 校准位置与角度/); assert.match(editorAction, /W\/S 前后、A\/D 左右、↑\/↓ 高度/);
     const unavailable = render(PhotoPerspectiveButton, { photo: { ...photo, placed: false }, active: false, editor: true, onClick() {} });
     assert.match(unavailable, /disabled=""/); assert.match(unavailable, /先在地图标记/);
     const active = render(PhotoPerspectiveButton, { photo, active: true, onClick() {} });
@@ -608,6 +609,128 @@ test('real camera rig suspends orbit controls during photo transitions, responds
     await act(async () => { state.advance(timeline += 1 / 60, false); });
     close(camera.position.y, 1.6);
 
+  } finally {
+    if (root) await act(async () => root.unmount());
+    globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;
+    await environment.close();
+  }
+});
+
+test('real photo editing moves in the live view, clamps height within its floor, commits atomically and releases keyboard control', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window, previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const canvas = testCanvas(), committed = [], windowEvents = new EventTarget();
+  canvas.ownerDocument.defaultView = windowEvents;
+  const gl = { domElement: canvas, render() {}, setSize() {}, setPixelRatio() {}, shadowMap: {}, xr: { addEventListener() {}, removeEventListener() {} } };
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let root;
+  try {
+    const { default: Rig } = await environment.server.ssrLoadModule('/src/MapCameraRig.tsx');
+    globalThis.window = { devicePixelRatio: 1, navigator: globalThis.navigator, matchMedia: () => ({ matches: false }) };
+    root = createRoot(canvas);
+    await root.configure({ gl, size: { width: 900, height: 600, top: 0, left: 0 }, frameloop: 'never', camera: { position: [-240, 340, -380], fov: 43, near: .5, far: 2000 } });
+    const props = { command: { type: 'initial', sequence: 0 }, selected: null, canAdjustPhotoView: true,
+      photoHeightRange: { min: 8.3, max: 11.7 }, onCompact() {}, onAzimuth() {}, onMoving() {}, onPhotoOrientation: adjustment => committed.push(adjustment) };
+    let preview = null, store, timeline = 0;
+    const render = async (extra = {}) => { await act(async () => { store = root.render(React.createElement(React.StrictMode, null, React.createElement(Rig, { ...props, preview, ...extra }))); }); };
+    await render();
+    const state = store.getState(), camera = state.camera, control = state.controls, original = readCameraPose(camera, control.target);
+    const advance = async () => { await act(async () => { for (let n = 0; n < 65; n++) state.advance(timeline += 1 / 60, false); }); };
+    const key = (type, name, extra = {}, target = canvas) => {
+      const event = new Event(type, { cancelable: true });
+      Object.assign(event, { key: name, code: /^[wasd]$/i.test(name) ? 'Key' + name.toUpperCase() : name, ...extra });
+      target.dispatchEvent(event); return event;
+    };
+    const accept = async () => {
+      const adjustment = committed.at(-1);
+      preview = { ...preview, ...adjustment, position: { ...preview.position, ...adjustment.position } };
+      await render();
+    };
+    const assertView = (x, y, z, heading = preview.heading, pitch = preview.pitch) => {
+      vectorClose(camera.position, new THREE.Vector3(x, y, z));
+      vectorClose(camera.getWorldDirection(new THREE.Vector3()), new THREE.Vector3(...directionVector(heading, pitch)));
+      vectorClose(control.target, camera.position.clone().addScaledVector(new THREE.Vector3(...directionVector(heading, pitch)), 20));
+    };
+
+    preview = { ...photo, heading: 0, pitch: 60, position: { ...photo.position, height: 9 } };
+    const source = JSON.stringify(preview);
+    await render();
+    assert.ok(camera.position.distanceTo(new THREE.Vector3(10, 9, -25)) > 1, 'Photo entry is still animating');
+    assert.equal(key('keydown', 'w').defaultPrevented, true);
+    assertView(10, 9, -25.1);
+    key('keydown', 'w', { repeat: true }); assertView(10, 9, -25.2);
+    assert.equal(committed.length, 0, 'Repeated movement reaches the camera before draft persistence');
+    await advance(); assertView(10, 9, -25.2);
+    key('keyup', 'w');
+    assert.equal(committed.length, 1); close(committed[0].position.x, 10); close(committed[0].position.z, -25.2);
+    assert.equal(JSON.stringify(preview), source, 'The camera never mutates the saved input record');
+    await accept(); assertView(10, 9, -25.2);
+
+    key('keydown', 's'); assertView(10, 9, -25.1);
+    key('keydown', 'a'); assertView(9.9, 9, -25.1);
+    key('keydown', 'D', { shiftKey: true }); assertView(10.4, 9, -25.1);
+    key('keyup', 's'); key('keyup', 'a'); assert.equal(committed.length, 1);
+    key('keyup', 'd'); assert.equal(committed.length, 2); await accept();
+
+    const sensitivity = 2 * Math.tan(camera.fov * Math.PI / 360) * 180 / Math.PI / 600;
+    pointerEvent(canvas, 'pointerdown');
+    pointerEvent(canvas, 'pointermove', { clientX: 100 + 90 / sensitivity });
+    key('keydown', 'w'); assertView(10.3, 9, -25.1, 270, 60);
+    key('keyup', 'w'); close(committed.at(-1).heading, 270); await accept();
+    pointerEvent(canvas, 'pointerup');
+
+    pointerEvent(canvas, 'pointerdown'); pointerEvent(canvas, 'pointermove', { clientX: 110 });
+    const liveHeading = 270 - 10 * sensitivity, beforeBlur = committed.length;
+    key('keydown', 'd');
+    const afterBlur = camera.position.clone();
+    canvas.dispatchEvent(new Event('blur'));
+    assert.equal(committed.length, beforeBlur + 1, 'A simultaneous drag and held movement commits one position-and-angle update');
+    close(committed.at(-1).heading, liveHeading);
+    close(committed.at(-1).position.x, afterBlur.x); close(committed.at(-1).position.z, afterBlur.z);
+    await accept(); assertView(afterBlur.x, 9, afterBlur.z);
+
+    const beforeHeight = committed.length;
+    for (let n = 0; n < 50; n++) key('keydown', 'ArrowUp', { repeat: n > 0 });
+    assertView(afterBlur.x, 11.7, afterBlur.z);
+    assert.equal(committed.length, beforeHeight);
+    key('keyup', 'ArrowUp'); close(committed.at(-1).position.height, 11.7); await accept();
+    for (let n = 0; n < 20; n++) key('keydown', 'ArrowDown', { shiftKey: true, repeat: n > 0 });
+    assertView(afterBlur.x, 8.3, afterBlur.z);
+    key('keyup', 'ArrowDown'); close(committed.at(-1).position.height, 8.3); await accept();
+    preview = { ...preview, position: { x: 20, z: -10, height: 10.1 } };
+    await render(); assertView(20, 10.1, -10);
+
+    key('keydown', 'w');
+    const resizedPosition = camera.position.clone();
+    await act(async () => { state.setSize(800, 600); });
+    key('keyup', 'w');
+    close(committed.at(-1).position.x, resizedPosition.x); close(committed.at(-1).position.z, resizedPosition.z);
+    await accept(); vectorClose(camera.position, resizedPosition);
+
+    const typingPosition = camera.position.clone(), typingCount = committed.length, input = new EventTarget();
+    for (const target of [input, canvas.ownerDocument, windowEvents]) {
+      assert.equal(key('keydown', 'w', {}, target).defaultPrevented, false);
+      key('keyup', 'w', {}, target);
+    }
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }, { isComposing: true }]) {
+      assert.equal(key('keydown', 'w', modifier).defaultPrevented, false);
+    }
+    vectorClose(camera.position, typingPosition); assert.equal(committed.length, typingCount);
+    key('keydown', 'a'); windowEvents.dispatchEvent(new Event('blur'));
+    assert.equal(committed.length, typingCount + 1); await accept();
+    key('keydown', 'd'); key('keydown', 'Escape');
+    assert.equal(committed.length, typingCount + 2); await accept();
+
+    await render({ canAdjustPhotoView: false });
+    const viewerPosition = camera.position.clone(), viewerCount = committed.length;
+    assert.equal(canvas.tabIndex, -1);
+    for (const name of ['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown']) {
+      assert.equal(key('keydown', name).defaultPrevented, false); key('keyup', name);
+    }
+    await advance(); vectorClose(camera.position, viewerPosition); assert.equal(committed.length, viewerCount);
+    preview = null; await render();
+    assert.equal(key('keydown', 'w').defaultPrevented, false); key('keyup', 'w');
+    await advance(); vectorClose(camera.position, original.position); vectorClose(control.target, original.target);
+    assert.equal(committed.length, viewerCount); assert.equal(canvas.tabIndex, -1);
   } finally {
     if (root) await act(async () => root.unmount());
     globalThis.window = previousWindow; globalThis.IS_REACT_ACT_ENVIRONMENT = previousAct;

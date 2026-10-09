@@ -6,8 +6,8 @@ export function newSubmissionSession():UploadSession {
   return {id:crypto.randomUUID(),receipt:[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('')};
 }
 export function photoAnnotation(p:Photo) {
-  const {title,description,capturedAt,locationId,buildingId,floor,captureType,altitude,position,heading,pitch,placed,author,copyright,view}=p;
-  return {title,description,capturedAt,locationId,buildingId,floor,captureType,altitude,position:{x:position.x,z:position.z},heading,pitch,placed,author,copyright,view};
+  const {title,description,capturedAt,locationId,buildingId,floor,captureType,altitude,cameraHeight,position,heading,pitch,placed,author,copyright,view}=p;
+  return {title,description,capturedAt,locationId,buildingId,floor,captureType,altitude,cameraHeight,position:{x:position.x,z:position.z},heading,pitch,placed,author,copyright,view};
 }
 export function createSubmissionsClient(baseURL:string,transport:typeof fetch=fetch) {
   const base=baseURL.replace(/\/+$/,'');
