@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import clip from 'polygon-clipping';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 import { curvedStairPoint, curvedStairTreads } from '../src/structure-geometry.ts';
-import { passageFootprint, undergroundLayout } from '../src/underground-geometry.ts';
+import { joinedPassages, passageFootprint, undergroundLayout } from '../src/underground-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const find = id => campus.features.find(feature => feature.id === id);
@@ -40,7 +40,13 @@ test('relocated stairs join the tunnel without a gap and keep the existing under
   for (const point of tunnel.points.slice(1)) close((point[0] - tunnel.points[0][0]) * route[1] - (point[1] - tunnel.points[0][1]) * route[0], 0);
   const layout = undergroundLayout(campus.features);
   assert.equal(layout.areas.get(tunnel.id).footprints.length, 1, 'The straight tunnel remains one connected surface');
-  assert.equal(layout.areas.get(tunnel.id).openings.length, 1, 'The exit remains open to its connected corridor');
+  const openings = layout.areas.get(tunnel.id).openings;
+  assert.equal(openings.length, 2, 'The tunnel has its original corridor exit and the stair entrance');
+  assert.deepEqual(openings[0], joinedPassages(tunnel, exit).seam, 'The original corridor exit remains open at the same seam');
+  const stairDoor = openings[1];
+  close((stairDoor[0][0] + stairDoor[1][0]) / 2, bottom[0]);
+  close((stairDoor[0][1] + stairDoor[1][1]) / 2, bottom[2]);
+  close(Math.hypot(stairDoor[1][0] - stairDoor[0][0], stairDoor[1][1] - stairDoor[0][1]), entrance.curvedStair.width);
 });
 
 test('all history hall terrace steps stay outside the road edge and survive map refresh', async () => {

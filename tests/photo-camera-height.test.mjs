@@ -60,6 +60,16 @@ test('local, package and cloud boundaries validate and retain the optional heigh
   }
 });
 
+test('underground photo height uses its venue floor and ceiling in both map and editing limits', () => {
+  const map = { ...campus, features: [{ id: 'underground-hall', type: 'undergroundRoom', height: -3.8, wallHeight: 6.2 }] };
+  const p = { ...photo, locationId: 'underground-hall', cameraHeight: 1.6 };
+  const range = photoCameraHeightRange(p, map, site);
+  assert.equal(range.min, .1);
+  assert.ok(Math.abs(range.max - 6.1) < 1e-9);
+  assert.ok(Math.abs(photoMapHeight(p, map, site) - -2.2) < 1e-9);
+  assert.ok(Math.abs(photoMapHeight({ ...p, cameraHeight: 10 }, map, site) - 2.3) < 1e-9, 'Height cannot cross the venue ceiling');
+});
+
 test('camera height survives photo package import, saving, restoration and static export', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nsfz-camera-height-'));
   try {

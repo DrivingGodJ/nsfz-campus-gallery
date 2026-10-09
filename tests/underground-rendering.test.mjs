@@ -61,7 +61,9 @@ test('the tunnel and green exit align along a shared open seam, without overlapp
   const tunnel = layout.areas.get('local/underpass'), corridor = layout.areas.get('local/underground-corridor');
   const exit = corridor.connections.find(f => f.id === 'local/underpass-exit');
   const joined = joinedPassages(tunnel.feature, exit), seam = joined.seam;
-  assert.deepEqual(tunnel.openings, [seam]); assert.deepEqual(corridor.openings, [seam]);
+  assert.deepEqual(tunnel.openings[0], seam); assert.deepEqual(corridor.openings[0], seam);
+  assert.equal(tunnel.openings.length, 2, 'The entrance stair has its own real opening at the other tunnel end');
+  assert.ok(corridor.openings.length >= 3, 'Sports halls also have real doors into the side passages');
   assert.equal(tunnel.feature.height, corridor.feature.height);
   const tunnelShape = tunnel.footprints[0], corridorShape = corridor.footprints[0];
   for (const p of seam) {

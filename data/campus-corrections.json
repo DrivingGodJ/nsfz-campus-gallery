@@ -78,7 +78,16 @@
       "sourceBuildingIds": [
         "way/855459409"
       ],
-      "baseElevation": 3.6
+      "baseElevation": 3.6,
+      "classroomWindows": {
+        "wallThickness": 0.25,
+        "bayWidth": 4.5,
+        "windowWidth": 2.4,
+        "sill": 0.9,
+        "top": 2.75,
+        "columns": 2,
+        "transom": 0.35
+      }
     },
     {
       "id": "way/855459411",
@@ -236,7 +245,16 @@
           ],
           "holes": []
         }
-      ]
+      ],
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 3.7,
+        "windowWidth": 2.2,
+        "sill": 0.95,
+        "top": 2.85,
+        "columns": 2,
+        "transom": 0.4
+      }
     },
     {
       "id": "local/theatre",
@@ -770,7 +788,16 @@
             ]
           ]
         }
-      ]
+      ],
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 3.8,
+        "windowWidth": 3.5,
+        "sill": 0.3,
+        "top": 3.25,
+        "columns": 3,
+        "transom": 0.5
+      }
     },
     {
       "id": "way/1233313436",
@@ -859,7 +886,16 @@
         "way/1233313436",
         "way/1233313438",
         "way/1233313439"
-      ]
+      ],
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 4.8,
+        "windowWidth": 3.1,
+        "sill": 0.9,
+        "top": 2.95,
+        "columns": 3,
+        "transom": 0.4
+      }
     },
     {
       "id": "way/1233313439",
@@ -1819,7 +1855,7 @@
       "classroomWindows": {
         "wallThickness": 0.28,
         "bayWidth": 6.6,
-        "windowWidth": 4.5,
+        "windowWidth": 4.7,
         "sill": 0.85,
         "top": 3.1,
         "columns": 4,
@@ -1884,7 +1920,16 @@
               41.522170065466014
             ]
           ],
-          "holes": []
+          "holes": [],
+          "classroomWindows": {
+            "wallThickness": 0.28,
+            "bayWidth": 7,
+            "windowWidth": 6.5,
+            "sill": 0.15,
+            "top": 3.25,
+            "columns": 5,
+            "transom": 0.55
+          }
         },
         {
           "partId": "main",
@@ -2083,7 +2128,16 @@
       ],
       "holes": [],
       "floors": null,
-      "calibrated": true
+      "calibrated": true,
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 4.3,
+        "windowWidth": 2.6,
+        "sill": 0.95,
+        "top": 2.75,
+        "columns": 2,
+        "transom": 0.35
+      }
     },
     {
       "id": "way/1233313451",
@@ -2226,6 +2280,15 @@
             "at": 0.22
           }
         }
+      },
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 2.85,
+        "windowWidth": 1.55,
+        "sill": 0.9,
+        "top": 2.65,
+        "columns": 2,
+        "transom": 0.35
       }
     },
     {
@@ -2243,6 +2306,15 @@
           },
           "projection": 5.8
         }
+      },
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 3.5,
+        "windowWidth": 2.1,
+        "sill": 0.85,
+        "top": 2.8,
+        "columns": 2,
+        "transom": 0.4
       }
     },
     {
@@ -2416,7 +2488,76 @@
           ],
           "holes": []
         }
-      ]
+      ],
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 4.2,
+        "windowWidth": 3.05,
+        "sill": 0.7,
+        "top": 2.95,
+        "columns": 3,
+        "transom": 0.4
+      }
+    },
+    {
+      "id": "way/1233313430",
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 4.3,
+        "windowWidth": 2.4,
+        "sill": 0.95,
+        "top": 2.65,
+        "columns": 2,
+        "transom": 0.35
+      }
+    },
+    {
+      "id": "way/1233313437",
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 4.4,
+        "windowWidth": 2.7,
+        "sill": 0.85,
+        "top": 2.85,
+        "columns": 2,
+        "transom": 0.4
+      }
+    },
+    {
+      "id": "way/1233313435",
+      "classroomWindows": {
+        "wallThickness": 0.25,
+        "bayWidth": 4.3,
+        "windowWidth": 2.6,
+        "sill": 0.95,
+        "top": 2.75,
+        "columns": 2,
+        "transom": 0.35
+      }
+    },
+    {
+      "id": "way/855459421",
+      "classroomWindows": {
+        "wallThickness": 0.28,
+        "bayWidth": 4.5,
+        "windowWidth": 3,
+        "sill": 0.85,
+        "top": 2.95,
+        "columns": 3,
+        "transom": 0.4
+      }
+    },
+    {
+      "id": "way/1277841229",
+      "classroomWindows": {
+        "wallThickness": 0.25,
+        "bayWidth": 4,
+        "windowWidth": 2.8,
+        "sill": 0.7,
+        "top": 2.9,
+        "columns": 2,
+        "transom": 0.35
+      }
     }
   ],
   "removeBuildings": [
@@ -2449,8 +2590,9 @@
         ]
       ],
       "width": 4,
-      "height": -3,
-      "estimated": true
+      "height": -3.8,
+      "estimated": true,
+      "wallHeight": 3.2
     },
     {
       "id": "local/underpass-entrance",
@@ -2467,7 +2609,7 @@
         ]
       ],
       "width": 3.2,
-      "height": -3,
+      "height": -3.8,
       "estimated": true,
       "curvedStair": {
         "center": [
@@ -2478,9 +2620,9 @@
         "startAngle": 1.3078911804601328,
         "sweep": 1.253771644936454,
         "width": 3.2,
-        "steps": 18,
+        "steps": 23,
         "topHeight": 0.12,
-        "bottomHeight": -3
+        "bottomHeight": -3.8
       },
       "connectedTo": [
         "local/underpass"
@@ -2506,13 +2648,14 @@
         ]
       ],
       "width": 5,
-      "height": -3,
+      "height": -3.8,
       "estimated": true,
       "connectedTo": [
         "local/underpass",
         "local/underground-corridor"
       ],
-      "hideLabel": true
+      "hideLabel": true,
+      "wallHeight": 4
     },
     {
       "id": "local/footbridge",
@@ -2619,8 +2762,8 @@
         ]
       ],
       "holes": [],
-      "height": -3,
-      "wallHeight": 2.4,
+      "height": -3.8,
+      "wallHeight": 6.2,
       "estimated": true,
       "connectedTo": [
         "local/underground-corridor"
@@ -2645,7 +2788,7 @@
         ]
       ],
       "width": 5,
-      "height": -3,
+      "height": -3.8,
       "estimated": true,
       "connectedTo": [
         "local/underpass-exit",
@@ -2690,7 +2833,7 @@
         ]
       ],
       "holes": [],
-      "wallHeight": 2.4,
+      "wallHeight": 4,
       "branches": [
         [
           [
@@ -2968,11 +3111,12 @@
         ]
       ],
       "width": 5,
-      "height": -3,
+      "height": -3.8,
       "estimated": true,
       "connectedTo": [
         "local/underground-corridor"
-      ]
+      ],
+      "wallHeight": 6.2
     },
     {
       "id": "local/bridge-upper-approach",
@@ -3030,272 +3174,272 @@
             101.00022716950825,
             73.46071309652523
           ],
-          "radius": 2.1,
-          "height": 6.8
+          "radius": 2.77,
+          "height": 8.5
         },
         {
           "position": [
             100.15523200886585,
             81.59984450002176
           ],
-          "radius": 1.6,
-          "height": 7.45
+          "radius": 2.11,
+          "height": 9.31
         },
         {
           "position": [
             99.69264295198118,
             101.09937804405111
           ],
-          "radius": 1.6,
-          "height": 6.8
+          "radius": 2.11,
+          "height": 8.5
         },
         {
           "position": [
             105.45323771872154,
             74.51536833843042
           ],
-          "radius": 1.6,
-          "height": 6.15
+          "radius": 2.11,
+          "height": 7.69
         },
         {
           "position": [
             105.64995906368841,
             81.07868526911922
           ],
-          "radius": 1.85,
-          "height": 6.8
+          "radius": 2.44,
+          "height": 8.5
         },
         {
           "position": [
             106.62820412533554,
             85.90033765376127
           ],
-          "radius": 2.1,
-          "height": 7.45
+          "radius": 2.77,
+          "height": 9.31
         },
         {
           "position": [
             107.48857890539279,
             94.03163523462831
           ],
-          "radius": 1.6,
-          "height": 5.5
+          "radius": 2.11,
+          "height": 6.88
         },
         {
           "position": [
             107.44005879889711,
             100.56287439169846
           ],
-          "radius": 1.85,
-          "height": 6.15
+          "radius": 2.44,
+          "height": 7.69
         },
         {
           "position": [
             113.54352468625247,
             75.09619630672555
           ],
-          "radius": 1.85,
-          "height": 5.5
+          "radius": 2.44,
+          "height": 6.88
         },
         {
           "position": [
             114.09839767991207,
             80.02548547053232
           ],
-          "radius": 2.1,
-          "height": 6.15
+          "radius": 2.77,
+          "height": 7.69
         },
         {
           "position": [
             113.64340891218094,
             86.38291731683005
           ],
-          "radius": 1.6,
-          "height": 6.8
+          "radius": 2.11,
+          "height": 8.5
         },
         {
           "position": [
             112.59687295782288,
             94.59757810709644
           ],
-          "radius": 1.85,
-          "height": 7.45
+          "radius": 2.44,
+          "height": 9.31
         },
         {
           "position": [
             111.92097014692686,
             99.50886661944651
           ],
-          "radius": 2.1,
-          "height": 5.5
+          "radius": 2.77,
+          "height": 6.88
         },
         {
           "position": [
             120.53480361234774,
             67.91577551698428
           ],
-          "radius": 1.85,
-          "height": 6.8
+          "radius": 2.44,
+          "height": 8.5
         },
         {
           "position": [
             119.74517890551027,
             74.66918644598547
           ],
-          "radius": 2.1,
-          "height": 7.45
+          "radius": 2.77,
+          "height": 9.31
         },
         {
           "position": [
             118.7301378436471,
             79.40855214200214
           ],
-          "radius": 1.6,
-          "height": 5.5
+          "radius": 2.11,
+          "height": 6.88
         },
         {
           "position": [
             118.42290449793354,
             87.43283995298268
           ],
-          "radius": 1.85,
-          "height": 6.15
+          "radius": 2.44,
+          "height": 7.69
         },
         {
           "position": [
             119.10594778953948,
             94.15441272964088
           ],
-          "radius": 2.1,
-          "height": 6.8
+          "radius": 2.77,
+          "height": 8.5
         },
         {
           "position": [
             120.15128086617794,
             98.9064046122978
           ],
-          "radius": 1.6,
-          "height": 7.45
+          "radius": 2.11,
+          "height": 9.31
         },
         {
           "position": [
             124.98494703622592,
             68.58159528228684
           ],
-          "radius": 2.1,
-          "height": 6.15
+          "radius": 2.77,
+          "height": 7.69
         },
         {
           "position": [
             125.09488854553442,
             73.62692965291778
           ],
-          "radius": 1.6,
-          "height": 6.8
+          "radius": 2.11,
+          "height": 8.5
         },
         {
           "position": [
             126.03698535194324,
             79.79509094064551
           ],
-          "radius": 1.85,
-          "height": 7.45
+          "radius": 2.44,
+          "height": 9.31
         },
         {
           "position": [
-            126.94507799634215,
+            125.29507799634214,
             88.08481153250675
           ],
-          "radius": 2.1,
-          "height": 5.5
+          "radius": 2.77,
+          "height": 6.88
         },
         {
           "position": [
-            126.98427028935455,
-            93.10958330653243
+            128.50867151799818,
+            93.74101096993482
           ],
-          "radius": 1.6,
-          "height": 6.15
+          "radius": 2.11,
+          "height": 7.69
         },
         {
           "position": [
             132.96218374050932,
             68.25300133308708
           ],
-          "radius": 1.6,
-          "height": 5.5
+          "radius": 2.11,
+          "height": 6.88
         },
         {
           "position": [
             133.58966809126434,
             72.92767201645542
           ],
-          "radius": 1.85,
-          "height": 6.15
+          "radius": 2.44,
+          "height": 7.69
         },
         {
           "position": [
             133.21531662417283,
             80.82971987760472
           ],
-          "radius": 2.1,
-          "height": 6.8
+          "radius": 2.77,
+          "height": 8.5
         },
         {
           "position": [
             132.18330635166842,
             87.73941239190881
           ],
-          "radius": 1.6,
-          "height": 7.45
+          "radius": 2.11,
+          "height": 9.31
         },
         {
           "position": [
             131.4424627589325,
             92.42370119089922
           ],
-          "radius": 1.85,
-          "height": 5.5
+          "radius": 2.44,
+          "height": 6.88
         },
         {
           "position": [
             139.33343019242028,
             67.23210143089062
           ],
-          "radius": 1.85,
-          "height": 7.45
+          "radius": 2.44,
+          "height": 9.31
         },
         {
           "position": [
-            138.29808264941727,
-            73.21430778277008
+            137.13135646045947,
+            72.04758159381227
           ],
-          "radius": 2.1,
-          "height": 5.5
+          "radius": 2.77,
+          "height": 6.88
         },
         {
           "position": [
             137.9080746814823,
             81.56120587967527
           ],
-          "radius": 1.6,
-          "height": 6.15
+          "radius": 2.11,
+          "height": 7.69
         },
         {
           "position": [
             138.5219778157209,
             86.71420090816487
           ],
-          "radius": 1.85,
-          "height": 6.8
+          "radius": 2.44,
+          "height": 8.5
         },
         {
           "position": [
             139.57537234167347,
             92.72736323674701
           ],
-          "radius": 2.1,
-          "height": 7.45
+          "radius": 2.77,
+          "height": 9.31
         }
       ],
       "estimated": true
@@ -6660,80 +6804,90 @@
             87.10401343683588,
             -4.256407209993706
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 1.45,
+          "height": 13.2,
+          "kind": "columnar"
         },
         {
           "position": [
             88.22762497926456,
             4.26987551471822
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
-            94.6388679377441,
-            -5.249366247488816
+            94.71,
+            -5.737
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 1.61,
+          "height": 14.6,
+          "kind": "columnar"
         },
         {
           "position": [
-            95.76247948017277,
-            3.27691647722311
+            98.676324,
+            1.9371
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 3.5,
+          "height": 11.6,
+          "kind": "plane"
         },
         {
           "position": [
-            102.17372243865232,
-            -6.2423252849839255
+            99.043073,
+            -6.4606
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 1.53,
+          "height": 13.9,
+          "kind": "columnar"
         },
         {
           "position": [
-            103.297333981081,
-            2.2839574397280002
+            109.882985,
+            2.335367
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.7,
+          "height": 11.4,
+          "kind": "plane"
         },
         {
           "position": [
-            109.70857693956053,
-            -7.2352843224790355
+            101.956168,
+            -7.020778
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 1.38,
+          "height": 13.2,
+          "kind": "columnar"
         },
         {
           "position": [
-            110.8321884819892,
-            1.2909984022328906
+            117.455943,
+            1.588763
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.5,
+          "height": 10.9,
+          "kind": "plane"
         },
         {
           "position": [
-            117.24343144046874,
-            -8.228243359974144
+            107.683501,
+            -8.398079
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 1.61,
+          "height": 14.6,
+          "kind": "columnar"
         },
         {
           "position": [
-            118.36704298289742,
-            0.2980393647377815
+            115.231933,
+            -9.703801
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 1.55,
+          "height": 14,
+          "kind": "columnar"
         }
       ],
       "estimated": true
@@ -6770,56 +6924,63 @@
             78.24747209502239,
             6.114536889193943
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.3,
+          "height": 10.1,
+          "kind": "plane"
         },
         {
           "position": [
             87.87171843517248,
             11.92318179936954
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.4,
+          "height": 10.6,
+          "kind": "plane"
         },
         {
           "position": [
             79.36117409795636,
             13.160370178024316
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.5,
+          "height": 11.1,
+          "kind": "plane"
         },
         {
           "position": [
             90.9792396659641,
             33.29806622450216
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.3,
+          "height": 10.1,
+          "kind": "plane"
         },
         {
           "position": [
-            82.46881276787515,
-            34.536062190684554
+            81.65,
+            34.25
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.4,
+          "height": 10.6,
+          "kind": "plane"
         },
         {
           "position": [
             83.5052745070046,
             41.66107075652647
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.5,
+          "height": 11.1,
+          "kind": "plane"
         },
         {
           "position": [
             84.54173624613404,
             48.7860793223684
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.3,
+          "height": 10.1,
+          "kind": "plane"
         }
       ],
       "estimated": true
@@ -6846,192 +7007,216 @@
             23.137719834527356,
             9.860013704509552
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             15.32174584715094,
             13.447568669754713
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             25.51551789288752,
             15.040368556607874
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         },
         {
           "position": [
             17.699543905511103,
             18.627923521853035
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             27.893315951247683,
             20.220723408706196
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             20.077341963871266,
             23.808278373951357
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         },
         {
           "position": [
             30.27111400960785,
             25.401078260804525
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             22.455140022231433,
             28.988633226049686
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             32.64891206796801,
             30.581433112902843
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         },
         {
           "position": [
             24.832938080591596,
             34.168988078148004
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             35.026710126328176,
             35.76178796500117
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             27.21073613895176,
             39.34934293024633
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         },
         {
           "position": [
             37.40450818468834,
             40.94214281709949
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             29.588534197311926,
             44.52969778234465
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             39.78230624304851,
             46.12249766919781
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         },
         {
           "position": [
             31.96633225567209,
             49.710052634442974
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             42.160104301408666,
             51.30285252129614
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             34.344130314032256,
             54.8904074865413
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         },
         {
           "position": [
             44.537902359768836,
             56.483207373394464
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             36.72192837239241,
             60.070762338639625
           ],
-          "radius": 1.65,
-          "height": 5.7
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             46.915700418129006,
             61.66356222549278
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         },
         {
           "position": [
             39.09972643075258,
             65.25111719073794
           ],
-          "radius": 1.72,
-          "height": 5.9
+          "radius": 2.05,
+          "height": 9.3,
+          "kind": "plane"
         },
         {
           "position": [
             49.29349847648916,
             66.84391707759112
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.17,
+          "height": 9.9,
+          "kind": "plane"
         },
         {
           "position": [
             41.47752448911274,
             70.43147204283626
           ],
-          "radius": 1.79,
-          "height": 6.1000000000000005
+          "radius": 2.29,
+          "height": 10.5,
+          "kind": "plane"
         }
       ],
       "estimated": true
@@ -7226,6 +7411,128 @@
       },
       "hideLabel": true,
       "estimated": true
+    },
+    {
+      "id": "local/river-bank-trees",
+      "type": "trees",
+      "name": "河岸树木",
+      "hideLabel": true,
+      "estimated": true,
+      "trees": [
+        {
+          "position": [
+            51.1,
+            39.2
+          ],
+          "radius": 2.05,
+          "height": 9.4
+        },
+        {
+          "position": [
+            53.3,
+            27.9
+          ],
+          "radius": 2.15,
+          "height": 9.950000000000001
+        },
+        {
+          "position": [
+            61,
+            25.1
+          ],
+          "radius": 2.25,
+          "height": 10.5
+        },
+        {
+          "position": [
+            66.4,
+            18.5
+          ],
+          "radius": 2.05,
+          "height": 11.05
+        },
+        {
+          "position": [
+            68.65,
+            9.35
+          ],
+          "radius": 3.1,
+          "height": 9.4
+        },
+        {
+          "position": [
+            60.5,
+            11.1
+          ],
+          "radius": 2.25,
+          "height": 9.950000000000001
+        },
+        {
+          "position": [
+            95.1,
+            7.2
+          ],
+          "radius": 1.1,
+          "height": 6.4
+        },
+        {
+          "position": [
+            102.6,
+            8.1
+          ],
+          "radius": 2.15,
+          "height": 11.05
+        },
+        {
+          "position": [
+            117.4,
+            8.2
+          ],
+          "radius": 2.25,
+          "height": 9.4
+        },
+        {
+          "position": [
+            70.9,
+            39.3
+          ],
+          "radius": 2.05,
+          "height": 9.950000000000001
+        },
+        {
+          "position": [
+            94.2,
+            29.1
+          ],
+          "radius": 2.15,
+          "height": 10.5
+        },
+        {
+          "position": [
+            105.5,
+            23
+          ],
+          "radius": 1.5,
+          "height": 5.5,
+          "kind": "palm"
+        },
+        {
+          "position": [
+            122.85,
+            10.67
+          ],
+          "radius": 2.05,
+          "height": 9.4
+        },
+        {
+          "position": [
+            132,
+            11.9
+          ],
+          "radius": 2.15,
+          "height": 9.950000000000001
+        }
+      ]
     }
   ]
 }

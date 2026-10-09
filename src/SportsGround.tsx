@@ -4,7 +4,7 @@ import { memo, useMemo, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { Feature, Point, Shape } from './types';
 import { stadiumRing, stadiumSurfaces } from './structure-geometry';
-import { sportsGroundPlatform } from './sports-ground-geometry';
+import { sportsGroundPlatformLayers } from './sports-ground-geometry';
 import { LocationHtml, LocationName } from './LocationSelection';
 
 const SURFACE_HEIGHT = .16;
@@ -21,31 +21,31 @@ function Ground({ data, color }: { data: Shape; color: string }) {
   return <mesh userData={{ photoOpacityOccluder: true }} rotation={[-Math.PI / 2, 0, 0]} position={[0, SURFACE_HEIGHT, 0]} renderOrder={1}><shapeGeometry args={[shape]} /><meshStandardMaterial color={mapColor(color)} roughness={1} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} /></mesh>;
 }
 
-function RaisedPlatform({ feature }: { feature: Feature }) {
+function RaisedPlatform({ feature, features }: { feature: Feature; features: Feature[] }) {
   const mapColor = useMapColor();
-  const shape = useMemo(() => {
-    const data = sportsGroundPlatform(feature);
+  const layers = useMemo(() => sportsGroundPlatformLayers(feature, features).map(layer => {
+    const data = layer.shape;
     const result = new THREE.Shape(data.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
     result.holes = data.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
-    return result;
-  }, [feature]);
-  return <mesh rotation={[-Math.PI / 2, 0, 0]} userData={{ photoOccluder: true, photoOpacityOccluder: true }}>
-    <extrudeGeometry args={[shape, { depth: feature.height! + .06, bevelEnabled: false, steps: 1 }]} />
+    return { ...layer, outline: result };
+  }), [feature, features]);
+  return <group>{layers.map((layer, index) => <mesh key={index} position={[0, layer.bottom, 0]} rotation={[-Math.PI / 2, 0, 0]} userData={{ photoOccluder: true, photoOpacityOccluder: true }}>
+    <extrudeGeometry args={[layer.outline, { depth: layer.top - layer.bottom, bevelEnabled: false, steps: 1 }]} />
     <meshStandardMaterial color={mapColor('#bdc9ac')} roughness={1} />
-  </mesh>;
+  </mesh>)}</group>;
 }
 function FieldLine({ points }: { points: Point[] }) {
   const mapColor = useMapColor();
   return <Line points={points.map(([x, z]) => [x, LINE_HEIGHT, z])} color={mapColor('#edf0da')} lineWidth={1.2} {...lineDepth} />;
 }
-export default memo(function SportsGround({ feature, labelPortal }: { feature: Feature; labelPortal: RefObject<HTMLDivElement> }) {
+export default memo(function SportsGround({ feature, features, labelPortal }: { feature: Feature; features: Feature[]; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
   const track = feature.track!;
   const surfaces = useMemo(() => stadiumSurfaces(track), [track]);
   const halfLength = track.pitchLength / 2, halfWidth = track.pitchWidth / 2;
   const yaw = Math.atan2(track.axis[0], track.axis[1]);
   return <group>
-    {(feature.height ?? 0) > 0 && <RaisedPlatform feature={feature} />}
+    {(feature.height ?? 0) > 0 && <RaisedPlatform feature={feature} features={features} />}
     <group position={[track.center[0], feature.height ?? 0, track.center[1]]} rotation={[0, yaw, 0]}>
       <Ground data={surfaces.track} color="#ae6652" />
       <Ground data={surfaces.grass} color="#83a575" />

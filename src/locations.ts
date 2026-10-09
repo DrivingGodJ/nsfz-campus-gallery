@@ -53,7 +53,10 @@ export const altitudeLabel = (photo: Photo) => photo.altitude?.reference === 'se
 
 export function photoCameraHeightRange(photo: Photo, campus: Campus, site: Site) {
   const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
-  return { min: .1, max: (building ? buildingLevels(building, site.buildingOverrides[id]).floorHeight : 3.6) - .1 };
+  const feature = campus.features.find(f => f.id === id);
+  const clearHeight = building ? buildingLevels(building, site.buildingOverrides[id]).floorHeight
+    : feature && (feature.height ?? 0) < 0 ? feature.wallHeight ?? 3.6 : 3.6;
+  return { min: .1, max: Math.max(.1, clearHeight - .1) };
 }
 
 export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {

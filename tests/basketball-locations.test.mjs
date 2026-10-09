@@ -99,7 +99,9 @@ test('named ground locations derive height from their surface through save, rest
     assigned.position.height = -2.1;
     await store.updateDraft(draft.id, assigned);
     const published = await store.publish(draft.id, 0);
-    assert.equal(published.locationId, 'local/underpass'); assert.equal(published.position.height, undefined); assert.equal(photoMapHeight(published, campus, state.site), -1.4);
+    assert.equal(published.locationId, 'local/underpass'); assert.equal(published.position.height, undefined);
+    const undergroundFloor = campus.features.find(feature => feature.id === 'local/underpass').height;
+    assert.ok(Math.abs(photoMapHeight(published, campus, state.site) - undergroundFloor - 1.6) < 1e-8);
     const next = assignPhotoLocation(published, 'local/footbridge', campus, (await store.state()).site);
     next.position.height = 6.7;
     await store.updatePhoto(draft.id, next, 1);

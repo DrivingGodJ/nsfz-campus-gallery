@@ -4,8 +4,8 @@ import fs from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import * as THREE from 'three';
 import { groundSurfaces } from '../src/ground-geometry.ts';
-import { buildingGeometry } from '../src/building-geometry.ts';
-import { passageFootprint } from '../src/underground-geometry.ts';
+import { buildingGeometry, snapFootprint } from '../src/building-geometry.ts';
+import { passageFootprint, undergroundLayout } from '../src/underground-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const polygon = shape => [shape.outer, ...(shape.holes || [])];
@@ -17,6 +17,21 @@ const roads = campus.features.filter(feature => feature.type === 'path' && featu
 roads.push(...campus.features.filter(feature => feature.type === 'bridge' && !feature.archRise && feature.deckHeight <= .12)
   .map(feature => passageFootprint(feature.points, feature.width)));
 const roadMask = polygonClipping.union(...roads.map(polygon));
+
+test('ground layers leave all rooms that cross ground level hollow while preserving ordinary tunnel cover', () => {
+  const layout = groundSurfaces(campus);
+  const voids = [...undergroundLayout(campus.features).areas.values()]
+    .filter(a => a.feature.height + a.feature.wallHeight > .12).flatMap(a => a.footprints);
+  assert.ok(voids.length > 0);
+  const surfaces = [...layout.campus, ...layout.background, ...campus.features.filter(f => ['green', 'sport', 'plaza'].includes(f.type)).flatMap(f => layout.features.get(f.id) || [])];
+  for (const surface of surfaces) assert.ok(area(polygonClipping.intersection(snapFootprint([polygon(surface)]), snapFootprint(polygons(voids)))) < .005,
+    'No ground face passes horizontally through an underground room');
+  const fixture = { boundary: [[-20,-20],[20,-20],[20,20],[-20,20],[-20,-20]], buildings: [], features: [
+    {id:'low-tunnel',type:'tunnel',points:[[-10,0],[10,0]],width:4,height:-4,wallHeight:3}
+  ]};
+  const normal = groundSurfaces(fixture);
+  assert.equal(area(polygons(normal.campus)), 1600, 'An entirely submerged tunnel keeps normal ground above it');
+});
 
 test('each lake renders once, with all overlapping lawn, campus and background faces removed', () => {
   const before = JSON.stringify(campus), layout = groundSurfaces(campus);

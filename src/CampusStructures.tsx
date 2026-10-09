@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import type { Building, BuildingOverride, Feature, Point, Shape } from './types';
 import { bridgeHeight, bridgeSurfaceHeight, curvedStairPoint, curvedStairTreads, straightStairTreads } from './structure-geometry';
 import { undergroundFootprints, undergroundLayout, type PassageOpening } from './underground-geometry';
-import { undergroundBoundaryLines, undergroundVolume } from './underground-mesh';
+import { undergroundBoundaryLines, undergroundVolume, undergroundCameraInside, undergroundMaterialView, type UndergroundViewSpace } from './underground-mesh';
+import { undergroundDetailGeometry, UNDERGROUND_COLORS } from './underground-details';
 import { BRIDGE_DECK_THICKNESS, bridgeLayout, bridgeSupports, type RailPoint } from './bridge-geometry';
 import { bridgeRailGeometry } from './bridge-rail-geometry';
 import { archedBridgeGeometry } from './bridge-mesh';
@@ -31,8 +32,9 @@ function UndergroundFade({ anchor, occlusionRevision, children }: { anchor: THRE
       const material = (object as THREE.Mesh).material;
       if (!material) return;
       for (const item of Array.isArray(material) ? material : [material]) {
-        if (!item.transparent) continue;
-        if (!bases.current.has(item)) bases.current.set(item, item.opacity);
+        if (!item.transparent && item.userData.undergroundGhostOpacity===undefined) continue;
+        if (item.userData.undergroundGhostOpacity===undefined) item.userData.undergroundGhostOpacity=item.opacity;
+        if (!bases.current.has(item)) bases.current.set(item, item.userData.undergroundGhostOpacity);
         materials.current.push(item);
       }
     });
@@ -46,9 +48,36 @@ function UndergroundFade({ anchor, occlusionRevision, children }: { anchor: THRE
     if (last.checked && last.world.equals(camera.matrixWorld) && last.projection.equals(camera.projectionMatrix)) return;
     // Preserve each underground material's original translucency when nothing covers it.
     const multiplier = photoPointOpacity(anchor, camera, occluders.current, ray.current) / .85;
-    for (const material of materials.current) material.opacity = bases.current.get(material)! * multiplier;
+    for (const material of materials.current) if (!material.userData.inside) material.opacity = bases.current.get(material)! * multiplier;
     last.checked = true; last.world.copy(camera.matrixWorld); last.projection.copy(camera.projectionMatrix);
   });
+  return <group ref={group}>{children}</group>;
+}
+
+function UndergroundView({ space, spaces, children }: { space: UndergroundViewSpace; spaces: UndergroundViewSpace[]; children: ReactNode }) {
+  const group=useRef<THREE.Group>(null), previous=useRef('');
+  useEffect(()=>{previous.current='';},[space,spaces,children]);
+  useFrame(({camera})=>{
+    const inside=undergroundCameraInside(camera.position,space), active=inside||spaces.some(item=>undergroundCameraInside(camera.position,item));
+    const mode=inside?'inside':active?'nearby':'plan';
+    if(previous.current===mode)return;
+    previous.current=mode;
+    group.current?.traverse(object=>{
+      if(object.userData.undergroundPlanOnly) object.visible=!active;
+      // The detailed shell has the real window and door openings. The coarse
+      // plan volume must not remain behind its photographed clerestories.
+      if(object.userData.undergroundPlanVolume) object.visible=!inside;
+      const material=(object as THREE.Mesh).material;
+      if(!material)return;
+      if(object.userData.undergroundGhostRenderOrder===undefined)object.userData.undergroundGhostRenderOrder=object.renderOrder;
+      object.renderOrder=mode==='inside'?0:object.userData.undergroundGhostRenderOrder;
+      for(const item of Array.isArray(material)?material:[material]) {
+        const opacity=item.userData.undergroundGhostOpacity??item.opacity;
+        if(item.userData.undergroundGhostOpacity===undefined)item.userData.undergroundGhostOpacity=opacity;
+        undergroundMaterialView(item,mode,opacity,!!item.userData.undergroundTranslucent);
+      }
+    });
+  }, -1);
   return <group ref={group}>{children}</group>;
 }
 
@@ -124,31 +153,58 @@ function Bridge({ feature, buildings, overrides, labelPortal }: { feature: Featu
     {!feature.hideLabel && feature.name && <LocationHtml portal={labelPortal} position={[center[0], bridgeSurfaceHeight(feature, y, center) + 4, center[1]]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name} /></LocationHtml>}
   </group>;
 }
-function Entrance({ feature, underground, labelPortal }: { feature: Feature; underground: boolean; labelPortal: RefObject<HTMLDivElement> }) {
+function Entrance({ feature, underground, labelPortal, spaces, occlusionRevision }: { feature: Feature; underground: boolean; labelPortal: RefObject<HTMLDivElement>; spaces: UndergroundViewSpace[]; occlusionRevision?: string }) {
   const mapColor = useMapColor();
   const stair = feature.curvedStair;
   const treads = useMemo(() => stair ? curvedStairTreads(stair).map(tread => ({ ...tread, shape: new THREE.Shape(tread.ring.map(([x, z]) => new THREE.Vector2(x, -z))) })) : [], [stair]);
   const opening = useMemo(() => stair ? new THREE.Shape(curvedStairTreads({ ...stair, steps: 1 })[0].ring.map(([x, z]) => new THREE.Vector2(x, -z))) : null, [stair]);
+  const canopy = useMemo(() => stair ? new THREE.Shape(curvedStairTreads({ ...stair, sweep: stair.sweep * .7, steps: 1 })[0].ring.map(([x, z]) => new THREE.Vector2(x, -z))) : null, [stair]);
+  const rails = useMemo(() => stair ? [-1, 1].map(side => Array.from({ length: stair.steps + 1 }, (_, i) => curvedStairPoint(stair, i / stair.steps, stair.radius + side * (stair.width / 2 - .12)))) : [], [stair]);
+  const viewSpace = useMemo(() => stair ? {floor:stair.bottomHeight,height:stair.topHeight + 2.35 - stair.bottomHeight,footprints:[{outer:curvedStairTreads({...stair,steps:1})[0].ring,holes:[]},...spaces.flatMap(space=>space.footprints)]} : null,[stair,spaces]);
+  const anchor = useMemo(()=>new THREE.Vector3(stair?.center[0]??0,stair?.bottomHeight??0,stair?.center[1]??0),[stair]);
   if (!stair || !opening) return null;
   const top = curvedStairPoint(stair, 0);
   const markerSize = feature.width || 3.2;
   return <group>
-    <mesh position={[top[0], top[1] + markerSize / 2, top[2]]} rotation={[0, -stair.startAngle, 0]}>
-      <boxGeometry args={[markerSize, markerSize, markerSize]} />
-      <meshStandardMaterial color={mapColor('#b7b69e')} roughness={.9} />
-    </mesh>
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .14, 0]}><shapeGeometry args={[opening]} /><meshStandardMaterial color={mapColor('#6b8174')} transparent opacity={underground ? .12 : .48} depthWrite={false} side={THREE.DoubleSide} /></mesh>
-    {underground && treads.map((tread, i) => <group key={i}>
+    {canopy && <mesh position={[0, stair.topHeight + 2.35, 0]} rotation={[-Math.PI / 2, 0, 0]}><shapeGeometry args={[canopy]} /><meshStandardMaterial color={mapColor('#a6c4c1')} transparent opacity={.32} depthWrite={false} side={THREE.DoubleSide} /></mesh>}
+    {[0, .23, .46, .7].map(progress => {
+      const a = curvedStairPoint(stair, progress, stair.radius - stair.width / 2), b = curvedStairPoint(stair, progress, stair.radius + stair.width / 2), roof = stair.topHeight + 2.35;
+      return <group key={progress}><Segment from={[a[0], a[2]]} to={[b[0], b[2]]} width={.12} y={roof} thickness={.12} color="#788d87" />
+        {[a, b].map((p, i) => <mesh key={i} position={[p[0], (roof + p[1]) / 2, p[2]]}><boxGeometry args={[.13, roof - p[1], .13]} /><meshStandardMaterial color={mapColor('#788d87')} roughness={.75} /></mesh>)}
+      </group>;
+    })}
+    <BridgeRails chains={underground ? rails : rails.map(chain => chain.filter(point => point[1] >= -.1))} smooth />
+    {underground && viewSpace ? <UndergroundFade anchor={anchor} occlusionRevision={occlusionRevision}><UndergroundView space={viewSpace} spaces={spaces}>
+    <mesh userData={{undergroundPlanOnly:true}} rotation={[-Math.PI / 2, 0, 0]} position={[0, .14, 0]}><shapeGeometry args={[opening]} /><meshStandardMaterial color={mapColor('#6b8174')} transparent opacity={.12} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+    {treads.map((tread, i) => <group key={i}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, tread.height - .16, 0]} renderOrder={25}><extrudeGeometry args={[tread.shape, { depth: .16, bevelEnabled: false }]} /><meshStandardMaterial color={mapColor(i % 2 ? '#b2ae95' : '#c8c2a8')} roughness={1} transparent opacity={.25} depthTest={false} depthWrite={false} /></mesh>
       <Line points={tread.ring.map(([x, z]) => [x, tread.height + .01, z])} color={mapColor('#667867')} lineWidth={.7} transparent opacity={.5} depthTest={false} depthWrite={false} renderOrder={26} />
     </group>)}
     <mesh position={[top[0], .04, top[2]]} rotation={[0, Math.atan2(-Math.sin(stair.startAngle) * stair.sweep, Math.cos(stair.startAngle) * stair.sweep), 0]} renderOrder={25}><boxGeometry args={[stair.width, .16, 1.4]} /><meshStandardMaterial color={mapColor('#b7b69e')} transparent opacity={.25} depthTest={false} depthWrite={false} /></mesh>
+    </UndergroundView></UndergroundFade> : <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .14, 0]}><shapeGeometry args={[opening]} /><meshStandardMaterial color={mapColor('#6b8174')} transparent opacity={.48} depthWrite={false} side={THREE.DoubleSide} /></mesh>}
     {!feature.hideLabel && feature.name && <LocationHtml portal={labelPortal} position={[top[0], top[1] + markerSize + 1.5, top[2]]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name} underground /></LocationHtml>}
   </group>;
 }
 const NO_CONNECTIONS: Feature[] = [];
 const NO_OPENINGS: PassageOpening[] = [];
-function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, openings = NO_OPENINGS, labelPortal, occlusionRevision }: { feature: Feature; connections?: Feature[]; footprints?: Shape[]; openings?: PassageOpening[]; labelPortal: RefObject<HTMLDivElement>; occlusionRevision?: string }) {
+function UndergroundDetails({ feature, footprint, openings }: { feature: Feature; footprint: Shape; openings: PassageOpening[] }) {
+  const mapColor = useMapColor();
+  const geometry = useMemo(() => undergroundDetailGeometry(feature, [footprint], openings), [feature, footprint, openings]);
+  const ceilings = useRef<THREE.Mesh>(null);
+  useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
+  useFrame(({ camera }) => {
+    // The overhead cutaway exposes the hall. Inside a photo view, its real beam
+    // ceiling is restored; it never remains a lid across the plan inspection.
+    if (ceilings.current) ceilings.current.visible = camera.position.y < (feature.height ?? -3) + (feature.wallHeight || 2.4) - .1;
+  });
+  return <group>{Object.entries(geometry).map(([kind, part]) => <mesh key={kind} ref={kind === 'ceiling' ? ceilings : undefined} geometry={part} renderOrder={kind === 'floor' || kind === 'green' ? 23 : 25}>
+    <meshStandardMaterial color={mapColor(UNDERGROUND_COLORS[kind as keyof typeof UNDERGROUND_COLORS])} roughness={kind === 'floor' || kind === 'green' ? .48 : .85}
+      emissive={kind === 'lights' ? mapColor('#ede2be') : '#000000'} emissiveIntensity={kind === 'lights' ? .25 : 0}
+      userData={{undergroundGhostOpacity:kind === 'glass' ? .28 : kind === 'nets' ? .38 : kind === 'ceiling' ? .22 : .75,undergroundTranslucent:kind==='glass'||kind==='nets'}}
+      transparent opacity={kind === 'glass' ? .28 : kind === 'nets' ? .38 : kind === 'ceiling' ? .22 : .75} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
+  </mesh>)}</group>;
+}
+function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, openings = NO_OPENINGS, labelPortal, occlusionRevision, spaces }: { feature: Feature; connections?: Feature[]; footprints?: Shape[]; openings?: PassageOpening[]; labelPortal: RefObject<HTMLDivElement>; occlusionRevision?: string; spaces: UndergroundViewSpace[] }) {
   const mapColor = useMapColor();
   const floor = feature.height ?? -3, wallHeight = feature.wallHeight || 2.4;
   const corridor = feature.type === 'undergroundCorridor' || feature.type === 'tunnelJunction', tunnel = feature.type === 'tunnel';
@@ -159,7 +215,7 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
     shape.holes = footprint.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
     const points = footprint.outer.slice(0, -1);
     const anchor = new THREE.Vector3(points.reduce((sum, p) => sum + p[0], 0) / points.length, floor + .04, points.reduce((sum, p) => sum + p[1], 0) / points.length);
-    return { shape, anchor, volume: undergroundVolume(footprint, wallHeight, openings), boundaries: undergroundBoundaryLines(footprint, openings) };
+    return { footprint, shape, anchor, volume: undergroundVolume(footprint, wallHeight, openings, true), boundaries: undergroundBoundaryLines(footprint, openings) };
   }), [feature, connections, footprints, openings, wallHeight, floor]);
   useEffect(() => () => shapes.forEach(item => item.volume.dispose()), [shapes]);
   const labelPosition = (item: Feature): [number, number, number] => {
@@ -170,47 +226,33 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
     return [center[0], floor + wallHeight + 2, center[1]];
   };
   return <group>
-    {shapes.map(({ shape, anchor, volume, boundaries }, n) => <UndergroundFade key={n} anchor={anchor} occlusionRevision={occlusionRevision}>
-      <mesh geometry={volume} position={[0, floor, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}><meshStandardMaterial color={mapColor(color)} transparent opacity={.1} depthTest={false} depthWrite={false} /></mesh>
-      <mesh position={[0, floor + .04, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={23}><shapeGeometry args={[shape]} /><meshBasicMaterial color={mapColor(color)} side={THREE.DoubleSide} transparent opacity={.24} depthTest={false} depthWrite={false} /></mesh>
-      {boundaries.map((ring, i) => <Line key={i} points={ring.map(([x, z]) => [x, floor + .08, z])} color={mapColor(lineColor)} lineWidth={1.2} transparent opacity={.7} dashed dashSize={2} gapSize={1} depthTest={false} depthWrite={false} renderOrder={24} />)}
+    {shapes.map(({ footprint, shape, anchor, volume, boundaries }, n) => <UndergroundFade key={n} anchor={anchor} occlusionRevision={occlusionRevision}>
+      <UndergroundView space={{floor,height:wallHeight,footprints:[footprint]}} spaces={spaces}>
+      <mesh geometry={volume} userData={{undergroundPlanVolume:true}} position={[0, floor, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}><meshStandardMaterial color={mapColor(color)} userData={{undergroundGhostOpacity:.1}} side={THREE.DoubleSide} transparent opacity={.1} depthTest={false} depthWrite={false} /></mesh>
+      <mesh userData={{undergroundPlanOnly:true}} position={[0, floor + .04, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={23}><shapeGeometry args={[shape]} /><meshBasicMaterial color={mapColor(color)} userData={{undergroundGhostOpacity:.24}} side={THREE.DoubleSide} transparent opacity={.24} depthTest={false} depthWrite={false} /></mesh>
+      <group userData={{undergroundPlanOnly:true}}>{boundaries.map((ring, i) => <Line key={i} points={ring.map(([x, z]) => [x, floor + .08, z])} color={mapColor(lineColor)} lineWidth={1.2} transparent opacity={.7} dashed dashSize={2} gapSize={1} depthTest={false} depthWrite={false} renderOrder={24} />)}</group>
+      <UndergroundDetails feature={feature} footprint={footprint} openings={openings} />
+      </UndergroundView>
     </UndergroundFade>)}
     {[feature, ...connections].filter(item => !item.hideLabel && item.name?.trim()).map(item => <LocationHtml key={item.id} portal={labelPortal} position={labelPosition(item)} center zIndexRange={[5, 1]}><LocationName id={item.id} name={item.name!} underground /></LocationHtml>)}
   </group>;
 }
-function UndergroundRunway({ feature, labelPortal, occlusionRevision }: { feature: Feature; labelPortal: RefObject<HTMLDivElement>; occlusionRevision?: string }) {
-  const mapColor = useMapColor();
-  const [from, to] = feature.points!, width = feature.width || 5, floor = feature.height ?? -3;
-  const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
-  const side: Point = [dz / length, -dx / length];
-  const anchor = useMemo(() => new THREE.Vector3((from[0] + to[0]) / 2, floor + .04, (from[1] + to[1]) / 2), [from, to, floor]);
-  return <group>
-    <UndergroundFade anchor={anchor} occlusionRevision={occlusionRevision}>
-    <Segment from={from} to={to} width={width} y={floor + .04} thickness={.12} color="#b98060" ghost />
-    {Array.from({ length: 5 }, (_, i) => {
-      const offset = (i / 4 - .5) * width;
-      return <Line key={i} points={[[from[0] + side[0] * offset, floor + .12, from[1] + side[1] * offset], [to[0] + side[0] * offset, floor + .12, to[1] + side[1] * offset]]} color={mapColor('#faf0dc')} lineWidth={1} transparent opacity={.8} depthTest={false} depthWrite={false} renderOrder={24} />;
-    })}
-    </UndergroundFade>
-    <LocationHtml portal={labelPortal} position={[(from[0] + to[0]) / 2, floor + 4.4, (from[1] + to[1]) / 2]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name!} underground /></LocationHtml>
-  </group>;
-}
 export default memo(function CampusStructures({ features, buildings, overrides, underground, labelPortal, occlusionRevision }: { features: Feature[]; buildings: Building[]; overrides: Record<string, BuildingOverride>; underground: boolean; labelPortal: RefObject<HTMLDivElement>; occlusionRevision?: string }) {
   const layout = useMemo(() => undergroundLayout(features), [features]);
+  const spaces=useMemo(()=>[...layout.areas.values()].map(area=>({floor:area.feature.height??-3,height:area.feature.wallHeight||2.4,footprints:area.footprints})),[layout]);
   return <>{features.map(feature => {
     if (feature.type === 'mottoStone' && feature.stone) return <MottoStone key={feature.id} feature={feature} />;
     if (feature.type === 'flagPlatform' && feature.flagPlatform) return <FlagPlatform key={feature.id} feature={feature} />;
     if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return <LakeGarden key={feature.id} feature={feature} features={features} connectedBuilding={buildings.find(building => feature.connectedTo?.includes(building.id))} labelPortal={labelPortal} />;
     if (feature.type === 'landmark' && feature.landmark) return <GateLandmark key={feature.id} feature={feature} labelPortal={labelPortal} />;
-    if (['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction'].includes(feature.type)) {
+    if (['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction', 'undergroundTrack'].includes(feature.type)) {
       const area = layout.areas.get(feature.id);
-      return underground && area ? <UndergroundArea key={feature.id} {...area} labelPortal={labelPortal} occlusionRevision={occlusionRevision} /> : null;
+      return underground && area ? <UndergroundArea key={feature.id} {...area} labelPortal={labelPortal} occlusionRevision={occlusionRevision} spaces={spaces} /> : null;
     }
     if (!feature.points || feature.points.length < 2) return null;
     if (feature.type === 'garageEntrance' && feature.ramp && feature.points.length === 2) return <GarageEntrance key={feature.id} feature={feature} />;
-    if (feature.type === 'undergroundTrack') return underground ? <UndergroundRunway key={feature.id} feature={feature} labelPortal={labelPortal} occlusionRevision={occlusionRevision} /> : null;
     if (feature.type === 'bridge') return <Bridge key={feature.id} feature={feature} buildings={buildings} overrides={overrides} labelPortal={labelPortal} />;
-    if (feature.type === 'tunnelEntrance') return <Entrance key={feature.id} feature={feature} underground={underground} labelPortal={labelPortal} />;
+    if (feature.type === 'tunnelEntrance') return <Entrance key={feature.id} feature={feature} underground={underground} labelPortal={labelPortal} spaces={spaces} occlusionRevision={occlusionRevision} />;
     return null;
   })}</>;
 });

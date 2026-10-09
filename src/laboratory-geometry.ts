@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildingGeometry, passageShape, snapFootprint } from './building-geometry.ts';
 import { passageFootprint } from './underground-geometry.ts';
 import { stairwellShaft } from './teaching-stairs.ts';
+import { classroomWindowLayout } from './teaching-classrooms.ts';
 import type { Building, BuildingStairwell, FloorCorridor, GroundPassage, Point, Shape } from './types';
 
 const WALL = .28, SLAB = .25;
@@ -81,6 +82,7 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
   const walls = polygonClipping.union(wallPolygons[0], ...wallPolygons.slice(1));
   const platePolygons = snapFootprint([...layout.rooms, ...layout.walkways, layout.stair.opening].map(polygon));
   const floorPlate = polygonClipping.union(platePolygons[0], ...platePolygons.slice(1));
+  const glazing = laboratoryWindows(building, height, floorHeight);
   const add = (shape: Shape, bottom: number, top: number, photoBlocking: boolean, doors: GroundPassage[] = []) => {
     if (top <= bottom) return;
     const geometry = buildingGeometry(shape, top - bottom, floorHeight, doors);
@@ -92,12 +94,13 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
     const bottom = floor * floorHeight, top = Math.min(bottom + floorHeight, height);
     const groundPassages = floor === 0 ? building.groundPassages || [] : [];
     const openings = floor === 0 ? snapFootprint((building.groundFloorOpenings || []).map(polygon)) : [];
-    for (const [outer, ...holes] of walls) {
-      const shape = { outer: outer as Point[], holes: holes as Point[][] };
-      const doorTop = Math.min(bottom + 2.65, top);
-      const lower = openings.length ? polygonClipping.difference(polygon(shape), openings) : [polygon(shape)];
-      for (const [lowerOuter, ...lowerHoles] of lower) add({ outer: lowerOuter as Point[], holes: lowerHoles as Point[][] }, bottom + SLAB, doorTop, true, [...layout.doors, ...groundPassages]);
-      add(shape, doorTop, top, true, groundPassages);
+    const levels = [...new Set([bottom + SLAB, top, Math.min(bottom + 2.65, top), ...glazing.filter(window => window.bottom >= bottom && window.bottom < top).flatMap(window => [window.bottom, window.top])])].sort((a, b) => a - b);
+    for (let i = 0; i < levels.length - 1; i++) {
+      const low = levels[i], high = levels[i + 1], middle = (low + high) / 2;
+      let layer = openings.length && middle < bottom + 2.65 ? polygonClipping.difference(walls, openings) : walls;
+      const cuts = glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut);
+      if (cuts.length) layer = polygonClipping.difference(layer, ...snapFootprint(cuts));
+      for (const [outer, ...holes] of layer) add({ outer: outer as Point[], holes: holes as Point[][] }, low, high, true, middle < bottom + 2.65 ? [...layout.doors, ...groundPassages] : groundPassages);
     }
     let plates = floorPlate;
     if (floor) plates = polygonClipping.difference(plates, snapFootprint([polygon(stairwellShaft(layout.stair))]));
@@ -113,4 +116,14 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
   parts.forEach(part => part.dispose());
   geometry.userData.photoOcclusionMask = new Uint8Array(masks);
   return geometry;
+}
+
+// The approved lab plan has real classroom strips, not the glass canopy's
+// outline. Cut only those strips; keep the circular wall and theatre seam solid.
+export function laboratoryWindows(building: Building, height: number, floorHeight: number) {
+  if (!building.classroomWindows) return [];
+  const layout = laboratoryLayout(building), classrooms = layout.rooms.at(-1)!;
+  const seam = passageFootprint([classrooms.outer[0], classrooms.outer.at(-2)!], .7);
+  const groundOpenings = [...(building.groundPassages || []).map(passageShape), ...(building.groundFloorOpenings || [])].map(polygon);
+  return classroomWindowLayout(snapFootprint(layout.rooms.slice(1).map(polygon)), building.classroomWindows, height, floorHeight, groundOpenings, [polygon(seam), polygon(layout.stair.opening)]);
 }

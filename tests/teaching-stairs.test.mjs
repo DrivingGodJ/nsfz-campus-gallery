@@ -179,7 +179,12 @@ test('stairs sit beside the classroom wall, with enclosed outer rooms from the s
         assert.ok(wall && wall.distance > .08 && wall.distance < .2, 'The flight is close to the classroom wall without penetrating it');
       }
       for (const u of [2, 3, 5]) {
-        const room = new THREE.Raycaster(point(u, -2.4, .12 + (level + .5) * info.floorHeight), new THREE.Vector3(-across[0], 0, -across[1]), 0, 5).intersectObject(model)[0];
+        const windowTop = building.solidCores.find(core => core.startFloor === 2)?.classroomWindows?.top;
+        // The photo-confirmed room now has real glass at eye height. Probe its
+        // concrete lintel below the next slab, keeping the exact wall offset,
+        // independent-room enclosure and open ground entrance assertions.
+        const head = windowTop === undefined ? info.floorHeight / 2 : Math.min(windowTop, info.floorHeight - .35) + .06;
+        const room = new THREE.Raycaster(point(u, -2.4, .12 + level * info.floorHeight + head), new THREE.Vector3(-across[0], 0, -across[1]), 0, 5).intersectObject(model)[0];
         assert.equal(!!room, level > 0, 'The outer room is closed on every upper floor, while the ground-floor entrance remains open');
         if (room) {
           assert.ok(Math.abs(room.distance - .55) < 1e-4, 'A clear gap separates the room wall from the stair shaft');

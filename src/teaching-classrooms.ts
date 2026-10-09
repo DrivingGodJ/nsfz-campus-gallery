@@ -1,8 +1,8 @@
 import polygonClipping from 'polygon-clipping';
-import type { ClassroomWindows, Point } from './types';
+import type { BuildingSolidCore, ClassroomWindows, Point } from './types';
 
 type MultiPolygon = polygonClipping.MultiPolygon;
-export type ClassroomWindow = { from: Point; to: Point; cut: polygonClipping.Polygon; bottom: number; top: number };
+export type ClassroomWindow = { from: Point; to: Point; cut: polygonClipping.Polygon; bottom: number; top: number; mullions?: number[] };
 const lerp = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
 function wallEdges(core: MultiPolygon) {
@@ -22,6 +22,26 @@ function strip(from: Point, to: Point, normal: Point, start: number, end: number
   return [[...ring, ring[0]]];
 }
 
+// Short chords describe the rounded bays, not separate blank wall ends. Keep
+// their actual curved boundary and distribute a window across the smooth run.
+// Sharp corners and short square returns still separate independent faces.
+function windowRuns(core: MultiPolygon) {
+  const edges = wallEdges(core), runs: (typeof edges)[] = [];
+  const joins = (a: typeof edges[number], b: typeof edges[number]) =>
+    a.length < 4.5 && b.length < 4.5 && Math.hypot(a.to[0] - b.from[0], a.to[1] - b.from[1]) < 1e-6 &&
+    a.normal[0] * b.normal[0] + a.normal[1] * b.normal[1] > .5;
+  for (const edge of edges) {
+    const previous = runs.at(-1);
+    if (previous && joins(previous.at(-1)!, edge)) previous.push(edge);
+    else runs.push([edge]);
+  }
+  // A wholly curved ring may start in the middle of a window run.
+  if (runs.length > 1 && joins(runs.at(-1)!.at(-1)!, runs[0][0])) {
+    runs[0] = [...runs.pop()!, ...runs[0]];
+  }
+  return runs;
+}
+
 // Hollow only the classroom cores. Corridor and stair openings have already
 // been removed; complete concrete slabs keep classrooms closed above and below.
 // Dense curved outlines can supply the same coordinate snapping used by their
@@ -35,25 +55,45 @@ export function classroomWallFootprint(core: MultiPolygon, thickness: number, st
 
 export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = []): ClassroomWindow[] {
   const result: ClassroomWindow[] = [];
-  for (const { from, to, length, normal } of wallEdges(core)) {
+  for (const run of windowRuns(core)) {
+    const length = run.reduce((sum, edge) => sum + edge.length, 0);
     if (length < 3.2) continue;
     const count = Math.max(1, Math.floor(length / config.bayWidth));
     const bay = length / count, width = Math.min(config.windowWidth, bay - .9);
     for (let i = 0; i < count; i++) {
-      const center = bay * (i + .5), a = lerp(from, to, (center - width / 2) / length), b = lerp(from, to, (center + width / 2) / length);
-      const inset = (p: Point): Point => [p[0] + normal[0] * config.wallThickness / 2, p[1] + normal[1] * config.wallThickness / 2];
+      const center = bay * (i + .5), start = center - width / 2, end = center + width / 2;
+      let station = 0;
+      const segments = run.flatMap(edge => {
+        const first = Math.max(start, station), last = Math.min(end, station + edge.length), origin = station;
+        station += edge.length;
+        if (last - first < 1e-6) return [];
+        const a = lerp(edge.from, edge.to, (first - origin) / edge.length), b = lerp(edge.from, edge.to, (last - origin) / edge.length);
+        const inset = (p: Point): Point => [p[0] + edge.normal[0] * config.wallThickness / 2, p[1] + edge.normal[1] * config.wallThickness / 2];
+        const mullions = Array.from({ length: config.columns + 1 }, (_, column) => start + width * column / config.columns)
+          .filter(at => at >= first - 1e-6 && at <= last + 1e-6).map(at => Math.max(0, Math.min(1, (at - first) / (last - first))));
+        return [{ from: inset(a), to: inset(b), cut: strip(a, b, edge.normal, -.04, config.wallThickness + .04), mullions }];
+      });
       for (let floor = 0; floor * floorHeight < height; floor++) {
         const bottom = floor * floorHeight + Math.min(config.sill, floorHeight * .3);
         const top = Math.min(floor * floorHeight + Math.min(config.top, floorHeight - .35), height - .25);
         if (top <= bottom) continue;
-        const cut = strip(a, b, normal, -.04, config.wallThickness + .04);
         // Core enclosures have their own appearance (including glass elevators).
         // Never replace them with generic classroom windows or openings.
-        if (solidCores.some(solid => polygonClipping.intersection(cut, solid).length)) continue;
-        if (!floor && groundOpenings.some(opening => polygonClipping.intersection(cut, opening).length)) continue;
-        result.push({ from: inset(a), to: inset(b), cut, bottom, top });
+        if (solidCores.some(solid => segments.some(segment => polygonClipping.intersection(segment.cut, solid).length))) continue;
+        if (!floor && groundOpenings.some(opening => segments.some(segment => polygonClipping.intersection(segment.cut, opening).length))) continue;
+        result.push(...segments.map(segment => ({ ...segment, bottom, top })));
       }
     }
   }
   return result;
+}
+
+// Some dedicated upper-floor rooms are glazing bays, rather than solid blocks.
+// Use an explicit saved window calibration; elevator and opaque cores keep
+// their separate appearance and do not inherit ordinary classroom windows.
+export function solidCoreWindowLayout(cores: BuildingSolidCore[], height: number, floorHeight: number): ClassroomWindow[] {
+  return cores.flatMap(core => !core.elevator && core.classroomWindows
+    ? classroomWindowLayout([[core.outer, ...core.holes]], core.classroomWindows, height, floorHeight)
+      .filter(window => window.bottom >= ((core.startFloor ?? 1) - 1) * floorHeight)
+    : []);
 }

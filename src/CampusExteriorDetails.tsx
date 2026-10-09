@@ -11,6 +11,6 @@ export default function CampusExteriorDetails({ building, floors, floorHeight, c
   const model = useMemo(() => campusExteriorGeometry(building, floors, floorHeight, cutawayHeight, annexFloors), [building, floors, floorHeight, cutawayHeight, annexFloors]);
   useEffect(() => () => Object.values(model).forEach(geometry => geometry.dispose()), [model]);
   return <group>{(Object.keys(model) as (keyof typeof model)[]).filter(kind => model[kind].getAttribute('position').count).map(kind => <mesh key={kind} geometry={model[kind]} raycast={() => null}>
-    <meshStandardMaterial color={mapColor(EXTERIOR_COLORS[kind])} side={THREE.DoubleSide} roughness={kind === 'glass' ? .42 : .9} metalness={kind === 'glass' ? .12 : 0} transparent={cutawayHeight !== undefined} opacity={cutawayHeight === undefined ? 1 : .6} depthWrite={cutawayHeight === undefined} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+    <meshStandardMaterial color={mapColor(EXTERIOR_COLORS[kind])} side={THREE.DoubleSide} forceSinglePass roughness={kind === 'glass' ? .42 : .9} metalness={kind === 'glass' ? .12 : 0} transparent={cutawayHeight !== undefined} opacity={cutawayHeight ===undefined ? 1 : .6} depthWrite={cutawayHeight === undefined} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
   </mesh>)}</group>;
 }

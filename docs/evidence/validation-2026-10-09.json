@@ -1,0 +1,47 @@
+{
+  "viewport": [
+    1920,
+    893
+  ],
+  "pixelRatio": 2,
+  "canvas": [
+    3360,
+    1562
+  ],
+  "render": {
+    "frame": 46,
+    "calls": 894,
+    "triangles": 939446,
+    "points": 0,
+    "lines": 3947
+  },
+  "memory": {
+    "geometries": 761,
+    "textures": 3
+  },
+  "cpuSubmissionMs": {
+    "samples": 40,
+    "median": 3.699999988079071,
+    "p95": 4.5
+  },
+  "scope": "CPU submission only; does not measure GPU completion or interaction FPS",
+  "idle": {
+    "intervalMs": 1500,
+    "frames": 0,
+    "frameloop": "demand"
+  },
+  "revision": 690,
+  "checkedAt": "2026-10-09T14:47:09.560Z",
+  "rendererPixelRatio": 1.75,
+  "tests": {
+    "passed": 390,
+    "failed": 0,
+    "skipped": 0
+  },
+  "checks": {
+    "typescriptAndProductionBuild": "passed",
+    "likesDryRun": "passed",
+    "photoCameraRenders": 325,
+    "sourceModelComparisonPages": 17
+  }
+}

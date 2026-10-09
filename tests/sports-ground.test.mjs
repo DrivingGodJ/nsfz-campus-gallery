@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { stadiumSurfaces } from '../src/structure-geometry.ts';
+import { sportsGroundPlatformLayers } from '../src/sports-ground-geometry.ts';
 
 const ringArea = ring => Math.abs(ring.slice(1).reduce((sum, point, i) => sum + ring[i][0] * point[1] - point[0] * ring[i][1], 0) / 2);
 const polygonArea = polygon => ringArea(polygon[0]) - polygon.slice(1).reduce((sum, ring) => sum + ringArea(ring), 0);
@@ -33,4 +34,25 @@ test('track, grass and pitch stripes cover the stadium once without overlapping 
     mesh.dispose();
   }
   assert.equal(JSON.stringify(track), before);
+});
+
+test('the raised field retains a roof above each real underground room without filling its headroom', async () => {
+  const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
+  const field = campus.features.find(feature => feature.type === 'runningTrack');
+  const layers = sportsGroundPlatformLayers(field, campus.features);
+  const rooms = campus.features.filter(feature => ['undergroundRoom', 'undergroundTrack', 'undergroundCorridor'].includes(feature.type) && feature.outer);
+  const before = JSON.stringify(campus);
+  for (const room of rooms) {
+    const ceiling = room.height + room.wallHeight;
+    for (const layer of layers.filter(layer => layer.bottom < ceiling - 1e-6)) {
+      const overlap = polygonClipping.intersection([layer.shape.outer, ...layer.shape.holes], [room.outer, ...(room.holes || [])]);
+      assert.ok(geometryArea(overlap) < .005, room.id + ' remains hollow below its own ceiling (10 micrometre clipping grid)');
+    }
+  }
+  const roof = layers.filter(layer => layer.bottom >= 2.4 - 1e-6);
+  assert.ok(roof.length > 0 && roof.every(layer => layer.top <= field.height));
+  const hall = rooms.find(room => room.type === 'undergroundRoom');
+  assert.ok(geometryArea(polygonClipping.intersection(roof.map(layer => [layer.shape.outer, ...layer.shape.holes]), [hall.outer])) > 100,
+    'Sports hall headroom ends at its ceiling, with real field roof mass above');
+  assert.equal(JSON.stringify(campus), before);
 });

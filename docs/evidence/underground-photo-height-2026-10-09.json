@@ -1,0 +1,185 @@
+{
+  "note": "Floor and ceiling dimensions inferred from photographed stairs, beams and clerestories; exact heights are estimates. Horizontal positions, heading, pitch and calibrated relative eye heights retained.",
+  "featureUpdates": [
+    {
+      "id": "local/underpass",
+      "height": -3.8,
+      "wallHeight": 3.2,
+      "estimated": true
+    },
+    {
+      "id": "local/underpass-entrance",
+      "height": -3.8,
+      "curvedStair": {
+        "center": [
+          -24.233662306732903,
+          9.058384130808982
+        ],
+        "radius": 6.670832032063167,
+        "startAngle": 1.3078911804601328,
+        "sweep": 1.253771644936454,
+        "width": 3.2,
+        "steps": 23,
+        "topHeight": 0.12,
+        "bottomHeight": -3.8
+      },
+      "estimated": true
+    },
+    {
+      "id": "local/underpass-exit",
+      "height": -3.8,
+      "wallHeight": 4,
+      "estimated": true
+    },
+    {
+      "id": "local/underground-badminton",
+      "height": -3.8,
+      "wallHeight": 6.2,
+      "estimated": true
+    },
+    {
+      "id": "local/underground-corridor",
+      "height": -3.8,
+      "wallHeight": 4,
+      "estimated": true
+    },
+    {
+      "id": "local/sheltered-runway",
+      "height": -3.8,
+      "wallHeight": 6.2,
+      "estimated": true
+    }
+  ],
+  "photos": [
+    {
+      "id": "35af56d9-984d-43be-82bb-aaa47ddefb37",
+      "title": "DSC01480",
+      "locationId": "local/underground-badminton",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "06863d9c-c0cb-4a6f-b6f1-b1080f9f9efa",
+      "title": "向上",
+      "locationId": "local/underpass",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "559153e7-dd9d-4b0f-a940-2eefc5241831",
+      "title": "DSC08912",
+      "locationId": "local/sheltered-runway",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "ddcdc8a8-f5c6-44c7-aa41-25911197d4c3",
+      "title": "DSC08915",
+      "locationId": "local/sheltered-runway",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "74f60c2f-421b-4c1b-8b33-5ac6db39bc03",
+      "title": "DSC07554",
+      "locationId": "local/underground-badminton",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "d1e18779-30db-424f-be64-7d2d35602be7",
+      "title": "DSC03643",
+      "locationId": "local/underpass",
+      "priorCameraHeight": 0.9999999999999996,
+      "newCameraHeight": 1,
+      "priorWorldHeight": -2,
+      "newWorldHeight": -2.8,
+      "reason": "Preserve manually calibrated relative eye height; lower shared floor by 0.8 m. _DSC9517 and DSC03602 explicitly show low reflection views."
+    },
+    {
+      "id": "6877d72b-047f-4958-9795-958e116ace05",
+      "title": "DSC03602-已增强-降噪",
+      "locationId": "local/underground-corridor",
+      "priorCameraHeight": 0.5999999999999992,
+      "newCameraHeight": 0.6,
+      "priorWorldHeight": -2.4,
+      "newWorldHeight": -3.2,
+      "reason": "Preserve manually calibrated relative eye height; lower shared floor by 0.8 m. _DSC9517 and DSC03602 explicitly show low reflection views."
+    },
+    {
+      "id": "79cd84d6-bf4a-4331-9a08-5b4f81ea1f00",
+      "title": "_DSC0337",
+      "locationId": "local/underground-badminton",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "f8853bef-6b8f-4920-9deb-750d18668fb4",
+      "title": "_DSC9517",
+      "locationId": "local/underground-corridor",
+      "priorCameraHeight": 0.29999999999999893,
+      "newCameraHeight": 0.3,
+      "priorWorldHeight": -2.7,
+      "newWorldHeight": -3.5,
+      "reason": "Preserve manually calibrated relative eye height; lower shared floor by 0.8 m. _DSC9517 and DSC03602 explicitly show low reflection views."
+    },
+    {
+      "id": "2de4e955-98d2-4157-bed7-7ee448f1a77a",
+      "title": "_DSC8295",
+      "locationId": "local/underpass",
+      "priorCameraHeight": 0.29999999999999893,
+      "newCameraHeight": 0.3,
+      "priorWorldHeight": -2.7,
+      "newWorldHeight": -3.5,
+      "reason": "Preserve manually calibrated relative eye height; lower shared floor by 0.8 m. _DSC9517 and DSC03602 explicitly show low reflection views."
+    },
+    {
+      "id": "0ec460c7-55b5-4283-99ce-dcdcde63ac71",
+      "title": "DJI_20231019140600_0059_D-已增强-降噪",
+      "locationId": "local/underground-badminton",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "db564407-9db3-4e82-9f08-0d6ac779beef",
+      "title": "DJI_20231020142241_0068_D-已增强-降噪",
+      "locationId": "local/underground-corridor",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    },
+    {
+      "id": "07fa62be-e579-426a-a286-02b3a741dfe5",
+      "title": "DJI_20231020142247_0070_D-已增强-降噪",
+      "locationId": "local/underground-corridor",
+      "priorCameraHeight": 1.6,
+      "newCameraHeight": 1.6,
+      "priorWorldHeight": -1.4,
+      "newWorldHeight": -2.2,
+      "reason": "Record default 1.6 m eye height explicitly; lower shared floor by 0.8 m."
+    }
+  ]
+}

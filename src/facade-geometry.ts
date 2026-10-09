@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
-import { buildingGeometry } from './building-geometry.ts';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildingGeometry, snapFootprint } from './building-geometry.ts';
+import { classroomWindowLayout, type ClassroomWindow } from './teaching-classrooms.ts';
 import type { Building, Point, Shape } from './types';
 
 export const FACADE_BASE = .12;
@@ -51,9 +53,28 @@ export function dormitoryProfile(building: Building) {
   return { shape: { outer, holes: building.holes }, curve };
 }
 
+export function dormitoryObservatory(building: Building, floorHeight: number) {
+  const entry=building.facade?.entry;
+  if(!entry)return undefined;
+  const edge=edgesOf(outline(building))[entry.edge];
+  return {center:shifted(shifted(edge.from,edge.axis,edge.length*entry.at),edge.normal,-3.1),radius:floorHeight*.77,drumRise:floorHeight*.4};
+}
+
 export function dormitoryBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
   const { shape, curve } = dormitoryProfile(building);
-  const geometry = buildingGeometry(shape, height, floorHeight, building.groundPassages, [], [], undefined, [], [], cutaway);
+  const observatory=!cutaway && height>=(building.floors??6)*floorHeight-.001?dormitoryObservatory(building,floorHeight):undefined;
+  const body = buildingGeometry(shape, height, floorHeight, building.groundPassages, [], [], building.classroomWindows, [], [], cutaway||!!observatory);
+  let geometry=body;
+  if(observatory) {
+    // The telescope room rises into the existing dome. A generic top-floor
+    // slab and a solid plinth used to cut straight across that real cavity.
+    const {center,radius}=observatory,opening=Array.from({length:48},(_,i):Point=>[center[0]+Math.cos(i*Math.PI/24)*(radius-.22),center[1]+Math.sin(i*Math.PI/24)*(radius-.22)]);opening.push(opening[0]);
+    const roof=polygonClipping.difference(snapFootprint([[shape.outer,...shape.holes]]),snapFootprint([[opening]]));
+    const plates=roof.map(([outer,...holes])=>{const slab=buildingGeometry({outer:outer as Point[],holes:holes as Point[][]},.25,floorHeight);slab.translate(0,0,height-.25);slab.deleteAttribute('uv');return slab;});
+    geometry=mergeGeometries([body,...plates])!;
+    geometry.userData.photoOcclusionMask=new Uint8Array([...body.userData.photoOcclusionMask,...plates.flatMap(plate=>Array(plate.attributes.position.count/3).fill(1))]);
+    body.dispose();plates.forEach(plate=>plate.dispose());
+  }
   return smoothSideNormals(geometry, shape, curve);
 }
 
@@ -153,12 +174,38 @@ function flatCap(shape: Shape, height: number, downward: boolean) {
 }
 const polygonArea = (ring: Point[]) => Math.abs(ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0)) / 2;
 
+export function cafeteriaStairStrip(building: Building) {
+  const edge = edgesOf(outline(building))[3], center = shifted(edge.from, edge.axis, edge.length / 2), width = Math.min(2.35, edge.length * .24);
+  return { ...edge, center, width, from: shifted(center, edge.axis, -width / 2), to: shifted(center, edge.axis, width / 2) };
+}
+
+// Photo DJI_20231101172343_0047_D shows a central glazed stair strip above
+// the entrance. Use this same layout for its holes and panes; decorative glass
+// must not be pasted over an opaque masonry wall.
+export function cafeteriaUpperWindows(building: Building, height: number, floorHeight: number): ClassroomWindow[] {
+  const config = building.classroomWindows;
+  if (!config || height <= .6) return [];
+  const strip = cafeteriaStairStrip(building), normal = strip.normal.map(n => -n) as Point;
+  const move = (p: Point, amount: number) => shifted(p, normal, amount);
+  const cut = [[move(strip.from, -.04), move(strip.to, -.04), move(strip.to, config.wallThickness + .04), move(strip.from, config.wallThickness + .04), move(strip.from, -.04)]];
+  const regular = classroomWindowLayout(snapFootprint([[building.outer, ...building.holes]]), config, height, floorHeight)
+    .filter(window => !polygonClipping.intersection(window.cut, cut).length);
+  const central: ClassroomWindow[] = [];
+  for (let floor = 0; floor * floorHeight < height; floor++) {
+    const bottom = floor * floorHeight + .3, top = Math.min((floor + 1) * floorHeight - .3, height - .3);
+    if (top > bottom) central.push({ from: move(strip.from, config.wallThickness / 2), to: move(strip.to, config.wallThickness / 2), cut, bottom, top, mullions: [0, .5, 1] });
+  }
+  return [...regular, ...central];
+}
+
 export function cafeteriaBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
   const lower = cafeteriaLowerProfile(building).shape, boundary = Math.min(height, 2 * floorHeight);
-  if (height <= boundary) return smoothSideNormals(buildingGeometry(lower, height, floorHeight, [], [], [], undefined, [], [], cutaway), lower, outline(lower));
+  const lowerWindows = building.classroomWindows ? { ...building.classroomWindows, bayWidth: 2.5, windowWidth: 2.35, sill: .2, top: floorHeight - .35, columns: 1 } : undefined;
+  if (height <= boundary) return smoothSideNormals(buildingGeometry(lower, height, floorHeight, [], [], [], lowerWindows, [], [], cutaway), lower, outline(lower));
   const positions: number[] = [];
   const append = (shape: Shape, depth: number, bottom: number, skipBottom: boolean, skipTop: boolean, openTop = false) => {
-    const geometry = buildingGeometry(shape, depth, floorHeight, [], [], [], undefined, [], [], openTop), p = geometry.getAttribute('position');
+    const geometry = buildingGeometry(shape, depth, floorHeight, [], [], [], shape === lower ? lowerWindows : building.classroomWindows, [], [], openTop,
+      shape === lower ? undefined : cafeteriaUpperWindows(building, depth, floorHeight)), p = geometry.getAttribute('position');
     for (let i = 0; i < p.count; i += 3) {
       if (skipBottom && [0, 1, 2].every(j => Math.abs(p.getZ(i + j)) < 1e-5) || skipTop && [0, 1, 2].every(j => Math.abs(p.getZ(i + j) - depth) < 1e-5)) continue;
       for (let j = 0; j < 3; j++) positions.push(p.getX(i + j), p.getY(i + j), p.getZ(i + j) + bottom);
@@ -167,7 +214,7 @@ export function cafeteriaBodyGeometry(building: Building, height: number, floorH
   };
   append(lower, boundary, 0, false, true);
   append(building, height - boundary, boundary, true, false, cutaway);
-  const original = [building.outer, ...building.holes], rounded = [lower.outer, ...lower.holes];
+  const original = snapFootprint([[building.outer, ...building.holes]])[0], rounded = snapFootprint([[lower.outer, ...lower.holes]])[0];
   for (const [outer, ...holes] of polygonClipping.difference(rounded, original)) if (polygonArea(outer) > 1e-6) positions.push(...flatCap({ outer, holes }, boundary, false));
   for (const [outer, ...holes] of polygonClipping.difference(original, rounded)) if (polygonArea(outer) > 1e-6) positions.push(...flatCap({ outer, holes }, boundary, true));
   const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -236,7 +283,9 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
       if (!cutaway) {
         const center = at(edge, along, 0, -3.1), radius = floorHeight * .77;
         const base = top + floorHeight * .4 + .01, domeRise = floorHeight * .73;
-        box('stone', [center[0], top + floorHeight * .2 + .01, center[2]], [6.4, floorHeight * .4, 6.4], edge.axis);
+        const drum=new THREE.Shape(Array.from({length:49},(_,i)=>new THREE.Vector2(Math.cos(i*Math.PI/24)*radius,Math.sin(i*Math.PI/24)*radius)));
+        drum.holes.push(new THREE.Path(Array.from({length:49},(_,i)=>new THREE.Vector2(Math.cos(-i*Math.PI/24)*(radius-.22),Math.sin(-i*Math.PI/24)*(radius-.22)))));
+        const support=new THREE.ExtrudeGeometry(drum,{depth:floorHeight*.4+.01,bevelEnabled:false});support.rotateX(-Math.PI/2);support.translate(center[0],top,center[2]);append('stone',support);
         const sphere = new THREE.SphereGeometry(radius, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
         sphere.scale(1, domeRise / radius, 1); sphere.translate(center[0], base, center[2]); append('stone', sphere);
         for (let i = 0; i < 20; i++) {

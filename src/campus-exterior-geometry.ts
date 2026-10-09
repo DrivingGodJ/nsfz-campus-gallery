@@ -42,8 +42,19 @@ export function campusExteriorGeometry(building: Building, floors: number, floor
   if (building.id === OFFICE_ID && building.outer.length > 15) {
     // DSC06615 / DSC8181 view this exact front face; DSC8913 faces edge 6.
     const length = face(13).length, height = .12 + floors * floorHeight;
-    box(13, length * .19, length * .38 - .2, .12, height - .25, 'accent', .055);
-    for (let floor = 0; floor < floors; floor++) window(13, length * .19, 1.65, .12 + floor * floorHeight + 1.2, .12 + floor * floorHeight + 2.35);
+    if (building.classroomWindows) {
+      // Brick spandrels surround the real apertures. The old full-height
+      // decorative rectangle would otherwise close their newly hollow holes.
+      const { sill, top } = building.classroomWindows;
+      for (let floor = 0; floor < floors; floor++) {
+        const base = .12 + floor * floorHeight;
+        box(13, length * .19, length * .38 - .2, base, base + Math.min(sill, floorHeight * .3) - .025, 'accent', .055);
+        box(13, length * .19, length * .38 - .2, base + Math.min(top, floorHeight - .35) + .025, base + floorHeight - .25, 'accent', .055);
+      }
+    } else {
+      box(13, length * .19, length * .38 - .2, .12, height - .25, 'accent', .055);
+      for (let floor = 0; floor < floors; floor++) window(13, length * .19, 1.65, .12 + floor * floorHeight + 1.2, .12 + floor * floorHeight + 2.35);
+    }
     const stripAt = length * .48, stripWidth = 1.9;
     box(13, stripAt, stripWidth, .12, height - .25, 'glass', .12);
     for (const side of [-1, 1]) box(13, stripAt + side * stripWidth / 2, .12, .12, height - .2, 'frame', .19, .13);
@@ -51,11 +62,11 @@ export function campusExteriorGeometry(building: Building, floors: number, floor
       const y = Math.min(.12 + floor * floorHeight, height - .22);
       box(13, stripAt, stripWidth, y, y + .09, 'frame', .19, .13);
     }
-    bays(14, floors, 2.3, 3.8); bays(6, floors, 2.2, 4.5);
+    if (!building.classroomWindows) { bays(14, floors, 2.3, 3.8); bays(6, floors, 2.2, 4.5); }
   } else if (building.id === LIBRARY_ID && building.outer.length > 14) {
     const levels = annexFloors ?? building.parts?.find(part => part.id === 'curved-annex')?.floors ?? 3;
     // DSC9722 looks through edge 1; editor overrides also cap its facade height.
-    for (const edge of [0, 1, 2, 12, 13, 14]) {
+    for (const edge of building.classroomWindows ? [1, 2] : [0, 1, 2, 12, 13, 14]) {
       const length = face(edge).length;
       for (let floor = 0; floor < levels; floor++) window(edge, length / 2, length - .4,
         .12 + floor * floorHeight + .25, .12 + (floor + 1) * floorHeight - .2, Math.max(2, Math.round(length / 1.8)));

@@ -30,8 +30,13 @@ function exposedFloorSamples(geometry, height, floorHeight, label = "") {
     // Starting inside a thin solid wall sees its legitimate top edge; only
     // probe usable interior space with at least 35 cm of horizontal clearance.
     const origin = new THREE.Vector3(x, y, floor + floorHeight * .5);
-    if ([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]].some(direction =>
-      new THREE.Raycaster(origin, new THREE.Vector3(...direction), 0, .35).intersectObject(object).length)) continue;
+    // A window can clear the eye-height rays while this sample remains inside
+    // its thin wall footprint. Its legitimate lintel cap is not a room ceiling.
+    // Check the wall-head height too; genuine interior roof caps still fail the
+    // strict downward/upward assertions below because no nearby wall is hit.
+    const clearanceOrigins = [origin, new THREE.Vector3(x, y, height - .05)];
+    if (clearanceOrigins.some(point => [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]].some(direction =>
+      new THREE.Raycaster(point, new THREE.Vector3(...direction), 0, .35).intersectObject(object).length))) continue;
     // Looking down from above must reach that same floor, not a replacement cap.
     const above = down(object, x, y, height + 1);
     assert.ok(above && Math.abs(above.point.z - floorHit.point.z) < 1e-4, `${label}: ceiling at ${above?.point.z}, floor at ${floorHit.point.z}, sample ${x},${y}`);

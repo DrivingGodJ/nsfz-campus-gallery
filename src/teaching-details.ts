@@ -65,7 +65,10 @@ export function teachingDetailGeometry(building: Building, sections: Section[], 
       if (building.floorCorridors?.some(c => c.partId === section.id && ('edge' in c && c.edge === edge || 'edges' in c && c.edges.includes(edge)))) continue;
       const nx = dz / length * sign, nz = -dx / length * sign;
       for (let bay = 1; bay < bays; bay += 2) for (let level = 1; level < section.floors; level++) {
-        const bottom = level * floorHeight + 1.25, top = bottom + .56;
+        // Photo-visible units sit on the masonry beneath the windows. Facade
+        // and classroom bay subdivisions differ near stair cores; placing them
+        // at eye height from the outer outline can fill an otherwise open pane.
+        const top = level * floorHeight + Math.min(.84, (building.classroomWindows?.sill ?? .85) - .03), bottom = top - .56;
         if (top > shown - .1) continue;
         const x = a[0] + dx * bay / bays + nx * .23, z = a[1] + dz * bay / bays + nz * .23;
         const box = new THREE.BoxGeometry(.82, .56, .36); box.rotateY(-Math.atan2(dz, dx)); box.translate(x, BASE + (bottom + top) / 2, z); units.push(box);

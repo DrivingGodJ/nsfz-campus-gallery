@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { specimenGroveGeometry, specimenPaths, specimenTrees } from '../src/specimen-grove.ts';
 import { treeInstances, treeTrunkGeometry } from '../src/tree-geometry.ts';
+import { photoMapHeight } from '../src/locations.ts';
+import { photoCameraPose } from '../src/photo-camera.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const grove = campus.features.find(feature => feature.id === 'local/specimen-forest');
@@ -72,4 +74,72 @@ test('batched tree lobes preserve tree radius/height while producing stable bran
   }
   assert.equal(new Set(colors).size, grove.trees.length);
   geometry.dispose(); crown.dispose();
+});
+
+test('April balcony views keep the grove ground visible through dimensionally stable trunks and canopy', async () => {
+  const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
+  const original = JSON.stringify(grove), trees = specimenTrees(grove);
+  const crown = new THREE.IcosahedronGeometry(1, 1), material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const stem = treeTrunkGeometry(), fork = new THREE.CylinderGeometry(.4, 1, 1, 5);
+  const canopy = new THREE.InstancedMesh(crown, material, trees.length * 3);
+  const trunks = new THREE.InstancedMesh(stem, material, trees.length), branches = new THREE.InstancedMesh(fork, material, trees.length * 6);
+  const position = fork.getAttribute('position');
+  trees.forEach((tree, i) => {
+    const instances = treeInstances(tree, true), root = new THREE.Vector3().setFromMatrixPosition(instances.trunk);
+    assert.equal(root.x, tree.position[0]); assert.equal(root.z, tree.position[1]);
+    trunks.setMatrixAt(i, instances.trunk);
+    assert.equal(instances.branches.length, 6);
+    instances.branches.forEach((matrix, j) => {
+      branches.setMatrixAt(i * 6 + j, matrix);
+      const center = new THREE.Vector3().setFromMatrixPosition(matrix), axis = new THREE.Vector3(0, 1, 0).transformDirection(matrix);
+      for (let vertex = 0; vertex < position.count; vertex++) {
+        const delta = new THREE.Vector3().fromBufferAttribute(position, vertex).applyMatrix4(matrix).sub(center);
+        delta.addScaledVector(axis, -delta.dot(axis));
+        assert.ok(delta.length() < .22, 'A tilted branch stays narrow in world space instead of becoming a height-scaled sheet');
+      }
+    });
+    instances.crowns.forEach((matrix, j) => canopy.setMatrixAt(i * 3 + j, matrix));
+  });
+  const completeTrees = [canopy, trunks, branches];
+  completeTrees.forEach(mesh => mesh.updateMatrixWorld());
+  const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.075), point = new THREE.Vector3(), ray = new THREE.Raycaster();
+  for (const id of ['0441ecc7-6b59-42b9-b9d1-f929f93c2f0e', 'd3af1f5f-3433-4bf7-a6af-f298045ab168']) {
+    const photo = site.photos.find(photo => photo.id === id), aspect = photo.width / photo.height;
+    const pose = photoCameraPose(photo, photoMapHeight(photo, campus, site), aspect);
+    const camera = new THREE.PerspectiveCamera(pose.fov, aspect, .08, 500);
+    camera.position.copy(pose.position); camera.quaternion.copy(pose.quaternion); camera.updateMatrixWorld();
+    let sampled = 0, clear = 0;
+    // Source photographs show trunks, paths and furniture through the lower 65%.
+    for (let x = -.9; x <= .91; x += .1) for (let y = -.9; y <= .31; y += .1) {
+      ray.setFromCamera(new THREE.Vector2(x, y), camera);
+      if (!ray.ray.intersectPlane(ground, point) || !inside([point.x, point.z])) continue;
+      sampled++; ray.far = point.distanceTo(camera.position);
+      if (!ray.intersectObjects(completeTrees).length) clear++;
+    }
+    assert.ok(sampled > 80, photo.title + ' samples the grove ground');
+    assert.ok(clear / sampled > .72, photo.title + ' retains visible ground between actual trunks and thin branches');
+  }
+  assert.equal(JSON.stringify(grove), original, 'Tree roots and stored dimensions remain unchanged');
+  crown.dispose(); stem.dispose(); fork.dispose(); material.dispose();
+});
+
+test('all plane tree forks preserve round world cross-sections without changing crowns or roots', () => {
+  const trees = campus.features.flatMap(feature => feature.trees ?? []), cylinder = new THREE.CylinderGeometry(.4, 1, 1, 5);
+  const position = cylinder.getAttribute('position');
+  for (const tree of trees) {
+    const instances = treeInstances(tree), root = new THREE.Vector3().setFromMatrixPosition(instances.trunk);
+    assert.equal(root.x, tree.position[0]); assert.equal(root.z, tree.position[1]);
+    const expected = !tree.kind || tree.kind === 'plane' ? 6 : 0;
+    assert.equal(instances.branches.length, expected);
+    for (const [i, matrix] of instances.branches.entries()) {
+      const center = new THREE.Vector3().setFromMatrixPosition(matrix), axis = new THREE.Vector3(0, 1, 0).transformDirection(matrix);
+      const radius = Math.max(.2, tree.radius * .13) * (i % 2 ? .24 : .58);
+      for (let vertex = 0; vertex < position.count; vertex++) {
+        const delta = new THREE.Vector3().fromBufferAttribute(position, vertex).applyMatrix4(matrix).sub(center);
+        delta.addScaledVector(axis, -delta.dot(axis));
+        assert.ok(delta.length() <= radius + 1e-6, 'Tree height never multiplies the fork radius');
+      }
+    }
+  }
+  cylinder.dispose();
 });

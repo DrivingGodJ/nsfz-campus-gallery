@@ -34,12 +34,12 @@ test('laboratory corridors connect each floor while the round enclosure and oute
       assert.equal(cast(target, from, to, y, Math.hypot(to[0] - from[0], to[1] - from[1])).length, 0, 'Blue routes and the round-room doorway are open');
     }
     assert.ok(cast(target, at(circleU, 34), at(circleU + 8, 34), y, 8).length, 'The round outline is an enclosed wall, not an open void');
-    assert.ok(cast(target, at(57.1, 35), at(60, 35), y, 4).length, 'The right passage retains its outside wall');
+    assert.ok(cast(target, at(57.1, 35), at(60, 35), .12 + floor * 3.6 + 3.1, 4).length, 'The right passage retains its outside wall above the photographed window openings');
     for (const [u, v] of [[16, 15.5], [57.1, 35], [circleU, 20]]) {
       assert.ok(down(target, at(u, v), .12 + floor * 3.6 + .4).length, 'Every blue route has a continuous floor slab');
     }
   }
-  assert.ok(geometry.getAttribute('position').count / 3 < 8000);
+  assert.ok(geometry.getAttribute('position').count / 3 < 30000, 'Window jambs and the room shell stay within the batched wall budget');
   assert.equal(JSON.stringify(building), snapshot);
   geometry.dispose();
 });
@@ -93,7 +93,7 @@ test('the annotated front wall, recessed left staircase and right-hand wall retu
   assert.ok(Math.abs(layout.stairU + layout.roomWidth / 2 - 20.5) < .03, 'The staircase occupies the left recess next to the theatre, instead of the corridor centre');
   const body = laboratoryBodyGeometry(building, 21.6, 3.6), target = mesh(body, true);
   for (let floor = 0; floor < 6; floor++) {
-    const y = .12 + floor * 3.6 + 1.5;
+    const y = .12 + floor * 3.6 + 3.1; // Probe the concrete lintel, above the new window apertures.
     assert.ok(cast(target, at(30, 13), at(30, 10.5), y, 3).length, 'The continuous black wall follows the marked long horizontal line');
     assert.equal(cast(target, at(34.25, 16), at(34.25, 13), y, 3).length, 0, 'The previous central stairwell is removed');
     assert.ok(cast(target, at(52, 18), at(52, 22), y, 4).length, 'The inside end of the left wall band turns back at the corridor');
@@ -139,7 +139,7 @@ test('the white connection is part of the theatre outline, with the recess road 
   assert.deepEqual(campus.features.find(f => f.id === 'way/855459414').points, building.groundPassages[0].points);
   assert.equal(building.groundPassages[0].sourcePathId, 'way/855459414');
   for (let floor = 0; floor < 6; floor++) {
-    const hits = cast(target, at(5.8, 13), at(5.8, 10.5), .12 + floor * 3.6 + 2.8, 3);
+    const hits = cast(target, at(5.8, 13), at(5.8, 10.5), .12 + floor * 3.6 + 3.1, 3);
     assert.equal(hits.length > 0, floor > 0, 'The existing road crosses the recess beneath the retained upper-floor wall');
   }
   const labLevels = buildingLevels(building), layout = laboratoryLayout(building);
@@ -243,7 +243,7 @@ test('the laboratory passages retain three metres, the theatre long end is two m
   const lab = laboratoryBodyGeometry(building,21.6,3.6), bodies = info.sections.map(p => buildingGeometry(p,p.height,3.6,theatre.groundPassages,theatre.floorCorridors.filter(c => c.partId === p.id)));
   const group = new THREE.Group(); [lab,...bodies].forEach(g => group.add(mesh(g,true))); group.updateMatrixWorld();
   for (let floor=0;floor<6;floor++) {
-    const y=.12+floor*3.6+1.5;
+    const y=.12+floor*3.6+3.1; // Wall positions are measured on the intact lintel, not through a window.
     for (const [from,to] of [[[62,13.1],[62,9]],[[62,13.1],[62,17]],[[57.1,35],[53,35]],[[57.1,35],[61,35]]]) {
       const hit=cast(group,at(...from),at(...to),y,5)[0];
       assert.ok(hit && Math.abs(hit.distance-1.5)<1e-4, 'Every corridor wall is exactly 1.5m from its centreline');
@@ -288,7 +288,7 @@ test('the marked walls and left guards move forward together while classrooms an
   for(let floor=0;floor<6;floor++) {
     const level=.12+floor*info.floorHeight, eye=level+1.5;
     assert.equal(cast(target,at(40,7),at(40,11),eye,4).length,0,'The previous classroom partition no longer cuts through the enlarged interior');
-    const wall=cast(target,at(40,12.5),at(40,10.5),eye,2)[0];
+    const wall=cast(target,at(40,12.5),at(40,10.5),level+3.1,2)[0];
     assert.ok(wall && Math.abs(wall.distance-.9)<1e-4,'The replacement inner wall stands four metres farther forward');
     for(const v of [8,10,11]) assert.ok(down(target,at(40,v),level+.4).length,'The added classroom depth keeps a solid floor');
     for(const u of [branchRight-.02,branchRight+.02]) for(const v of [17.1,19,20.9]) assert.ok(down(target,at(u,v),level+.4).length,'The shifted left side and fixed right side meet without a floor crack');

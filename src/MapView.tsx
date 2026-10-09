@@ -10,12 +10,16 @@ import { buildingInfo, type Campus, type Photo, type Point, type Shape, type Sit
 import CampusStructures from './CampusStructures';
 import SportsGround from './SportsGround';
 import Forest, { Trees } from './Forest';
+import RiverLandscape from './RiverLandscape';
 import HistoryPavilion from './HistoryPavilion';
 import BuildingFacade from './BuildingFacade';
 import BuildingSkylights from './BuildingSkylights';
 import BuildingArchitecture from './BuildingArchitecture';
 import VenueDetails from './VenueDetails';
 import CampusExteriorDetails from './CampusExteriorDetails';
+import PhotoFacadeDetails from './PhotoFacadeDetails';
+import PhotoInteriorDetails from './PhotoInteriorDetails';
+import { PHOTO_INTERIOR_IDS } from './photo-interior-geometry';
 import { OFFICE_ID, LIBRARY_ID } from './campus-exterior-geometry';
 import { STANDS_ID, THEATRE_ID, standsArchitecture } from './venue-geometry';
 import { GYM_ID, gymArchitecture } from './architecture-geometry';
@@ -121,6 +125,8 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     {(building.facade?.type === 'laboratory' || building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
     {(stands || gym || building.id === THEATRE_ID) && <VenueDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} stands={stands} />}
     {(building.id === OFFICE_ID || building.id === LIBRARY_ID) && <CampusExteriorDetails building={building} floors={info.floors} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} annexFloors={info.sections.find(section => section.id === 'curved-annex')?.floors} />}
+    {(building.classroomWindows || building.id === 'way/855459420') && <PhotoFacadeDetails building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
+    {PHOTO_INTERIOR_IDS.includes(building.id) && <PhotoInteriorDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
     {building.facade?.type === 'dormitory' && <BuildingFacade building={building} floors={info.floors} floorHeight={info.floorHeight} height={height} selected={selected} cutaway={!!(selected && floor)} />}
     </group>}
     {(selected || !!building.name || !!site.buildingOverrides[building.id]?.name) && <LocationHtml portal={labelPortal} key={info.name} position={[info.center[0], height + 3, info.center[1]]} center zIndexRange={[5, 1]}><LocationName id={building.id} name={info.name} building /></LocationHtml>}
@@ -280,10 +286,11 @@ export default function MapView(props: Props) {
       <LocationSelection.Provider value={locationSelection}><Suspense fallback={null}><group onClick={clickBackground}>
         {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={-.08} unlit />)}
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}
-        {campus.features.map(feature => feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'path' && feature.points && !feature.representedBy ? <Roads key={feature.id} points={feature.points} width={feature.width || 3} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
+        {campus.features.map(feature => feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} features={campus.features} labelPortal={labelPortal} /> : feature.type === 'path' && feature.points && !feature.representedBy ? <Roads key={feature.id} points={feature.points} width={feature.width || 3} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
         <Line points={campus.boundary.map(([x, z]) => [x, .2, z])} color={mapColor('#97a188')} lineWidth={1.5} />
         {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
         <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground={underground} labelPortal={labelPortal} occlusionRevision={[selectedLocation, cutawayFloor, underground].join(':')} />
+        <RiverLandscape features={campus.features} buildings={campus.buildings} />
         <FeatureTargets campus={campus} site={site} underground={underground} labelPortal={labelPortal} />
         {!viewingPhoto && <PhotoMarkers occlusionRevision={[selectedLocation, cutawayFloor, underground].join(':')} photos={photos} photoLikes={props.photoLikes} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
         {!viewingPhoto && selectedPhoto && !editPhoto && <Direction photo={selectedPhoto} labelPortal={labelPortal} />}

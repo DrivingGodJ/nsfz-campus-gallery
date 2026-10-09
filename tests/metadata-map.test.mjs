@@ -158,7 +158,8 @@ test('underground court and corridor connect to the tunnel on the same level; ne
   assert.equal(exit.height, tunnel.height);
   assert.equal(corridor.height, exit.height);
   assert.equal(court.height, corridor.height);
-  assert.ok(court.height + court.wallHeight < 0);
+  const sportsDeck = map.buildings.find(b => b.id === 'local/gymnasium').baseElevation;
+  assert.ok(court.height + court.wallHeight < sportsDeck, 'Hall ceiling fits beneath the raised sports deck');
   assert.deepEqual(tunnel.points.at(-1), exit.points[0]);
   assert.deepEqual(corridor.points[0], exit.points.at(-1));
   assert.deepEqual(court.outer[1], corridor.outer[0]);

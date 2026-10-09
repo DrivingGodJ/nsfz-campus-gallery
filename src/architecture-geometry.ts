@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildingCoreFootprint, buildingGeometry, passageShape } from './building-geometry.ts';
-import { classroomWindowLayout } from './teaching-classrooms.ts';
+import { classroomWindowLayout, solidCoreWindowLayout, type ClassroomWindow } from './teaching-classrooms.ts';
 import { GYM_WALL, gymFrame, gymStairGeometry, gymWindowOpenings } from './gym-interior.ts';
-import type { Building, BuildingPart, Feature, GroundPassage, Point, Shape } from './types';
+import type { Building, BuildingPart, ClassroomWindows, Feature, GroundPassage, Point, Shape } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
 type Vector = [number, number, number];
@@ -109,7 +109,7 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
 }
 
 export function teachingWindowGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
-  const glass: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [], config = building.classroomWindows;
+  const windows: ClassroomWindow[] = [], config = building.classroomWindows;
   if (config) for (const section of sections) {
     const height = Math.min(section.height, cutawayHeight ?? section.height);
     const solids = (building.solidCores || []).filter(core => core.partId === section.id);
@@ -117,15 +117,40 @@ export function teachingWindowGeometry(building: Building, sections: Section[], 
     const core = buildingCoreFootprint(section, building.groundPassages || [], (building.floorCorridors || []).filter(corridor => corridor.partId === section.id), stairs, solids, (building.cutouts || []).filter(cut => cut.partId === section.id));
     const groundOpenings = (building.groundPassages || []).map(passage => { const shape = passageShape(passage); return [shape.outer, ...shape.holes]; });
     const windowExclusions = [...solids.map(core => [core.outer, ...core.holes]), ...stairs.filter(stair => stair.internal).map(stair => [stair.opening.outer, ...stair.opening.holes])];
-    for (const { from, to, bottom, top } of classroomWindowLayout(core, config, height, floorHeight, groundOpenings, windowExclusions)) {
-      glass.push(windowPanel(from, to, bottom, top));
-      const y0 = BASE + bottom, y1 = BASE + top;
-      for (const y of [y0, y1 - Math.min(config.transom, (top - bottom) / 3), y1]) frames.push(bar([from[0], y, from[1]], [to[0], y, to[1]], .055));
-      for (let column = 0; column <= config.columns; column++) {
-        const point = lerp(from, to, column / config.columns);
-        frames.push(bar([point[0], y0, point[1]], [point[0], y1, point[1]], .055));
+    windows.push(...classroomWindowLayout(core, config, height, floorHeight, groundOpenings, windowExclusions));
+    windows.push(...solidCoreWindowLayout(solids, height, floorHeight));
+  }
+  return classroomGlazingGeometry(windows, config);
+}
+
+export function classroomGlazingGeometry(windows: ClassroomWindow[], config?: ClassroomWindows) {
+  const glass: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [];
+  const panel = (from: Point, to: Point, bottom: number, top: number, frame = false, vertical = false) => {
+    const dx = to[0] - from[0], dz = to[1] - from[1], width = Math.hypot(dx, dz), height = top - bottom;
+    let geometry: THREE.BufferGeometry = new THREE.PlaneGeometry(width, height);
+    if (frame) {
+      // Keep the front and two long side faces. End caps are covered by the
+      // meeting bars/wall jamb, and a double-sided front also reads from inside.
+      // Six triangles replace twelve for every 55 mm repeated metal member.
+      const indexed = new THREE.BoxGeometry(width, height, .055), box = indexed.toNonIndexed(); indexed.dispose();
+      const positions = box.getAttribute('position'), normals = box.getAttribute('normal'), p: number[] = [], n: number[] = [];
+      for (let i = 0; i < positions.count; i += 3) if (normals.getZ(i) > .5 || Math.abs(vertical ? normals.getX(i) : normals.getY(i)) > .5) {
+        for (let j = 0; j < 3; j++) { p.push(positions.getX(i + j), positions.getY(i + j), positions.getZ(i + j)); n.push(normals.getX(i + j), normals.getY(i + j), normals.getZ(i + j)); }
       }
+      geometry.dispose(); box.dispose();
+      geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(p, 3)).setAttribute('normal', new THREE.Float32BufferAttribute(n, 3));
     }
+    return geometry.rotateY(-Math.atan2(dz, dx)).translate((from[0] + to[0]) / 2, BASE + (bottom + top) / 2, (from[1] + to[1]) / 2);
+  };
+  if (config) for (const { from, to, bottom, top, mullions } of windows) {
+      glass.push(panel(from, to, bottom, top));
+      for (const y of [bottom, top - Math.min(config.transom, (top - bottom) / 3), top]) frames.push(panel(from, to, y - .0275, y + .0275, true));
+      const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+      for (const fraction of mullions ?? Array.from({ length: config.columns + 1 }, (_, column) => column / config.columns)) {
+        const point = lerp(from, to, fraction);
+        const left: Point = [point[0] - dx / length * .0275, point[1] - dz / length * .0275], right: Point = [point[0] + dx / length * .0275, point[1] + dz / length * .0275];
+        frames.push(panel(left, right, bottom, top, true, true));
+      }
   }
   return { glass: combined(glass, false), frames: combined(frames, false) };
 }

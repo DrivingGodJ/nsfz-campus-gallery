@@ -1,7 +1,8 @@
 import polygonClipping from 'polygon-clipping';
-import { passageFootprint } from './underground-geometry.ts';
+import { passageFootprint, undergroundLayout } from './underground-geometry.ts';
 import { bridgeLayout } from './bridge-geometry.ts';
 import { garageRampFootprint } from './garage-ramp-geometry.ts';
+import { snapFootprint } from './building-geometry.ts';
 import type { Campus, Feature, Shape } from './types';
 
 const polygon = (shape: Shape) => [shape.outer, ...shape.holes];
@@ -11,6 +12,9 @@ const subtract = (shape: Shape, mask: ReturnType<typeof polygonClipping.union>) 
 const featureShape = (feature: Feature): Shape => ({ outer: feature.outer!, holes: feature.holes || [] });
 
 export function groundSurfaces(campus: Campus) {
+  const undergroundVoids = shapes(snapFootprint([...undergroundLayout(campus.features).areas.values()]
+    .filter(area => (area.feature.height ?? -3) < -.08 && (area.feature.height ?? -3) + (area.feature.wallHeight || 2.4) > .12)
+    .flatMap(area => area.footprints).map(polygon)));
   const entrances = campus.features.filter(feature => feature.type === 'garageEntrance' && feature.ramp && feature.points?.length === 2).map(garageRampFootprint);
   const waters = campus.features.filter(feature => feature.type === 'water' && feature.outer);
   const waterMask = union(waters.map(featureShape));
@@ -31,11 +35,11 @@ export function groundSurfaces(campus: Campus) {
   const plazas = campus.features.filter(feature => feature.type === 'plaza' && feature.outer);
   const previousPlazas: Shape[] = [];
   for (const plaza of plazas) {
-    const visible = subtract(featureShape(plaza), union([...shapes(waterMask), ...shapes(roadMask), ...previousPlazas, ...entrances]));
+    const visible = subtract(featureShape(plaza), union([...shapes(waterMask), ...shapes(roadMask), ...previousPlazas, ...entrances, ...undergroundVoids]));
     features.set(plaza.id, visible);
     previousPlazas.push(...visible);
   }
-  const landMask = union([...shapes(waterMask), ...previousPlazas, ...entrances]);
+  const landMask = union([...shapes(waterMask), ...previousPlazas, ...entrances, ...undergroundVoids]);
   // Cut the lake out of every underlying ground layer. The source outlines,
   // photo positions and paths stay intact; each visible lake area has one face.
   const visibleLand: Shape[] = [];
