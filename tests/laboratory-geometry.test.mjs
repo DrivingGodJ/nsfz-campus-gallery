@@ -29,7 +29,7 @@ test('laboratory corridors connect each floor while the round enclosure and oute
   const { at, circleU } = laboratoryLayout(building), geometry = laboratoryBodyGeometry(building, 21.6, 3.6), target = mesh(geometry, true);
   for (let floor = 0; floor < 6; floor++) {
     const y = .12 + floor * 3.6 + 1.2;
-    for (const [a, b] of [[[1, 9.1], [67, 9.1]], [[57.1, 9.1], [57.1, 55]], [[circleU, 9.1], [circleU, 29]]]) {
+    for (const [a, b] of [[[1, 13.1], [67, 13.1]], [[57.1, 13.1], [57.1, 55]], [[circleU, 13.1], [circleU, 29]]]) {
       const from = at(...a), to = at(...b);
       assert.equal(cast(target, from, to, y, Math.hypot(to[0] - from[0], to[1] - from[1])).length, 0, 'Blue routes and the round-room doorway are open');
     }
@@ -68,7 +68,7 @@ test('yellow edges have guards instead of solid walls or glazing, and the green 
     const y = .12 + floor * info.floorHeight + .25 + 1.05;
     assert.ok(cast(mesh(rails), layout.at(22, 18), layout.at(22, 15), y, 3).length, 'The open side has a guard on every floor');
     assert.equal(cast(mesh(body, true), layout.at(22, 18), layout.at(22, 15), y, 3).length, 0, 'No wall blocks the view outside');
-    assert.equal(cast(mesh(body, true), layout.at(layout.stairU, 7.5), layout.at(layout.stairU, 6.1), y, 2).length, 0, 'The staircase entrance is open');
+    assert.equal(cast(mesh(body, true), layout.at(layout.stairU, 11.5), layout.at(layout.stairU, 10.1), y, 2).length, 0, 'The staircase entrance is open');
   }
   const stairs = teachingStairGeometry(configured, info.sections, info.floorHeight), shaft = stairwellShaft(layout.stair);
   assert.ok(stairs.concrete.getAttribute('position').count > 0);
@@ -94,9 +94,9 @@ test('the annotated front wall, recessed left staircase and right-hand wall retu
   const body = laboratoryBodyGeometry(building, 21.6, 3.6), target = mesh(body, true);
   for (let floor = 0; floor < 6; floor++) {
     const y = .12 + floor * 3.6 + 1.5;
-    assert.ok(cast(target, at(30, 9), at(30, 6.5), y, 3).length, 'The continuous black wall follows the marked long horizontal line');
-    assert.equal(cast(target, at(34.25, 12), at(34.25, 9), y, 3).length, 0, 'The previous central stairwell is removed');
-    assert.ok(cast(target, at(52, 14), at(52, 18), y, 4).length, 'The inside end of the left wall band turns back at the corridor');
+    assert.ok(cast(target, at(30, 13), at(30, 10.5), y, 3).length, 'The continuous black wall follows the marked long horizontal line');
+    assert.equal(cast(target, at(34.25, 16), at(34.25, 13), y, 3).length, 0, 'The previous central stairwell is removed');
+    assert.ok(cast(target, at(52, 18), at(52, 22), y, 4).length, 'The inside end of the left wall band turns back at the corridor');
     assert.ok(cast(target, at(60, 15.5), at(57, 15.5), y, 3).length, 'The right wall band has the annotated end return');
   }
   body.dispose();
@@ -139,7 +139,7 @@ test('the white connection is part of the theatre outline, with the recess road 
   assert.deepEqual(campus.features.find(f => f.id === 'way/855459414').points, building.groundPassages[0].points);
   assert.equal(building.groundPassages[0].sourcePathId, 'way/855459414');
   for (let floor = 0; floor < 6; floor++) {
-    const hits = cast(target, at(5.8, 9), at(5.8, 6.5), .12 + floor * 3.6 + 2.8, 3);
+    const hits = cast(target, at(5.8, 13), at(5.8, 10.5), .12 + floor * 3.6 + 2.8, 3);
     assert.equal(hits.length > 0, floor > 0, 'The existing road crosses the recess beneath the retained upper-floor wall');
   }
   const labLevels = buildingLevels(building), layout = laboratoryLayout(building);
@@ -163,15 +163,15 @@ test('the black stepped inner hall is identical on all six floors and connects d
   [...bodies, lab].forEach(g => group.add(mesh(g,true))); group.updateMatrixWorld();
   for(let floor=0;floor<6;floor++) {
     const y = .12 + floor * 3.6 + 1.5;
-    for(const [a,b] of [[[16,15.5],[-11,15.5]],[[-11,15.5],[-11,9.1]],[[-11,9.1],[-35,9.1]]]) {
+    for(const [a,b] of [[[16,15.5],[-11,15.5]],[[-11,15.5],[-11,13.1]],[[-11,13.1],[-35,13.1]]]) {
       const from=at(...a), to=at(...b);
       assert.equal(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,0,'The complete hallway remains open from the lab into the stepped black frame');
     }
-    for(const [a,b] of [[[-25,9.1],[-25,5]],[[-25,9.1],[-25,13]],[[-36,9.1],[-39,9.1]],[[-10,15.5],[-10,18]]]) {
+    for(const [a,b] of [[[-25,13.1],[-25,9]],[[-25,13.1],[-25,17]],[[-36,13.1],[-39,13.1]],[[-10,15.5],[-10,18]]]) {
       const from=at(...a),to=at(...b);
       assert.ok(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,'The black upper, end and stepped return walls exist on all six floors');
     }
-    for(const p of [[-10,15.5],[-35,9.1]]) assert.ok(down(group,at(...p),.12+floor*3.6+.4).length,'The internal hall has a floor on every storey');
+    for(const p of [[-10,15.5],[-35,13.1]]) assert.ok(down(group,at(...p),.12+floor*3.6+.4).length,'The internal hall has a floor on every storey');
     if(floor>=4) {
       const hit=cast(group,at(-5,19),at(-5,17),y,2)[0];
       assert.ok(hit && hit.distance<1.5,'The upper outside wall follows the green line beyond the inner black return');
@@ -231,20 +231,28 @@ test('the laboratory roof is closed and the marked corridor end is walled on eve
   geometry.dispose();
 });
 
-test('only the marked narrow ends and side passage are three metres wide; the hatched middle stays a full open hall', () => {
+test('the laboratory passages retain three metres, the theatre long end is two metres, and the middle stays a full open hall', () => {
   const { at } = laboratoryLayout(building), info = buildingLevels(theatre);
   const lab = laboratoryBodyGeometry(building,21.6,3.6), bodies = info.sections.map(p => buildingGeometry(p,p.height,3.6,theatre.groundPassages,theatre.floorCorridors.filter(c => c.partId === p.id)));
   const group = new THREE.Group(); [lab,...bodies].forEach(g => group.add(mesh(g,true))); group.updateMatrixWorld();
   for (let floor=0;floor<6;floor++) {
     const y=.12+floor*3.6+1.5;
-    for (const [from,to] of [[[67,9.1],[67,6]],[[67,9.1],[67,12]],[[57.1,35],[53,35]],[[57.1,35],[61,35]],[[-25,9.1],[-25,6]],[[-25,9.1],[-25,12]]]) {
+    for (const [from,to] of [[[62,13.1],[62,9]],[[62,13.1],[62,17]],[[57.1,35],[53,35]],[[57.1,35],[61,35]]]) {
       const hit=cast(group,at(...from),at(...to),y,5)[0];
       assert.ok(hit && Math.abs(hit.distance-1.5)<1e-4, 'Every corridor wall is exactly 1.5m from its centreline');
     }
-    assert.equal(cast(group,at(40,4),at(40,7),y,3).length,0,'The frontage up to the annotated straight line is enclosed classroom interior');
-    for(const [from,to] of [[[40,4],[40,2]],[[40,7],[40,8]]]) assert.ok(cast(group,at(...from),at(...to),y,2).length,'Both faces enclose the widened classroom');
-    for(const [a,b] of [[[40,8],[40,16.8]],[[1,12],[-11,12]],[[-10,8],[-10,16.8]]]) { const from=at(...a),to=at(...b); assert.equal(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,0,'The blue hatched middle retains its full width instead of being reduced to a 3m strip'); }
-    for(const v of [4,5.5,7]) assert.ok(down(group,at(40,v),.12+floor*3.6+.4).length,'The complete classroom depth retains its floor');
+    for(const v of [11,16]) {
+      const hit=cast(group,at(-25,13.6),at(-25,v),y,3)[0];
+      assert.ok(hit && Math.abs(hit.distance-1)<1e-4,'Only the marked theatre long end narrows to two metres');
+    }
+    for(const [a,b] of [[[-10,12],[-10,16.8]],[[1,15],[-11,15]]]) {
+      const from=at(...a),to=at(...b);
+      assert.equal(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,0,'The theatre turning area and laboratory joint keep their previous width');
+    }
+    assert.equal(cast(group,at(40,4),at(40,11),y,7).length,0,'The frontage up to the annotated straight line is enclosed classroom interior');
+    for(const [from,to] of [[[40,4],[40,2]],[[40,11],[40,12]]]) assert.ok(cast(group,at(...from),at(...to),y,2).length,'Both faces enclose the widened classroom');
+    for(const [a,b] of [[[40,12],[40,20.8]],[[1,15],[-11,15]],[[-10,12],[-10,16.8]]]) { const from=at(...a),to=at(...b); assert.equal(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,0,'The blue hatched middle retains its full width instead of being reduced to a 3m strip'); }
+    for(const v of [4,7,11]) assert.ok(down(group,at(40,v),.12+floor*3.6+.4).length,'The complete classroom depth retains its floor');
   }
   [lab,...bodies].forEach(g=>g.dispose());
 });
@@ -255,11 +263,31 @@ test('laboratory and theatre slabs share one aligned seam without overlapping se
   const lab=laboratoryBodyGeometry(building,21.6,3.6), labMesh=mesh(lab,true), info=buildingLevels(theatre);
   const bodies=info.sections.map(p=>buildingGeometry(p,p.height,3.6,theatre.groundPassages,theatre.floorCorridors.filter(c=>c.partId===p.id)));
   const theatreGroup=new THREE.Group(); bodies.forEach(g=>theatreGroup.add(mesh(g,true))); theatreGroup.updateMatrixWorld();
-  for(let floor=1;floor<6;floor++) for(const v of [7.75,8.5,10,12,14.7,16.85]) for(const side of [-1,1]) {
+  for(let floor=1;floor<6;floor++) for(const v of [11.75,12,13.5,14.7,16.85]) for(const side of [-1,1]) {
     const point=seam(v).map((n,i)=>n+unit[i]*side*.02), y=.12+floor*3.6+.4;
     assert.equal(down(labMesh,point,y).length>0,side>0,'Only the laboratory owns the laboratory side of the joint');
     assert.equal(down(theatreGroup,point,y).length>0,side<0,'Only the theatre owns the theatre side, and neither side has a floor gap');
   }
   for(let floor=0;floor<4;floor++) assert.equal(cast(labMesh,at(1.5,26),at(-1.5,26),.12+floor*3.6+1.5,3).length,0,'The lab no longer duplicates the theatre projection walls');
   [lab,...bodies].forEach(g=>g.dispose());
+});
+
+test('the marked walls and left guards move forward together while classrooms and the asymmetric hall retain continuous floors', () => {
+  const layout=laboratoryLayout(building), {at,seam,circleU,circleRadius}=layout, info=buildingLevels(building);
+  assert.deepEqual(layout.corridors[0].railEdges[0], [seam(17),at(circleU-circleRadius,17),at(circleU-circleRadius,34)], 'The complete right-hand guard stays in its original position');
+  const body=laboratoryBodyGeometry(building,info.height,info.floorHeight), target=mesh(body,true);
+  const rails=teachingRailGeometry({...building,floorCorridors:layout.corridors},info.sections,info.floorHeight), guard=mesh(rails);
+  const branchRight=circleU+circleRadius;
+  for(let floor=0;floor<6;floor++) {
+    const level=.12+floor*info.floorHeight, eye=level+1.5;
+    assert.equal(cast(target,at(40,7),at(40,11),eye,4).length,0,'The previous classroom partition no longer cuts through the enlarged interior');
+    const wall=cast(target,at(40,12.5),at(40,10.5),eye,2)[0];
+    assert.ok(wall && Math.abs(wall.distance-.9)<1e-4,'The replacement inner wall stands four metres farther forward');
+    for(const v of [8,10,11]) assert.ok(down(target,at(40,v),level+.4).length,'The added classroom depth keeps a solid floor');
+    for(const u of [branchRight-.02,branchRight+.02]) for(const v of [17.1,19,20.9]) assert.ok(down(target,at(u,v),level+.4).length,'The shifted left side and fixed right side meet without a floor crack');
+    assert.equal(cast(guard,at(45,18),at(45,16),level+.25+1.05,2).length,0,'The former left guard does not remain across the expanded hall');
+    assert.ok(cast(guard,at(45,22),at(45,20),level+.25+1.05,2).length,'The left guard follows the shifted front edge');
+    assert.ok(cast(guard,at(22,18),at(22,16),level+.25+1.05,2).length,'The right guard stays on the fixed front edge');
+  }
+  body.dispose(); rails.dispose();
 });

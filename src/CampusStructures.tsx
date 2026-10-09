@@ -14,6 +14,18 @@ import GateLandmark from './GateLandmark';
 import LakeGarden from './LakeGarden';
 import MottoStone from './MottoStone';
 import FlagPlatform from './FlagPlatform';
+import { garageRampGeometry } from './garage-ramp-geometry';
+
+function GarageEntrance({ feature }: { feature: Feature }) {
+  const mapColor = useMapColor();
+  const geometry = useMemo(() => garageRampGeometry(feature), [feature]);
+  useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
+  return <group>
+    <mesh geometry={geometry.floor}><meshStandardMaterial color={mapColor('#929f9c')} roughness={1} side={THREE.DoubleSide} /></mesh>
+    {[geometry.leftWall, geometry.rightWall].map((wall, i) => <mesh key={i} geometry={wall}><meshStandardMaterial color={mapColor('#d7d2c3')} roughness={.95} side={THREE.DoubleSide} /></mesh>)}
+    <mesh geometry={geometry.doorway}><meshBasicMaterial color={mapColor('#263832')} side={THREE.DoubleSide} /></mesh>
+  </group>;
+}
 
 function Segment({ from, to, width, y, thickness, color, ghost = false }: { from: Point; to: Point; width: number; y: number; thickness: number; color: string; ghost?: boolean }) {
   const mapColor = useMapColor();
@@ -154,6 +166,7 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
       return underground && area ? <UndergroundArea key={feature.id} {...area} labelPortal={labelPortal} /> : null;
     }
     if (!feature.points || feature.points.length < 2) return null;
+    if (feature.type === 'garageEntrance' && feature.ramp && feature.points.length === 2) return <GarageEntrance key={feature.id} feature={feature} />;
     if (feature.type === 'undergroundTrack') return underground ? <UndergroundRunway key={feature.id} feature={feature} labelPortal={labelPortal} /> : null;
     if (feature.type === 'bridge') return <Bridge key={feature.id} feature={feature} buildings={buildings} overrides={overrides} labelPortal={labelPortal} />;
     if (feature.type === 'tunnelEntrance') return <Entrance key={feature.id} feature={feature} underground={underground} labelPortal={labelPortal} />;

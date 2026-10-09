@@ -35,24 +35,27 @@ export function laboratoryLayout(building: Building) {
   const corridorWest = 49.6;
   // Three metres applies to the two narrow ends and side passage. The
   // central blue area is the full shared hall, not a uniform three-metre strip.
-  const corridorWidth = 3, corridorFront = 7.6, endReturn = corridorFront + corridorWidth;
+  // Move the marked inner walls into the hall, retaining the classroom's back
+  // edge and the right-hand guards while its usable depth increases.
+  const forward = 4, corridorWidth = 3, corridorFront = 7.6 + forward, endReturn = corridorFront + corridorWidth;
+  const leftFront = 17 + forward;
   const sideLeft = 57.1 - corridorWidth / 2, sideRight = sideLeft + corridorWidth;
   const circleRadius = 7.2, circleU = corridorWest - roomWidth * 2 - circleRadius;
   const circle = shape(Array.from({ length: 24 }, (_, i): Point => [circleU + Math.cos(i * Math.PI / 12) * circleRadius, 34 + Math.sin(i * Math.PI / 12) * circleRadius]));
   const corner = building.facade?.connectionWall?.at(-2) || building.outer[1], reach = (corner[0] - origin[0]) * inward[0] + (corner[1] - origin[1]) * inward[1];
   const seam = (v: number): Point => origin.map((n, i) => n + (corner[i] - n) * v / reach) as Point;
   const classrooms: Shape = { outer: [origin, building.outer[10], building.outer[9], building.outer[8], at(68.85, corridorFront), seam(corridorFront), origin], holes: [] };
-  const rooms = [circle, rectangle(corridorWest, 17, sideLeft, 56.6), shape([[sideRight,endReturn],[68.85,endReturn],[68.85,14],[65,14],[65,56.6],[sideRight,56.6]]), classrooms];
+  const rooms = [circle, rectangle(corridorWest, leftFront, sideLeft, 56.6), shape([[sideRight,endReturn],[68.85,endReturn],[68.85,14 + forward],[65,14 + forward],[65,56.6],[sideRight,56.6]]), classrooms];
   const stairU = 20.48 - roomWidth / 2;
   const stair: BuildingStairwell = {
-    partId: 'main', origin: at(stairU, 6.12), axis: [-inward[0], -inward[1]], width: stairWidth, run: 3.2, landingDepth: .8, stepsPerFlight: 11,
-    opening: rectangle(stairU - roomWidth / 2, WALL, stairU + roomWidth / 2, corridorFront),
+    partId: 'main', origin: at(stairU, 6.12 + forward), axis: [-inward[0], -inward[1]], width: stairWidth, run: 3.2, landingDepth: .8, stepsPerFlight: 11, firstFlight: 'left',
+    opening: rectangle(stairU - roomWidth / 2, WALL + forward, stairU + roomWidth / 2, corridorFront),
   };
   const branchLeft = circleU - circleRadius, branchRight = circleU + circleRadius;
   const connectionEdge = seam(17);
   const walkways: Shape[] = [
-    { outer: [seam(corridorFront), at(68.85,corridorFront), at(68.85,endReturn), at(sideRight,endReturn), at(sideRight,17), connectionEdge, seam(corridorFront)], holes: [] },
-    rectangle(branchLeft, 17, branchRight, 34), rectangle(sideLeft, 17, sideRight, 56.6),
+    { outer: [seam(corridorFront), at(68.85,corridorFront), at(68.85,endReturn), at(sideRight,endReturn), at(sideRight,leftFront), at(branchRight,leftFront), at(branchRight,17), connectionEdge, seam(corridorFront)], holes: [] },
+    rectangle(branchLeft, 17, branchRight, 34), rectangle(sideLeft, leftFront, sideRight, 56.6),
   ];
   // Keep the classroom band and full central hall on their marked sides of
   // the long straight wall. The theatre owns its outside walls and projection.
@@ -65,9 +68,9 @@ export function laboratoryLayout(building: Building) {
   ];
   const railEdges = [
     [connectionEdge, at(branchLeft, 17), at(branchLeft, 34)],
-    [at(branchRight, 34), at(branchRight, 17), at(49.6, 17)],
+    [at(branchRight, 34), at(branchRight, leftFront), at(corridorWest, leftFront)],
   ];
-  const corridors: FloorCorridor[] = [{ partId: 'main', depth: corridorWidth, startFloor: 1, points: [seam(12), at(57.1,12)], railEdges }];
+  const corridors: FloorCorridor[] = [{ partId: 'main', depth: corridorWidth, startFloor: 1, points: [seam(12 + forward), at(57.1,12 + forward)], railEdges }];
   return { at, seam, rooms, walls, walkways, stair, stairU, doors, corridors, circleU, circleRadius, corridorWest, roomWidth };
 }
 
@@ -88,15 +91,18 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
   for (let floor = 0; floor * floorHeight < height; floor++) {
     const bottom = floor * floorHeight, top = Math.min(bottom + floorHeight, height);
     const groundPassages = floor === 0 ? building.groundPassages || [] : [];
+    const openings = floor === 0 ? snapFootprint((building.groundFloorOpenings || []).map(polygon)) : [];
     for (const [outer, ...holes] of walls) {
       const shape = { outer: outer as Point[], holes: holes as Point[][] };
       const doorTop = Math.min(bottom + 2.65, top);
-      add(shape, bottom + SLAB, doorTop, true, [...layout.doors, ...groundPassages]);
+      const lower = openings.length ? polygonClipping.difference(polygon(shape), openings) : [polygon(shape)];
+      for (const [lowerOuter, ...lowerHoles] of lower) add({ outer: lowerOuter as Point[], holes: lowerHoles as Point[][] }, bottom + SLAB, doorTop, true, [...layout.doors, ...groundPassages]);
       add(shape, doorTop, top, true, groundPassages);
     }
     let plates = floorPlate;
     if (floor) plates = polygonClipping.difference(plates, snapFootprint([polygon(stairwellShaft(layout.stair))]));
     if (groundPassages.length) plates = polygonClipping.difference(plates, snapFootprint(groundPassages.map(p => polygon(passageShape(p)))));
+    if (openings.length) plates = polygonClipping.difference(plates, openings);
     for (const [outer, ...holes] of plates) add({ outer: outer as Point[], holes: holes as Point[][] }, bottom, Math.min(bottom + SLAB, top), false);
   }
   // The concrete roof follows the occupied building, below the larger glass canopy.
