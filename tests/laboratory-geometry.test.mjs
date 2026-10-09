@@ -156,22 +156,29 @@ test('the white connection is part of the theatre outline, with the recess road 
   theatreBodies.forEach(g => g.dispose()); body.dispose(); rails.dispose();
 });
 
-test('the black stepped inner hall is identical on all six floors and connects directly to the laboratory', () => {
+test('the white marked hall has a straight upper wall and retained lower return on all six floors', () => {
   const {at} = laboratoryLayout(building), info = buildingLevels(theatre);
+  assert.deepEqual(corrections.buildings.find(b => b.id === theatre.id).floorCorridors, theatre.floorCorridors, 'Refreshing the map retains the same marked walls');
   const bodies = info.sections.map(p => buildingGeometry(p, p.height, info.floorHeight, theatre.groundPassages, theatre.floorCorridors.filter(c => c.partId === p.id)));
   const lab = laboratoryBodyGeometry(building, 21.6, 3.6), group = new THREE.Group();
   [...bodies, lab].forEach(g => group.add(mesh(g,true))); group.updateMatrixWorld();
   for(let floor=0;floor<6;floor++) {
     const y = .12 + floor * 3.6 + 1.5;
-    for(const [a,b] of [[[16,15.5],[-11,15.5]],[[-11,15.5],[-11,13.1]],[[-11,13.1],[-35,13.1]]]) {
+    for(const [a,b] of [[[16,15.5],[-11,15.5]],[[-11,15.5],[-11,12.6]],[[-11,12.6],[-35,12.6]],[[.1,11.8],[-35,11.8]]]) {
       const from=at(...a), to=at(...b);
-      assert.equal(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,0,'The complete hallway remains open from the lab into the stepped black frame');
+      assert.equal(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,0,'The hallway connects to the lab and the former upper-wall step is gone');
     }
-    for(const [a,b] of [[[-25,13.1],[-25,9]],[[-25,13.1],[-25,17]],[[-36,13.1],[-39,13.1]],[[-10,15.5],[-10,18]]]) {
+    for(const u of [-2,-12,-13,-25,-35]) {
+      const upper=cast(group,at(u,12.6),at(u,10.6),y,2)[0];
+      assert.ok(upper && Math.abs(upper.distance-1)<1e-4,'The entire upper wall lies on one straight line at v11.6');
+    }
+    const returnWall=cast(group,at(-11.5,15.5),at(-13.5,15.5),y,2)[0];
+    assert.ok(returnWall && Math.abs(returnWall.distance-1)<1e-4,'The lower return stays at u=-12.5');
+    for(const [a,b] of [[[-25,12.6],[-25,9]],[[-25,12.6],[-25,17]],[[-36,12.6],[-39,12.6]],[[-10,15.5],[-10,18]]]) {
       const from=at(...a),to=at(...b);
-      assert.ok(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,'The black upper, end and stepped return walls exist on all six floors');
+      assert.ok(cast(group,from,to,y,Math.hypot(to[0]-from[0],to[1]-from[1])).length,'The upper, end and lower return walls exist on all six floors');
     }
-    for(const p of [[-10,15.5],[-35,13.1]]) assert.ok(down(group,at(...p),.12+floor*3.6+.4).length,'The internal hall has a floor on every storey');
+    for(const p of [[-10,15.5],[-2,11.8],[-12.48,12.6],[-12.52,12.6],[-35,12.6]]) assert.ok(down(group,at(...p),.12+floor*3.6+.4).length,'The shifted hallway keeps a continuous floor through the return');
     if(floor>=4) {
       const hit=cast(group,at(-5,19),at(-5,17),y,2)[0];
       assert.ok(hit && hit.distance<1.5,'The upper outside wall follows the green line beyond the inner black return');
@@ -242,7 +249,7 @@ test('the laboratory passages retain three metres, the theatre long end is two m
       assert.ok(hit && Math.abs(hit.distance-1.5)<1e-4, 'Every corridor wall is exactly 1.5m from its centreline');
     }
     for(const v of [11,16]) {
-      const hit=cast(group,at(-25,13.6),at(-25,v),y,3)[0];
+      const hit=cast(group,at(-25,12.6),at(-25,v),y,3)[0];
       assert.ok(hit && Math.abs(hit.distance-1)<1e-4,'Only the marked theatre long end narrows to two metres');
     }
     for(const [a,b] of [[[-10,12],[-10,16.8]],[[1,15],[-11,15]]]) {
