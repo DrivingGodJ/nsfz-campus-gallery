@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 682,
+  "revision": 686,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -5390,12 +5390,12 @@
       "uploadedAt": "2026-10-08T12:47:27.279Z",
       "captureType": "ground",
       "position": {
-        "x": 60.69432848312795,
-        "z": -52.22560902150217
+        "x": 60.88965943416322,
+        "z": -50.532612910984824
       },
       "placed": true,
-      "heading": 259.44920416294485,
-      "pitch": 2.8215107915404336,
+      "heading": 262.9816727347636,
+      "pitch": 2.299560226570309,
       "width": 3942,
       "height": 7008,
       "downloadBytes": 4846844,
