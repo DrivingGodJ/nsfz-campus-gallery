@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 686,
+  "revision": 688,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -8437,8 +8437,8 @@
       "uploadedAt": "2026-10-09T06:28:43.920Z",
       "captureType": "ground",
       "position": {
-        "x": 86.53628542201201,
-        "z": -53.279163956309155
+        "x": 85.50525917681404,
+        "z": -57.061621475133705
       },
       "placed": true,
       "heading": 170.60869306111056,
