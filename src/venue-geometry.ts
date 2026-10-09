@@ -69,43 +69,9 @@ export function standsFrame(building: Building) {
 
 export function standsArchitecture(building: Building, height: number, floorHeight: number, cutawayHeight?: number) {
   const frame = standsFrame(building), { at, length, width } = frame, shown = Math.min(height, cutawayHeight ?? height);
-  const cutouts = (building.cutouts || []).filter(cut => cut.partId === 'main');
-  const origin = building.outer[0], determinant = frame.along[0] * frame.across[1] - frame.along[1] * frame.across[0];
-  const slots = cutouts.map(cut => {
-    const points = cut.outer.map(p => { const x = p[0] - origin[0], z = p[1] - origin[1]; return [(x * frame.across[1] - z * frame.across[0]) / determinant, (frame.along[0] * z - frame.along[1] * x) / determinant]; });
-    return { u0: Math.min(...points.map(p => p[0])), u1: Math.max(...points.map(p => p[0])), v0: Math.min(...points.map(p => p[1])), v1: Math.max(...points.map(p => p[1])) };
-  });
   const bodyParts: THREE.BufferGeometry[] = [], blue: THREE.BufferGeometry[] = [], green: THREE.BufferGeometry[] = [], red: THREE.BufferGeometry[] = [];
   const canopy: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [], rails: THREE.BufferGeometry[] = [], glass: THREE.BufferGeometry[] = [];
   const point = (u: number, v: number, y: number): Vector => { const p = at(u, v); return [p[0], BASE + y, p[1]]; };
-  // The adjoining white stair occupies one explicit rectangle. Split only boxes
-  // intersecting it; untouched seating keeps its original positions and sizes.
-  const standBox = (parts: THREE.BufferGeometry[], u: number, v: number, bottom: number, top: number, span: number, depth: number) => {
-    let rectangles = [{ u0: u - span / 2, u1: u + span / 2, v0: v - depth / 2, v1: v + depth / 2 }];
-    for (const slot of slots) rectangles = rectangles.flatMap(rectangle => {
-      const u0 = Math.max(rectangle.u0, slot.u0), u1 = Math.min(rectangle.u1, slot.u1), v0 = Math.max(rectangle.v0, slot.v0), v1 = Math.min(rectangle.v1, slot.v1);
-      if (u1 <= u0 || v1 <= v0) return [rectangle];
-      return [{ ...rectangle, u1: u0 }, { ...rectangle, u0: u1 }, { u0, u1, v0: rectangle.v0, v1: v0 }, { u0, u1, v0: v1, v1: rectangle.v1 }]
-        .filter(rectangle => rectangle.u1 - rectangle.u0 > 1e-6 && rectangle.v1 - rectangle.v0 > 1e-6);
-    });
-    for (const rectangle of rectangles) add(parts, box(frame, (rectangle.u0 + rectangle.u1) / 2, (rectangle.v0 + rectangle.v1) / 2, bottom, top, rectangle.u1 - rectangle.u0, rectangle.v1 - rectangle.v0, shown));
-  };
-  const standRail = (u0: number, v0: number, y0: number, u1: number, v1: number, y1: number, thickness: number) => {
-    let intervals = [[0, 1]];
-    for (const slot of slots) {
-      let start = 0, end = 1;
-      for (const [from, delta, minimum, maximum] of [[u0, u1 - u0, slot.u0, slot.u1], [v0, v1 - v0, slot.v0, slot.v1]]) {
-        if (Math.abs(delta) < 1e-8) { if (from < minimum - thickness / 2 || from > maximum + thickness / 2) end = -1; }
-        else {
-          const a = (minimum - thickness / 2 - from) / delta, b = (maximum + thickness / 2 - from) / delta;
-          start = Math.max(start, Math.min(a, b)); end = Math.min(end, Math.max(a, b));
-        }
-      }
-      if (end < start) continue;
-      intervals = intervals.flatMap(([a, b]) => end <= a || start >= b ? [[a, b]] : [[a, Math.max(a, start)], [Math.min(b, end), b]].filter(([a, b]) => b - a > 1e-6));
-    }
-    for (const [a, b] of intervals) add(rails, bar(point(u0 + (u1 - u0) * a, v0 + (v1 - v0) * a, y0 + (y1 - y0) * a), point(u0 + (u1 - u0) * b, v0 + (v1 - v0) * b, y0 + (y1 - y0) * b), thickness, shown));
-  };
   const inner = [at(.35, .35), at(length - .35, .35), at(length - .35, width - .35), at(.35, width - .35)];
   const shell: Shape = { outer: building.outer, holes: [[...inner, inner[0]]] };
   const opening = (u: number, span: number): GroundPassage => ({ id: `stand-${u}`, sourcePathId: '', width: span, points: [at(u, -1), at(u, 1)] });
@@ -117,18 +83,18 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     const bottom = bands[i - 1], top = bands[i];
     if (top <= bottom) continue;
     const cuts = [...(top <= 2.8 ? doors : []), ...(bottom >= .65 && top <= 2.55 ? windows : [])];
-    const geometry = buildingGeometry(shell, top - bottom, floorHeight, cuts, [], [], undefined, [], cutouts); geometry.translate(0, 0, bottom); bodyParts.push(geometry);
+    const geometry = buildingGeometry(shell, top - bottom, floorHeight, cuts); geometry.translate(0, 0, bottom); bodyParts.push(geometry);
   }
   for (const [bottom, top] of [[0, .2], [floorHeight - .22, floorHeight]]) {
     const end = Math.min(top, shown);
     if (end <= bottom || (cutawayHeight !== undefined && top >= shown - 1e-6 && bottom > 0)) continue;
-    const slab = buildingGeometry(building, end - bottom, floorHeight, [], [], [], undefined, [], cutouts); slab.translate(0, 0, bottom); bodyParts.push(slab);
+    const slab = buildingGeometry(building, end - bottom, floorHeight); slab.translate(0, 0, bottom); bodyParts.push(slab);
   }
   for (const cut of windows) {
     const u = Number(cut.id.slice(6)), top = Math.min(2.55, shown);
-    standBox(glass, u, .13, .65, top, cut.width, .04);
-    for (const x of [u - cut.width / 2, u, u + cut.width / 2]) standBox(frames, x, .13, .65, top, .06, .065);
-    for (const y of [.65, 2.55]) standBox(frames, u, .13, y - .03, y + .03, cut.width, .065);
+    add(glass, box(frame, u, .13, .65, top, cut.width, .04));
+    for (const x of [u - cut.width / 2, u, u + cut.width / 2]) add(frames, box(frame, x, .13, .65, top, .06, .065));
+    for (const y of [.65, 2.55]) add(frames, box(frame, u, .13, y - .03, y + .03, cut.width, .065, shown));
   }
   // A stair/control block occupies the photographed end; it does not change the
   // imported building footprint or add a false third storey over all the seats.
@@ -140,51 +106,33 @@ export function standsArchitecture(building: Building, height: number, floorHeig
   }
   const rows = 10, deck = floorHeight, tread = (width - 2.1) / rows, rise = Math.min(.32, floorHeight / rows), aisles = [length * .27, length * .53, length * .78];
   if (shown > deck + .001) {
-    standBox(frames, (towerWidth + length) / 2, .95, deck - .18, deck, length - towerWidth, 1.9);
+    add(frames, box(frame, (towerWidth + length) / 2, .95, deck - .18, deck, length - towerWidth, 1.9, shown));
     for (let row = 0; row < rows; row++) {
       const top = deck + (row + 1) * rise, v = 1.9 + (row + .5) * tread;
       const boundaries = [towerWidth, ...aisles.flatMap(u => [u - 1.1, u + 1.1]), length - .2];
       for (let section = 0; section < boundaries.length - 1; section += 2) {
         const from = boundaries[section], to = boundaries[section + 1];
         const parts = section % 6 === 0 ? blue : section % 6 === 2 ? red : green;
-        standBox(parts, (from + to) / 2, v, deck - .15, top, to - from, tread);
+        add(parts, box(frame, (from + to) / 2, v, deck - .15, top, to - from, tread, shown));
       }
-      for (const u of aisles) for (let half = 0; half < 2; half++) standBox(frames, u, v - tread / 4 + half * tread / 2, deck - .15, deck + row * rise + rise * (half + 1) / 2, 2.2, tread / 2);
+      for (const u of aisles) for (let half = 0; half < 2; half++) add(frames, box(frame, u, v - tread / 4 + half * tread / 2, deck - .15, deck + row * rise + rise * (half + 1) / 2, 2.2, tread / 2, shown));
     }
     for (const v of [.1, width - .12]) {
       const base = v < 1 ? deck : deck + rows * rise;
-      for (const y of [.55, 1.02]) standRail(towerWidth, v, base + y, length - .2, v, base + y, .05);
-      for (let u = towerWidth; u < length; u += 1.4) standRail(u, v, base, u, v, base + 1.05, .045);
+      for (const y of [.55, 1.02]) add(rails, bar(point(towerWidth, v, base + y), point(length - .2, v, base + y), .05, shown));
+      for (let u = towerWidth; u < length; u += 1.4) add(rails, bar(point(u, v, base), point(u, v, base + 1.05), .045, shown));
     }
-    for (const u of aisles) for (const offset of [-1.1, 1.1]) standRail(u + offset, 1.9, deck + 1, u + offset, width - .1, deck + rows * rise + 1, .055);
-    // Guard the two exposed seating edges beside the stair pocket. Follow the
-    // existing terrace heights and leave the stair/office entries clear.
-    for (const slot of slots) {
-      const u = slot.u0 - .08;
-      if (slot.v0 < 1.9) {
-        for (const offset of [.5, 1.02]) standRail(u, slot.v0, deck + offset, u, Math.min(slot.v1, 1.9), deck + offset, .05);
-        for (const v of [slot.v0, Math.min(slot.v1, 1.9)]) standRail(u, v, deck, u, v, deck + 1.05, .045);
-      }
-      for (let row = 0; row < rows; row++) {
-        const from = Math.max(slot.v0, 1.9 + row * tread), to = Math.min(slot.v1, 1.9 + (row + 1) * tread), base = deck + (row + 1) * rise;
-        if (to <= from) continue;
-        for (const offset of [.5, 1.02]) standRail(u, from, base + offset, u, to, base + offset, .05);
-        for (const v of [from, to]) standRail(u, v, base, u, v, base + 1.05, .045);
-      }
-      const v = slot.v1 + .08, base = deck + Math.min(rows, Math.max(1, Math.ceil((v - 1.9) / tread))) * rise;
-      for (const offset of [.5, 1.02]) standRail(u, v, base + offset, Math.min(length - .2, slot.u1), v, base + offset, .05);
-      for (let station = u; station <= Math.min(length - .2, slot.u1); station += .7) standRail(station, v, base, station, v, base + 1.05, .045);
-    }
+    for (const u of aisles) for (const offset of [-1.1, 1.1]) add(rails, bar(point(u + offset, 1.9, deck + 1), point(u + offset, width - .1, deck + rows * rise + 1), .055, shown));
   }
   const canopyBottom = Math.min(height - .45, deck + rows * rise + 2.55), canopyShown = cutawayHeight === undefined || cutawayHeight > canopyBottom + .32;
   if (canopyShown && shown > canopyBottom) {
     // DSC06875 places the partial roof toward the adjoining office (u+).
     const u0 = length * .35, u1 = length * .90;
-    standBox(canopy, (u0 + u1) / 2, width / 2, canopyBottom, canopyBottom + .28, u1 - u0, width - .2);
+    add(canopy, box(frame, (u0 + u1) / 2, width / 2, canopyBottom, canopyBottom + .28, u1 - u0, width - .2, shown));
     for (let i = 0; i < 5; i++) {
       const u = u0 + (u1 - u0) * i / 4;
-      standBox(frames, u, width - .65, deck + rows * rise - .32, canopyBottom, .3, .3);
-      standBox(frames, u, width / 2, canopyBottom - .24, canopyBottom, .18, width - .35);
+      add(frames, box(frame, u, width - .65, deck + rows * rise - .32, canopyBottom, .3, .3, shown));
+      add(frames, box(frame, u, width / 2, canopyBottom - .24, canopyBottom, .18, width - .35, shown));
     }
   }
   return { body: combined(bodyParts, true), tiersBlue: combined(blue), tiersGreen: combined(green), tiersRed: combined(red), canopy: combined(canopy), frames: combined(frames), glass: combined(glass), rails: combined(rails) };

@@ -84,13 +84,21 @@ export function bridgeLayout(feature: Feature, height: number) {
     }
     return bridgeSurfaceHeight(feature, height, point);
   };
+  const groundApproaches = stairs.flatMap(stair => stair.landings.filter(landing => near(landing.to, stair.to) && Math.abs(landing.height - stair.bottom) < 1e-6));
+  const onGroundApproach = (from: Point, to: Point) => groundApproaches.some(landing => {
+    const dx = landing.to[0] - landing.from[0], dz = landing.to[1] - landing.from[1], length = Math.hypot(dx, dz);
+    return [from, to].every(point => {
+      const x = point[0] - landing.from[0], z = point[1] - landing.from[1];
+      const along = (x * dx + z * dz) / length;
+      return along >= -1e-6 && along <= length + 1e-6 && Math.abs(x * dz - z * dx) / length <= width / 2 + 1e-6;
+    });
+  });
   const railChains: RailPoint[][] = [];
   for (const shape of footprint) for (const ring of [shape.outer, ...shape.holes]) {
     const chains: Point[][] = []; let chain: Point[] = [];
     for (let i = 1; i < ring.length; i++) {
       const from = ring[i - 1], to = ring[i];
       if (onOpening(from, to)) { if (chain.length) chains.push(chain); chain = []; continue; }
-      if (!chain.length) chain.push(from);
       // Cut rails at every flight/platform joint so the middle and ground
       // landings stay level instead of becoming another long sloping rail.
       const cuts = [0, 1];
@@ -105,7 +113,16 @@ export function bridgeLayout(feature: Feature, height: number) {
           if (Number.isFinite(t) && t > 1e-7 && t < 1 - 1e-7) cuts.push(t);
         }
       }
-      for (const t of [...new Set(cuts)].sort((a, b) => a - b).slice(1)) chain.push(from.map((n, j) => n + (to[j] - n) * t) as Point);
+      const ordered = [...new Set(cuts)].sort((a, b) => a - b);
+      for (let n = 1; n < ordered.length; n++) {
+        const a = from.map((value, j) => value + (to[j] - value) * ordered[n - 1]) as Point;
+        const b = from.map((value, j) => value + (to[j] - value) * ordered[n]) as Point;
+        // The field-level continuation is an open path. Stop both guards at
+        // the last stair tread; their shared chains also bound the wire mesh.
+        if (onGroundApproach(a, b)) { if (chain.length) chains.push(chain); chain = []; continue; }
+        if (!chain.length) chain.push(a);
+        chain.push(b);
+      }
     }
     if (chain.length) chains.push(chain);
     if (chains.length > 1 && near(chains.at(-1)!.at(-1)!, chains[0][0])) {

@@ -10,6 +10,7 @@ import { TEACHING_ID, teachingDetailGeometry } from './teaching-details';
 import { teachingClassroomFurniture } from './teaching-classroom-furniture';
 import { OFFICE_ID } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
+import { STAND_OFFICE_ID, standOfficeWindows } from './stand-office-geometry';
 import type { Building, BuildingPart } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -27,6 +28,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   const stairs = useMemo(() => teachingStairGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
   const windows = useMemo(() => {
     const visibleHeight = Math.min(Math.max(...sections.map(section => section.height)), cutawayHeight ?? Infinity);
+    if (building.id === STAND_OFFICE_ID) return classroomGlazingGeometry(standOfficeWindows(building, visibleHeight, floorHeight), building.classroomWindows);
     if (building.id === OFFICE_ID) return classroomGlazingGeometry(officeWindowLayout(building, visibleHeight, floorHeight), building.classroomWindows);
     if (building.facade?.type === 'laboratory') return classroomGlazingGeometry(laboratoryWindows(building, visibleHeight, floorHeight), building.classroomWindows);
     if (building.facade?.type === 'dormitory') {

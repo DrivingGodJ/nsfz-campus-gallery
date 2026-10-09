@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { BRIDGE_DECK_THICKNESS, bridgeLayout, bridgeRailPosts, bridgeSupports } from '../src/bridge-geometry.ts';
 import { bridgeHeight, straightStairTreads } from '../src/structure-geometry.ts';
+import { bridgeNetGeometry } from '../src/bridge-net-geometry.ts';
 
 const distanceToRing = (point, ring) => Math.min(...ring.slice(1).map((to, i) => {
   const from = ring[i], dx = to[0] - from[0], dz = to[1] - from[1];
@@ -24,11 +25,14 @@ test('bridge rails follow the joined perimeter, leave all three exits open and m
     assert.equal(layout.railChains.length, 3, 'Each open exit separates adjacent perimeter rail chains');
     const ends = layout.railChains.flatMap(chain => [chain[0], chain.at(-1)]);
     for (const connection of bridge.connections) {
-      const terminal = connection.points.at(-1), previous = connection.points.at(-2);
+      const stair = layout.stairs.find(stair => stair.id === connection.id);
+      const terminal = stair?.landings.some(landing => landing.height === stair.bottom && landing.to === stair.to)
+        ? stair.flights.at(-1).to : connection.points.at(-1);
+      const previous = connection.points.at(-2);
       const length = Math.hypot(terminal[0] - previous[0], terminal[1] - previous[1]);
       const direction = terminal.map((n, i) => (n - previous[i]) / length);
       const portal = ends.filter(point => Math.abs((point[0] - terminal[0]) * direction[0] + (point[2] - terminal[1]) * direction[1]) < 1e-6);
-      assert.equal(portal.length, 2, connection.id + ' has one rail endpoint at each side');
+      assert.equal(portal.length, 2, connection.id + ' has one rail endpoint at each side of its guarded exit');
       for (const point of portal) {
         assert.ok(Math.abs(Math.hypot(point[0] - terminal[0], point[2] - terminal[1]) - bridge.width / 2) < 1e-6);
         assert.ok(Math.abs(point[1] - (connection.type === 'stairs' ? connection.groundHeight : height)) < 1e-6);
@@ -88,7 +92,7 @@ test('playground stair flights descend through a level middle landing and meet t
       if (height === 5.52) assert.equal(treads.length, 5, 'Each normal flight has five steps, rather than metre-deep treads');
     }
     const dx = stair.to[0] - stair.from[0], dz = stair.to[1] - stair.from[1], span = Math.hypot(dx, dz);
-    const profile = [first, { ...middle, top: middle.height, bottom: middle.height }, second, { ...ground, top: ground.height, bottom: ground.height }];
+    const profile = [first, { ...middle, top: middle.height, bottom: middle.height }, second];
     for (const segment of profile) for (const side of [-1, 1]) {
       const endpoints = [segment.from, segment.to].map((point, i) => [point[0] + side * dz / span * bridge.width / 2,
         i ? segment.bottom : segment.top, point[1] - side * dx / span * bridge.width / 2]);
@@ -98,8 +102,19 @@ test('playground stair flights descend through a level middle landing and meet t
       assert.ok(layout.railChains.some(chain => chain.slice(1).some((to, i) => {
         const from = chain[i], length = Math.hypot(...to.map((n, j) => n - from[j]));
         return Math.abs(Math.hypot(...center.map((n, j) => n - from[j])) + Math.hypot(...to.map((n, j) => n - center[j])) - length) < 1e-6;
-      })), 'Rails follow each slope and stay flat over the middle and ground platforms');
+      })), 'Rails follow both slopes and stay flat over the middle platform');
     }
+    const railPoints = [...layout.railChains.flat(), ...bridgeRailPosts(layout.railChains)];
+    const net = bridgeNetGeometry(bridge, layout.railChains), wires = net.attributes.position;
+    try {
+      for (let n = 0; n < wires.count; n++) railPoints.push([wires.getX(n), wires.getY(n), wires.getZ(n)]);
+      for (const point of railPoints) {
+        const along = ((point[0] - ground.from[0]) * dx + (point[2] - ground.from[1]) * dz) / span;
+        const across = Math.abs((point[0] - ground.from[0]) * dz - (point[2] - ground.from[1]) * dx) / span;
+        assert.ok(along <= 1e-5 || along > distance(ground.from, ground.to) + 1e-5 || across > bridge.width / 2 + 1e-5,
+          'No side guard, post or wire continues beyond the last flight onto the level ground approach');
+      }
+    } finally { net.dispose(); }
     const oldStair = layout.stairs.find(stair => stair.id === 'upper-road-stairs');
     assert.equal(oldStair.flights.length, 1, 'Unmarked stairs retain the existing straight descent');
     assert.deepEqual(oldStair.landings, []);
