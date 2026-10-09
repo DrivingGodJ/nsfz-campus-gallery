@@ -41,7 +41,9 @@ test('stands have real ascending terraces, clear stair aisles, a partial canopy,
   assert.equal(aisle.length, 0, 'Colour seating blocks leave the stair aisle free');
   assert.ok(down([mesh(model.frames)], frame.at(frame.length * .53, frame.width / 2)).length, 'The free aisle has stair treads');
   assert.ok(down([mesh(model.canopy)], frame.at(frame.length / 2, frame.width / 2)).length);
-  assert.equal(down([mesh(model.canopy)], frame.at(frame.length * .9, frame.width / 2)).length, 0, 'The canopy covers the photographed middle only');
+  assert.ok(down([mesh(model.canopy)], frame.at(frame.length * .85, frame.width / 2)).length, 'The canopy shifts toward the adjoining office');
+  assert.equal(down([mesh(model.canopy)], frame.at(frame.length * .27, frame.width / 2)).length, 0, 'The old opposite-end canopy area is uncovered');
+  assert.equal(down([mesh(model.canopy)], frame.at(frame.length * .96, frame.width / 2)).length, 0, 'The roof remains partial rather than covering all seats');
   const body = mesh(model.body, true), origin = frame.at(frame.length * .4, frame.width / 2);
   assert.equal(new THREE.Raycaster(new THREE.Vector3(origin[0], 1.6, origin[1]), new THREE.Vector3(frame.along[0], 0, frame.along[1]), 0, 3).intersectObject(body).length, 0, 'Ground housing is hollow');
   const entry = frame.at(frame.length * .5, -1);

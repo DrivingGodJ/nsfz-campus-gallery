@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { BRIDGE_DECK_THICKNESS, bridgeLayout, bridgeRailPosts, bridgeSupports } from '../src/bridge-geometry.ts';
-import { bridgeHeight } from '../src/structure-geometry.ts';
+import { bridgeHeight, straightStairTreads } from '../src/structure-geometry.ts';
 
 const distanceToRing = (point, ring) => Math.min(...ring.slice(1).map((to, i) => {
   const from = ring[i], dx = to[0] - from[0], dz = to[1] - from[1];
@@ -54,6 +54,63 @@ test('bridge rails follow the joined perimeter, leave all three exits open and m
     for (let i = 0; i < posts.length; i++) for (let j = i + 1; j < posts.length; j++) assert.ok(Math.hypot(...posts[i].map((n, k) => n - posts[j][k])) >= .3 - 1e-7, 'No doubled or crowded corner posts');
   }
   assert.equal(JSON.stringify([bridge, site]), before);
+});
+
+test('playground stair flights descend through a level middle landing and meet the original terminal at field level', async () => {
+  const map = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
+  const bridge = structuredClone(map.features.find(feature => feature.id === 'local/footbridge'));
+  const connection = bridge.connections.find(connection => connection.id === 'playground-stairs');
+  connection.midLanding = 1.1;
+  const before = JSON.stringify(bridge);
+  const distance = (from, to) => Math.hypot(...to.map((n, i) => n - from[i]));
+  const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
+  for (const height of [5.52, 5.82, 4.02]) {
+    const layout = bridgeLayout(bridge, height), stair = layout.stairs.find(stair => stair.id === connection.id);
+    const [first, second] = stair.flights, [middle, ground] = stair.landings;
+    assert.equal(stair.flights.length, 2);
+    assert.equal(stair.landings.length, 2);
+    assert.deepEqual(first.from, stair.from);
+    assert.deepEqual(first.to, middle.from);
+    assert.deepEqual(middle.to, second.from);
+    assert.deepEqual(second.to, ground.from);
+    assert.deepEqual(ground.to, connection.points.at(-1), 'The original field connection stays in place');
+    close(first.bottom, middle.height);
+    close(second.top, middle.height);
+    close(second.bottom, ground.height);
+    close(ground.height, connection.groundHeight);
+    close(distance(middle.from, middle.to), 1.1);
+    for (const flight of stair.flights) {
+      const treads = straightStairTreads(flight.from, flight.to, flight.top, flight.bottom);
+      close(distance(flight.from, flight.to) / treads.length, .3);
+      assert.ok(treads.every((tread, i) => tread.height < (i ? treads[i - 1].height : flight.top)));
+      assert.deepEqual(treads.at(-1).to, flight.to);
+      close(treads.at(-1).height, flight.bottom);
+      if (height === 5.52) assert.equal(treads.length, 5, 'Each normal flight has five steps, rather than metre-deep treads');
+    }
+    const dx = stair.to[0] - stair.from[0], dz = stair.to[1] - stair.from[1], span = Math.hypot(dx, dz);
+    const profile = [first, { ...middle, top: middle.height, bottom: middle.height }, second, { ...ground, top: ground.height, bottom: ground.height }];
+    for (const segment of profile) for (const side of [-1, 1]) {
+      const endpoints = [segment.from, segment.to].map((point, i) => [point[0] + side * dz / span * bridge.width / 2,
+        i ? segment.bottom : segment.top, point[1] - side * dx / span * bridge.width / 2]);
+      for (const expected of endpoints) assert.ok(layout.railChains.flat().some(point => Math.hypot(...point.map((n, i) => n - expected[i])) < 1e-6),
+        'Each flight and platform has a matching continuous rail joint on both sides');
+      const center = endpoints[0].map((n, i) => (n + endpoints[1][i]) / 2);
+      assert.ok(layout.railChains.some(chain => chain.slice(1).some((to, i) => {
+        const from = chain[i], length = Math.hypot(...to.map((n, j) => n - from[j]));
+        return Math.abs(Math.hypot(...center.map((n, j) => n - from[j])) + Math.hypot(...to.map((n, j) => n - center[j])) - length) < 1e-6;
+      })), 'Rails follow each slope and stay flat over the middle and ground platforms');
+    }
+    const oldStair = layout.stairs.find(stair => stair.id === 'upper-road-stairs');
+    assert.equal(oldStair.flights.length, 1, 'Unmarked stairs retain the existing straight descent');
+    assert.deepEqual(oldStair.landings, []);
+  }
+  assert.equal(JSON.stringify(bridge), before, 'Layout generation never changes saved feature data');
+  const end = connection.points.at(-1), start = connection.points[0], length = distance(start, end);
+  connection.points[1] = start.map((n, i) => n + (end[i] - n) * 3 / length);
+  const short = bridgeLayout(bridge, 5.52).stairs.find(stair => stair.id === connection.id);
+  assert.equal(short.flights.length, 2);
+  assert.equal(short.landings.length, 1, 'A short route uses its available space instead of extending beyond the terminal');
+  assert.deepEqual(short.flights.at(-1).to, short.to);
 });
 
 test('elevated bridge columns remain covered by the slab at different heights and viewing angles, and ground bridges have no columns', async () => {

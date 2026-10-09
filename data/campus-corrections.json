@@ -38,7 +38,35 @@
       "holes": [],
       "floors": null,
       "calibrated": true,
-      "baseElevation": 3.6
+      "baseElevation": 3.6,
+      "cutouts": [
+        {
+          "partId": "main",
+          "outer": [
+            [
+              -73.56859133434637,
+              -82.98174997126766
+            ],
+            [
+              -71.50141000131447,
+              -80.38383516581995
+            ],
+            [
+              -76.51738081450011,
+              -76.39282817493786
+            ],
+            [
+              -78.58456214753201,
+              -78.99074298038558
+            ],
+            [
+              -73.56859133434637,
+              -82.98174997126766
+            ]
+          ],
+          "holes": []
+        }
+      ]
     },
     {
       "id": "local/stand-office",
@@ -79,7 +107,31 @@
         "way/855459409"
       ],
       "baseElevation": 3.6,
-      "classroomWindows": null
+      "classroomWindows": {
+        "wallThickness": 0.32,
+        "bayWidth": 5,
+        "windowWidth": 100,
+        "sill": 0.9,
+        "top": 2.95,
+        "columns": 4,
+        "transom": 0.4,
+        "pierWidth": 0.24,
+        "startFloor": 2,
+        "endFloor": 3,
+        "frameColor": "#e1e4dc",
+        "facadeLines": [
+          [
+            [
+              -71.13283412142542,
+              -80.86820063867947
+            ],
+            [
+              -48.292924286495506,
+              -52.1643133854854
+            ]
+          ]
+        ]
+      }
     },
     {
       "id": "way/855459411",
@@ -3314,7 +3366,8 @@
               -83.06416040244733
             ]
           ],
-          "groundHeight": 3.72
+          "groundHeight": 3.72,
+          "midLanding": 1.1
         }
       ],
       "connectedTo": [
@@ -3324,7 +3377,14 @@
       "sourcePathIds": [
         "way/855459412",
         "way/855459413"
-      ]
+      ],
+      "sideNet": {
+        "facing": [
+          -56.09336342384422,
+          -125.63239432212606
+        ],
+        "height": 1
+      }
     },
     {
       "id": "local/underground-badminton",

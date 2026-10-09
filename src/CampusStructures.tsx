@@ -10,6 +10,7 @@ import { undergroundBoundaryLines, undergroundVolume, undergroundCameraInside, u
 import { undergroundDetailGeometry, UNDERGROUND_COLORS } from './underground-details';
 import { BRIDGE_DECK_THICKNESS, bridgeLayout, bridgeSupports, type RailPoint } from './bridge-geometry';
 import { bridgeRailGeometry } from './bridge-rail-geometry';
+import { bridgeNetGeometry } from './bridge-net-geometry';
 import { archedBridgeGeometry } from './bridge-mesh';
 import { LocationHtml, LocationName } from './LocationSelection';
 import GateLandmark from './GateLandmark';
@@ -110,6 +111,14 @@ function BridgeRails({ chains, smooth = false }: { chains: RailPoint[][]; smooth
     <mesh geometry={geometry.posts}><meshStandardMaterial color={mapColor('#5c7866')} roughness={.9} /></mesh>
   </group>;
 }
+function BridgeNet({ feature, chains }: { feature: Feature; chains: RailPoint[][] }) {
+  const mapColor = useMapColor();
+  const geometry = useMemo(() => bridgeNetGeometry(feature, chains), [feature, chains]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <lineSegments geometry={geometry} raycast={() => null}>
+    <lineBasicMaterial color={mapColor('#64716a')} transparent opacity={.65} depthWrite={false} />
+  </lineSegments>;
+}
 function BridgeDeck({ shapes, height }: { shapes: { outer: Point[]; holes: Point[][] }[]; height: number }) {
   const mapColor = useMapColor();
   const geometry = useMemo(() => shapes.map(data => {
@@ -138,8 +147,10 @@ function Bridge({ feature, buildings, overrides, labelPortal }: { feature: Featu
   const layout = useMemo(() => bridgeLayout(feature, y), [feature, y]);
   const center: Point = [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2];
   return <group>{feature.archRise ? <ArchedBridgeDeck feature={feature} height={y} /> : <BridgeDeck shapes={layout.deck} height={y} />}<BridgeRails chains={layout.railChains} smooth={!!feature.archRise} />
+    {feature.sideNet && <BridgeNet feature={feature} chains={layout.railChains} />}
     {bridgeSupports(feature, y).map((support, i) => <mesh key={i} position={support.position}><boxGeometry args={support.size} /><meshStandardMaterial color={mapColor('#9b9f8e')} /></mesh>)}
-    {layout.stairs.map(stair => <BridgeStairs key={stair.id} from={stair.from} to={stair.to} width={width} top={stair.top} bottom={stair.bottom} />)}
+    {layout.stairs.flatMap(stair => stair.flights.map((flight, i) => <BridgeStairs key={stair.id + i} {...flight} width={width} />))}
+    {layout.stairs.flatMap(stair => stair.landings.map((landing, i) => <Segment key={stair.id + '-landing-' + i} from={landing.from} to={landing.to} width={width} y={landing.height - BRIDGE_DECK_THICKNESS / 2} thickness={BRIDGE_DECK_THICKNESS} color="#b6b39e" />))}
     {feature.connections?.filter(c => c.buildingId && c.buildingId !== 'local/gymnasium').map(connection => {
       const end = connection.points.at(-1)!, building = buildings.find(b => b.id === connection.buildingId);
       if (!building) return null;

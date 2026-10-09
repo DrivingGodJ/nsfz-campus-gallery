@@ -16,7 +16,7 @@ const dispose = model => Object.values(model).forEach(geometry => geometry.dispo
 // These candidates were rejected after reading the actual photographs, rather
 // than inferred from the camera ray or another building in the same group.
 test('unconfirmed buildings persist as masonry and cannot regenerate generic glass after map refresh', () => {
-  for (const id of ['way/1233313436', 'way/1233313437', 'way/1233313435', 'local/unknown-west-corner', 'way/1277841229', 'local/stand-office', 'way/855459421']) {
+  for (const id of ['way/1233313436', 'way/1233313437', 'way/1233313435', 'local/unknown-west-corner', 'way/1277841229', 'way/855459421']) {
     const b = building(id), info = buildingLevels(b, site.buildingOverrides[id]);
     assert.equal(corrections.buildings.find(b => b.id === id).classroomWindows, null);
     const windows = teachingWindowGeometry(b, info.sections, info.floorHeight);

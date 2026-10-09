@@ -28,7 +28,23 @@ export function bridgeLayout(feature: Feature, height: number) {
     const cornerSetback = width / 2 * Math.sqrt((1 - cosine) / Math.max(1e-8, 1 + cosine));
     const landing = Math.min(Math.max(width / 2, cornerSetback) + .25, length / 3);
     const from: Point = node.map((n, i) => n + (to[i] - n) * landing / length) as Point;
-    return { id: connection.id, from, to, top: height, bottom: connection.groundHeight ?? .12 };
+    const bottom = connection.groundHeight ?? .12;
+    let flights = [{ from, to, top: height, bottom }];
+    const landings: { from: Point; to: Point; height: number }[] = [];
+    if ((connection.midLanding ?? 0) > 0 && height > bottom) {
+      // The photographed field stairs descend in two short flights. Keep the
+      // existing axis and terminal, then meet it with a level ground approach.
+      const span = length - landing, midLength = Math.min(connection.midLanding!, span / 3);
+      const run = Math.min(Math.ceil((height - bottom) / .36 - 1e-7) * .3, (span - midLength) / 2);
+      const at = (distance: number): Point => from.map((n, i) => n + (to[i] - from[i]) * distance / span) as Point;
+      const firstEnd = at(run), secondStart = at(run + midLength), secondEnd = at(2 * run + midLength);
+      const middle = (height + bottom) / 2;
+      flights = [{ from, to: firstEnd, top: height, bottom: middle },
+        { from: secondStart, to: secondEnd, top: middle, bottom }];
+      landings.push({ from: firstEnd, to: secondStart, height: middle });
+      if (2 * run + midLength < span - 1e-6) landings.push({ from: secondEnd, to, height: bottom });
+    }
+    return { id: connection.id, from, to, top: height, bottom, flights, landings };
   });
   const fullRoutes = [points], deckRoutes = [points];
   for (const connection of feature.connections || []) {
@@ -58,10 +74,13 @@ export function bridgeLayout(feature: Feature, height: number) {
   });
   const floorAt = (point: Point) => {
     for (const stair of stairs) {
-      const dx = stair.to[0] - stair.from[0], dz = stair.to[1] - stair.from[1], length = Math.hypot(dx, dz);
-      const t = ((point[0] - stair.from[0]) * dx + (point[1] - stair.from[1]) * dz) / (length * length);
-      const across = Math.abs((point[0] - stair.from[0]) * dz - (point[1] - stair.from[1]) * dx) / length;
-      if (t >= 0 && t <= 1 + 1e-6 && across <= width / 2 + 1e-6) return stair.top + (stair.bottom - stair.top) * Math.min(1, t);
+      const segments = [...stair.flights, ...stair.landings.map(landing => ({ ...landing, top: landing.height, bottom: landing.height }))];
+      for (const segment of segments) {
+        const dx = segment.to[0] - segment.from[0], dz = segment.to[1] - segment.from[1], length = Math.hypot(dx, dz);
+        const t = ((point[0] - segment.from[0]) * dx + (point[1] - segment.from[1]) * dz) / (length * length);
+        const across = Math.abs((point[0] - segment.from[0]) * dz - (point[1] - segment.from[1]) * dx) / length;
+        if (t >= -1e-6 && t <= 1 + 1e-6 && across <= width / 2 + 1e-6) return segment.top + (segment.bottom - segment.top) * Math.max(0, Math.min(1, t));
+      }
     }
     return bridgeSurfaceHeight(feature, height, point);
   };
@@ -72,15 +91,19 @@ export function bridgeLayout(feature: Feature, height: number) {
       const from = ring[i - 1], to = ring[i];
       if (onOpening(from, to)) { if (chain.length) chains.push(chain); chain = []; continue; }
       if (!chain.length) chain.push(from);
-      // Add the exact transition from the level landing to a sloped stair rail.
+      // Cut rails at every flight/platform joint so the middle and ground
+      // landings stay level instead of becoming another long sloping rail.
       const cuts = [0, 1];
       if (feature.archRise) for (let n = 1; n < 32; n++) cuts.push(n / 32);
       for (const stair of stairs) {
         const dx = stair.to[0] - stair.from[0], dz = stair.to[1] - stair.from[1];
-        const a = (from[0] - stair.from[0]) * dx + (from[1] - stair.from[1]) * dz;
-        const b = (to[0] - stair.from[0]) * dx + (to[1] - stair.from[1]) * dz;
-        const t = -a / (b - a);
-        if (Number.isFinite(t) && t > 1e-7 && t < 1 - 1e-7) cuts.push(t);
+        const joints = [stair.from, ...stair.flights.map(flight => flight.to), ...stair.landings.map(landing => landing.to)];
+        for (const joint of joints) {
+          const a = (from[0] - joint[0]) * dx + (from[1] - joint[1]) * dz;
+          const b = (to[0] - joint[0]) * dx + (to[1] - joint[1]) * dz;
+          const t = -a / (b - a);
+          if (Number.isFinite(t) && t > 1e-7 && t < 1 - 1e-7) cuts.push(t);
+        }
       }
       for (const t of [...new Set(cuts)].sort((a, b) => a - b).slice(1)) chain.push(from.map((n, j) => n + (to[j] - n) * t) as Point);
     }

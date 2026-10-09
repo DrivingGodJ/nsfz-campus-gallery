@@ -18,6 +18,7 @@ import BuildingFacade from './BuildingFacade';
 import BuildingSkylights from './BuildingSkylights';
 import BuildingArchitecture from './BuildingArchitecture';
 import VenueDetails from './VenueDetails';
+import StandOfficeDetails from './StandOfficeDetails';
 import CampusExteriorDetails from './CampusExteriorDetails';
 import PhotoFacadeDetails from './PhotoFacadeDetails';
 import PhotoInteriorDetails from './PhotoInteriorDetails';
@@ -25,6 +26,7 @@ import { PHOTO_INTERIOR_IDS } from './photo-interior-geometry';
 import { OFFICE_ID, LIBRARY_ID } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
 import { STANDS_ID, THEATRE_ID, standsArchitecture } from './venue-geometry';
+import { STAND_OFFICE_ID, standOfficeOpenings } from './stand-office-geometry';
 import { GYM_ID, gymArchitecture } from './architecture-geometry';
 import { buildingGeometry } from './building-geometry';
 import { cafeteriaBodyGeometry, dormitoryBodyGeometry } from './facade-geometry';
@@ -100,7 +102,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
       building.stairwells?.filter(stair => stair.partId === section.id), building.classroomWindows,
       building.solidCores?.filter(core => core.partId === section.id),
       building.cutouts?.filter(cut => cut.partId === section.id), cutaway,
-      building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight) : undefined);
+      building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight) : building.id === STAND_OFFICE_ID ? standOfficeOpenings(building, height, info.floorHeight) : undefined);
   }), [building, info, cutawayHeight, gym, stands]);
   useEffect(() => () => { if (!gym && !stands) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym, stands]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;
@@ -128,6 +130,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor ? floor * info.floorHeight : undefined} />}
     {(building.facade?.type === 'laboratory' || building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
     {(stands || gym || building.id === THEATRE_ID) && <VenueDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} stands={stands} />}
+    {building.id === STAND_OFFICE_ID && <StandOfficeDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
     {(building.id === OFFICE_ID || building.id === LIBRARY_ID) && <CampusExteriorDetails building={building} floors={info.floors} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} annexFloors={info.sections.find(section => section.id === 'curved-annex')?.floors} />}
     {(building.classroomWindows || building.id === 'way/855459420') && <PhotoFacadeDetails building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
     {PHOTO_INTERIOR_IDS.includes(building.id) && <PhotoInteriorDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
