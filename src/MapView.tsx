@@ -14,6 +14,10 @@ import HistoryPavilion from './HistoryPavilion';
 import BuildingFacade from './BuildingFacade';
 import BuildingSkylights from './BuildingSkylights';
 import BuildingArchitecture from './BuildingArchitecture';
+import VenueDetails from './VenueDetails';
+import CampusExteriorDetails from './CampusExteriorDetails';
+import { OFFICE_ID, LIBRARY_ID } from './campus-exterior-geometry';
+import { STANDS_ID, THEATRE_ID, standsArchitecture } from './venue-geometry';
 import { GYM_ID, gymArchitecture } from './architecture-geometry';
 import { buildingGeometry } from './building-geometry';
 import { cafeteriaBodyGeometry, dormitoryBodyGeometry } from './facade-geometry';
@@ -74,10 +78,13 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
   const cutawayHeight = selected && floor ? floor * info.floorHeight : undefined;
   const gym = useMemo(() => building.id === GYM_ID ? gymArchitecture(building, info.height, info.floorHeight, bridge, cutawayHeight) : undefined, [building, info.height, info.floorHeight, bridge, cutawayHeight]);
   useEffect(() => () => { if (gym) for (const geometry of Object.values(gym)) geometry.dispose(); }, [gym]);
+  const stands = useMemo(() => building.id === STANDS_ID ? standsArchitecture(building, info.height, info.floorHeight, cutawayHeight) : undefined, [building, info.height, info.floorHeight, cutawayHeight]);
+  useEffect(() => () => { if (stands) Object.values(stands).forEach(geometry => geometry.dispose()); }, [stands]);
   const geometries = useMemo(() => info.sections.map(section => {
     const height = Math.min(section.height, cutawayHeight ?? section.height);
     const cutaway = cutawayHeight !== undefined && cutawayHeight <= section.height + 1e-6;
     if (gym) return gym.body;
+    if (stands) return stands.body;
     if (building.facade?.type === 'laboratory') return laboratoryBodyGeometry(building, height, info.floorHeight, cutaway);
     if (building.facade?.type === 'cafeteria') return cafeteriaBodyGeometry(building, height, info.floorHeight, cutaway);
     if (building.facade?.type === 'dormitory') return dormitoryBodyGeometry(building, height, info.floorHeight, cutaway);
@@ -86,8 +93,8 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
       building.stairwells?.filter(stair => stair.partId === section.id), building.classroomWindows,
       building.solidCores?.filter(core => core.partId === section.id),
       building.cutouts?.filter(cut => cut.partId === section.id), cutaway);
-  }), [building, info, cutawayHeight, gym]);
-  useEffect(() => () => { if (!gym) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym]);
+  }), [building, info, cutawayHeight, gym, stands]);
+  useEffect(() => () => { if (!gym && !stands) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym, stands]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;
   const color = selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
   const floorLines = useMemo(() => buildingFloorLineGeometry(building, info.sections, info.floorHeight, selected ? floor : undefined), [building, info, selected, floor]);
@@ -112,6 +119,8 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>
     {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor ? floor * info.floorHeight : undefined} />}
     {(building.facade?.type === 'laboratory' || building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
+    {(stands || gym || building.id === THEATRE_ID) && <VenueDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} stands={stands} />}
+    {(building.id === OFFICE_ID || building.id === LIBRARY_ID) && <CampusExteriorDetails building={building} floors={info.floors} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} annexFloors={info.sections.find(section => section.id === 'curved-annex')?.floors} />}
     {building.facade?.type === 'dormitory' && <BuildingFacade building={building} floors={info.floors} floorHeight={info.floorHeight} height={height} selected={selected} cutaway={!!(selected && floor)} />}
     </group>}
     {(selected || !!building.name || !!site.buildingOverrides[building.id]?.name) && <LocationHtml portal={labelPortal} key={info.name} position={[info.center[0], height + 3, info.center[1]]} center zIndexRange={[5, 1]}><LocationName id={building.id} name={info.name} building /></LocationHtml>}

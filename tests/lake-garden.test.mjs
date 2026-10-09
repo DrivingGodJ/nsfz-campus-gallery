@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import clip from 'polygon-clipping';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
-import { gardenFootprints, boardwalkLayout, boardwalkPlanks, pavilionRoofGeometry, pergolaLayout } from '../src/garden-geometry.ts';
+import { gardenFootprints, boardwalkLayout, boardwalkPlanks, boardwalkDetails, pavilionDetails, pavilionPoint, pavilionRoofGeometry, pergolaLayout } from '../src/garden-geometry.ts';
 import { photoMapHeight, campusLocations, assignPhotoLocation } from '../src/locations.ts';
 import { libraryAnnexLayout, wisteriaArchitecture } from '../src/wisteria-architecture.ts';
 
@@ -153,4 +153,31 @@ test('wisteria walkway stays open and its long library-side annex has a straight
   } finally {
     Object.values(meshes).forEach(mesh => mesh.material.dispose()); Object.values(model).forEach(geometry => geometry.dispose());
   }
+});
+
+
+test('photo-informed timber details keep both pavilion approaches open and use a few merged meshes', () => {
+  const detail = pavilionDetails(pavilion.pavilion, pavilion.height), walkway = boardwalkDetails(boardwalk, campus.features);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), wood = new THREE.Mesh(detail.timber, material);
+  wood.updateMatrixWorld();
+  const world = (x, z, y) => { const [wx, wz] = pavilionPoint(pavilion.pavilion, x, z); return new THREE.Vector3(wx, y, wz); };
+  const r = pavilion.pavilion.span / 2 - .4, base = pavilion.height;
+  try {
+    for (const eye of [.9, 1.6]) for (const [start, end] of [[world(0, -4, base + eye), world(0, 0, base + eye)], [world(0, 0, base + eye), world(4, 0, base + eye)]]) {
+      assert.equal(new THREE.Raycaster(start, end.clone().sub(start).normalize(), 0, start.distanceTo(end)).intersectObject(wood).length, 0, 'Circular openings and benches leave both entrances clear');
+    }
+    for (const [x, z] of [[0, r - .12], [-r + .12, 0]]) {
+      const hit = new THREE.Raycaster(world(x, z, base + .7), new THREE.Vector3(0, -1, 0), 0, .4).intersectObject(wood)[0];
+      assert.ok(hit && Math.abs(hit.point.y - (base + .51)) < 1e-5, 'Seats run along the two non-entrance sides');
+    }
+    for (const geometry of [...Object.values(walkway), detail.timber, detail.stone, detail.rocks]) {
+      assert.ok(geometry.getAttribute('position').count > 0);
+      assert.ok(geometry.userData.photoOcclusionMask.every(v => v === 0), 'Open details do not conceal nearby photo markers');
+    }
+    assert.ok(Object.values(walkway).reduce((n, g) => n + g.getAttribute('position').count / 3, 0) < 4200);
+    assert.ok([detail.timber, detail.stone, detail.rocks].reduce((n, g) => n + g.getAttribute('position').count / 3, 0) < 2400);
+    assert.equal(detail.tiles.getAttribute('position').count, 840, 'Tile lines stay a single line buffer');
+    walkway.supports.computeBoundingBox();
+    assert.ok(walkway.supports.boundingBox.max.y < base, 'Structural piles never protrude through the walking slab');
+  } finally { material.dispose(); [...Object.values(detail), ...Object.values(walkway)].forEach(geometry => geometry.dispose()); }
 });

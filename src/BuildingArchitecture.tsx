@@ -5,6 +5,8 @@ import { useMapColor } from './MapTheme';
 import { ARCHITECTURE_COLORS, GYM_ID, gymArchitecture, teachingElevatorGeometry, teachingRailGeometry, teachingWindowGeometry } from './architecture-geometry';
 import { teachingStairGeometry } from './teaching-stairs';
 import { laboratoryLayout } from './laboratory-geometry';
+import { TEACHING_ID, teachingDetailGeometry } from './teaching-details';
+import { teachingClassroomFurniture } from './teaching-classroom-furniture';
 import type { Building, BuildingPart } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -22,10 +24,14 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   const stairs = useMemo(() => teachingStairGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
   const windows = useMemo(() => teachingWindowGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
   const elevator = useMemo(() => teachingElevatorGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
+  const teaching = useMemo(() => building.id === TEACHING_ID ? teachingDetailGeometry(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
+  const furniture = useMemo(() => building.id === TEACHING_ID ? teachingClassroomFurniture(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
   useEffect(() => () => rails.dispose(), [rails]);
   useEffect(() => () => Object.values(stairs).forEach(geometry => geometry.dispose()), [stairs]);
   useEffect(() => () => Object.values(windows).forEach(geometry => geometry.dispose()), [windows]);
   useEffect(() => () => Object.values(elevator).forEach(geometry => geometry.dispose()), [elevator]);
+  useEffect(() => () => { if (teaching) Object.values(teaching).forEach(geometry => geometry.dispose()); }, [teaching]);
+  useEffect(() => () => { if (furniture) Object.values(furniture).forEach(geometry => geometry.dispose()); }, [furniture]);
   const detail = useRef<THREE.Group>(null), railMaterial = useRef<THREE.MeshStandardMaterial>(null), frameMaterial = useRef<THREE.MeshStandardMaterial>(null);
   useFrame(({ camera }) => {
     const distance = Math.hypot(camera.position.x - building.center[0], camera.position.y, camera.position.z - building.center[1]);
@@ -36,6 +42,11 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   });
   // The roof remains visible at campus scale; only small rail details fade away.
   return <group>
+    {teaching && <>
+      <mesh geometry={teaching.columns} raycast={() => null}><meshStandardMaterial color={mapColor('#c5c9be')} roughness={.95} /></mesh>
+      <mesh geometry={teaching.paving} raycast={() => null}><meshStandardMaterial color={mapColor('#bda995')} roughness={1} /></mesh>
+      <mesh geometry={teaching.inlay} raycast={() => null}><meshStandardMaterial color={mapColor('#92a7a4')} roughness={1} /></mesh>
+    </>}
     <mesh geometry={windows.glass} raycast={() => null}><meshStandardMaterial color={mapColor('#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     <mesh geometry={elevator.glass} raycast={() => null}><meshStandardMaterial color={mapColor('#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     <mesh geometry={elevator.doors} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.glass)} roughness={.35} transparent opacity={.3} depthWrite={false} side={THREE.DoubleSide} /></mesh>
@@ -49,6 +60,17 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
       <mesh geometry={gym.stairGlass} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.glass)} roughness={.6} transparent opacity={.18} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     </>}
     <group ref={detail}>
+      {furniture && <>
+        <mesh geometry={furniture.wood} raycast={() => null}><meshStandardMaterial color={mapColor('#baa477')} roughness={.9} /></mesh>
+        <mesh geometry={furniture.metal} raycast={() => null}><meshStandardMaterial color={mapColor('#626a65')} roughness={.8} /></mesh>
+        <mesh geometry={furniture.boards} raycast={() => null}><meshStandardMaterial color={mapColor('#305b4b')} roughness={1} /></mesh>
+        <mesh geometry={furniture.storage} raycast={() => null}><meshStandardMaterial color={mapColor('#c8d3bf')} roughness={.95} /></mesh>
+      </>}
+      {teaching && <>
+        <mesh geometry={teaching.rails} raycast={() => null}><meshStandardMaterial color={mapColor('#5e99ac')} roughness={.85} /></mesh>
+        <mesh geometry={teaching.units} raycast={() => null}><meshStandardMaterial color={mapColor('#d2d6cc')} roughness={.85} /></mesh>
+        <mesh geometry={teaching.vents} raycast={() => null}><meshStandardMaterial color={mapColor('#89968c')} roughness={.85} /></mesh>
+      </>}
       <mesh geometry={windows.frames} raycast={() => null}><meshStandardMaterial color={mapColor('#d2d6cc')} roughness={.8} /></mesh>
       <mesh geometry={elevator.frames} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.frame)} roughness={.5} metalness={.2} /></mesh>
       <mesh geometry={stairs.rails} raycast={() => null}><meshStandardMaterial color={mapColor('#5e99ac')} roughness={.85} /></mesh>

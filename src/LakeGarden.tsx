@@ -2,19 +2,12 @@ import { useMapColor } from './MapTheme';
 import { Edges, Line } from '@react-three/drei';
 import { useContext, useEffect, useMemo, type RefObject } from 'react';
 import * as THREE from 'three';
-import type { Feature, Point, Shape } from './types';
-import { boardwalkLayout, boardwalkPlanks, gardenFootprints, pavilionPoint, pavilionRoofGeometry, pergolaLayout } from './garden-geometry';
+import type { Feature, Shape } from './types';
+import { boardwalkDetails, boardwalkLayout, boardwalkPlanks, gardenFootprints, pavilionDetails, pavilionRoofGeometry, pergolaLayout } from './garden-geometry';
 import type { RailPoint } from './bridge-geometry';
 import { LocationHtml, LocationName, LocationSelection } from './LocationSelection';
 import { wisteriaArchitecture } from './wisteria-architecture';
 
-function Bar({ from, to, radius = .065, color = '#796e56' }: { from: RailPoint; to: RailPoint; radius?: number; color?: string }) {
-  const mapColor = useMapColor();
-  const direction = new THREE.Vector3(...to).sub(new THREE.Vector3(...from)), length = direction.length();
-  if (length < 1e-6) return null;
-  const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-  return <mesh position={from.map((n, i) => (n + to[i]) / 2) as RailPoint} quaternion={rotation}><cylinderGeometry args={[radius, radius, length, 6]} /><meshStandardMaterial color={mapColor(color)} roughness={.95} /></mesh>;
-}
 function Slab({ footprints, height, color, thickness = .18, edgeColor }: { footprints: Shape[]; height: number; color: string; thickness?: number; edgeColor?: string }) {
   const mapColor = useMapColor();
   const shapes = useMemo(() => footprints.map(data => {
@@ -32,26 +25,28 @@ function Boardwalk({ feature, features, labelPortal }: { feature: Feature; featu
   const mapColor = useMapColor();
   const layout = useMemo(() => boardwalkLayout(feature, features), [feature, features]);
   const planks = useMemo(() => boardwalkPlanks(feature, features), [feature, features]);
-  useEffect(() => () => planks.dispose(), [planks]);
+  const details = useMemo(() => boardwalkDetails(feature, features), [feature, features]);
+  useEffect(() => () => { planks.dispose(); Object.values(details).forEach(geometry => geometry.dispose()); }, [planks, details]);
   const position = feature.points![Math.floor(feature.points!.length / 2)];
-  return <group><Slab footprints={layout.deck} height={layout.height} color="#b4a286" />
+  return <group><Slab footprints={layout.deck} height={layout.height} color="#a18b73" />
     <lineSegments geometry={planks} raycast={() => null}><lineBasicMaterial color={mapColor('#96896f')} /></lineSegments>
-    {layout.railChains.map((chain, i) => <group key={i}>{[.45, .95].map(offset => <group key={offset}>{chain.slice(1).map((to, j) => <Bar key={j} from={[chain[j][0], chain[j][1] + offset, chain[j][2]]} to={[to[0], to[1] + offset, to[2]]} radius={offset > .5 ? .07 : .045} />)}</group>)}</group>)}
-    {layout.posts.map((p, i) => <mesh key={i} position={[p[0], p[1] + .5, p[2]]}><boxGeometry args={[.15, 1, .15]} /><meshStandardMaterial color={mapColor('#796e56')} roughness={.95} /></mesh>)}
+    {(['timber', 'supports'] as const).map(key => <mesh key={key} geometry={details[key]}><meshStandardMaterial color={mapColor('#79604f')} roughness={.95} /></mesh>)}
+    <mesh geometry={details.caps}><meshStandardMaterial color={mapColor('#74776a')} roughness={.95} /></mesh>
     <Name feature={feature} position={[position[0], layout.height + 3.5, position[1]]} labelPortal={labelPortal} />
   </group>;
 }
 function Pavilion({ feature, features, labelPortal }: { feature: Feature; features: Feature[]; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
-  const model = feature.pavilion!, base = feature.height ?? .26, r = model.span / 2 - .4;
+  const model = feature.pavilion!, base = feature.height ?? .26;
   const layout = useMemo(() => pavilionRoofGeometry(model, base), [model, base]);
   const footprints = useMemo(() => gardenFootprints(feature, features), [feature, features]);
-  useEffect(() => () => layout.geometry.dispose(), [layout]);
-  const corner = (x: number, z: number, y: number): RailPoint => { const p = pavilionPoint(model, x, z); return [p[0], y, p[1]]; };
-  const corners: Point[] = [[-r, -r], [r, -r], [r, r], [-r, r], [-r, -r]];
-  return <group><Slab footprints={footprints} height={base} color="#b4a286" />
-    {corners.slice(0, -1).map(([x, z], i) => <Bar key={i} from={corner(x, z, base)} to={corner(x, z, base + model.postHeight)} radius={.14} color="#796e56" />)}
-    {corners.slice(1).map(([x, z], i) => <Bar key={i} from={corner(corners[i][0], corners[i][1], base + model.postHeight)} to={corner(x, z, base + model.postHeight)} radius={.12} />)}
+  const details = useMemo(() => pavilionDetails(model, base), [model, base]);
+  useEffect(() => () => { layout.geometry.dispose(); Object.values(details).forEach(geometry => geometry.dispose()); }, [layout, details]);
+  return <group><Slab footprints={footprints} height={base} color="#a18b73" />
+    <mesh geometry={details.timber}><meshStandardMaterial color={mapColor('#79604f')} roughness={.95} /></mesh>
+    <mesh geometry={details.stone}><meshStandardMaterial color={mapColor('#81918a')} roughness={.95} /></mesh>
+    <mesh geometry={details.rocks}><meshStandardMaterial color={mapColor('#afa797')} roughness={.95} /></mesh>
+    <lineSegments geometry={details.tiles} raycast={() => null}><lineBasicMaterial color={mapColor('#65756b')} /></lineSegments>
     <mesh geometry={layout.geometry}><meshStandardMaterial color={mapColor('#7e8c83')} roughness={.95} side={THREE.DoubleSide} /></mesh>
     {[...layout.eaves, ...layout.ribs].map((points, i) => <Line key={i} points={points.map(([x, y, z]) => [x, y + .015, z])} color={mapColor('#596f63')} lineWidth={1.2} raycast={() => null} />)}
     <mesh position={[model.center[0], layout.peak + .07, model.center[1]]}><sphereGeometry args={[.16, 8, 6]} /><meshStandardMaterial color={mapColor('#596f63')} /></mesh>

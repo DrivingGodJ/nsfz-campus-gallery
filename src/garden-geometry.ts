@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import clip from 'polygon-clipping';
 import type { Feature, LakePavilion, Point, Shape } from './types';
 import { passageFootprint } from './underground-geometry.ts';
@@ -73,7 +74,7 @@ export function boardwalkLayout(feature: Feature, features: Feature[]) {
   const height = feature.height ?? .26;
   const pads = features.filter(f => f.type === 'lakePavilion' && f.pavilion && feature.connectedTo?.includes(f.id)).map(f => pavilionFootprint(f.pavilion!));
   const railChains = trimRailChains(bridgeLayout(feature, height).railChains, pads);
-  return { deck: gardenFootprints(feature, features), railChains, posts: bridgeRailPosts(railChains, 2.6), height };
+  return { deck: gardenFootprints(feature, features), railChains, posts: bridgeRailPosts(railChains, 1.6), height };
 }
 export function boardwalkPlanks(feature: Feature, features: Feature[]) {
   const points = feature.points!, width = feature.width || 1.9, y = (feature.height ?? .26) + .008;
@@ -122,4 +123,98 @@ export function pergolaLayout(feature: Feature) {
   const hub: Shape = { outer: circleRing(model.hub, model.hubRadius), holes: [] };
   const footprint = pergolaFootprint(feature);
   return { footprint, hub, corridor: shapes(clip.difference(footprint.map(polygon), polygon(hub))), base, height: base + model.floors * model.floorHeight };
+}
+
+
+function detailMesh(parts: THREE.BufferGeometry[]) {
+  const plain = parts.map(part => {
+    const geometry = part.index ? part.toNonIndexed() : part.clone();
+    geometry.deleteAttribute('uv'); return geometry;
+  });
+  const result = plain.length ? mergeGeometries(plain)! : new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+  parts.forEach(part => part.dispose()); plain.forEach(part => part.dispose());
+  // Open timber work and shoreline stones should not hide photographs.
+  result.userData.photoOcclusionMask = new Uint8Array(result.getAttribute('position').count / 3);
+  return result;
+}
+function detailBar(from: RailPoint, to: RailPoint, width: number, depth = width) {
+  const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), direction = b.clone().sub(a), length = direction.length();
+  const geometry = new THREE.BoxGeometry(width, length, depth);
+  geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.divideScalar(length)));
+  return geometry.translate(...a.add(b).multiplyScalar(.5).toArray());
+}
+
+export function boardwalkDetails(feature: Feature, features: Feature[]) {
+  const { railChains, posts, height } = boardwalkLayout(feature, features);
+  const timber: THREE.BufferGeometry[] = [], caps: THREE.BufferGeometry[] = [], supports: THREE.BufferGeometry[] = [];
+  // DSC2479 and IMG9847 show a low single rail with capped square timber posts.
+  for (const chain of railChains) for (let i = 1; i < chain.length; i++) {
+    const a = chain[i - 1], b = chain[i];
+    timber.push(detailBar([a[0], height + .52, a[2]], [b[0], height + .52, b[2]], .095, .11));
+  }
+  for (const [x, , z] of posts) {
+    timber.push(new THREE.BoxGeometry(.18, .65, .18).translate(x, height + .325, z));
+    caps.push(new THREE.BoxGeometry(.25, .055, .25).translate(x, height + .67, z));
+  }
+  const pads = features.filter(f => f.type === 'lakePavilion' && f.pavilion && feature.connectedTo?.includes(f.id)).map(f => pavilionFootprint(f.pavilion!));
+  for (const chain of trimRailChains([feature.points!.map(([x, z]) => [x, height, z])], pads)) for (let i = 1; i < chain.length; i++) {
+    const a = chain[i - 1], b = chain[i], dx = b[0] - a[0], dz = b[2] - a[2], length = Math.hypot(dx, dz), count = Math.max(1, Math.ceil(length / 3.6));
+    for (let j = 0; j <= count; j++) {
+      const x = a[0] + dx * j / count, z = a[2] + dz * j / count;
+      for (const side of [-1, 1]) supports.push(new THREE.BoxGeometry(.2, .55, .2).translate(x - dz / length * .62 * side, height - .35, z + dx / length * .62 * side));
+    }
+  }
+  return { timber: detailMesh(timber), caps: detailMesh(caps), supports: detailMesh(supports) };
+}
+
+export function pavilionDetails(model: LakePavilion, base: number) {
+  const timber: THREE.BufferGeometry[] = [], stone: THREE.BufferGeometry[] = [], rocks: THREE.BufferGeometry[] = [], roofLines: number[] = [];
+  const r = model.span / 2 - .4, top = base + model.postHeight;
+  const box = (x: number, y: number, z: number, w: number, h: number, d: number, target = timber) => target.push(new THREE.BoxGeometry(w, h, d).translate(x, base + y, z));
+  const corners: Point[] = [[-r, -r], [r, -r], [r, r], [-r, r]];
+  for (const [x, z] of corners) {
+    timber.push(new THREE.BoxGeometry(.24, .6, .24).translate(x, base - .3, z));
+    timber.push(new THREE.CylinderGeometry(.14, .14, model.postHeight - .16, 8).translate(x, base + (model.postHeight + .16) / 2, z));
+    stone.push(new THREE.CylinderGeometry(.19, .21, .16, 8).translate(x, base + .08, z));
+  }
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i], b = corners[(i + 1) % 4];
+    timber.push(detailBar([a[0], top - .1, a[1]], [b[0], top - .1, b[1]], .18));
+  }
+  // The two non-entrance faces have benches. The front and left-bank exit stay open.
+  for (const turn of [0, -Math.PI / 2]) {
+    const bench: THREE.BufferGeometry[] = [];
+    bench.push(new THREE.BoxGeometry(r * 1.72, .1, .43).translate(0, base + .46, r - .12));
+    bench.push(new THREE.BoxGeometry(r * 1.72, .09, .085).translate(0, base + .94, r));
+    for (const x of [-r * .66, r * .66]) bench.push(new THREE.BoxGeometry(.09, .42, .28).translate(x, base + .21, r - .12));
+    for (let x = -r * .8; x < r * .81; x += .25) bench.push(detailBar([x, base + .5, r - .18], [x, base + .94, r], .035));
+    timber.push(...bench.map(part => part.rotateY(turn)));
+  }
+  // Photo-confirmed circular timber openings; 2.5 m diameter clears the 1.9 m walk.
+  for (const turn of [0, -Math.PI / 2]) {
+    const lattice: THREE.BufferGeometry[] = [], radius = Math.min(1.25, r - .22);
+    const at = (angle: number): RailPoint => [Math.cos(angle) * radius, base + radius + Math.sin(angle) * radius, -r];
+    for (let i = 0; i < 40; i++) lattice.push(detailBar(at(i / 40 * Math.PI * 2), at((i + 1) / 40 * Math.PI * 2), .035));
+    for (const side of [-1, 1]) {
+      lattice.push(detailBar([side * r, base + .18, -r], [side * radius, base + radius, -r], .035));
+      lattice.push(detailBar([side * r, top - .25, -r], [side * radius * .7, base + radius * 1.7, -r], .035));
+      lattice.push(detailBar([side * r, base + radius * 1.4, -r], [side * radius * .9, top - .25, -r], .035));
+    }
+    timber.push(...lattice.map(part => part.rotateY(turn)));
+  }
+  // A few bank boulders are visible in aerial DJI0008 and ground DSC1080.
+  // Their exact outlines and placement are estimates; leave both deck approaches clear.
+  for (const [x, z, w, h, d] of [[-2.8, 2.1, .85, .48, .65], [3.6, 1.3, .65, .38, .52], [1.8, 3, .85, .36, .55], [-2.6, -2.8, .55, .3, .45]]) {
+    rocks.push(new THREE.IcosahedronGeometry(1, 0).scale(w, h, d).translate(x, .08, z));
+  }
+  const half = model.roofSpan / 2, peak = base + model.postHeight + model.roofRise;
+  for (let face = 0; face < 4; face++) for (let stripe = 1; stripe < 16; stripe++) {
+    const u = stripe / 16, edge = (u * 2 - 1) * half, angle = face * Math.PI / 2;
+    const at = (t: number): RailPoint => [t * (half * Math.cos(angle) - edge * Math.sin(angle)), peak - model.roofRise * (1 - (1 - t) ** 2) + .28 * t ** 4 * Math.abs(u * 2 - 1) ** 3 + .012, t * (half * Math.sin(angle) + edge * Math.cos(angle))];
+    for (let j = 1; j < 8; j++) roofLines.push(...at(j / 8), ...at((j + 1) / 8));
+  }
+  const rotation = -Math.atan2(model.axis[1], model.axis[0]);
+  const place = (geometry: THREE.BufferGeometry) => geometry.rotateY(rotation).translate(model.center[0], 0, model.center[1]);
+  const tiles = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(roofLines, 3));
+  return { timber: place(detailMesh(timber)), stone: place(detailMesh(stone)), rocks: place(detailMesh(rocks)), tiles: place(tiles) };
 }

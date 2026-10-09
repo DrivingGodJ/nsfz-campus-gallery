@@ -31,6 +31,8 @@ function bar(from: Vector, to: Vector, width: number, depth = width) {
   return geometry.translate(...a.add(b).multiplyScalar(.5).toArray());
 }
 
+export { combined as architectureBatch, bar as architectureBar };
+
 function windowPanel(from: Point, to: Point, bottom: number, top: number) {
   const dx = to[0] - from[0], dz = to[1] - from[1];
   const geometry = new THREE.BoxGeometry(Math.hypot(dx, dz), top - bottom, .045);

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import polygonClipping from 'polygon-clipping';
 import { snapFootprint } from './building-geometry.ts';
 import { laboratoryLayout } from './laboratory-geometry.ts';
+import { architectureBar } from './architecture-geometry.ts';
 import type { Building, BuildingPart, Point } from './types';
 
 export const SKYLIGHT_BASE = .12;
@@ -50,6 +51,22 @@ export function buildingSkylightGeometry(building: Building, sections: Section[]
         [skylight.rows ?? 9, ring[0], ring[3], ring[1], ring[2]],
       ] as [number, Point, Point, Point, Point][]) {
         for (let i = 1; i < count; i++) beam(interpolate(from, to, i / count), interpolate(oppositeFrom, oppositeTo, i / count), .045, .04, gridY);
+      }
+      if (building.id === 'way/855459420') {
+        // The teaching atrium's photographed roof has a shallow space frame
+        // under the glass. Keep it attached to the roof, including its cutaway.
+        const columns = skylight.columns ?? 10, rows = skylight.rows ?? 9;
+        const at = (u: number, v: number): Point => interpolate(interpolate(ring[0], ring[1], u), interpolate(ring[3], ring[2], u), v);
+        const lower = y - .68;
+        for (let u = 0; u < columns; u++) for (let v = 0; v < rows; v++) {
+          const middle = at((u + .5) / columns, (v + .5) / rows);
+          for (const du of [0, 1]) for (const dv of [0, 1]) {
+            const corner = at((u + du) / columns, (v + dv) / rows);
+            beams.push(architectureBar([corner[0], y, corner[1]], [middle[0], lower, middle[1]], .045));
+          }
+          if (u < columns - 1) beam(middle, at((u + 1.5) / columns, (v + .5) / rows), .05, .05, lower);
+          if (v < rows - 1) beam(middle, at((u + .5) / columns, (v + 1.5) / rows), .05, .05, lower);
+        }
       }
     }
     const frame = mergeGeometries(beams)!;
