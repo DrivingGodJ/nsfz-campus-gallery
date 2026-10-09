@@ -111,7 +111,7 @@ test('curved underground stairs descend monotonically and meet the existing tunn
   assert.ok(tangent[0] * entryRun[0] + tangent[1] * entryRun[1] > 0, 'Stair tangent continues directly into the relocated entrance passage');
 });
 
-test('bridge follows the OSM route at global third-floor height, joining gym second floor and raised playground', () => {
+test('bridge keeps its existing route and 5.52 metre deck while joining the lowered playground and retained gym entry', () => {
   const bridge = find('local/footbridge');
   const gym = bridge.connections.find(c => c.buildingId === 'local/gymnasium');
   const stairs = bridge.connections.find(c => c.id === 'playground-stairs'), upper = bridge.connections.find(c => c.id === 'upper-road-stairs');
@@ -124,14 +124,14 @@ test('bridge follows the OSM route at global third-floor height, joining gym sec
   assert.ok(road.points.some(p => p.every((n, i) => n === approach.points.at(-1)[i])), 'Shortened upper stairs meet the existing road through a ground approach');
   assert.deepEqual(gym.points[0], gymSource.points[0]);
   for (const id of bridge.sourcePathIds) assert.equal(find(id).representedBy, bridge.id, 'The source footway is rendered as the bridge, without a second road underneath');
-  assert.equal(gym.floor, 1.5, 'The bridge meets the raised gym half-floor platform');
+  assert.equal(gym.floor, 1.5, 'The existing gym entry annotation is retained');
   assert.deepEqual(gym.points[0], bridge.points[0]);
   assert.deepEqual(stairs.points[0], bridge.points[0]);
   const height = bridgeHeight(bridge, campus.buildings, { 'local/gymnasium': { floorHeight: 3.6 } });
   close(height, 5.52);
-  close(bridgeHeight(bridge, campus.buildings, { 'local/gymnasium': { floorHeight: 4.2 } }), 5.82);
+  close(bridgeHeight(bridge, campus.buildings, { 'local/gymnasium': { floorHeight: 4.2 } }), 5.52);
   const treads = straightStairTreads(stairs.points[0], stairs.points.at(-1), height, stairs.groundHeight);
-  close(treads.at(-1).height, 3.72);
+  close(treads.at(-1).height, 2.72);
   assert.deepEqual(treads.at(-1).to, stairs.points.at(-1));
   assert.ok(treads.every((step, i) => step.height < (i ? treads[i - 1].height : height)), 'Playground stairs descend only as far as the raised field');
   const wallDistance = (point, building) => Math.min(...building.outer.slice(1).map((to, i) => {

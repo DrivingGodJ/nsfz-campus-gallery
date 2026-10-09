@@ -141,3 +141,131 @@ test('gym court and gallery follow editable floor heights and do not create floo
     } finally { dispose(model, [court, stairs]); }
   }
 });
+
+test('lowering the gym preserves the absolute bridge doorway and landing while upper floors and roof move down exactly one metre', () => {
+  const fixedBridge = { ...bridge, deckHeight: 5.52, levelAnchor: undefined };
+  const oldGym = { ...gym, baseElevation: 3.6 }, loweredGym = { ...gym, baseElevation: 2.6 };
+  const floorHeight = 3.6, height = 4 * floorHeight;
+  const oldModel = gymArchitecture(oldGym, height, floorHeight, fixedBridge);
+  const model = gymArchitecture(loweredGym, height, floorHeight, fixedBridge);
+  const worldMesh = (geometry, base, extrusion = false) => {
+    const object = mesh(geometry, extrusion); object.position.y += base; object.updateMatrixWorld(); return object;
+  };
+  const oldStairs = worldMesh(oldModel.stairs, 3.6), stairs = worldMesh(model.stairs, 2.6);
+  const oldCourt = worldMesh(oldModel.court, 3.6), court = worldMesh(model.court, 2.6);
+  const oldRoof = worldMesh(oldModel.roof, 3.6), roof = worldMesh(model.roof, 2.6);
+  const bodies = [worldMesh(oldModel.body, 3.6, true), worldMesh(model.body, 2.6, true)];
+  const panes = [worldMesh(oldModel.glass, 3.6), worldMesh(model.glass, 2.6)];
+  const connection = fixedBridge.connections.find(c => c.type === 'deck' && c.buildingId === gym.id);
+  const u = frame.local(connection.points[0])[0], middle = (layout.u0 + layout.u1) / 2;
+  const rayDown = (object, u, v, y) => {
+    const p = frame.at(u, v);
+    return new THREE.Raycaster(new THREE.Vector3(p[0], y + .1, p[1]), down, 0, .5).intersectObject(object)[0];
+  };
+  try {
+    for (const object of [oldStairs, stairs]) {
+      const hit = rayDown(object, u, 3, 5.52);
+      assert.ok(hit && Math.abs(hit.point.y - 5.52) < 1e-4, 'Both entrance platforms meet the unchanged bridge exactly');
+    }
+    for (const [object, base] of [[oldCourt, 3.6], [court, 2.6]]) {
+      const hit = rayDown(object, layout.bayStart / 2, frame.width / 2, base + BASE + floorHeight);
+      assert.ok(hit && Math.abs(hit.point.y - base - BASE - floorHeight) < 1e-4);
+    }
+    const oldUpper = rayDown(oldStairs, middle, 3, 3.6 + BASE + 1.5 * floorHeight);
+    const upper = rayDown(stairs, middle, 3, 2.6 + BASE + 1.5 * floorHeight);
+    assert.ok(oldUpper && upper && Math.abs(oldUpper.point.y - upper.point.y - 1) < 1e-4,
+      'The next half-floor platform follows the building, rather than the fixed bridge');
+    const unchangedUpper = geometry => {
+      const positions = geometry.getAttribute('position'), result = [];
+      for (let i = 0; i < positions.count; i++) if (positions.getY(i) > BASE + 4.7) {
+        result.push(positions.getX(i), positions.getY(i), positions.getZ(i));
+      }
+      return result;
+    };
+    for (const key of ['stairs', 'stairRails', 'stairGlass']) {
+      assert.deepEqual(unchangedUpper(model[key]), unchangedUpper(oldModel[key]),
+        `${key} above the first flights keeps the original relative geometry, so world height changes by precisely one metre`);
+    }
+    oldRoof.geometry.computeBoundingBox(); roof.geometry.computeBoundingBox();
+    assert.deepEqual(model.roof.getAttribute('position').array, oldModel.roof.getAttribute('position').array,
+      'The roof keeps its shape and local height');
+    assert.ok(Math.abs(oldRoof.geometry.boundingBox.max.y + 3.6 - roof.geometry.boundingBox.max.y - 2.6 - 1) < 1e-6);
+
+    for (let i = 0; i < bodies.length; i++) {
+      const p = frame.at(u, -1), direction = new THREE.Vector3(...[frame.across[0], 0, frame.across[1]]);
+      const atHeight = (object, y) => new THREE.Raycaster(new THREE.Vector3(p[0], y, p[1]), direction, 0, 1.5).intersectObject(object);
+      for (const y of [5.62, 7.12, 9.02]) {
+        assert.equal(atHeight(bodies[i], y).length, 0, 'The complete exterior doorway remains at its original absolute height');
+        assert.equal(atHeight(panes[i], y).length, 0, 'Glazing does not block that doorway');
+      }
+      for (const y of [5.42, 9.22]) assert.ok(atHeight(panes[i], y).length,
+        'The glazing immediately below and above fixes both doorway boundaries at the original world heights');
+    }
+    for (const [a, b, v0, v1, bottom, top, steps] of [
+      [middle + layout.gap / 2, layout.u1, layout.near, layout.far, .16, 2.8, 15],
+      [layout.u0, middle - layout.gap / 2, layout.far, layout.near, 2.8, 3.6, 5]
+    ]) for (let step = 0; step < steps; step++) {
+      const y = 2.6 + BASE + bottom + (top - bottom) * (step + 1) / steps;
+      const hit = rayDown(stairs, (a + b) / 2, v0 + (v1 - v0) * (step + .5) / steps, y);
+      assert.ok(hit && Math.abs(hit.point.y - y) < 1e-4, 'Each of the 15/5 first-flight treads matches the actual rise');
+    }
+  } finally {
+    dispose(oldModel, [oldStairs, oldCourt, oldRoof, ...bodies.slice(0, 1), ...panes.slice(0, 1)]);
+    dispose(model, [stairs, court, roof, ...bodies.slice(1), ...panes.slice(1)]);
+  }
+});
+
+test('a 2.8 metre gym floor meets the fixed bridge with a flat return and usable headroom without degenerate stair runs', () => {
+  const loweredGym = { ...gym, baseElevation: 2.6 }, fixedBridge = { ...bridge, deckHeight: 5.52, levelAnchor: undefined };
+  const floorHeight = 2.8, middle = (layout.u0 + layout.u1) / 2;
+  for (const floors of [1, 2, 4]) {
+    const height = floorHeight * floors, model = gymArchitecture(loweredGym, height, floorHeight, fixedBridge);
+    const stairs = mesh(model.stairs);
+    const objects = ['body', 'stairs', 'glass', 'frame', 'stairGlass', 'stairRails'].map(key => mesh(model[key], key === 'body'));
+    try {
+      if (floors === 1) assert.equal(model.stairs.getAttribute('position').count, 0, 'A one-floor gym does not invent upper flights');
+      else {
+        expectFloor(stairs, middle, 3, 2.8, 'The fixed bridge has its full-width entry platform');
+        for (const v of [layout.far + .1, 7, layout.near - .1]) {
+          expectFloor(stairs, (layout.u0 + middle - layout.gap / 2) / 2, v, 2.8,
+            'The zero-rise return is a continuous flat connection to the second floor');
+        }
+        for (const offset of [-.8, 0, .8]) {
+          const p = frame.at(middle + offset, -1);
+          const ray = new THREE.Raycaster(new THREE.Vector3(p[0], BASE + 2.8 + 2.2, p[1]),
+            new THREE.Vector3(frame.across[0], 0, frame.across[1]), 0, 4);
+          assert.equal(ray.intersectObjects(objects).length, 0, 'Upper landings preserve at least 2.2 metres of entry headroom');
+        }
+      }
+      for (const [key, geometry] of Object.entries(model)) {
+        const positions = geometry.getAttribute('position');
+        assert.ok(positions.array.every(Number.isFinite), `${key} has finite geometry at the coincident landing height`);
+        if (['stairs', 'stairRails', 'stairGlass'].includes(key) && positions.count) {
+          geometry.computeBoundingBox();
+          assert.ok(geometry.boundingBox.max.y <= BASE + height + 1e-5, `${key} stays inside the modeled floor count`);
+        }
+      }
+    } finally { dispose(model, [stairs, ...objects]); }
+  }
+});
+
+test('cutaways at the fixed bridge landing remove its ceiling slab and flat return exactly at the boundary', () => {
+  const loweredGym = { ...gym, baseElevation: 2.6 }, fixedBridge = { ...bridge, deckHeight: 5.52, levelAnchor: undefined };
+  const floorHeight = 2.8, middle = (layout.u0 + layout.u1) / 2;
+  for (const ceiling of [2.79, 2.8, 2.81, 5.6]) {
+    const model = gymArchitecture(loweredGym, 4 * floorHeight, floorHeight, fixedBridge, ceiling), stairs = mesh(model.stairs);
+    try {
+      assert.equal(Boolean(hitAt(stairs, middle, 3, 2.9, down, .3)), ceiling > 2.8,
+        'The selected ceiling removes the landing slab, including its underside');
+      assert.equal(Boolean(hitAt(stairs, (layout.u0 + middle - layout.gap / 2) / 2, 7, 2.9, down, .3)), ceiling > 2.8,
+        'The flat return has the same exact cutaway boundary as the entry landing');
+      for (const [key, geometry] of Object.entries(model)) {
+        const positions = geometry.getAttribute('position');
+        assert.ok(positions.array.every(Number.isFinite), `${key} stays finite around the cut boundary`);
+        if (key === 'body' || !positions.count) continue;
+        geometry.computeBoundingBox();
+        assert.ok(geometry.boundingBox.max.y <= BASE + ceiling + 1e-5, `${key} has no remaining detail above the selected ceiling`);
+      }
+    } finally { dispose(model, [stairs]); }
+  }
+});

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GYM_ID, gymArchitecture, teachingRailGeometry } from '../src/architecture-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
 import { GYM_WALL, gymFrame, gymStairLayout } from '../src/gym-interior.ts';
+import { bridgeHeight } from '../src/structure-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
@@ -18,6 +19,9 @@ const mesh = (geometry, extrusion = false) => {
   result.updateMatrixWorld(); return result;
 };
 const dispose = model => Object.values(model).forEach(geometry => geometry.dispose());
+const entryLevel = (building, floorHeight) => bridgeHeight(bridge, [building], {
+  [building.id]: { name: building.name, floors: 4, floorHeight }
+});
 
 test('walkway guard rails follow both courtyard rings, respect floor cutaways, and never hide photos', () => {
   const info = buildingLevels(teaching, site.buildingOverrides[teaching.id]);
@@ -70,8 +74,8 @@ test('gym bridge enters a real doorway while the adjacent wall and ground remain
   const body = mesh(model.body, true), connection = bridge.connections.find(c => c.type === 'deck' && c.buildingId === gym.id);
   body.position.y += info.baseElevation; body.updateMatrixWorld();
   const [a, b] = connection.points, direction = vector(b).sub(vector(a)).normalize();
-  const start = vector(a); start.y = .12 + info.baseElevation + (connection.floor - 1) * info.floorHeight + 1.6;
-  const entryY = .12 + info.baseElevation + (connection.floor - 1) * info.floorHeight;
+  const start = vector(a); start.y = entryLevel(gym, info.floorHeight) + 1.6;
+  const entryY = entryLevel(gym, info.floorHeight);
   for (const eyeHeight of [.3, 1.6, info.floorHeight - .3]) {
     const eye = start.clone(); eye.y = entryY + eyeHeight;
     assert.equal(new THREE.Raycaster(eye, direction, 0, 7).intersectObject(body).length, 0, 'The half-floor doorway is open across the regular floor boundary');
@@ -85,19 +89,19 @@ test('gym bridge enters a real doorway while the adjacent wall and ground remain
   dispose(model);
 });
 
-test('the half-floor bridge doorway has continuous headroom without an interior floor slab across its middle', () => {
+test('the half-floor bridge entrance has 2.2 metres of walking headroom below the next half-floor slab', () => {
   const original = JSON.stringify([gym, bridge]), info = buildingLevels(gym, site.buildingOverrides[gym.id]);
   const model = gymArchitecture(gym, info.height, info.floorHeight, bridge), frame = gymFrame(gym);
   const connection = bridge.connections.find(c => c.type === 'deck' && c.buildingId === gym.id);
-  const u = frame.local(connection.points[0])[0], base = .12 + (connection.floor - 1) * info.floorHeight;
+  const u = frame.local(connection.points[0])[0], base = entryLevel(gym, info.floorHeight) - info.baseElevation;
   const objects = ['body', 'stairs', 'glass', 'frame', 'stairGlass', 'stairRails'].map(key => {
     const object = mesh(model[key], key === 'body'); object.material.side = THREE.DoubleSide; return object;
   });
   try {
-    for (const offset of [-.8, 0, .8]) for (const eyeHeight of [.3, 1.6, 1.7, 1.79, 2.2, 3.3]) {
+    for (const offset of [-.8, 0, .8]) for (const eyeHeight of [.3, 1.6, 1.7, 1.79, 2.2]) {
       const p = frame.at(u + offset, -1);
       const ray = new THREE.Raycaster(new THREE.Vector3(p[0], base + eyeHeight, p[1]), vector(frame.across), 0, 4);
-      assert.equal(ray.intersectObjects(objects).length, 0, 'The complete doorway stays clear, including the slab height of the next regular floor');
+      assert.equal(ray.intersectObjects(objects).length, 0, 'The entrance stays clear throughout 2.2 metres of walking headroom');
     }
     const stairs = objects[1], p = frame.at(u, 3);
     const floor = new THREE.Raycaster(new THREE.Vector3(p[0], base + .5, p[1]), new THREE.Vector3(0, -1, 0), 0, 1).intersectObject(stairs)[0];
@@ -181,20 +185,23 @@ test('gym repeated return stairs rise step by step and meet the half-floor bridg
     const p = frame.at(u, v), hit = new THREE.Raycaster(new THREE.Vector3(p[0], .12 + above, p[1]), new THREE.Vector3(0, -1, 0), 0, 2).intersectObject(stairs)[0];
     assert.ok(hit, 'A real upward-facing tread or landing exists'); return hit.point.y - .12;
   };
+  const entry = entryLevel(gym, info.floorHeight) - info.baseElevation - .12;
   for (let floor = 0; floor < info.floors - 1; floor++) {
-    const bottom = floor ? floor * info.floorHeight : .16, half = (floor + .5) * info.floorHeight, top = (floor + 1) * info.floorHeight;
-    for (let step = 0; step < layout.steps; step++) {
-      const t = (step + .5) / layout.steps;
-      const lowerY = bottom + (half - bottom) * (step + 1) / layout.steps;
-      const upperY = half + (top - half) * (step + 1) / layout.steps;
-      assert.ok(Math.abs(topAt((middle + layout.u1) / 2, layout.near + (layout.far - layout.near) * t, lowerY + .1) - lowerY) < 1e-4, 'First flight climbs toward the side windows');
-      assert.ok(Math.abs(topAt((layout.u0 + middle) / 2, layout.far + (layout.near - layout.far) * t, upperY + .1) - upperY) < 1e-4, 'Adjacent flight returns toward the full-floor landing');
+    const bottom = floor ? floor * info.floorHeight : .16, half = floor ? (floor + .5) * info.floorHeight : entry, top = (floor + 1) * info.floorHeight;
+    const lowerSteps = floor ? layout.steps : Math.ceil((half - bottom) / .18 - 1e-7);
+    const upperSteps = floor ? layout.steps : Math.ceil((top - half) / .18 - 1e-7);
+    for (let step = 0; step < lowerSteps; step++) {
+      const t = (step + .5) / lowerSteps, y = bottom + (half - bottom) * (step + 1) / lowerSteps;
+      assert.ok(Math.abs(topAt((middle + layout.u1) / 2, layout.near + (layout.far - layout.near) * t, y + .1) - y) < 1e-4, 'First flight climbs toward the side windows');
+    }
+    for (let step = 0; step < upperSteps; step++) {
+      const t = (step + .5) / upperSteps, y = half + (top - half) * (step + 1) / upperSteps;
+      assert.ok(Math.abs(topAt((layout.u0 + middle) / 2, layout.far + (layout.near - layout.far) * t, y + .1) - y) < 1e-4, 'Adjacent flight returns toward the full-floor landing');
     }
     assert.ok(Math.abs(topAt(middle, 3, half + .1) - half) < 1e-4);
     assert.ok(Math.abs(topAt(frame.length - GYM_WALL - 1, frame.width / 2, top + .1) - top) < 1e-4, 'The window-side landing has a complete floor');
   }
-  const connection = bridge.connections.find(c => c.type === 'deck' && c.buildingId === gym.id);
-  assert.ok(Math.abs(topAt(middle, 3, info.floorHeight / 2 + .1) - (connection.floor - 1) * info.floorHeight) < 1e-4, 'The first half landing meets the existing bridge without changing bridge height');
+  assert.ok(Math.abs(topAt(middle, 3, entry + .1) - entry) < 1e-4, 'The first half landing meets the actual bridge height');
   for (const key of ['stairs', 'stairRails', 'stairGlass', 'glass', 'frame']) {
     assert.ok(model[key].userData.photoOcclusionMask.every(value => value === 0), `${key} does not hide interior-photo markers`);
   }

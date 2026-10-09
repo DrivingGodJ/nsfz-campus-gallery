@@ -27,8 +27,20 @@ type Frame = ReturnType<typeof gymFrame>;
 export function gymWindowOpenings(frame: Frame, height: number, floorHeight: number, wallTop: number, entry?: { u: number; width: number; bottom: number; top: number }) {
   const { length, width, at } = frame;
   const windows: { from: Point; to: Point; bottom: number; top: number; cut: GroundPassage }[] = [];
-  const add = (id: string, u0: number, v0: number, u1: number, v1: number, bottom: number, top: number) => {
-    if (top - bottom < .2) return;
+  const add = (id: string, u0: number, v0: number, u1: number, v1: number, bottom: number, top: number): void => {
+    if (top - bottom < .2 || Math.hypot(u1 - u0, v1 - v0) < .1) return;
+    // Every front pane respects the fixed bridge door, including a high window
+    // row that can overlap it when the editable gym has only two storeys.
+    if (entry && v0 === 0 && v1 === 0 && top > entry.bottom && bottom < entry.top &&
+      u0 < entry.u + entry.width / 2 && u1 > entry.u - entry.width / 2) {
+      add(`${id}-below`, u0, 0, u1, 0, bottom, Math.min(top, entry.bottom));
+      add(`${id}-above`, u0, 0, u1, 0, Math.max(bottom, entry.top), top);
+      const overlapBottom = Math.max(bottom, entry.bottom), overlapTop = Math.min(top, entry.top);
+      const left = Math.min(u1, entry.u - entry.width / 2), right = Math.max(u0, entry.u + entry.width / 2);
+      if (left > u0) add(`${id}-beside-left`, u0, 0, left, 0, overlapBottom, overlapTop);
+      if (right < u1) add(`${id}-beside-right`, right, 0, u1, 0, overlapBottom, overlapTop);
+      return;
+    }
     const from = at(u0, v0), to = at(u1, v1);
     const du = u1 - u0, dv = v1 - v0;
     const cut = Math.abs(dv) > Math.abs(du)
@@ -46,16 +58,7 @@ export function gymWindowOpenings(frame: Frame, height: number, floorHeight: num
   }
   const clerestory = height - 2.8;
   for (const [id, u0, u1] of [['left', .9, 5.4], ['right', length - 8.2, length - 3.7]] as const) {
-    const bottom = .55;
-    // Leave the half-floor bridge doorway completely free of glass as well as
-    // concrete; the panes beside and above it remain a continuous tall bay.
-    if (entry && entry.u + entry.width / 2 > u0 && entry.u - entry.width / 2 < u1) {
-      add(`gym-tower-${id}-below`, u0, 0, u1, 0, bottom, Math.min(entry.bottom, clerestory));
-      add(`gym-tower-${id}-above`, u0, 0, u1, 0, Math.max(entry.top, bottom), clerestory);
-      for (const [a, b] of [[u0, Math.max(u0, entry.u - entry.width / 2)], [Math.min(u1, entry.u + entry.width / 2), u1]]) {
-        if (b - a > .1) add(`gym-tower-${id}-beside-${a}`, a, 0, b, 0, Math.max(bottom, entry.bottom), Math.min(clerestory, entry.top));
-      }
-    } else add(`gym-tower-${id}`, u0, 0, u1, 0, bottom, clerestory);
+    add(`gym-tower-${id}`, u0, 0, u1, 0, .55, clerestory);
   }
   const entrance = length / 2;
   for (const u of [10, 17, 24, entrance - 7, entrance + 7, length - 22, length - 15]) {
@@ -89,7 +92,7 @@ function clippedProfile(points: Point[], top: number) {
   });
 }
 
-export function gymStairGeometry(frame: Frame, height: number, floorHeight: number, cutawayHeight?: number) {
+export function gymStairGeometry(frame: Frame, height: number, floorHeight: number, cutawayHeight?: number, entryHeight = floorHeight / 2) {
   const { at, length, width, along } = frame, layout = gymStairLayout(frame);
   const { u0, u1, near, far, gap, steps, bayStart } = layout, middleU = (u0 + u1) / 2;
   const shown = Math.min(height, cutawayHeight ?? height), floors = Math.ceil(height / floorHeight);
@@ -97,6 +100,7 @@ export function gymStairGeometry(frame: Frame, height: number, floorHeight: numb
   const court: THREE.BufferGeometry[] = [], courtLines: number[] = [];
   const point = (u: number, v: number, y: number): Vector => { const p = at(u, v); return [p[0], BASE + y, p[1]]; };
   const slab = (a: number, b: number, c: number, d: number, top: number, parts = concrete) => {
+    if (cutawayHeight !== undefined && top >= shown - 1e-6) return;
     const bottom = top - .22; top = Math.min(top, shown);
     if (top <= bottom) return;
     const geometry = new THREE.BoxGeometry(b - a, top - bottom, d - c);
@@ -138,12 +142,17 @@ export function gymStairGeometry(frame: Frame, height: number, floorHeight: numb
       bar(point(u, v, y), point(u, v, y + 1));
     }
   };
-  const flight = (a: number, b: number, v0: number, v1: number, bottom: number, top: number) => {
+  const flight = (a: number, b: number, v0: number, v1: number, bottom: number, top: number, count = steps) => {
     if (bottom >= shown) return;
+    if (top - bottom < 1e-6) {
+      slab(a, b, Math.min(v0, v1), Math.max(v0, v1), top);
+      for (const u of [a + .06, b - .06]) guard([u, v0], [u, v1], top, top);
+      return;
+    }
     const profile: Point[] = [[v0, bottom - .22]];
-    for (let step = 0; step < steps; step++) {
-      const y = bottom + (top - bottom) * (step + 1) / steps;
-      profile.push([v0 + (v1 - v0) * step / steps, y], [v0 + (v1 - v0) * (step + 1) / steps, y]);
+    for (let step = 0; step < count; step++) {
+      const y = bottom + (top - bottom) * (step + 1) / count;
+      profile.push([v0 + (v1 - v0) * step / count, y], [v0 + (v1 - v0) * (step + 1) / count, y]);
     }
     profile.push([v1, top - .22]);
     const shape = new THREE.Shape(clippedProfile(profile, shown).map(p => new THREE.Vector2(...p)));
@@ -154,12 +163,19 @@ export function gymStairGeometry(frame: Frame, height: number, floorHeight: numb
     for (const u of [a + .06, b - .06]) guard([u, v0], [u, v1], bottom, top);
   };
   for (let level = 0; level < floors - 1; level++) {
-    const bottom = level ? level * floorHeight : .16, middle = (level + .5) * floorHeight, top = (level + 1) * floorHeight;
+    const bottom = level ? level * floorHeight : .16, top = (level + 1) * floorHeight;
+    // The entry fixes only the first landing. At unusually low editable storey
+    // heights, preserve 2.2 m headroom plus slab thickness above that landing.
+    // Each adjustment uses the entry datum, so it cannot accumulate by floor.
+    const regularMiddle = (level + .5) * floorHeight;
+    const middle = Math.min(top, Math.max(bottom, level ? Math.max(regularMiddle, entryHeight + level * 2.45) : entryHeight));
+    const adjusted = level === 0 || Math.abs(middle - regularMiddle) > 1e-6;
+    const count = (from: number, to: number) => adjusted ? Math.max(1, Math.ceil((to - from) / .18 - 1e-7)) : steps;
     // Looking toward the bridge-side windows: ascend on the left, then return
     // on the adjacent flight. The first half landing meets the 1.5-floor bridge.
-    flight(middleU + gap / 2, u1, near, far, bottom, middle);
+    flight(middleU + gap / 2, u1, near, far, bottom, middle, count(bottom, middle));
     slab(u0, u1, GYM_WALL, far, middle);
-    flight(u0, middleU - gap / 2, far, near, middle, top);
+    flight(u0, middleU - gap / 2, far, near, middle, top, count(middle, top));
     for (const u of [u0 + .06, u1 - .06]) guard([u, GYM_WALL + .1], [u, far], middle, middle);
     // The shaft includes the half-floor landing: a regular-floor slab above it
     // would cut through the bridge doorway and leave only 1.8 m of headroom.
@@ -173,11 +189,13 @@ export function gymStairGeometry(frame: Frame, height: number, floorHeight: numb
   // Exclude slabs at the selected ceiling, rather than leaving their underside.
   if (shown > floorHeight + .001) {
     slab(GYM_WALL, bayStart, GYM_WALL, width - GYM_WALL, floorHeight, court);
-    const [marking] = basketballGeometry({ center: at((GYM_WALL + bayStart) / 2, width / 2), axis: along,
-      length: Math.min(28, bayStart - GYM_WALL - 4), width: Math.min(15, width - 2 * GYM_WALL - 4), count: 1, gap: 0 });
-    for (const mark of marking.marks) for (let i = 1; i < mark.points.length; i++) {
-      if (mark.dashed && i % 2 === 0) continue;
-      for (const p of [mark.points[i - 1], mark.points[i]]) courtLines.push(p[0], BASE + floorHeight + .015, p[1]);
+    if (shown > floorHeight + .015 + 1e-6) {
+      const [marking] = basketballGeometry({ center: at((GYM_WALL + bayStart) / 2, width / 2), axis: along,
+        length: Math.min(28, bayStart - GYM_WALL - 4), width: Math.min(15, width - 2 * GYM_WALL - 4), count: 1, gap: 0 });
+      for (const mark of marking.marks) for (let i = 1; i < mark.points.length; i++) {
+        if (mark.dashed && i % 2 === 0) continue;
+        for (const p of [mark.points[i - 1], mark.points[i]]) courtLines.push(p[0], BASE + floorHeight + .015, p[1]);
+      }
     }
   }
   // The marked long side faces away from the running track. Its third-floor

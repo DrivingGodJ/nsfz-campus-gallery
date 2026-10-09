@@ -19,9 +19,9 @@ const bridge = campus.features.find(f => f.id === 'local/footbridge');
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} equals ${b}`);
 const photo = (locationId, position, floor = 0) => ({ locationId, buildingId: '', floor, position: { x: position[0], z: position[1] }, captureType: 'ground' });
 
-test('athletics ground, its buildings, their photos and floor cutaways share a one-storey elevation', () => {
+test('athletics ground, its buildings, their photos and floor cutaways share the lowered 2.6 metre base', () => {
   const before = JSON.stringify({ campus, site });
-  close(field.height, 3.6);
+  close(field.height, 2.6);
   const platform = sportsGroundPlatform(field);
   const trackOutline = stadiumRing(field.track.halfStraight, field.track.innerRadius + field.track.lanes * field.track.laneWidth).map(p => trackWorldPoint(field.track, p));
   assert.deepEqual(polygonClipping.difference([trackOutline], [platform.outer]), [], 'The raised base supports the entire running track');
@@ -43,13 +43,17 @@ test('athletics ground, its buildings, their photos and floor cutaways share a o
   assert.deepEqual(applyCampusCorrections(campus, corrections), campus, 'All calibration survives a map refresh');
 });
 
-test('bridge reaches the raised gym half-floor platform, while aerial and underground photos stay unchanged', () => {
+test('bridge stays at its existing height above the lowered athletics base, while aerial and underground photos stay unchanged', () => {
+  close(bridge.deckHeight, 5.52);
+  assert.equal(bridge.levelAnchor, undefined, 'The fixed bridge deck is independent of the lowered gym base');
   close(bridgeHeight(bridge, campus.buildings, site.buildingOverrides), 5.52);
+  for (const floorHeight of [2.4, 3.6, 4.2]) close(bridgeHeight(bridge, campus.buildings, { [gym.id]: { floorHeight } }), 5.52);
   close(photoMapHeight(photo(bridge.id, bridge.points[0]), campus, site), 7.12);
   const entry = bridge.connections.find(c => c.buildingId === gym.id);
   assert.equal(entry.floor, 1.5);
-  close(bridgeHeight(bridge, campus.buildings, site.buildingOverrides), gym.baseElevation + (entry.floor - 1) * buildingLevels(gym).floorHeight + .12);
+  assert.deepEqual(entry.points.at(-1), [21.882475305766725, -93.95995475795036], 'The gym entry stays at the existing facade point');
   const stairs = bridge.connections.find(c => c.id === 'playground-stairs');
+  close(stairs.groundHeight, 2.72);
   close(stairs.groundHeight, field.height + .12);
   const aerial = { ...photo(gym.id, gym.center, 2), captureType: 'aerial', altitude: { reference: 'takeoff', meters: 80 } };
   close(photoMapHeight(aerial, campus, site), 80);

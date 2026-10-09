@@ -10,12 +10,13 @@ const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json'
 test('the photographed diamond net follows only the field-facing bridge and stair guards and leaves exits open', () => {
   const feature = campus.features.find(f => f.id === 'local/footbridge'), layout = bridgeLayout(feature, 5.52);
   const geometry = bridgeNetGeometry(feature, layout.railChains), positions = geometry.attributes.position;
-  const routes = [feature.points, feature.connections.find(c => c.id === 'playground-stairs').points];
+  const stairs = feature.connections.find(c => c.id === 'playground-stairs'), routes = [feature.points, stairs.points];
+  assert.ok(Math.abs(stairs.groundHeight - 2.72) < 1e-7, 'The field-facing net reaches the lowered stair landing');
   assert.ok(positions.count > 500 && positions.count < 3500, 'One bounded static wire batch spans the two confirmed faces');
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
     assert.ok(Number.isFinite(x + y + z));
-    assert.ok(y > 3.72 && y < 6.52, 'Wire stays between the actual stair level and the bridge guard top');
+    assert.ok(y > stairs.groundHeight && y < 6.52, 'Wire stays between the lowered stair level and the unchanged bridge guard top');
     assert.ok(routes.some(([a, b]) => {
       const dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz);
       const facing = dz * (feature.sideNet.facing[0] - a[0]) - dx * (feature.sideNet.facing[1] - a[1]);

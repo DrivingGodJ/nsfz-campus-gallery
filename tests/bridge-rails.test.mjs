@@ -20,6 +20,7 @@ test('bridge rails follow the joined perimeter, leave all three exits open and m
   for (const floorHeight of [site.buildingOverrides['local/gymnasium'].floorHeight, 4.2]) {
     const overrides = { ...site.buildingOverrides, 'local/gymnasium': { ...site.buildingOverrides['local/gymnasium'], floorHeight } };
     const height = bridgeHeight(bridge, map.buildings, overrides), layout = bridgeLayout(bridge, height);
+    assert.ok(Math.abs(height - 5.52) < 1e-6, 'Gym floor-height edits do not move the fixed bridge deck or its guards');
     assert.equal(layout.deck.length, 1, 'Bridge and branch landings share a single deck');
     assert.equal(layout.footprint.length, 1);
     assert.equal(layout.railChains.length, 3, 'Each open exit separates adjacent perimeter rail chains');
@@ -90,7 +91,11 @@ test('playground stairs retain both flights and their middle platform while the 
       assert.ok(treads.every((tread, i) => tread.height < (i ? treads[i - 1].height : flight.top)));
       assert.deepEqual(treads.at(-1).to, flight.to);
       close(treads.at(-1).height, flight.bottom);
-      if (height === 5.52) assert.equal(treads.length, 5, 'Each normal flight has five steps, rather than metre-deep treads');
+      if (height === 5.52) {
+        assert.equal(treads.length, 8, 'Each flight has eight steps to reach the field one metre lower');
+        close(distance(flight.from, flight.to), 2.4);
+        close((flight.top - flight.bottom) / treads.length, .175);
+      }
     }
     const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
     const slab = (from, to, top, thickness) => {
