@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 690,
+  "revision": 692,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -25,12 +25,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 162.40531490595149,
-        "z": 33.34949814827148
+        "x": 162.18667308470614,
+        "z": 31.703869228919928
       },
       "placed": true,
-      "heading": 14.812098139020009,
-      "pitch": 4.749325680958422,
+      "heading": 10.957758107073118,
+      "pitch": 6.766055001543015,
       "width": 4342,
       "height": 5789,
       "downloadBytes": 3327998,
@@ -45,7 +45,7 @@
       "author": "DrivingGodJ",
       "copyright": "DGJ",
       "depthUpdatedAt": "8c3974ab-328d-42e1-b49a-92e78c2e563e",
-      "cameraHeight": 0.5
+      "cameraHeight": 0.4
     },
     {
       "id": "07daa633-1b1c-427e-bbd7-37dc23428ee8",
@@ -1174,12 +1174,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 163.7,
-        "z": 39.87828649775446
+        "x": 163.14246633023959,
+        "z": 35.72302462906981
       },
       "placed": true,
-      "heading": 353.40136249661714,
-      "pitch": 0.05811300102251036,
+      "heading": 354.2966205492912,
+      "pitch": 1.0462789157053078,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 4740319,
@@ -1193,7 +1193,8 @@
       "locationId": "",
       "author": "DrivingGodJ",
       "copyright": "DGJ",
-      "depthUpdatedAt": "d82eba30-f2b5-4b60-aa72-8f3063d181e1"
+      "depthUpdatedAt": "d82eba30-f2b5-4b60-aa72-8f3063d181e1",
+      "cameraHeight": 1.2999999999999998
     },
     {
       "id": "51f40733-0225-4555-a676-40aeffb92106",

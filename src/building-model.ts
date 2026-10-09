@@ -2,7 +2,7 @@ import type { Building, BuildingOverride } from './types';
 
 export function buildingLevels(building: Building, override?: BuildingOverride) {
   const baseFloors = override?.floors ?? building.floors ?? 3;
-  const floorHeight = override?.floorHeight ?? 3.6;
+  const floorHeight = override?.floorHeight ?? building.floorHeight ?? 3.6;
   const baseHeight = baseFloors * floorHeight;
   const sections = (building.parts?.length ? building.parts : [{ id: 'main', name: building.name, outer: building.outer, holes: building.holes }]).map(part => {
     const floors = part.id === 'main' ? baseFloors : override?.partFloors?.[part.id] ?? part.floors ?? baseFloors;

@@ -61,7 +61,7 @@ test('all ordinary campus buildings open every selected storey, preserving floor
 
 test('laboratory, cafeteria and dormitory cutaways remove first and top ceilings without flattening their profiles', () => {
   const generators = { laboratory: laboratoryBodyGeometry, cafeteria: cafeteriaBodyGeometry, dormitory: dormitoryBodyGeometry };
-  for (const building of campus.buildings.filter(b => b.facade)) {
+  for (const building of campus.buildings.filter(b => b.facade && generators[b.facade.type])) {
     const info = buildingLevels(building, site.buildingOverrides[building.id]);
     for (const floor of [1, 2, info.floors]) {
       const height = floor * info.floorHeight, geometry = generators[building.facade.type](building, height, info.floorHeight, true);

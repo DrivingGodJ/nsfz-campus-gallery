@@ -19,7 +19,7 @@ const inside = (p, shape) => polygonClipping.intersection([shape.outer], [[[p[0]
 
 test('localized facade calibrations survive refresh and retain the merged dormitory', async () => {
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
-  assert.deepEqual(facades.map(b => b.facade.type).sort(), ['cafeteria', 'dormitory', 'laboratory']);
+  assert.deepEqual(facades.map(b => b.facade.type).sort(), ['boundary-house', 'cafeteria', 'dormitory', 'laboratory']);
   assert.deepEqual(applyCampusCorrections(campus, corrections), campus);
   assert.equal(site.buildingOverrides[dorm.id].name, '宿舍');
   assert.equal(dorm.sourceBuildingIds.length, 3);

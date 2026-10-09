@@ -3527,6 +3527,47 @@
       "floors": null,
       "calibrated": true,
       "classroomWindows": null
+    },
+    {
+      "id": "local/boundary-house",
+      "osmId": null,
+      "osmType": "local",
+      "name": "校界小屋",
+      "category": "utility",
+      "center": [
+        163.84883883138625,
+        17.335637918809795
+      ],
+      "outer": [
+        [
+          162.5952658298033,
+          22.351717536369936
+        ],
+        [
+          165.8847341701967,
+          22.088282463630062
+        ],
+        [
+          165.1024118329692,
+          12.31955830124965
+        ],
+        [
+          161.8129434925758,
+          12.582993373989524
+        ],
+        [
+          162.5952658298033,
+          22.351717536369936
+        ]
+      ],
+      "holes": [],
+      "floors": 1,
+      "floorHeight": 3.15,
+      "calibrated": true,
+      "facade": {
+        "type": "boundary-house"
+      },
+      "classroomWindows": null
     }
   ],
   "features": [
