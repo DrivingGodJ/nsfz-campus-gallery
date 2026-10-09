@@ -60,7 +60,7 @@ test('gym roof has a higher symmetric arch while floor and eave levels remain ca
     assert.ok(Math.abs(heights[2] - (info.height + 1.2 + .12)) < 1e-4, 'Only the arch rises by 1.2 metres above the calibrated building height');
     const point = vector(a).lerp(vector(b), .5).add(across); point.y = 2;
     assert.ok(new THREE.Raycaster(point, new THREE.Vector3(0, 1, 0)).intersectObject(roof).length, 'Underside is visible from inside');
-    assert.ok(Object.values(model).reduce((n, g) => n + g.getAttribute('position').count / 3, 0) < 10000, 'Facade glazing, repeated stairs and rails remain a modest merged model');
+    assert.ok(Object.values(model).reduce((n, g) => n + g.getAttribute('position').count / 3, 0) < 11000, 'Facade, court, viewing gallery and repeated stairs remain a modest merged model');
     dispose(model);
   }
 });

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { basketballGeometry } from './basketball-geometry.ts';
 import type { GroundPassage, Point, Shape } from './types';
 
 const BASE = .12;
@@ -69,7 +70,7 @@ export function gymStairLayout(frame: Frame) {
   return { u0: frame.length - 10.1, u1: frame.length - 3.7, near: 9.2, far: 5, gap: .24, steps: 12, bayStart: frame.length - 12.3 };
 }
 
-function combined(parts: THREE.BufferGeometry[]) {
+function combined(parts: THREE.BufferGeometry[], blocksPhotos = false) {
   const plain = parts.map(part => {
     const geometry = part.index ? part.toNonIndexed() : part.clone();
     geometry.deleteAttribute('uv'); return geometry;
@@ -77,7 +78,7 @@ function combined(parts: THREE.BufferGeometry[]) {
   const result = plain.length ? mergeGeometries(plain)! : new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3));
   parts.forEach(part => part.dispose()); plain.forEach(part => part.dispose());
   // Thin flights, landing slabs and glazing do not hide the archive's photos.
-  result.userData.photoOcclusionMask = new Uint8Array(result.getAttribute('position').count / 3);
+  if (!blocksPhotos) result.userData.photoOcclusionMask = new Uint8Array(result.getAttribute('position').count / 3);
   return result;
 }
 
@@ -93,13 +94,16 @@ export function gymStairGeometry(frame: Frame, height: number, floorHeight: numb
   const { u0, u1, near, far, gap, steps, bayStart } = layout, middleU = (u0 + u1) / 2;
   const shown = Math.min(height, cutawayHeight ?? height), floors = Math.ceil(height / floorHeight);
   const concrete: THREE.BufferGeometry[] = [], rails: THREE.BufferGeometry[] = [], glass: THREE.BufferGeometry[] = [];
+  const court: THREE.BufferGeometry[] = [], courtLines: number[] = [];
   const point = (u: number, v: number, y: number): Vector => { const p = at(u, v); return [p[0], BASE + y, p[1]]; };
-  const slab = (a: number, b: number, c: number, d: number, top: number) => {
+  const slab = (a: number, b: number, c: number, d: number, top: number, parts = concrete) => {
     const bottom = top - .22; top = Math.min(top, shown);
     if (top <= bottom) return;
     const geometry = new THREE.BoxGeometry(b - a, top - bottom, d - c);
-    geometry.rotateY(-Math.atan2(along[1], along[0]));
-    concrete.push(geometry.translate(...point((a + b) / 2, (c + d) / 2, (bottom + top) / 2)));
+    const vertices = geometry.getAttribute('position');
+    for (let i = 0; i < vertices.count; i++) vertices.setXYZ(i, ...point(
+      (a + b) / 2 + vertices.getX(i), (c + d) / 2 - vertices.getZ(i), (bottom + top) / 2 + vertices.getY(i)));
+    geometry.computeVertexNormals(); parts.push(geometry);
   };
   const bar = (a: Vector, b: Vector) => {
     const top = BASE + shown;
@@ -165,5 +169,25 @@ export function gymStairGeometry(frame: Frame, height: number, floorHeight: numb
     slab(u0, u1, near, width - GYM_WALL, top);
     guard([length - GYM_WALL - .18, .8], [length - GYM_WALL - .18, width - .8], top, top);
   }
-  return { stairs: combined(concrete), stairRails: combined(rails), stairGlass: combined(glass) };
+  // The basketball hall starts on floor two and stays open up to the roof.
+  // Exclude slabs at the selected ceiling, rather than leaving their underside.
+  if (shown > floorHeight + .001) {
+    slab(GYM_WALL, bayStart, GYM_WALL, width - GYM_WALL, floorHeight, court);
+    const [marking] = basketballGeometry({ center: at((GYM_WALL + bayStart) / 2, width / 2), axis: along,
+      length: Math.min(28, bayStart - GYM_WALL - 4), width: Math.min(15, width - 2 * GYM_WALL - 4), count: 1, gap: 0 });
+    for (const mark of marking.marks) for (let i = 1; i < mark.points.length; i++) {
+      if (mark.dashed && i % 2 === 0) continue;
+      for (const p of [mark.points[i - 1], mark.points[i]]) courtLines.push(p[0], BASE + floorHeight + .015, p[1]);
+    }
+  }
+  // The marked long side faces away from the running track. Its third-floor
+  // viewing gallery joins the existing stair landing without crossing the hall.
+  if (shown > 2 * floorHeight + .001) {
+    const edge = width - GYM_WALL, inner = edge - 3, top = 2 * floorHeight;
+    slab(GYM_WALL, bayStart, inner, edge, top);
+    guard([GYM_WALL + .08, inner + .06], [bayStart, inner + .06], top, top);
+    guard([GYM_WALL + .08, inner + .06], [GYM_WALL + .08, edge], top, top);
+  }
+  return { stairs: combined(concrete), stairRails: combined(rails), stairGlass: combined(glass),
+    court: combined(court, true), courtLines: new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(courtLines, 3)) };
 }

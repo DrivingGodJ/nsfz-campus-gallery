@@ -43,6 +43,8 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
     {gym && building.id === GYM_ID && <>
       <mesh geometry={gym.roof}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.roof)} roughness={.9} side={THREE.DoubleSide} /></mesh>
       <mesh geometry={gym.stairs}><meshStandardMaterial color={mapColor('#d7d2c3')} roughness={.95} /></mesh>
+      <mesh geometry={gym.court}><meshStandardMaterial color={mapColor('#c2a47a')} roughness={.95} /></mesh>
+      <lineSegments geometry={gym.courtLines} raycast={() => null}><lineBasicMaterial color={mapColor('#f4efe2')} /></lineSegments>
       <mesh geometry={gym.glass} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.glass)} roughness={.6} transparent opacity={.24} depthWrite={false} side={THREE.DoubleSide} /></mesh>
       <mesh geometry={gym.stairGlass} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.glass)} roughness={.6} transparent opacity={.18} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     </>}
