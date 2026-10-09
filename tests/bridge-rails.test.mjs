@@ -26,7 +26,7 @@ test('bridge rails follow the joined perimeter, leave all three exits open and m
     const ends = layout.railChains.flatMap(chain => [chain[0], chain.at(-1)]);
     for (const connection of bridge.connections) {
       const stair = layout.stairs.find(stair => stair.id === connection.id);
-      const terminal = stair?.landings.some(landing => landing.height === stair.bottom && landing.to === stair.to)
+      const terminal = stair?.flights.length === 2
         ? stair.flights.at(-1).to : connection.points.at(-1);
       const previous = connection.points.at(-2);
       const length = Math.hypot(terminal[0] - previous[0], terminal[1] - previous[1]);
@@ -60,7 +60,7 @@ test('bridge rails follow the joined perimeter, leave all three exits open and m
   assert.equal(JSON.stringify([bridge, site]), before);
 });
 
-test('playground stair flights descend through a level middle landing and meet the original terminal at field level', async () => {
+test('playground stairs retain both flights and their middle platform while the original field-level exit has no slab or guards', async () => {
   const map = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
   const bridge = structuredClone(map.features.find(feature => feature.id === 'local/footbridge'));
   const connection = bridge.connections.find(connection => connection.id === 'playground-stairs');
@@ -70,9 +70,10 @@ test('playground stair flights descend through a level middle landing and meet t
   const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
   for (const height of [5.52, 5.82, 4.02]) {
     const layout = bridgeLayout(bridge, height), stair = layout.stairs.find(stair => stair.id === connection.id);
-    const [first, second] = stair.flights, [middle, ground] = stair.landings;
+    const [first, second] = stair.flights, [middle] = stair.landings;
+    const ground = { from: second.to, to: stair.to, height: second.bottom };
     assert.equal(stair.flights.length, 2);
-    assert.equal(stair.landings.length, 2);
+    assert.equal(stair.landings.length, 1, 'Only the middle landing renders a slab; the ground continuation is an open path');
     assert.deepEqual(first.from, stair.from);
     assert.deepEqual(first.to, middle.from);
     assert.deepEqual(middle.to, second.from);
@@ -91,6 +92,31 @@ test('playground stair flights descend through a level middle landing and meet t
       close(treads.at(-1).height, flight.bottom);
       if (height === 5.52) assert.equal(treads.length, 5, 'Each normal flight has five steps, rather than metre-deep treads');
     }
+    const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+    const slab = (from, to, top, thickness) => {
+      const dx = to[0] - from[0], dz = to[1] - from[1];
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(bridge.width, thickness, distance(from, to)), material);
+      mesh.rotation.y = Math.atan2(dx, dz);
+      mesh.position.set((from[0] + to[0]) / 2, top - thickness / 2, (from[1] + to[1]) / 2);
+      mesh.updateMatrixWorld(); return mesh;
+    };
+    const surfaces = layout.stairs.flatMap(stair => [
+      ...stair.flights.flatMap(flight => straightStairTreads(flight.from, flight.to, flight.top, flight.bottom)
+        .map(step => slab(step.from, step.to, step.height, step.height - flight.bottom + .08))),
+      ...stair.landings.map(landing => slab(landing.from, landing.to, landing.height, BRIDGE_DECK_THICKNESS)),
+    ]);
+    const ray = point => new THREE.Raycaster(new THREE.Vector3(point[0], height + 1, point[1]), new THREE.Vector3(0, -1, 0), 0, height + 2).intersectObjects(surfaces);
+    try {
+      assert.ok(ray(middle.from.map((n, i) => (n + middle.to[i]) / 2)).length, 'The retained middle platform has a real walking surface');
+      for (const t of [.05, .25, .5, .75, .95]) {
+        const center = ground.from.map((n, i) => n + (ground.to[i] - n) * t);
+        for (const side of [-.4, 0, .4]) {
+          const dx = ground.to[0] - ground.from[0], dz = ground.to[1] - ground.from[1], span = distance(ground.from, ground.to);
+          const point = [center[0] + dz / span * bridge.width * side, center[1] - dx / span * bridge.width * side];
+          assert.equal(ray(point).length, 0, 'No bridge landing or stair slab covers the field-level continuation');
+        }
+      }
+    } finally { surfaces.forEach(mesh => mesh.geometry.dispose()); material.dispose(); }
     const dx = stair.to[0] - stair.from[0], dz = stair.to[1] - stair.from[1], span = Math.hypot(dx, dz);
     const profile = [first, { ...middle, top: middle.height, bottom: middle.height }, second];
     for (const segment of profile) for (const side of [-1, 1]) {

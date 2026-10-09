@@ -130,7 +130,11 @@ export function bridgeLayout(feature: Feature, height: number) {
     }
     railChains.push(...chains.map(points => points.map(point => [point[0], floorAt(point), point[1]] as RailPoint)));
   }
-  return { deck, footprint, stairs, railChains };
+  // The final field-level continuation only locates the original path exit;
+  // it has no bridge slab. Keep it above for perimeter/rail calculations.
+  const renderedStairs = stairs.map(stair => ({ ...stair, landings: stair.landings.filter(landing =>
+    !near(landing.to, stair.to) || Math.abs(landing.height - stair.bottom) >= 1e-6) }));
+  return { deck, footprint, stairs: renderedStairs, railChains };
 }
 
 export function bridgeRailPosts(chains: RailPoint[][], spacing = 3, smooth = false): RailPoint[] {
