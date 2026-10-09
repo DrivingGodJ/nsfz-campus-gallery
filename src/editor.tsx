@@ -36,7 +36,7 @@ function Editor() {
   // Parameter changes only move the edited photo; the rest of the map's photo
   // collection stays stable instead of rebuilding clusters on every keystroke.
   const mapPhotos = useMemo(() => state?.site.photos.filter(p => p.id !== photo?.id) || [], [state?.site.photos, photo?.id]);
-  const selectableLocationIds = useMemo(() => state ? campusFilterLocations(state.map, state.site).map(item => item.id) : [], [state]);
+  const selectableLocationIds = useMemo(() => state ? campusFilterLocations(state.map, state.site).map(item => item.id) : [], [state?.map, state?.site.buildingOverrides]);
   const locationId = photo ? photoLocationId(photo, state?.map) : '';
   const locationAllowed = !locationId || selectableLocationIds.includes(locationId);
   const [dirty, setDirty] = useState(false);
@@ -66,7 +66,17 @@ function Editor() {
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const initial = useRef(false);
-  const refresh = async () => { const next = await api('state') as EditorState; setState(next); return next; };
+  const refresh = async () => {
+    const next = await api('state') as EditorState;
+    // Saving a photo returns the entire library. Keep unchanged model inputs
+    // stable so that its buildings and underground geometry can be reused.
+    setState(previous => previous ? {
+      ...next,
+      map: JSON.stringify(previous.map) === JSON.stringify(next.map) ? previous.map : next.map,
+      site: { ...next.site, buildingOverrides: JSON.stringify(previous.site.buildingOverrides) === JSON.stringify(next.site.buildingOverrides) ? previous.site.buildingOverrides : next.site.buildingOverrides }
+    } : next);
+    return next;
+  };
   const selectPhoto = useCallback((p: Photo) => {
     setPreviewing(false); setComparing(false);
     let cached: Photo | null = null;
@@ -207,7 +217,7 @@ function Editor() {
         <aside className="library-panel" aria-label="本地内容库"><div className="editor-tabs"><button className={mode === 'photos' ? 'active' : ''} onClick={() => setMode('photos')}><Images size={15} />照片</button>{!desktop && <button className={mode === 'reviews' ? 'active' : ''} onClick={() => { setMode('reviews'); setPreviewing(false); setComparing(false); setPlacing(false); }}>审核</button>}<button className={mode === 'buildings' ? 'active' : ''} onClick={() => { setMode('buildings'); setPreviewing(false); setPlacing(false); if (!buildingId) pickBuilding(state.map.buildings[0].id); }}><Building2 size={15} />建筑</button></div>
           {mode === 'reviews' ? <ReviewInbox api={api} onImport={row => void importReview(row)} onReject={(row,reason) => { setBusy('正在退回投稿'); setError(''); void api('review/' + row.id + '/reject','POST',{reason}).then(() => {setReviewReload(n=>n+1);setMessage('投稿已退回。');}).catch(e=>setError(e.message)).finally(()=>setBusy('')); }} onError={setError} busy={!!busy} reload={reviewReload} onRecords={setReviewRows} /> : mode === 'photos' ? <><p className="quick-import-note">你的照片直接导入；邮件投稿的 ZIP 包也在这里导入，核对后保存到内容库。</p><div className={'import-box' + (dragging ? ' drag-over' : '')} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); void importFiles(Array.from(e.dataTransfer.files)); }}><ImagePlus size={24} strokeWidth={1.4} /><strong>添加校园照片</strong><span>拖入照片或投稿 ZIP 包</span><button className="button primary" onClick={() => input.current?.click()} disabled={!!busy}>导入照片或投稿包</button><input ref={input} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/tiff,image/heic,image/heif,application/zip,.zip" multiple onChange={e => void importFiles(Array.from(e.target.files || []))} aria-label="选择校园照片文件" /><small>支持批量导入 · 原片最多 40 MB · 下载图自动压缩至 5 MB · ZIP 保留投稿标注</small></div>
             <div className="library-title">内容库 <span>{state.drafts.length + state.site.photos.length}</span></div>
-            {[...state.drafts, ...state.site.photos].map(p => <button className={'library-photo' + (photo?.id === p.id ? ' active' : '')} key={p.id} onClick={() => selectPhoto(p)}><img src={imageSource(p, 'thumbnail')} alt="" /><span><strong>{p.title}</strong><small>{state.drafts.some(d => d.id === p.id) ? '待标注草稿' : '已保存'}</small></span>{!state.drafts.some(d => d.id === p.id) && <Check size={13} />}</button>)}
+            {[...state.drafts, ...state.site.photos].map(p => <button className={'library-photo' + (photo?.id === p.id ? ' active' : '')} key={p.id} onClick={() => selectPhoto(p)}><img src={imageSource(p, 'thumbnail')} alt="" loading="lazy" decoding="async" /><span><strong>{p.title}</strong><small>{state.drafts.some(d => d.id === p.id) ? '待标注草稿' : '已保存'}</small></span>{!state.drafts.some(d => d.id === p.id) && <Check size={13} />}</button>)}
             {state.drafts.length + state.site.photos.length === 0 && <p className="library-help">原始照片保存在本地。公开网站使用处理后的展示图和高清 JPEG。</p>}
           </> : <><p className="library-help">OSM 提供轮廓与部分层数。名称、楼层数和层高可以在这里校准。</p>{state.map.buildings.map((b, i) => <button className={'building-row' + (buildingId === b.id ? ' active' : '')} key={b.id} onClick={() => pickBuilding(b.id)}><Building2 size={15} /><span>{buildingInfo(b, state.site, i).name}<small>{buildingFloorText(buildingInfo(b, state.site, i))} · 层高 {buildingInfo(b, state.site, i).floorHeight} m</small></span></button>)}</>}
         </aside>

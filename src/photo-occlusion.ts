@@ -2,6 +2,26 @@ import * as THREE from 'three';
 import { acceleratedRaycast, MeshBVH, type MeshBVHOptions } from 'three-mesh-bvh';
 
 const indexed = new WeakSet<THREE.BufferGeometry>();
+const worldBounds = new WeakMap<THREE.Mesh, { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4; localBox: THREE.Box3; box: THREE.Box3 }>();
+
+// Reject distant meshes before BVH raycasting has to invert their world matrix.
+// A world-axis box is conservative even for rotated, scaled and nested models.
+export function photoRayIntersectsOccluder(mesh: THREE.Mesh, ray: THREE.Raycaster) {
+  if (mesh instanceof THREE.InstancedMesh || mesh instanceof THREE.SkinnedMesh) return true;
+  const geometry = mesh.geometry;
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
+  if (!geometry.boundingBox) return true;
+  let bounds = worldBounds.get(mesh);
+  if (!bounds || bounds.geometry !== geometry) {
+    bounds = { geometry, matrix: new THREE.Matrix4(), localBox: new THREE.Box3(), box: new THREE.Box3() };
+    worldBounds.set(mesh, bounds);
+  }
+  if (!bounds.matrix.equals(mesh.matrixWorld) || !bounds.localBox.equals(geometry.boundingBox)) {
+    bounds.localBox.copy(geometry.boundingBox);
+    bounds.matrix.copy(mesh.matrixWorld); bounds.box.copy(geometry.boundingBox).applyMatrix4(mesh.matrixWorld).expandByScalar(1e-6);
+  }
+  return ray.ray.intersectsBox(bounds.box);
+}
 
 // Keep original triangle order: corridor slabs carry a per-face visibility mask.
 // Reuse this index for both photo visibility and pointer picking, without changing

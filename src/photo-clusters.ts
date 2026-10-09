@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { MapPhoto } from './MapCameraRig';
 import { MAP_PHOTO_FOCUS_DISTANCE } from './map-card-viewport.ts';
-import { acceleratePhotoOccluder, isOwnBuildingOccluder, isPhotoOccluder, isPhotoOpacityOnlyOccluder, photoOpacityRaycast } from './photo-occlusion.ts';
+import { acceleratePhotoOccluder, isOwnBuildingOccluder, isPhotoOccluder, isPhotoOpacityOnlyOccluder, photoOpacityRaycast, photoRayIntersectsOccluder } from './photo-occlusion.ts';
 import { isAerialPhoto, photoLocationId } from './locations.ts';
 
 export const PHOTO_MERGE_METERS = 2;
@@ -20,7 +20,7 @@ function groupPosition(spots: PhotoSpot[]) {
   return spots.reduce((nearest, spot) => spot.position.distanceToSquared(middle) < nearest.position.distanceToSquared(middle) ? spot : nearest).position.clone();
 }
 
-function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], ray: THREE.Raycaster, halfSize: [number, number], buildingId?: string) {
+function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Mesh[], ray: THREE.Raycaster, halfSize: [number, number]) {
   const projected = anchor.clone().project(camera);
   // Keep partially clipped thumbnails at their real position until their entire
   // rectangle leaves the canvas. Depth and building occlusion still apply.
@@ -29,7 +29,7 @@ function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: {
   if (!occluders.length) return true;
   ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), camera);
   ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
-  return !ray.intersectObjects(occluders.filter(object => object instanceof THREE.Mesh && isPhotoOccluder(object) && !isPhotoOpacityOnlyOccluder(object) && !isOwnBuildingOccluder(object, buildingId)), false).some(hit => {
+  return !ray.intersectObjects(occluders.filter(mesh => photoRayIntersectsOccluder(mesh, ray)), false).some(hit => {
     const mesh = hit.object as THREE.Mesh;
     const blockingFace = mesh.geometry?.userData.photoOcclusionMask?.[hit.faceIndex ?? -1] !== 0;
     return blockingFace && mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite));
@@ -42,7 +42,7 @@ export function photoPointOpacity(anchor: THREE.Vector3, camera: THREE.Camera, o
   ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
   const layers: { point: THREE.Vector3; normal: THREE.Vector3 }[] = [];
   const hits: THREE.Intersection[] = [];
-  for (const mesh of occluders) if (mesh instanceof THREE.Mesh && isPhotoOccluder(mesh)) photoOpacityRaycast(mesh, ray, hits);
+  for (const mesh of occluders) if (mesh instanceof THREE.Mesh && isPhotoOccluder(mesh) && photoRayIntersectsOccluder(mesh, ray)) photoOpacityRaycast(mesh, ray, hits);
   hits.sort((a, b) => a.distance - b.distance);
   for (const hit of hits) {
     const mesh = hit.object as THREE.Mesh;
@@ -60,7 +60,8 @@ export function photoPointOpacity(anchor: THREE.Vector3, camera: THREE.Camera, o
 }
 
 export function photoPointVisible(position: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[] = [], ray = new THREE.Raycaster(), halfSize: [number, number] = [32.5, 24], buildingId?: string) {
-  return photoAnchorVisible(markerPoint(position), camera, size, occluders, ray, halfSize, buildingId);
+  const blockers = occluders.filter((object): object is THREE.Mesh => object instanceof THREE.Mesh && isPhotoOccluder(object) && !isPhotoOpacityOnlyOccluder(object) && !isOwnBuildingOccluder(object, buildingId));
+  return photoAnchorVisible(markerPoint(position), camera, size, blockers, ray, halfSize);
 }
 
 // Thumbnail grouping never replaces or moves individual shooting points.
@@ -116,9 +117,22 @@ export function cameraPhotoClusters(spots: PhotoSpot[], camera: THREE.Camera, si
   // Include enough offscreen anchors for the largest possible collage, then
   // test the final group's actual size after merging.
   const maxHalfSize: [number, number] = appearance.selectedId ? [43, 32] : appearance.compact ? [30, 24] : [32.5, 24];
+  const hardOccluders = occluders.filter((object): object is THREE.Mesh => object instanceof THREE.Mesh && isPhotoOccluder(object) && !isPhotoOpacityOnlyOccluder(object));
+  const byBuilding = new Map<string | undefined, THREE.Mesh[]>();
+  const blockers = (buildingId?: string) => {
+    let list = byBuilding.get(buildingId);
+    if (!list) { list = hardOccluders.filter(mesh => !isOwnBuildingOccluder(mesh, buildingId)); byBuilding.set(buildingId, list); }
+    return list;
+  };
   const projected = spots.flatMap(spot => {
     // Nearby photos may belong to different buildings; only their own shell is ignored.
-    const photos = spot.photos.filter(photo => photoPointVisible(spot.position, camera, size, occluders, ray, maxHalfSize, photoBuildingId(photo)));
+    const visible = new Map<string | undefined, boolean>();
+    const anchor = markerPoint(spot.position);
+    const photos = spot.photos.filter(photo => {
+      const buildingId = photoBuildingId(photo);
+      if (!visible.has(buildingId)) visible.set(buildingId, photoAnchorVisible(anchor, camera, size, blockers(buildingId), ray, maxHalfSize));
+      return visible.get(buildingId);
+    });
     if (!photos.length) return [];
     const point = markerPoint(spot.position).project(camera);
     return [{ spot: photos.length === spot.photos.length ? spot : { ...spot, photos }, point: new THREE.Vector2(point.x * size.width / 2, point.y * size.height / 2) }];

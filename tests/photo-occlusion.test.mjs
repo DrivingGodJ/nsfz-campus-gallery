@@ -5,8 +5,36 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildingGeometry } from '../src/building-geometry.ts';
 import { laboratoryBodyGeometry, laboratoryLayout } from '../src/laboratory-geometry.ts';
-import { acceleratePhotoOccluder } from '../src/photo-occlusion.ts';
+import { acceleratePhotoOccluder, photoRayIntersectsOccluder } from '../src/photo-occlusion.ts';
 import { cameraPhotoClusters, permanentPhotoSpots, photoOccluders, photoPointOpacity, photoPointPosition, photoPointVisible, visiblePhotoPoints } from '../src/photo-clusters.ts';
+
+test('photo ray bounds skip distant meshes and refresh after transforms or geometry changes', () => {
+  const scene = new THREE.Scene(), parent = new THREE.Group();
+  parent.userData.photoOccluder = true; scene.add(parent);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const original = new THREE.BoxGeometry(2, 6, 2), mesh = new THREE.Mesh(original, material);
+  let casts = 0;
+  mesh.raycast = function(ray, hits) { casts++; THREE.Mesh.prototype.raycast.call(this, ray, hits); };
+  parent.add(mesh); parent.position.x = 100; scene.updateMatrixWorld();
+  const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000);
+  camera.position.set(0, 1.6, 20); camera.lookAt(0, 1.6, 0); camera.updateMatrixWorld();
+  const anchor = new THREE.Vector3(0, 1.6, 0), ray = new THREE.Raycaster(camera.position, anchor.clone().sub(camera.position).normalize());
+  assert.equal(photoRayIntersectsOccluder(mesh, ray), false);
+  assert.equal(photoPointOpacity(anchor, camera, [mesh]), .85); assert.equal(casts, 0);
+  original.translate(-100, 0, 0);
+  assert.equal(photoRayIntersectsOccluder(mesh, ray), true, 'In-place geometry edits update the cached world box');
+  assert.ok(photoPointOpacity(anchor, camera, [mesh]) < .85);
+  original.translate(100, 0, 0);
+  assert.equal(photoRayIntersectsOccluder(mesh, ray), false);
+  parent.position.set(0, 0, 5); parent.rotation.y = Math.PI / 4; parent.scale.set(2, 1, .5); scene.updateMatrixWorld();
+  assert.equal(photoRayIntersectsOccluder(mesh, ray), true);
+  assert.ok(photoPointOpacity(anchor, camera, [mesh]) < .85); assert.ok(casts > 0);
+  const replacement = new THREE.BoxGeometry(2, 6, 2); replacement.translate(100, 0, 0); mesh.geometry = replacement;
+  assert.equal(photoRayIntersectsOccluder(mesh, ray), false);
+  const before = casts;
+  assert.equal(photoPointOpacity(anchor, camera, [mesh]), .85); assert.equal(casts, before);
+  original.dispose(); replacement.dispose(); material.dispose();
+});
 
 test('accelerated photo visibility preserves triangle masks and sees opaque walls behind nonblocking corridor slabs', () => {
   const slab = new THREE.PlaneGeometry(10, 10), wall = new THREE.PlaneGeometry(10, 10);
