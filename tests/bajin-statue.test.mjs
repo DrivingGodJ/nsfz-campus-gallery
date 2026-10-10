@@ -25,6 +25,26 @@ test('the modest bust fits its three step footprint and scales without non-finit
   }
 });
 
+test('Yuan Longping uses a narrow stone column and a short-haired bronze bust without the broad stair podium or glasses', () => {
+  const model = { center: [0, 0], axis: [1, 0], width: .7, depth: .6, totalHeight: 2.3, variant: 'yuanLongping' };
+  const geometry = bajinStatueGeometry(model), defaultGeometry = bajinStatueGeometry({ ...model, width: 3.6, depth: 3.2, variant: undefined });
+  try {
+    const bounds = new THREE.Box3();
+    for (const part of Object.values(geometry)) {
+      assert.ok([...part.getAttribute('position').array].every(Number.isFinite));
+      assert.ok([...part.getAttribute('normal').array].every(Number.isFinite));
+      bounds.union(part.boundingBox);
+    }
+    assert.ok(Math.abs(bounds.max.y - model.totalHeight) < 1e-6 && Math.abs(bounds.min.y) < 1e-6);
+    assert.ok(bounds.getSize(new THREE.Vector3()).x <= model.width + 1e-6, 'The portrait fits its modest narrow footprint');
+    assert.equal(geometry.steps.getAttribute('position').count / 3, 12, 'One thin square foot replaces the broad three-tier stairs');
+    assert.ok(geometry.steps.boundingBox.max.y < .06);
+    assert.ok(geometry.pedestal.boundingBox.getSize(new THREE.Vector3()).x >= .55 && geometry.pedestal.boundingBox.getSize(new THREE.Vector3()).x <= .65);
+    assert.ok(geometry.bust.getAttribute('position').count < defaultGeometry.bust.getAttribute('position').count, 'The portrait omits the spectacles and stays simple');
+    assert.ok(Object.values(geometry).reduce((sum, part) => sum + part.getAttribute('position').count / 3, 0) < 1600);
+  } finally { [...Object.values(geometry), ...Object.values(defaultGeometry)].forEach(part => part.dispose()); }
+});
+
 test('the photographed statue stays inside the courtyard, clears the pergola and does not add a selectable location', async () => {
   const fs = await import('node:fs/promises');
   const {default: clip} = await import('polygon-clipping');

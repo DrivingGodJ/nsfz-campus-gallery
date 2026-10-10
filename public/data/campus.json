@@ -9833,6 +9833,76 @@
         ]
       ],
       "railHeight": 0.5
+    },
+    {
+      "id": "local/yuan-longping-statue",
+      "type": "landmark",
+      "outer": [
+        [
+          27.03639,
+          67.49138
+        ],
+        [
+          27.25913,
+          68.32214
+        ],
+        [
+          26.56361,
+          68.50862
+        ],
+        [
+          26.34087,
+          67.67786
+        ],
+        [
+          27.03639,
+          67.49138
+        ]
+      ],
+      "holes": [],
+      "height": 0.02,
+      "hideLabel": true,
+      "estimated": true,
+      "statue": {
+        "variant": "yuanLongping",
+        "center": [
+          26.8,
+          68
+        ],
+        "axis": [
+          0.259,
+          0.966
+        ],
+        "width": 0.86,
+        "depth": 0.72,
+        "totalHeight": 2.8
+      }
+    },
+    {
+      "id": "local/alumni-display-gallery",
+      "type": "landmark",
+      "points": [
+        [
+          25.0127,
+          53.22205
+        ],
+        [
+          32,
+          68.6
+        ],
+        [
+          25.64,
+          71.52
+        ]
+      ],
+      "width": 3,
+      "height": 0.3,
+      "hideLabel": true,
+      "estimated": true,
+      "gallery": {
+        "postHeight": 2.3,
+        "roofRise": 0.68
+      }
     }
   ],
   "source": {
