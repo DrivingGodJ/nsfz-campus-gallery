@@ -1,12 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import clip from 'polygon-clipping';
 import type { Feature, Point, Shape } from './types';
-import { circleRing, pergolaLayout } from './garden-geometry.ts';
-import { passageFootprint } from './underground-geometry.ts';
+import { pergolaLayout } from './garden-geometry.ts';
 
 type Vector = [number, number, number];
-const polygon = (shape: Shape) => [shape.outer, ...shape.holes];
 function merged(parts: THREE.BufferGeometry[], photoBlocking = false) {
   const plain = parts.map(part => {
     const geometry = part.index ? part.toNonIndexed() : part.clone();
@@ -45,7 +42,7 @@ export function libraryAnnexLayout(library: Shape) {
 }
 
 export function wisteriaArchitecture(feature: Feature, library: Shape) {
-  const layout = pergolaLayout(feature), { base, height, hub, corridor } = layout;
+  const layout = pergolaLayout(feature), { base, height, terminal, corridor } = layout;
   const route = feature.points!, width = feature.width || 2.4;
   const structure: THREE.BufferGeometry[] = [], posts: THREE.BufferGeometry[] = [], details: THREE.BufferGeometry[] = [];
   const arches: THREE.BufferGeometry[] = [], canopy: THREE.BufferGeometry[] = [];
@@ -74,22 +71,17 @@ export function wisteriaArchitecture(feature: Feature, library: Shape) {
     const geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.computeVertexNormals(); return geometry;
   };
-  const hubCenter = feature.pergola!.hub, radius = feature.pergola!.hubRadius;
-  const hubDistance = Math.hypot(route.at(-2)![0] - hubCenter[0], route.at(-2)![1] - hubCenter[1]);
-  const hubAxis: Point = [(hubCenter[0] - route.at(-2)![0]) / hubDistance, (hubCenter[1] - route.at(-2)![1]) / hubDistance];
-  const slot = passageFootprint([-1, 1].map(sign => [hubCenter[0] + hubAxis[0] * radius * 1.2 * sign, hubCenter[1] + hubAxis[1] * radius * 1.2 * sign]), width * .5);
-  canopy.push(...corridor.map(shape => slab(shape, height - .18, height)), ...clip.difference(polygon(hub), polygon(slot)).map(([outer, ...holes]) => slab({ outer, holes }, height - .18, height)));
+  canopy.push(...corridor.map(shape => slab(shape, height - .18, height)), ...terminal.halves.map(half => slab(half.shape, height - .18, height)));
   const endParts: THREE.BufferGeometry[] = [];
-  const endAngle = Math.atan2(hubAxis[1], hubAxis[0]);
-  const circleAt = (angle: number, side = 0): Point => [hubCenter[0] + Math.cos(angle) * (radius - .14 + side), hubCenter[1] + Math.sin(angle) * (radius - .14 + side)];
-  for (let i = 0; i < 4; i++) {
-    const angle = endAngle + Math.PI / 4 + i * Math.PI / 2, next = angle + Math.PI / 2;
-    endParts.push(arch((t, side) => circleAt(angle + .06 + (next - angle - .12) * t, side), 10));
-    const p = circleAt(angle); posts.push(beam([p[0], base + .08, p[1]], [p[0], height - .18, p[1]], .34));
+  for (const half of terminal.halves) {
+    for (let i = 0; i < 3; i++) endParts.push(arch((t, side) => half.at((i + .04 + .92 * t) / 3, .14 - side)));
+    for (let i = 0; i <= 3; i++) {
+      const p = half.at(i / 3, .14); posts.push(beam([p[0], base + .08, p[1]], [p[0], height - .18, p[1]], .34));
+    }
   }
   const end = merged(endParts, true);
   let length = cumulative.at(-1)!;
-  while (length > 0 && Math.hypot(at(length)[0] - hubCenter[0], at(length)[1] - hubCenter[1]) < radius + .14) length -= .05;
+  while (length > 0 && terminal.contains(at(length))) length -= .05;
   const bays = Math.max(1, Math.round(length / 4.2));
   for (let i = 0; i < bays; i++) for (const side of [-1, 1]) {
     const from = i / bays * length, to = (i + 1) / bays * length;
@@ -109,12 +101,17 @@ export function wisteriaArchitecture(feature: Feature, library: Shape) {
       structure.push(beam([a[0], y, a[1]], [b[0], y, b[1]], .055));
     }
   }
-  const ring = circleRing(hubCenter, radius - .14, 32);
-  for (let i = 1; i < ring.length; i++) structure.push(beam([ring[i - 1][0], height + .65, ring[i - 1][1]], [ring[i][0], height + .65, ring[i][1]], .055));
-  for (const side of [-1, 1]) {
-    const a: Point = [hubCenter[0] - hubAxis[0] * radius - hubAxis[1] * width * .25 * side, hubCenter[1] - hubAxis[1] * radius + hubAxis[0] * width * .25 * side];
-    const b: Point = [hubCenter[0] + hubAxis[0] * radius - hubAxis[1] * width * .25 * side, hubCenter[1] + hubAxis[1] * radius + hubAxis[0] * width * .25 * side];
-    structure.push(beam([a[0], height + .12, a[1]], [b[0], height + .12, b[1]], .07));
+  // Each half has its own rim and supports; their straight inner edges stay staggered.
+  for (const half of terminal.halves) {
+    for (let i = 0; i < 16; i++) {
+      const a = half.at(i / 16, .14), b = half.at((i + 1) / 16, .14);
+      structure.push(beam([a[0], height + .65, a[1]], [b[0], height + .65, b[1]], .055));
+    }
+    const a = half.at(0, .14), b = half.at(1, .14);
+    for (const y of [height + .12, height + .65]) structure.push(beam([a[0], y, a[1]], [b[0], y, b[1]], .055));
+    for (let i = 0; i <= 3; i++) {
+      const p = half.at(i / 3, .14); structure.push(beam([p[0], height, p[1]], [p[0], height + .65, p[1]], .06));
+    }
   }
   const annex = libraryAnnexLayout(library), roomFloor = base + .24;
   const room = merged([slab(annex.footprint, roomFloor, height - .24)], true);

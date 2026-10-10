@@ -80,7 +80,7 @@ test('the smaller pavilion has an open interior and curved roof, and the simple 
   assert.equal(clip.union(footprint, polygon(library)).length, 1, 'The corridor starts flush against the library wall');
   for (const building of campus.buildings) assert.ok(area(clip.intersection(footprint, polygon(building))) < 1e-7, 'The connected corridor does not intrude into the library');
   for (const water of campus.features.filter(f => f.type === 'water')) assert.ok(area(clip.intersection(footprint, polygon(water))) < 1e-7);
-  assert.equal(clip.union(footprint).length, 1, 'Curved corridor joins its circular end');
+  assert.equal(clip.union(footprint).length, 1, 'Curved corridor joins both half-circle end platforms');
   assert.equal(pergolaPlan.height - pergolaPlan.base, pergola.pergola.floors * pergola.pergola.floorHeight, 'Building height comes from its storey height');
   const wall = library.outer.slice(13, 15), start = pergola.points[0];
   const wallCross = (start[0] - wall[0][0]) * (wall[1][1] - wall[0][1]) - (start[1] - wall[0][1]) * (wall[1][0] - wall[0][0]);
@@ -129,10 +129,10 @@ test('wisteria walkway stays open and its long library-side annex has a straight
     const ground = center.clone(); ground.y = 1;
     assert.ok(Math.abs(new THREE.Raycaster(ground, down, 0, 2).intersectObject(meshes.floor)[0].point.y - (layout.base + .08)) < 1e-5, 'The open corridor keeps its walking slab');
     const hub = vector(pergola.pergola.hub); hub.y = layout.base + 1.6;
-    const previous = pergola.points.at(-2), axis = vector(pergola.pergola.hub).sub(vector(previous)).normalize();
-    assert.equal(new THREE.Raycaster(hub.clone().addScaledVector(axis, -5), axis, 0, 10).intersectObject(meshes.end).length, 0, 'The circular shelter has arches instead of a solid cylinder');
+    const axis = vector(layout.terminal.axis);
+    assert.equal(new THREE.Raycaster(hub.clone().addScaledVector(axis, -5), axis, 0, 10).intersectObject(meshes.end).length, 0, 'The staggered shelter has arches instead of solid walls');
     const aboveHub = hub.clone(); aboveHub.y = layout.height + 1;
-    assert.equal(new THREE.Raycaster(aboveHub, down, 0, 2).intersectObject(meshes.canopy).length, 0, 'The aerial-confirmed central slot remains open in the circular roof');
+    assert.equal(new THREE.Raycaster(aboveHub, down, 0, 2).intersectObject(meshes.canopy).length, 0, 'The aerial-confirmed central band remains uncovered between the two roof halves');
     const coveredHub = aboveHub.clone().add(new THREE.Vector3(-axis.z, 0, axis.x).multiplyScalar(2));
     const hubRoof = new THREE.Raycaster(coveredHub, down, 0, 2).intersectObject(meshes.canopy)[0];
     assert.ok(hubRoof && Math.abs(hubRoof.point.y - layout.height) < 1e-5, 'White roof halves stand on either side of the central slot');
@@ -159,11 +159,46 @@ test('wisteria walkway stays open and its long library-side annex has a straight
     const frontU = Array.from({ length: positions.count }, (_, i) => (positions.getX(i) - library.outer[13][0]) * annex.along[0] + (positions.getZ(i) - library.outer[13][1]) * annex.along[1]);
     assert.ok(Math.max(...frontU) - Math.min(...frontU) < .031, 'The entire shutter is parallel to the straight front end, without the previous angled door face');
     for (const key of ['floor', 'beams', 'posts', 'roof']) assert.ok(model[key].userData.photoOcclusionMask.every(v => v === 0), 'Thin open structure does not hide corridor photos');
-    assert.ok(Object.values(model).reduce((n, geometry) => n + geometry.getAttribute('position').count / 3, 0) < 4500, 'The arches, canopy and annex retain a simple merged model');
+    assert.ok(Object.values(model).reduce((n, geometry) => n + geometry.getAttribute('position').count / 3, 0) < 5000, 'The independent half-circle rims, arches, canopy and annex retain a simple merged model');
     assert.equal(JSON.stringify(pergola), original);
   } finally {
     Object.values(meshes).forEach(mesh => mesh.material.dispose()); Object.values(model).forEach(geometry => geometry.dispose());
   }
+});
+
+test('wisteria terminal has two staggered half-circle roofs with a continuous uncovered central passage', () => {
+  const layout = pergolaLayout(pergola), { axis, normal, halves } = layout.terminal;
+  const model = wisteriaArchitecture(pergola, campus.buildings.find(b => b.id === 'way/855459419'));
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const meshes = Object.fromEntries(Object.entries(model).map(([key, geometry]) => {
+    const mesh = new THREE.Mesh(geometry, material); mesh.updateMatrixWorld(); return [key, mesh];
+  }));
+  const down = new THREE.Vector3(0, -1, 0), hub = pergola.pergola.hub;
+  const centerDelta = halves[1].center.map((v, i) => v - halves[0].center[i]);
+  const stagger = Math.abs(centerDelta[0] * axis[0] + centerDelta[1] * axis[1]);
+  const gap = Math.abs(centerDelta[0] * normal[0] + centerDelta[1] * normal[1]);
+  try {
+    assert.ok(stagger > 2 && stagger < 3, 'The two half-circle centers are offset along their parallel straight edges');
+    assert.ok(gap > .8 && gap < 1.2, 'The open central passage has a walkable width');
+    assert.equal(clip.intersection(...halves.map(half => polygon(half.shape))).length, 0, 'The roof halves do not overlap');
+    for (const half of halves) {
+      const first = half.at(0), last = half.at(1), edge = last.map((v, i) => v - first[i]);
+      assert.ok(Math.abs(edge[0] * normal[0] + edge[1] * normal[1]) < 1e-7, 'Both inner diameter edges run parallel');
+      const p = half.center.map((v, i) => v + half.sign * normal[i] * pergola.pergola.hubRadius * .5);
+      const roof = new THREE.Raycaster(new THREE.Vector3(p[0], layout.height + 1, p[1]), down, 0, 2).intersectObject(meshes.canopy)[0];
+      assert.ok(roof && Math.abs(roof.point.y - layout.height) < 1e-5, 'Each separate half-circle has an opaque white roof');
+    }
+    for (const distance of [-1.5, 0, 1.5]) {
+      const p = [hub[0] + axis[0] * distance, hub[1] + axis[1] * distance];
+      assert.equal(new THREE.Raycaster(new THREE.Vector3(p[0], layout.height + 1, p[1]), down, 0, 2).intersectObject(meshes.canopy).length, 0, 'No corridor roof fills the open central band');
+      const floor = new THREE.Raycaster(new THREE.Vector3(p[0], layout.base + 1, p[1]), down, 0, 2).intersectObject(meshes.floor)[0];
+      assert.ok(floor && Math.abs(floor.point.y - (layout.base + .08)) < 1e-5, 'The open band retains a continuous walking floor');
+    }
+    const start = new THREE.Vector3(hub[0] - axis[0] * 4, layout.base + 1.6, hub[1] - axis[1] * 4);
+    const forward = new THREE.Vector3(axis[0], 0, axis[1]);
+    for (const key of ['end', 'posts', 'beams']) assert.equal(new THREE.Raycaster(start, forward, 0, 8).intersectObject(meshes[key]).length, 0, 'Half-circle supports leave the central passage open at eye height');
+    assert.equal(Object.keys(model).length, 11, 'Both independent shelters reuse the existing merged mesh groups');
+  } finally { material.dispose(); Object.values(model).forEach(geometry => geometry.dispose()); }
 });
 
 

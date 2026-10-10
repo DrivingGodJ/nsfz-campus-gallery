@@ -16,10 +16,27 @@ export function pavilionFootprint(model: LakePavilion): Shape {
   const r = model.span / 2;
   return { outer: [[-r, -r], [r, -r], [r, r], [-r, r], [-r, -r]].map(([x, z]) => pavilionPoint(model, x, z)), holes: [] };
 }
+export function pergolaHubLayout(feature: Feature) {
+  const model = feature.pergola!, previous = feature.points!.at(-2)!, radius = model.hubRadius;
+  const direction = model.hubAxis || [model.hub[0] - previous[0], model.hub[1] - previous[1]];
+  const length = Math.hypot(direction[0], direction[1]), axis: Point = [direction[0] / length, direction[1] / length], normal: Point = [-axis[1], axis[0]];
+  const gap = model.hubGap ?? (feature.width || 2.4) * .5, stagger = model.hubStagger ?? 0, angle = Math.atan2(axis[1], axis[0]);
+  const halves = [-1, 1].map(sign => {
+    const center: Point = [model.hub[0] + sign * (normal[0] * gap / 2 - axis[0] * stagger / 2),
+      model.hub[1] + sign * (normal[1] * gap / 2 - axis[1] * stagger / 2)];
+    const startAngle = angle + (sign < 0 ? Math.PI : 0);
+    const at = (t: number, inset = 0): Point => [center[0] + Math.cos(startAngle + Math.PI * t) * (radius - inset), center[1] + Math.sin(startAngle + Math.PI * t) * (radius - inset)];
+    const outer = Array.from({ length: 25 }, (_, i) => at(i / 24)); outer.push(outer[0]);
+    return { center, sign, at, shape: { outer, holes: [] } as Shape };
+  });
+  const passage = passageFootprint([-1, 1].map(sign => [model.hub[0] + axis[0] * (radius + Math.abs(stagger) / 2) * sign,
+    model.hub[1] + axis[1] * (radius + Math.abs(stagger) / 2) * sign]), gap + .02);
+  const footprint = shapes(clip.union(polygon(halves[0].shape), polygon(halves[1].shape), polygon(passage)));
+  return { axis, normal, halves, passage, footprint, contains: (point: Point) => footprint.some(shape => inside(point, shape.outer)) };
+}
 export function pergolaFootprint(feature: Feature): Shape[] {
   const route = passageFootprint(feature.points!, feature.width || 2.4);
-  const hub = { outer: circleRing(feature.pergola!.hub, feature.pergola!.hubRadius), holes: [] };
-  return shapes(clip.union(polygon(route), polygon(hub)));
+  return shapes(clip.union(polygon(route), ...pergolaHubLayout(feature).footprint.map(polygon)));
 }
 export function gardenFootprints(feature: Feature, features: Feature[]): Shape[] {
   if (feature.type === 'lakePavilion' && feature.pavilion) return [pavilionFootprint(feature.pavilion)];
@@ -120,9 +137,9 @@ export function pavilionRoofGeometry(model: LakePavilion, base: number) {
 }
 export function pergolaLayout(feature: Feature) {
   const model = feature.pergola!, base = feature.height ?? .12;
-  const hub: Shape = { outer: circleRing(model.hub, model.hubRadius), holes: [] };
+  const terminal = pergolaHubLayout(feature);
   const footprint = pergolaFootprint(feature);
-  return { footprint, hub, corridor: shapes(clip.difference(footprint.map(polygon), polygon(hub))), base, height: base + model.floors * model.floorHeight };
+  return { footprint, terminal, corridor: shapes(clip.difference(footprint.map(polygon), terminal.footprint.map(polygon))), base, height: base + model.floors * model.floorHeight };
 }
 
 
