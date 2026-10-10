@@ -75,10 +75,11 @@ export function specimenGroveGeometry(feature: Feature) {
     for (const dx of [-.155, .155]) for (const dz of [-.155, .155]) box('metal', [.025, .47, .025], [x + dx, BASE + .26, z + dz]);
   }
   // DSC06142 and the marked row: three bars share a line in the clearing east of the grove.
+  const barScale = 1.15;
   for (let i = 0; i < 3; i++) {
-    const z = 72.8 + i * 2.55, top = BASE + 2.1 + (i % 2) * .2;
-    for (const end of [z, z + 2.2]) bar('fitness', [147, BASE, end], [147, top, end], .065);
-    bar('fitness', [147, top, z], [147, top, z + 2.2], .048);
+    const z = 66.25 + i * 2.55 * barScale, top = BASE + (2.1 + (i % 2) * .2) * barScale;
+    for (const end of [z, z + 2.2 * barScale]) bar('fitness', [147, BASE, end], [147, top, end], .065 * barScale);
+    bar('fitness', [147, top, z], [147, top, z + 2.2 * barScale], .048 * barScale);
   }
   // DSC2434: a low, open orange lattice enclosure, rather than a solid hut.
   const fence: Point[] = [[116.6, 84.4], [120.4, 84.4], [120.4, 86.9], [116.6, 86.9], [116.6, 84.4]];
