@@ -11,6 +11,7 @@ import { STAND_OFFICE_ID, standOfficeGeometry, standOfficeOpenings, standOfficeS
 import { STANDS_ID, standsArchitecture, standsFrame } from '../src/venue-geometry.ts';
 import { bridgeLayout } from '../src/bridge-geometry.ts';
 import { bridgeNetGeometry } from '../src/bridge-net-geometry.ts';
+import { undergroundSkylights, undergroundEntranceStair } from '../src/underground-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
@@ -31,8 +32,8 @@ test('DSC06875 office glazing persists on the photographed face in two rows only
   assert.deepEqual(config, corrections.buildings.find(building => building.id === STAND_OFFICE_ID).classroomWindows);
   assert.deepEqual(config.facadeLines, [[office.outer[0], office.outer[1]]]);
   const original = classroomWindowLayout([[office.outer]], config, info.height, info.floorHeight), windows = standOfficeWindows(office, info.height, info.floorHeight);
-  assert.equal(original.length, 14);
-  assert.equal(windows.length, 16, 'Only the pane at each new front entry is divided');
+  assert.equal(original.length, 16);
+  assert.equal(windows.length, 18, 'Only the pane at each new front entry is divided');
   assert.deepEqual([...new Set(windows.map(window => Math.floor(window.bottom / info.floorHeight) + 1))], [2, 3]);
   const openings = standOfficeOpenings(office, info.height, info.floorHeight);
   assert.equal(openings.length, windows.length + 3, 'Three entry apertures are additional doors, never glass');
@@ -55,6 +56,22 @@ test('DSC06875 office glazing persists on the photographed face in two rows only
       assert.deepEqual(windows.filter(window => station(window.from) > 5.2), original.filter(window => station(window.from) > 5.2), 'All panes beyond the first bay are unchanged');
     } finally { dispose(glazing); panes.material.dispose(); }
   } finally { geometry.dispose(); body.material.dispose(); }
+});
+
+test('extended office meets the athletics edge without covering the right-half roof glazing or its doorway', () => {
+  const corridor = campus.features.find(feature => feature.id === 'local/underground-corridor');
+  const [from, to] = corridor.points, length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  const right = [-(to[1] - from[1]) / length, (to[0] - from[0]) / length];
+  for (const point of office.outer.slice(1, 3)) {
+    const side = (point[0] - from[0]) * right[0] + (point[1] - from[1]) * right[1];
+    assert.ok(Math.abs(side) < 1e-7, 'The complete end wall reaches the platform edge');
+  }
+  assert.deepEqual(office.outer[0], [-71.13283412142542, -80.86820063867947], 'The stand-side stair anchor stays put');
+  const solid = [[office.outer]];
+  for (const light of undergroundSkylights(corridor).slice(0, 1)) {
+    assert.equal(polygonClipping.intersection(solid, [[light.outer]]).length, 0, 'Daylight still reaches the right-half glass');
+  }
+  assert.equal(polygonClipping.intersection(solid, [[undergroundEntranceStair(corridor).footprint.outer]]).length, 0, 'The existing entrance remains unobstructed');
 });
 
 test('external white switchbacks reach each raised floor and the office roof with connected landings', () => {

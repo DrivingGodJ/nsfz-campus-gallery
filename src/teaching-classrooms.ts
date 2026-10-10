@@ -84,7 +84,9 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
   if (facadeEdges && !facadeEdges.length) return result;
   for (const run of windowRuns(core)) {
     const length = run.reduce((sum, edge) => sum + edge.length, 0);
-    if (length < 3.2) continue;
+    // A photographed short end bay may be narrower than an ordinary classroom.
+    // Keep the conservative minimum for facades without explicit evidence.
+    if (length < (facadeEdges ? .8 : 3.2)) continue;
     const count = Math.max(1, Math.floor(length / config.bayWidth));
     const bay = length / count, width = Math.min(config.windowWidth, bay - (config.pierWidth ?? .9));
     if (width <= 1e-6) continue;

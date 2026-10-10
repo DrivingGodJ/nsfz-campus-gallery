@@ -87,13 +87,17 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
     const height = Math.min(section.height + (rooftop ? floorHeight : 0), cutawayHeight ?? Infinity);
     for (let floor = (corridor.startFloor ?? 2) - 1; floor * floorHeight + 1.3 < height; floor++) {
       const y = BASE + (rooftop ? section.height : floor * floorHeight + .25);
+      const enclosed = (building.solidCores || []).filter(core => core.partId === section.id &&
+        floor + 1 >= (core.startFloor ?? 1) && !rooftop);
       const posts = new Map<string, Point>();
       for (const [a, b] of segments) {
         const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
         if (length < .05) continue;
         const offset: Point = [(b[1] - a[1]) / length * inset, -(b[0] - a[0]) / length * inset];
         const from = a.map((v, i) => v + offset[i]) as Point, to = b.map((v, i) => v + offset[i]) as Point;
-        for (const [start, end] of outsideOpenings(from, to, floor === 0 ? groundOpenings : [])) {
+        // The photographed corridor end has masonry and glazing; its guards
+        // stop at the enclosure rather than continuing through the window.
+        for (const [start, end] of outsideOpenings(from, to, [...(floor === 0 ? groundOpenings : []), ...enclosed])) {
           for (const rise of [.5, 1.05]) parts.push(bar([start[0], y + rise, start[1]], [end[0], y + rise, end[1]], .055));
           const count = Math.max(1, Math.ceil(Math.hypot(end[0] - start[0], end[1] - start[1]) / 2.7));
           for (let i = 0; i <= count; i++) {

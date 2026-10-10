@@ -61,7 +61,8 @@ function Pergola({ feature, library, labelPortal }: { feature: Feature; library:
   const { selectedId, onSelect, placing, featuresSelectable } = useContext(LocationSelection);
   const model = feature.pergola!, selected = selectedId === feature.id;
   return <group onClick={e => { if (onSelect && !placing && featuresSelectable !== false && e.delta < 5) { e.stopPropagation(); onSelect(feature.id); } }}>
-    {(['floor', 'end', 'beams', 'posts'] as const).map(key => <mesh key={key} geometry={architecture[key]}><meshStandardMaterial color={mapColor(selected ? '#93aa98' : '#d7d2c3')} roughness={.95} /></mesh>)}
+    {(['floor', 'end', 'canopy', 'arches', 'posts'] as const).map(key => <mesh key={key} geometry={architecture[key]}><meshStandardMaterial color={mapColor(selected ? '#93aa98' : '#d7d2c3')} roughness={.95} /></mesh>)}
+    <mesh geometry={architecture.beams}><meshStandardMaterial color={mapColor('#8c9a91')} roughness={.85} /></mesh>
     <group onClick={e => { if (onSelect && !placing && e.delta < 5 && feature.connectedTo?.[0]) { e.stopPropagation(); onSelect(feature.connectedTo[0]); } }}>
       {(['room', 'roof', 'steps'] as const).map(key => <mesh key={key} geometry={architecture[key]}><meshStandardMaterial color={mapColor('#d7d2c3')} roughness={.95} /></mesh>)}
       <mesh geometry={architecture.door}><meshStandardMaterial color={mapColor('#b7b09d')} roughness={.95} /></mesh>

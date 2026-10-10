@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import clip from 'polygon-clipping';
 import type { Feature, Point, Shape } from './types';
-import { pergolaLayout } from './garden-geometry.ts';
+import { circleRing, pergolaLayout } from './garden-geometry.ts';
 import { passageFootprint } from './underground-geometry.ts';
 
 type Vector = [number, number, number];
@@ -48,32 +48,73 @@ export function wisteriaArchitecture(feature: Feature, library: Shape) {
   const layout = pergolaLayout(feature), { base, height, hub, corridor } = layout;
   const route = feature.points!, width = feature.width || 2.4;
   const structure: THREE.BufferGeometry[] = [], posts: THREE.BufferGeometry[] = [], details: THREE.BufferGeometry[] = [];
-  const floor = merged(corridor.map(shape => slab(shape, base, base + .08)));
-  const end = merged([slab(hub, base, height)], true);
-  const inner = passageFootprint(route, width - .5);
-  // Two curved edge beams and spaced crossbars leave the overhead trellis open.
-  const edges = clip.difference(layout.footprint.map(polygon), polygon(inner), polygon(hub));
-  for (const [outer, ...holes] of edges) structure.push(slab({ outer, holes }, height - .24, height));
-  let distance = 0, nextCrossbar = 0, nextPost = .6;
+  const arches: THREE.BufferGeometry[] = [], canopy: THREE.BufferGeometry[] = [];
+  const floor = merged(layout.footprint.map(shape => slab(shape, base, base + .08)));
+  const cumulative = [0];
+  for (let i = 1; i < route.length; i++) cumulative.push(cumulative.at(-1)! + Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]));
+  const at = (distance: number, side = 0): Point => {
+    const i = Math.min(route.length - 1, Math.max(1, cumulative.findIndex(d => d >= distance)));
+    const a = route[i - 1], b = route[i], length = cumulative[i] - cumulative[i - 1], t = Math.max(0, Math.min(1, (distance - cumulative[i - 1]) / length));
+    return [a[0] + (b[0] - a[0]) * t - (b[1] - a[1]) / length * side,
+      a[1] + (b[1] - a[1]) * t + (b[0] - a[0]) / length * side];
+  };
+  // DJI_0008 shows a white curved roof; DSC08047 / DSC2503 show arches below it.
+  // A thin fascia above each arch keeps the full walkway open at eye height.
+  const arch = (point: (t: number, side: number) => Point, count = 8) => {
+    const positions: number[] = [], quad = (a: Vector, b: Vector, c: Vector, d: Vector) => positions.push(...a, ...c, ...b, ...a, ...d, ...c);
+    const section = (t: number) => {
+      const [a, b] = [-.12, .12].map(side => point(t, side)), bottom = base + 2 + .65 * Math.sin(t * Math.PI);
+      return [[a[0], bottom, a[1]], [a[0], height - .18, a[1]], [b[0], height - .18, b[1]], [b[0], bottom, b[1]]] as Vector[];
+    };
+    for (let i = 0; i < count; i++) {
+      const a = section(i / count), b = section((i + 1) / count);
+      quad(a[0], b[0], b[1], a[1]); quad(a[3], a[2], b[2], b[3]); quad(a[0], a[3], b[3], b[0]);
+    }
+    const a = section(0), b = section(1); quad(a[0], a[1], a[2], a[3]); quad(b[3], b[2], b[1], b[0]);
+    const geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.computeVertexNormals(); return geometry;
+  };
+  const hubCenter = feature.pergola!.hub, radius = feature.pergola!.hubRadius;
+  const hubDistance = Math.hypot(route.at(-2)![0] - hubCenter[0], route.at(-2)![1] - hubCenter[1]);
+  const hubAxis: Point = [(hubCenter[0] - route.at(-2)![0]) / hubDistance, (hubCenter[1] - route.at(-2)![1]) / hubDistance];
+  const slot = passageFootprint([-1, 1].map(sign => [hubCenter[0] + hubAxis[0] * radius * 1.2 * sign, hubCenter[1] + hubAxis[1] * radius * 1.2 * sign]), width * .5);
+  canopy.push(...corridor.map(shape => slab(shape, height - .18, height)), ...clip.difference(polygon(hub), polygon(slot)).map(([outer, ...holes]) => slab({ outer, holes }, height - .18, height)));
+  const endParts: THREE.BufferGeometry[] = [];
+  const endAngle = Math.atan2(hubAxis[1], hubAxis[0]);
+  const circleAt = (angle: number, side = 0): Point => [hubCenter[0] + Math.cos(angle) * (radius - .14 + side), hubCenter[1] + Math.sin(angle) * (radius - .14 + side)];
+  for (let i = 0; i < 4; i++) {
+    const angle = endAngle + Math.PI / 4 + i * Math.PI / 2, next = angle + Math.PI / 2;
+    endParts.push(arch((t, side) => circleAt(angle + .06 + (next - angle - .12) * t, side), 10));
+    const p = circleAt(angle); posts.push(beam([p[0], base + .08, p[1]], [p[0], height - .18, p[1]], .34));
+  }
+  const end = merged(endParts, true);
+  let length = cumulative.at(-1)!;
+  while (length > 0 && Math.hypot(at(length)[0] - hubCenter[0], at(length)[1] - hubCenter[1]) < radius + .14) length -= .05;
+  const bays = Math.max(1, Math.round(length / 4.2));
+  for (let i = 0; i < bays; i++) for (const side of [-1, 1]) {
+    const from = i / bays * length, to = (i + 1) / bays * length;
+    arches.push(arch((t, thickness) => at(from + .17 + (to - from - .34) * t, side * (width / 2 - .16) + thickness)));
+  }
+  for (let i = 0; i <= bays; i++) for (const side of [-1, 1]) {
+    const p = at(i / bays * length, side * (width / 2 - .16));
+    posts.push(beam([p[0], base + .08, p[1]], [p[0], height - .18, p[1]], .32));
+    structure.push(beam([p[0], height, p[1]], [p[0], height + .65, p[1]], .06));
+  }
+  // The metal frame stands above the opaque roof, with an open central band at the round end.
   for (let i = 1; i < route.length; i++) {
-    const a = route[i - 1], b = route[i], dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz);
-    if (length < 1e-6) continue;
-    const at = (d: number, side: number): Point => [a[0] + dx * d / length - dz / length * side, a[1] + dz * d / length + dx / length * side];
-    for (; nextCrossbar <= distance + length; nextCrossbar += 1.1) {
-      const p = at(nextCrossbar - distance, 0);
-      if (Math.hypot(p[0] - feature.pergola!.hub[0], p[1] - feature.pergola!.hub[1]) < feature.pergola!.hubRadius + .15) continue;
-      const left = at(nextCrossbar - distance, -width / 2 + .1), right = at(nextCrossbar - distance, width / 2 - .1);
-      structure.push(beam([left[0], height - .13, left[1]], [right[0], height - .13, right[1]], .16));
+    const distance = Math.min(length, cumulative[i]), previous = cumulative[i - 1];
+    if (previous >= length) break;
+    for (const side of [-1, 1]) for (const y of [height + .12, height + .65]) {
+      const a = at(previous, side * (width / 2 - .16)), b = at(distance, side * (width / 2 - .16));
+      structure.push(beam([a[0], y, a[1]], [b[0], y, b[1]], .055));
     }
-    for (; nextPost <= distance + length; nextPost += 3.3) {
-      const center = at(nextPost - distance, 0);
-      if (Math.hypot(center[0] - feature.pergola!.hub[0], center[1] - feature.pergola!.hub[1]) < feature.pergola!.hubRadius + .15) continue;
-      for (const side of [-1, 1]) {
-        const p = at(nextPost - distance, side * (width / 2 - .18));
-        posts.push(beam([p[0], base + .08, p[1]], [p[0], height - .24, p[1]], .24));
-      }
-    }
-    distance += length;
+  }
+  const ring = circleRing(hubCenter, radius - .14, 32);
+  for (let i = 1; i < ring.length; i++) structure.push(beam([ring[i - 1][0], height + .65, ring[i - 1][1]], [ring[i][0], height + .65, ring[i][1]], .055));
+  for (const side of [-1, 1]) {
+    const a: Point = [hubCenter[0] - hubAxis[0] * radius - hubAxis[1] * width * .25 * side, hubCenter[1] - hubAxis[1] * radius + hubAxis[0] * width * .25 * side];
+    const b: Point = [hubCenter[0] + hubAxis[0] * radius - hubAxis[1] * width * .25 * side, hubCenter[1] + hubAxis[1] * radius + hubAxis[0] * width * .25 * side];
+    structure.push(beam([a[0], height + .12, a[1]], [b[0], height + .12, b[1]], .07));
   }
   const annex = libraryAnnexLayout(library), roomFloor = base + .24;
   const room = merged([slab(annex.footprint, roomFloor, height - .24)], true);
@@ -93,5 +134,5 @@ export function wisteriaArchitecture(feature: Feature, library: Shape) {
     const from = annex.at(annex.u0 - .035, annex.doorStart + .06), to = annex.at(annex.u0 - .035, annex.doorEnd - .06);
     details.push(beam([from[0], y, from[1]], [to[0], y, to[1]], .035));
   }
-  return { floor, end, beams: merged(structure), posts: merged(posts), room, roof, steps: merged(steps), door: merged([door]), details: merged(details) };
+  return { floor, end, canopy: merged(canopy, true), arches: merged(arches, true), beams: merged(structure), posts: merged(posts), room, roof, steps: merged(steps), door: merged([door]), details: merged(details) };
 }

@@ -125,11 +125,22 @@ test('wisteria walkway stays open and its long library-side annex has a straight
     }
     const side = center.clone().addScaledVector(normal, -2);
     const across = new THREE.Raycaster(side, normal, 0, 4);
-    for (const key of ['floor', 'beams', 'posts', 'end']) assert.equal(across.intersectObject(meshes[key]).length, 0, 'The passage has no solid wall between its spaced posts');
+    for (const key of ['floor', 'beams', 'posts', 'end', 'arches', 'canopy']) assert.equal(across.intersectObject(meshes[key]).length, 0, 'The passage has no solid wall between its spaced posts');
     const ground = center.clone(); ground.y = 1;
     assert.ok(Math.abs(new THREE.Raycaster(ground, down, 0, 2).intersectObject(meshes.floor)[0].point.y - (layout.base + .08)) < 1e-5, 'The open corridor keeps its walking slab');
     const hub = vector(pergola.pergola.hub); hub.y = layout.base + 1.6;
-    assert.ok(new THREE.Raycaster(hub.clone().add(new THREE.Vector3(-5, 0, 0)), new THREE.Vector3(1, 0, 0), 0, 10).intersectObject(meshes.end).length, 'Only the terminal circular region stays solid');
+    const previous = pergola.points.at(-2), axis = vector(pergola.pergola.hub).sub(vector(previous)).normalize();
+    assert.equal(new THREE.Raycaster(hub.clone().addScaledVector(axis, -5), axis, 0, 10).intersectObject(meshes.end).length, 0, 'The circular shelter has arches instead of a solid cylinder');
+    const aboveHub = hub.clone(); aboveHub.y = layout.height + 1;
+    assert.equal(new THREE.Raycaster(aboveHub, down, 0, 2).intersectObject(meshes.canopy).length, 0, 'The aerial-confirmed central slot remains open in the circular roof');
+    const coveredHub = aboveHub.clone().add(new THREE.Vector3(-axis.z, 0, axis.x).multiplyScalar(2));
+    const hubRoof = new THREE.Raycaster(coveredHub, down, 0, 2).intersectObject(meshes.canopy)[0];
+    assert.ok(hubRoof && Math.abs(hubRoof.point.y - layout.height) < 1e-5, 'White roof halves stand on either side of the central slot');
+    const aboveWalk = center.clone(); aboveWalk.y = layout.height + 1;
+    const walkingRoof = new THREE.Raycaster(aboveWalk, down, 0, 2).intersectObject(meshes.canopy)[0];
+    assert.ok(walkingRoof && Math.abs(walkingRoof.point.y - layout.height) < 1e-5, 'The curved walkway has the white continuous roof seen from the drone');
+    const highAcross = new THREE.Raycaster(side.clone().setY(layout.height - .3), normal, 0, 4);
+    assert.ok(highAcross.intersectObject(meshes.arches).length, 'Arched fascia appears above the unobstructed walking space');
     for (const building of campus.buildings) assert.ok(area(clip.intersection(polygon(annex.footprint), polygon(building))) < 1e-7, 'The annex sits outside the existing library footprint');
     assert.equal(clip.union(polygon(annex.footprint), polygon(library)).length, 1, 'The long annex sits flush along the entire marked library wall');
     assert.ok(annex.u1 - annex.u0 > 18 && (annex.u1 - annex.u0) / annex.depth > 4, 'The annex is a long strip rather than the previous small box');
@@ -148,7 +159,7 @@ test('wisteria walkway stays open and its long library-side annex has a straight
     const frontU = Array.from({ length: positions.count }, (_, i) => (positions.getX(i) - library.outer[13][0]) * annex.along[0] + (positions.getZ(i) - library.outer[13][1]) * annex.along[1]);
     assert.ok(Math.max(...frontU) - Math.min(...frontU) < .031, 'The entire shutter is parallel to the straight front end, without the previous angled door face');
     for (const key of ['floor', 'beams', 'posts', 'roof']) assert.ok(model[key].userData.photoOcclusionMask.every(v => v === 0), 'Thin open structure does not hide corridor photos');
-    assert.ok(Object.values(model).reduce((n, geometry) => n + geometry.getAttribute('position').count / 3, 0) < 2200, 'The annex and trellis retain a simple merged model');
+    assert.ok(Object.values(model).reduce((n, geometry) => n + geometry.getAttribute('position').count / 3, 0) < 4500, 'The arches, canopy and annex retain a simple merged model');
     assert.equal(JSON.stringify(pergola), original);
   } finally {
     Object.values(meshes).forEach(mesh => mesh.material.dispose()); Object.values(model).forEach(geometry => geometry.dispose());
