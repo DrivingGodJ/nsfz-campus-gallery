@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 706,
+  "revision": 707,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -296,8 +296,8 @@
         "z": 117.6344546350464
       },
       "placed": true,
-      "heading": 63.63989785548404,
-      "pitch": -0.40580107771733503,
+      "heading": 63.498552351443266,
+      "pitch": 0.7074166161786506,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 4879510,
