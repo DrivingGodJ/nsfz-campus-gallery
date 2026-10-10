@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 723,
+  "revision": 724,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -1176,12 +1176,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 163.14246633023959,
-        "z": 35.72302462906981
+        "x": 163.16000538230847,
+        "z": 37.437584228329285
       },
       "placed": true,
-      "heading": 354.42523521000203,
-      "pitch": 0.8401971708134066,
+      "heading": 354.397950653738,
+      "pitch": 0.7469822478897593,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 4740319,
