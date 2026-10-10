@@ -34,7 +34,8 @@ function UndergroundView({ space, spaces, mode, photoPerspective = false, childr
       // The detailed shell has the real window and door openings. The coarse
       // plan volume must not remain behind its photographed clerestories.
       if(object.userData.undergroundPlanVolume) object.visible=undergroundPartVisible('volume', view, camera.position.y, space.floor + space.height);
-      if(object.userData.undergroundCeiling) object.visible=roofVisible;
+      const surface = object.userData.undergroundSurface;
+      if(object.userData.undergroundCeiling) object.visible=roofVisible || surface && mode==='surface';
       const material=(object as THREE.Mesh).material;
       if(!material)return;
       if(object.userData.undergroundGhostRenderOrder===undefined)object.userData.undergroundGhostRenderOrder=object.renderOrder;
@@ -42,7 +43,7 @@ function UndergroundView({ space, spaces, mode, photoPerspective = false, childr
       for(const item of Array.isArray(material)?material:[material]) {
         const opacity=item.userData.undergroundGhostOpacity??item.opacity;
         if(item.userData.undergroundGhostOpacity===undefined)item.userData.undergroundGhostOpacity=opacity;
-        undergroundMaterialView(item,view,opacity,!!item.userData.undergroundTranslucent);
+        undergroundMaterialView(item,surface && !photoPerspective ? mode==='surface'?'inside':'surface' : view,opacity,!!item.userData.undergroundTranslucent);
       }
     });
   }, -1);
@@ -180,7 +181,7 @@ function UndergroundDetails({ feature, footprint, openings }: { feature: Feature
   const mapColor = useMapColor();
   const geometry = useMemo(() => undergroundDetailGeometry(feature, [footprint], openings), [feature, footprint, openings]);
   useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
-  return <group>{Object.entries(geometry).map(([kind, part]) => <mesh key={kind} userData={{undergroundCeiling:kind === 'ceiling' || kind === 'skylights'}} geometry={part} renderOrder={kind === 'floor' || kind === 'green' ? 23 : 25}>
+  return <group>{Object.entries(geometry).map(([kind, part]) => <mesh key={kind} userData={{undergroundCeiling:kind === 'ceiling' || kind === 'skylights',undergroundSurface:kind==='podium'||kind==='skylights'}} geometry={part} renderOrder={kind === 'floor' || kind === 'green' ? 23 : 25}>
     <meshStandardMaterial color={mapColor(UNDERGROUND_COLORS[kind as keyof typeof UNDERGROUND_COLORS])} roughness={kind === 'floor' || kind === 'green' ? .48 : .85}
       emissive={kind === 'lights' ? mapColor('#ede2be') : '#000000'} emissiveIntensity={kind === 'lights' ? .25 : 0}
       userData={{undergroundGhostOpacity:kind === 'glass' || kind === 'skylights' ? .28 : kind === 'nets' ? .38 : kind === 'ceiling' ? .22 : .75,undergroundTranslucent:kind==='glass'||kind==='skylights'||kind==='nets'}}

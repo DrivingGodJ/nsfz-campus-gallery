@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 import { buildingLevels } from '../src/building-model.ts';
+import { snapFootprint } from '../src/building-geometry.ts';
 import { bridgeHeight, stadiumRing, trackWorldPoint } from '../src/structure-geometry.ts';
 import { photoMapHeight, campusLocations } from '../src/locations.ts';
 import { mapLocationTarget } from '../src/location-geometry.ts';
@@ -17,6 +18,8 @@ const gym = campus.buildings.find(b => b.id === 'local/gymnasium');
 const raisedIds = ['way/855459409', 'local/stand-office', gym.id];
 const bridge = campus.features.find(f => f.id === 'local/footbridge');
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} equals ${b}`);
+const ringArea = ring => Math.abs(ring.slice(1).reduce((sum, point, i) => sum + ring[i][0] * point[1] - point[0] * ring[i][1], 0) / 2);
+const polygonArea = polygons => polygons.reduce((sum, [outer, ...holes]) => sum + ringArea(outer) - holes.reduce((area, ring) => area + ringArea(ring), 0), 0);
 const photo = (locationId, position, floor = 0) => ({ locationId, buildingId: '', floor, position: { x: position[0], z: position[1] }, captureType: 'ground' });
 
 test('athletics ground, its buildings, their photos and floor cutaways share the lowered 2.6 metre base', () => {
@@ -28,7 +31,9 @@ test('athletics ground, its buildings, their photos and floor cutaways share the
   for (const id of raisedIds) {
     const building = campus.buildings.find(b => b.id === id), info = buildingLevels(building);
     close(info.baseElevation, field.height);
-    assert.deepEqual(polygonClipping.difference([building.outer], [platform.outer]), [], 'Buildings stand on the same solid platform');
+    const unsupported = polygonClipping.difference(snapFootprint([[building.outer]]), snapFootprint([[platform.outer]]));
+    assert.ok(polygonArea(unsupported) < .0001,
+      'Buildings stand on the same solid platform within the shared ten micrometre clipping precision');
     for (const floor of [1, 2, info.floors]) close(photoMapHeight(photo(id, building.center, floor), campus, site), field.height + (floor - 1) * info.floorHeight + 1.6);
     const cut = mapLocationTarget(campus, site, id, 1);
     close(cut.bounds.min[1], field.height + .12);
@@ -51,7 +56,13 @@ test('bridge stays at its existing height above the lowered athletics base, whil
   close(photoMapHeight(photo(bridge.id, bridge.points[0]), campus, site), 7.12);
   const entry = bridge.connections.find(c => c.buildingId === gym.id);
   assert.equal(entry.floor, 1.5);
-  assert.deepEqual(entry.points.at(-1), [21.882475305766725, -93.95995475795036], 'The gym entry stays at the existing facade point');
+  const entryPoint = entry.points.at(-1), facadeFrom = gym.outer[0], facadeTo = gym.outer[3];
+  const dx = facadeTo[0] - facadeFrom[0], dz = facadeTo[1] - facadeFrom[1], length = Math.hypot(dx, dz);
+  const along = ((entryPoint[0] - facadeFrom[0]) * dx + (entryPoint[1] - facadeFrom[1]) * dz) / length;
+  const across = Math.abs((entryPoint[0] - facadeFrom[0]) * dz - (entryPoint[1] - facadeFrom[1]) * dx) / length;
+  assert.ok(across < 1e-7 && along > bridge.width / 2 && along < length - bridge.width / 2,
+    'The shifted gym entry meets its facade and retains enough width for the shared bridge doorway');
+  assert.deepEqual(entry.points[0], bridge.points[0], 'The gym platform joins the shifted main bridge');
   const stairs = bridge.connections.find(c => c.id === 'playground-stairs');
   close(stairs.groundHeight, 2.72);
   close(stairs.groundHeight, field.height + .12);
@@ -75,10 +86,14 @@ test('the rounded teaching-wing end is shallower without shifting its shoulders,
   assert.equal(wing.floors, 6);
 });
 
-test('gym extends twelve metres backward, retaining its front entrance and staying short of the halfway line', () => {
+test('gym keeps the twelve metre rear extension while its front end retreats with the bridge and stays short of midfield', () => {
   const originalRear = [[-12.160312632183086, -136.51343968038765], [6.839687367816914, -151.51343968038765]];
   const originalFront = [[45.08663784336115, -103.70475158595733], [26.086637843361153, -88.70475158595733]];
-  assert.deepEqual(gym.outer.slice(2, 4), originalFront, 'The bridge-facing end stays in place');
+  const retreats = gym.outer.slice(2, 4).map((point, i) => point.map((value, j) => value - originalFront[i][j]));
+  for (let j = 0; j < 2; j++) close(retreats[0][j], retreats[1][j]);
+  close(Math.hypot(...retreats[0]), 6.8514940189193965);
+  close(Math.hypot(gym.outer[2][0] - gym.outer[3][0], gym.outer[2][1] - gym.outer[3][1]),
+    Math.hypot(originalFront[0][0] - originalFront[1][0], originalFront[0][1] - originalFront[1][1]));
   for (let i = 0; i < 2; i++) close(Math.hypot(...gym.outer[i].map((v, j) => v - originalRear[i][j])), 12);
   const along = p => (p[0] - field.track.center[0]) * field.track.axis[0] + (p[1] - field.track.center[1]) * field.track.axis[1];
   assert.ok(Math.min(...gym.outer.map(along)) > 6.5, 'The extended rear wall leaves a visible gap before midfield');

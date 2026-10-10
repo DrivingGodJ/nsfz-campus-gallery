@@ -7,7 +7,7 @@ import { undergroundLayout, joinedPassages } from '../src/underground-geometry.t
 import { undergroundVolume, undergroundWallPanels, undergroundCameraInside, undergroundMaterialView } from '../src/underground-mesh.ts';
 import { undergroundDetailGeometry } from '../src/underground-details.ts';
 const campus = JSON.parse(fs.readFileSync(new URL('../public/data/campus.json', import.meta.url)));
-const levels = campus.features.map(feature => /tunnel|underground/.test(feature.type) ? { ...feature, height: -3.8, wallHeight: feature.type === 'undergroundRoom' || feature.type === 'undergroundTrack' ? 6.2 : feature.type === 'tunnel' ? 3.2 : 4 } : feature);
+const levels = campus.features.map(feature => /tunnel|underground/.test(feature.type) ? { ...feature, height: -3.8, wallHeight: feature.type === 'undergroundRoom' || feature.type === 'undergroundTrack' ? 6.2 : feature.type === 'tunnel' ? 3.2 : feature.wallHeight || 4 } : feature);
 const mesh = geometry => { const object = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({side:THREE.DoubleSide})); object.rotation.x=-Math.PI/2; object.updateMatrixWorld(); return object; };
 
 test('underground sports halls have open doors and a non-overlapping floor connection to the side passages', () => {
@@ -54,7 +54,7 @@ test('the detailed corridor roof covers its merged exit and lightwell seams whil
   const area=undergroundLayout(levels).areas.get('local/underground-corridor');
   const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings);
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
-  const objects=Object.fromEntries(['walls','ceiling','skylights'].map(kind=>{
+  const objects=Object.fromEntries(['walls','podium','ceiling','skylights'].map(kind=>{
     const object=new THREE.Mesh(model[kind],material);object.updateMatrixWorld();return [kind,object];
   }));
   const eye=area.feature.height+1.6;
@@ -74,8 +74,9 @@ test('the detailed corridor roof covers its merged exit and lightwell seams whil
       const center=opening[0].map((n,i)=>(n+opening[1][i])/2);
       const normal=new THREE.Vector3(opening[1][1]-opening[0][1],0,opening[0][0]-opening[1][0]).normalize();
       for(const sign of [-1,1]) {
-        const start=new THREE.Vector3(center[0],eye,center[1]).addScaledVector(normal,-.15*sign);
-        assert.equal(new THREE.Raycaster(start,normal.clone().multiplyScalar(sign),0,.3).intersectObjects([objects.walls,objects.ceiling]).length,0,'The roof leaves real entrances open in both viewing directions');
+        const doorEye=area.feature.height+(opening.bottom||0)+Math.min(1.6,((opening.height||area.feature.wallHeight)-(opening.bottom||0))/2);
+        const start=new THREE.Vector3(center[0],doorEye,center[1]).addScaledVector(normal,-.15*sign);
+        assert.equal(new THREE.Raycaster(start,normal.clone().multiplyScalar(sign),0,.3).intersectObjects([objects.walls,objects.podium,objects.ceiling]).length,0,'The roof leaves real entrances open in both viewing directions');
       }
     }
   } finally {Object.values(model).forEach(geometry=>geometry.dispose());material.dispose();}

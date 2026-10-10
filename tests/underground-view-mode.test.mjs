@@ -9,17 +9,25 @@ import { undergroundLayout } from '../src/underground-geometry.ts';
 const room = { floor: -3.8, height: 6.2, footprints: [{ outer: [[0, 0], [10, 0], [10, 8], [0, 8], [0, 0]], holes: [] }] };
 const other = { floor: -3.8, height: 6.2, footprints: [{ outer: [[20, 0], [30, 0], [30, 8], [20, 8], [20, 0]], holes: [] }] };
 
-test('surface inspection keeps underground structures faint and depth-tested even if the camera passes below ground', () => {
+test('surface inspection uses the same opaque physical shell as photo views above and below ground', () => {
   const wall = new THREE.MeshStandardMaterial({ transparent: true, opacity: .75, depthTest: false, depthWrite: false });
   try {
     for (const camera of [{ x: 1, y: 80, z: 2 }, { x: 1, y: -2.2, z: 2 }]) {
       const view = undergroundViewMode(camera, room, [room, other], 'surface');
-      assert.equal(view, 'surface');
+      assert.equal(view, undergroundViewMode(camera, room, [room, other], 'surface', true));
+      assert.equal(view, 'inside');
+      assert.equal(undergroundPartVisible('volume', view, camera.y, 2.4), false);
+      assert.equal(undergroundPartVisible('plan', view, camera.y, 2.4), false);
+      assert.equal(undergroundPartVisible('ceiling', view, camera.y, 2.4), true);
       undergroundMaterialView(wall, view, .75);
-      assert.equal(wall.transparent, true);
-      assert.ok(wall.opacity > 0 && wall.opacity <= .045, 'Underground context is almost transparent');
+      assert.equal(wall.transparent, false);
+      assert.equal(wall.opacity, 1);
       assert.equal(wall.depthTest, true, 'A real surface slab or building hides the underground fragment');
-      assert.equal(wall.depthWrite, false, 'Faint underground walls cannot block the foreground');
+      assert.equal(wall.depthWrite, true, 'Opaque underground walls hide what is behind them');
+      undergroundMaterialView(wall, view, .28, true);
+      assert.equal(wall.opacity, .28, 'Only genuine glass retains transparency');
+      assert.equal(wall.transparent, true);
+      assert.equal(wall.depthWrite, false);
     }
   } finally { wall.dispose(); }
 });

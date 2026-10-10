@@ -10,11 +10,11 @@ export function undergroundCameraInside(camera: { x: number; y: number; z: numbe
   return camera.y >= space.floor - .02 && camera.y < space.floor + space.height - .025 && space.footprints.some(shape => pointOnStairTread([camera.x,camera.z],shape.outer) && !shape.holes.some(hole=>pointOnStairTread([camera.x,camera.z],hole)));
 }
 export function undergroundViewMode(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace, _spaces: UndergroundViewSpace[], mode: UndergroundInspectionMode, photoPerspective = false): UndergroundMaterialView {
-  // Photo views use the complete physical shell from either side of an entrance.
+  // Surface and photo views use the physical shell from either side of an entrance.
   // Depth testing and real openings determine visibility, never a plan overlay.
-  if (photoPerspective) return 'inside';
+  if (photoPerspective || mode === 'surface') return 'inside';
   const inside = undergroundCameraInside(camera, space);
-  return mode === 'surface' ? 'surface' : inside ? 'inside' : 'overview';
+  return inside ? 'inside' : 'overview';
 }
 export function undergroundPartVisible(part: 'volume' | 'plan' | 'ceiling', mode: UndergroundMaterialView, cameraHeight: number, ceilingHeight: number) {
   if (part === 'volume') return mode === 'plan' || mode === 'nearby';
@@ -51,14 +51,21 @@ export function undergroundWallPanels(shape: Shape, height: number, openings: Pa
     const doors = openings.flatMap(opening => {
       if (across(opening[0]) > 1e-5 || across(opening[1]) > 1e-5) return [];
       const start = Math.max(0, Math.min(...opening.map(along))), end = Math.min(length, Math.max(...opening.map(along)));
-      return end - start > 1e-5 ? [{ start, end, top: Math.min(height, opening.height ?? height) }] : [];
+      return end - start > 1e-5 ? [{ start, end, bottom: Math.max(0, opening.bottom ?? 0), top: Math.min(height, opening.height ?? height) }] : [];
     });
     const breaks = [...new Set([0, length, ...doors.flatMap(door => [door.start, door.end])])].sort((a, b) => a - b);
     const at = (distance: number): Point => [from[0] + dx / length * distance, from[1] + dz / length * distance];
     return breaks.slice(1).flatMap((end, j) => {
       const start = breaks[j], middle = (start + end) / 2;
-      const bottom = Math.max(0, ...doors.filter(door => door.start < middle && door.end > middle).map(door => door.top));
-      return height - bottom > 1e-5 ? [{ from: at(start), to: at(end), bottom, top: height }] : [];
+      const cuts = doors.filter(door => door.start < middle && door.end > middle).sort((a, b) => a.bottom - b.bottom);
+      const panels: { from: Point; to: Point; bottom: number; top: number }[] = [];
+      let bottom = 0;
+      for (const cut of cuts) {
+        if (cut.bottom > bottom) panels.push({ from: at(start), to: at(end), bottom, top: cut.bottom });
+        bottom = Math.max(bottom, cut.top);
+      }
+      if (height - bottom > 1e-5) panels.push({ from: at(start), to: at(end), bottom, top: height });
+      return panels;
     });
   }));
 }

@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { passageFootprint, undergroundFootprints, type PassageOpening } from './underground-geometry.ts';
+import { undergroundFootprints, undergroundEntranceStair, undergroundSkylights, type PassageOpening } from './underground-geometry.ts';
 import { undergroundWallPanels } from './underground-mesh.ts';
 import type { Feature, Point, Shape } from './types';
 
-type Kind = 'floor' | 'walls' | 'tiles' | 'metal' | 'lights' | 'pipes' | 'glass' | 'skylights' | 'green' | 'wood' | 'paint' | 'nets' | 'ceiling' | 'fittings';
+type Kind = 'floor' | 'walls' | 'podium' | 'tiles' | 'metal' | 'lights' | 'pipes' | 'glass' | 'skylights' | 'green' | 'wood' | 'paint' | 'nets' | 'ceiling' | 'fittings';
 type Vector = [number, number, number];
-export const UNDERGROUND_COLORS: Record<Kind, string> = { floor: '#7a9799', walls: '#b6beb8', tiles: '#546566', metal: '#777d78', lights: '#f4eccc', pipes: '#a45342', glass: '#abc9cb', skylights: '#abc9cb', green: '#278778', wood: '#c89e66', paint: '#ede8d2', nets: '#a3afa2', ceiling: '#525d5b', fittings: '#56819a' };
+export const UNDERGROUND_COLORS: Record<Kind, string> = { floor: '#7a9799', walls: '#b6beb8', podium: '#bdc9ac', tiles: '#546566', metal: '#777d78', lights: '#f4eccc', pipes: '#a45342', glass: '#abc9cb', skylights: '#abc9cb', green: '#278778', wood: '#c89e66', paint: '#ede8d2', nets: '#a3afa2', ceiling: '#525d5b', fittings: '#56819a' };
 
 export function undergroundRoomFrame(feature: Feature) {
   const ring = feature.outer!, origin = ring[0], short = ring[1], long = ring.at(-2)!;
@@ -22,6 +22,7 @@ export function undergroundRoomFrame(feature: Feature) {
 export function undergroundDetailGeometry(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = []) {
   const parts = Object.fromEntries(Object.keys(UNDERGROUND_COLORS).map(kind => [kind, [] as THREE.BufferGeometry[]])) as Record<Kind, THREE.BufferGeometry[]>;
   const floor = feature.height ?? -3, clear = feature.wallHeight || 2.4, top = floor + clear;
+  const stair = undergroundEntranceStair(feature);
   const point = ([x, z]: Point, height: number): Vector => [x, height, z];
   const box = (p: Point, bottom: number, height: number, length: number, width: number, angle: number, kind: Kind) => {
     if (height <= 0 || length <= 0 || width <= 0) return;
@@ -45,7 +46,8 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     parts[kind].push(geometry.rotateX(-Math.PI / 2).translate(0, height, 0));
   };
   for (const shape of footprints) {
-    flat(shape, floor + .045, feature.type === 'undergroundRoom' ? 'green' : 'floor');
+    const floors = stair ? polygonClipping.difference([shape.outer, ...shape.holes], [stair.footprint.outer]) : [[shape.outer, ...shape.holes]];
+    for (const [outer, ...holes] of floors) flat({ outer, holes }, floor + .045, feature.type === 'undergroundRoom' ? 'green' : 'floor');
     // Windows cut through the high wall band; lower panels keep the sports hall
     // enclosure, and door heads are retained above each real connection.
     const panels = undergroundWallPanels(shape, clear, openings);
@@ -61,7 +63,11 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
           const p: Point = panel.from.map((n, j) => n + (panel.to[j] - n) * i / bays) as Point;
           bar(point(p, top - .95), point(p, top), .035, 'metal');
         }
-      } else segment(panel.from, panel.to, floor + panel.bottom, panel.top - panel.bottom, .2, 'walls');
+      } else {
+        const entranceFace = stair && [panel.from, panel.to].every(p => Math.abs(
+          (p[0] - stair.from[0]) * (stair.to[0] - stair.from[0]) + (p[1] - stair.from[1]) * (stair.to[1] - stair.from[1])) / stair.length < 1e-5);
+        segment(panel.from, panel.to, floor + panel.bottom, panel.top - panel.bottom, .2, entranceFace ? 'podium' : 'walls');
+      }
       const trimHeight = feature.type === 'undergroundTrack' ? 1.55 : feature.type === 'undergroundCorridor' ? 1.1 : clear - 1;
       for (let y = .55; y < trimHeight; y += .55) if (y > panel.bottom) segment(panel.from, panel.to, floor + y, .018, .215, 'tiles');
       if (panel.bottom < 1.1) {
@@ -73,7 +79,19 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       }
     }
   }
-  const roofOpenings: Shape[] = [];
+  if (stair) {
+    for (const tread of stair.treads) segment(tread.from, tread.to, floor, tread.height - floor, stair.width, 'floor');
+    for (const side of [-1, 1]) {
+      const offset = side * (stair.width / 2 - .09);
+      const railHeight = (distance: number) => stair.topHeight + (stair.bottomHeight - stair.topHeight) * distance / stair.length + 1;
+      bar(point(stair.at(0, offset), railHeight(0)), point(stair.at(stair.length, offset), railHeight(stair.length)), .045, 'metal');
+      for (let i = 0; i <= stair.steps; i += 2) {
+        const distance = stair.length * i / stair.steps, height = railHeight(distance);
+        bar(point(stair.at(distance, offset), height - 1), point(stair.at(distance, offset), height), .025, 'metal');
+      }
+    }
+  }
+  const roofOpenings = undergroundSkylights(feature);
   const routes = feature.points ? [feature.points, ...(feature.branches || [])] : [];
   for (const route of routes) for (let edge = 1; edge < route.length; edge++) {
     const a = route[edge - 1], b = route[edge], dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz), width = feature.width || 4;
@@ -116,10 +134,6 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       bar(point(from, top - .58), point(to, top - .58), .035, 'pipes');
       segment(from, to, floor + .065, .025, .2, 'tiles');
     }
-    if (lightwell) {
-      segment(at(.1, -width / 4), at(length - .1, -width / 4), top - .05, .045, width / 2 - .25, 'skylights');
-      roofOpenings.push(passageFootprint([at(.1, -width / 4), at(length - .1, -width / 4)], width / 2 - .25));
-    }
     if (feature.type === 'tunnel') {
       // Orange guiding strip, suspended red service pipe and bright rectangular
       // ceiling panels are visible in _DSC8295 and the two exit-stair photos.
@@ -132,6 +146,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       for (const distance of [.12, length - .12]) segment(at(distance, -width / 2 + .25), at(distance, width / 2 - .25), top - 1.4, .95, .045, 'glass');
     }
   }
+  for (const opening of roofOpenings) flat(opening, top - .05, 'skylights', .045);
   if (feature.type !== 'undergroundRoom') {
     // The full enclosure includes merged return passages and corner seams;
     // only the photographed skylight footprint cuts through its opaque roof.

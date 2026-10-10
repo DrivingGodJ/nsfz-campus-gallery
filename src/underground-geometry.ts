@@ -45,8 +45,38 @@ export function undergroundConnections(features: Feature[], area: Feature) {
     && (feature.height ?? -3) === (area.height ?? -3));
 }
 
-export type PassageOpening = [Point, Point] & { height?: number };
+export type PassageOpening = [Point, Point] & { height?: number; bottom?: number };
 export type UndergroundAreaLayout = { feature: Feature; connections: Feature[]; footprints: Shape[]; openings: PassageOpening[] };
+
+// An entrance belongs to its existing passage: the same footprint locates the
+// facade opening, descending treads and guards without adding a map location.
+export function undergroundEntranceStair(feature: Feature) {
+  const stair = feature.entranceStair;
+  if (!stair) return null;
+  const length = Math.hypot(stair.to[0] - stair.from[0], stair.to[1] - stair.from[1]);
+  const axis: Point = [(stair.to[0] - stair.from[0]) / length, (stair.to[1] - stair.from[1]) / length];
+  const at = (distance: number, side = 0): Point => [stair.from[0] + axis[0] * distance - axis[1] * side,
+    stair.from[1] + axis[1] * distance + axis[0] * side];
+  const opening = [at(0, -stair.width / 2), at(0, stair.width / 2)] as PassageOpening;
+  opening.bottom = stair.topHeight - (feature.height ?? -3);
+  opening.height = opening.bottom + stair.doorHeight;
+  const treads = Array.from({ length: stair.steps }, (_, i) => ({
+    from: at(length * i / stair.steps), to: at(length * (i + 1) / stair.steps),
+    height: stair.topHeight + (stair.bottomHeight - stair.topHeight) * (i + 1) / stair.steps,
+  }));
+  return { ...stair, at, length, opening, treads, footprint: passageFootprint([stair.from, stair.to], stair.width) };
+}
+
+export function undergroundSkylights(feature: Feature) {
+  if (feature.type !== 'undergroundCorridor' || !feature.points) return [];
+  const width = feature.width || 4;
+  return [feature.points, ...(feature.branches || [])].map(([from, to]) => {
+    const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+    const at = (distance: number): Point => [from[0] + dx / length * distance - dz / length * width / 4,
+      from[1] + dz / length * distance + dx / length * width / 4];
+    return passageFootprint([at(.1), at(length - .1)], width / 2 - .25);
+  });
+}
 
 // Both colored routes share the intersections of their offset edges, rather
 // than closing two perpendicular rectangles at the same centerline point.
@@ -99,8 +129,10 @@ export function undergroundLayout(features: Feature[]) {
     locations.set(feature.id, undergroundFootprints(feature, [], aligned));
     if (merged.has(feature.id)) continue;
     const joined = connections.get(feature.id) || [];
+    const stair = undergroundEntranceStair(feature);
     areas.set(feature.id, { feature, connections: joined, footprints: undergroundFootprints(feature, joined, aligned),
-      openings: [feature, ...joined].flatMap(item => openings.get(item.id) || []) });
+      openings: [...[feature, ...joined].flatMap(item => openings.get(item.id) || []),
+        ...(stair ? [stair.opening] : [])] });
   }
   for (const area of areas.values()) if (area.feature.type === 'undergroundTrack') {
     const neighbors = [...areas.values()].filter(other => area.feature.connectedTo?.includes(other.feature.id)

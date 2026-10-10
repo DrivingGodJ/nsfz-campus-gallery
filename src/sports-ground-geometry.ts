@@ -1,7 +1,7 @@
 import type { Campus, Feature, Point, Shape } from './types';
 import { stadiumRing, trackWorldPoint } from './structure-geometry.ts';
 import polygonClipping from 'polygon-clipping';
-import { undergroundLayout } from './underground-geometry.ts';
+import { undergroundLayout, undergroundSkylights } from './underground-geometry.ts';
 import { snapFootprint } from './building-geometry.ts';
 
 export function sportsGroundPlatform(feature: Feature): Shape {
@@ -16,14 +16,18 @@ export function sportsGroundPlatformLayers(feature: Feature, features: Feature[]
   const platform = sportsGroundPlatform(feature), top = feature.height ?? 0;
   const rooms = [...undergroundLayout(features).areas.values()].filter(area =>
     (area.feature.height ?? -3) < top && (area.feature.height ?? -3) + (area.feature.wallHeight || 2.4) > -.06);
+  const ceilingAt = (room: typeof rooms[number]) => (room.feature.height ?? -3) + (room.feature.wallHeight || 2.4)
+    // Embed the podium cap in the passage roof, away from its visible underside.
+    - (room.feature.type === 'undergroundCorridor' ? .1 : 0);
+  const glazing = features.flatMap(undergroundSkylights);
   const levels = [...new Set([-.06, top, ...rooms.flatMap(area => {
-    const ceiling = (area.feature.height ?? -3) + (area.feature.wallHeight || 2.4);
+    const ceiling = ceilingAt(area);
     return ceiling > -.06 && ceiling < top ? [ceiling] : [];
   })])].sort((a, b) => a - b);
   return levels.slice(1).flatMap((to, index) => {
     const from = levels[index], middle = (from + to) / 2;
-    const voids = rooms.filter(area => (area.feature.height ?? -3) < middle
-      && (area.feature.height ?? -3) + (area.feature.wallHeight || 2.4) > middle).flatMap(area => area.footprints);
+    const voids = [...glazing, ...rooms.filter(area => (area.feature.height ?? -3) < middle
+      && ceilingAt(area) > middle).flatMap(area => area.footprints)];
     const polygons = voids.length ? polygonClipping.difference(snapFootprint([[platform.outer, ...platform.holes]]),
       snapFootprint(voids.map(shape => [shape.outer, ...shape.holes]))) : [[platform.outer, ...platform.holes]];
     return polygons.map(([outer, ...holes]) => ({ shape: { outer, holes } as Shape, bottom: from, top: to }));

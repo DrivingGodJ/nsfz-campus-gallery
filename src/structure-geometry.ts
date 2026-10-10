@@ -57,7 +57,7 @@ export function bridgeSurfaceHeight(feature: Feature, height: number, point: Poi
 
 export function straightStairTreads(from: Point, to: Point, top: number, bottom: number) {
   const steps = Math.max(1, Math.ceil(Math.abs(top - bottom) / .18 - 1e-7));
-  const point = (t: number): Point => [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
+  const point = (t: number): Point => t === 0 ? [...from] : t === 1 ? [...to] : [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
   return Array.from({ length: steps }, (_, i) => ({ from: point(i / steps), to: point((i + 1) / steps), height: top + (bottom - top) * (i + 1) / steps }));
 }
 

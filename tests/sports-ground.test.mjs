@@ -43,7 +43,7 @@ test('the raised field retains a roof above each real underground room without f
   const rooms = campus.features.filter(feature => ['undergroundRoom', 'undergroundTrack', 'undergroundCorridor'].includes(feature.type) && feature.outer);
   const before = JSON.stringify(campus);
   for (const room of rooms) {
-    const ceiling = room.height + room.wallHeight;
+    const ceiling = room.height + room.wallHeight - (room.type === 'undergroundCorridor' ? .12 : 0);
     for (const layer of layers.filter(layer => layer.bottom < ceiling - 1e-6)) {
       const overlap = polygonClipping.intersection([layer.shape.outer, ...layer.shape.holes], [room.outer, ...(room.holes || [])]);
       assert.ok(geometryArea(overlap) < .005, room.id + ' remains hollow below its own ceiling (10 micrometre clipping grid)');
