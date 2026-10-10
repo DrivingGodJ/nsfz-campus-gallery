@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 721,
+  "revision": 723,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -469,12 +469,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": 157.06250226700294,
-        "z": 51.70493966633244
+        "x": 157.05961365681517,
+        "z": 51.708740288315894
       },
       "placed": true,
-      "heading": 17.59692032942297,
-      "pitch": -7.995492911451736,
+      "heading": 11.122996306931782,
+      "pitch": -10.464127757096593,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 4847656,
@@ -4541,12 +4541,12 @@
       "uploadedAt": "2026-10-08T12:13:47.841Z",
       "captureType": "ground",
       "position": {
-        "x": 155.7151079039803,
-        "z": 54.15084964781143
+        "x": 158.03839459684244,
+        "z": 53.516722240169585
       },
       "placed": true,
-      "heading": 82.35578467498249,
-      "pitch": 8.79074121738973,
+      "heading": 87.17195619479605,
+      "pitch": 9.316384675097254,
       "width": 4671,
       "height": 7006,
       "downloadBytes": 4830327,
@@ -4558,7 +4558,8 @@
         "depth": "media/b1cead6f-c073-41d3-94ea-2ff1b2513b8e/depth.webp"
       },
       "depthUpdatedAt": "45601263-a9fd-499a-9a03-1c18a5716739",
-      "locationId": ""
+      "locationId": "",
+      "cameraHeight": 1.1999999999999997
     },
     {
       "id": "559153e7-dd9d-4b0f-a940-2eefc5241831",
