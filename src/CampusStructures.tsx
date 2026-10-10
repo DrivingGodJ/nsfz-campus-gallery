@@ -19,6 +19,7 @@ import MottoStone from './MottoStone';
 import FlagPlatform from './FlagPlatform';
 import BajinStatue from './BajinStatue';
 import MemorialGallery from './MemorialGallery';
+import AircraftDisplay from './AircraftDisplay';
 import { garageRampGeometry, garageRampFootprint } from './garage-ramp-geometry';
 import MapModelLayer from './MapModelLayer';
 
@@ -233,6 +234,7 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
     if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return surface(<LakeGarden feature={feature} features={features} connectedBuilding={buildings.find(building => feature.connectedTo?.includes(building.id))} labelPortal={labelPortal} />);
     if (feature.type === 'landmark' && feature.statue) return surface(<BajinStatue feature={feature} />);
     if (feature.type === 'landmark' && feature.gallery) return surface(<MemorialGallery feature={feature} />);
+    if (feature.type === 'landmark' && feature.aircraft) return surface(<AircraftDisplay feature={feature} />);
     if (feature.type === 'landmark' && feature.landmark) return surface(<GateLandmark feature={feature} labelPortal={labelPortal} />);
     if (['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction', 'undergroundTrack'].includes(feature.type)) {
       const area = layout.areas.get(feature.id);
