@@ -117,7 +117,8 @@ function Bridge({ feature, buildings, overrides, labelPortal }: { feature: Featu
   const first = points[0], last = points.at(-1)!;
   const layout = useMemo(() => bridgeLayout(feature, y), [feature, y]);
   const center: Point = [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2];
-  return <group>{feature.archRise ? <ArchedBridgeDeck feature={feature} height={y} /> : <BridgeDeck shapes={layout.deck} height={y} />}<BridgeRails chains={layout.railChains} smooth={!!feature.archRise} />
+  // RiverLandscape already supplies the lake bridge's photographed timber guard.
+  return <group>{feature.archRise ? <ArchedBridgeDeck feature={feature} height={y} /> : <BridgeDeck shapes={layout.deck} height={y} />}{feature.id !== 'local/lake-bridge' && <BridgeRails chains={layout.railChains} smooth={!!feature.archRise} />}
     {feature.sideNet && <BridgeNet feature={feature} chains={layout.railChains} />}
     {bridgeSupports(feature, y).map((support, i) => <mesh key={i} position={support.position}><boxGeometry args={support.size} /><meshStandardMaterial color={mapColor('#9b9f8e')} /></mesh>)}
     {layout.stairs.flatMap(stair => stair.flights.map((flight, i) => <BridgeStairs key={stair.id + i} {...flight} width={width} />))}

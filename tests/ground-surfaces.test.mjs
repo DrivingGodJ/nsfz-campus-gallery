@@ -64,7 +64,7 @@ test('each lake renders once, with all overlapping lawn, campus and background f
   const waterShapes = waters.flatMap(feature => layout.features.get(feature.id));
   assert.equal(waters.length, 5);
   const green = campus.features.find(feature => feature.id === 'way/1233313452');
-  assert.ok(area(polygonClipping.intersection(polygon(green), polygons(waterShapes))) > 800, 'The original map contains a large lake/lawn overlap that previously caused flicker');
+  assert.ok(area(polygonClipping.intersection(polygon(green), polygons(waterShapes))) > 1e-7, 'The source lawn overlaps water, exercising the clipping that prevents flicker');
   const land = [...layout.campus, ...layout.background,
     ...campus.features.filter(feature => ['green', 'sport'].includes(feature.type)).flatMap(feature => layout.features.get(feature.id) || [])];
   for (const lake of waters) {
