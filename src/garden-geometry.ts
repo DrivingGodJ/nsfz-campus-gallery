@@ -42,7 +42,7 @@ export function gardenFootprints(feature: Feature, features: Feature[]): Shape[]
   if (feature.type === 'lakePavilion' && feature.pavilion) return [pavilionFootprint(feature.pavilion)];
   if (feature.type === 'pergola' && feature.pergola) return pergolaFootprint(feature);
   if (feature.type !== 'boardwalk') return [];
-  const deck = bridgeLayout(feature, feature.height ?? .26).deck;
+  const deck = feature.outer ? [{ outer: feature.outer, holes: feature.holes || [] }] : bridgeLayout(feature, feature.height ?? .26).deck;
   const pads = features.filter(f => f.type === 'lakePavilion' && f.pavilion && feature.connectedTo?.includes(f.id)).map(f => pavilionFootprint(f.pavilion!));
   // The pavilion owns its floor. Join at the same edge instead of drawing two
   // deck faces on top of each other where the boardwalk crosses its platform.
@@ -90,8 +90,9 @@ export function trimRailChains(chains: RailPoint[][], pads: Shape[]): RailPoint[
 export function boardwalkLayout(feature: Feature, features: Feature[]) {
   const height = feature.height ?? .26;
   const pads = features.filter(f => f.type === 'lakePavilion' && f.pavilion && feature.connectedTo?.includes(f.id)).map(f => pavilionFootprint(f.pavilion!));
-  const railChains = trimRailChains(bridgeLayout(feature, height).railChains, pads);
-  return { deck: gardenFootprints(feature, features), railChains, posts: bridgeRailPosts(railChains, 1.6), height };
+  const chains = feature.railEdges ? feature.railEdges.map(chain => chain.map(([x, z]) => [x, height, z] as RailPoint)) : bridgeLayout(feature, height).railChains;
+  const railChains = trimRailChains(chains, pads);
+  return { deck: gardenFootprints(feature, features), railChains, posts: bridgeRailPosts(railChains, 1.6, feature.railEdges !== undefined), height };
 }
 export function boardwalkPlanks(feature: Feature, features: Feature[]) {
   const points = feature.points!, width = feature.width || 1.9, y = (feature.height ?? .26) + .008;
@@ -164,14 +165,20 @@ function detailBar(from: RailPoint, to: RailPoint, width: number, depth = width)
 export function boardwalkDetails(feature: Feature, features: Feature[]) {
   const { railChains, posts, height } = boardwalkLayout(feature, features);
   const timber: THREE.BufferGeometry[] = [], caps: THREE.BufferGeometry[] = [], supports: THREE.BufferGeometry[] = [];
+  const lowRail = feature.railHeight;
+  const postHeight = lowRail === undefined ? .65 : lowRail - .045;
+  const capThickness = lowRail === undefined ? .055 : .045;
+  const capHeight = lowRail === undefined ? .67 : lowRail - capThickness / 2;
+  const beamHeight = lowRail === undefined ? .52 : lowRail - .07;
+  const postWidth = lowRail === undefined ? .18 : .14, capWidth = lowRail === undefined ? .25 : .19;
   // DSC2479 and IMG9847 show a low single rail with capped square timber posts.
   for (const chain of railChains) for (let i = 1; i < chain.length; i++) {
     const a = chain[i - 1], b = chain[i];
-    timber.push(detailBar([a[0], height + .52, a[2]], [b[0], height + .52, b[2]], .095, .11));
+    timber.push(detailBar([a[0], height + beamHeight, a[2]], [b[0], height + beamHeight, b[2]], .095, .11));
   }
   for (const [x, , z] of posts) {
-    timber.push(new THREE.BoxGeometry(.18, .65, .18).translate(x, height + .325, z));
-    caps.push(new THREE.BoxGeometry(.25, .055, .25).translate(x, height + .67, z));
+    timber.push(new THREE.BoxGeometry(postWidth, postHeight, postWidth).translate(x, height + postHeight / 2, z));
+    caps.push(new THREE.BoxGeometry(capWidth, capThickness, capWidth).translate(x, height + capHeight, z));
   }
   const pads = features.filter(f => f.type === 'lakePavilion' && f.pavilion && feature.connectedTo?.includes(f.id)).map(f => pavilionFootprint(f.pavilion!));
   for (const chain of trimRailChains([feature.points!.map(([x, z]) => [x, height, z])], pads)) for (let i = 1; i < chain.length; i++) {

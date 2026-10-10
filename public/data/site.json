@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 728,
+  "revision": 732,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -513,12 +513,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": 148.41210255058408,
-        "z": 43.792441535653225
+        "x": 141.884490958746,
+        "z": 42.77666489206188
       },
       "placed": true,
-      "heading": 316.64820245004785,
-      "pitch": 4.0833417941416075,
+      "heading": 329.7623971406315,
+      "pitch": -2.5115800657235594,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 4848417,
@@ -532,7 +532,8 @@
       "locationId": "way/855459420",
       "author": "DrivingGodJ",
       "copyright": "DGJ",
-      "depthUpdatedAt": "b5967e41-684f-4f5d-beac-aec9c5afd45e"
+      "depthUpdatedAt": "b5967e41-684f-4f5d-beac-aec9c5afd45e",
+      "cameraHeight": 2.499999999999996
     },
     {
       "id": "691551ff-0730-4879-a53e-678bc812d733",
@@ -561,8 +562,8 @@
         "z": 71.65531119718773
       },
       "placed": true,
-      "heading": 80.06210080954042,
-      "pitch": -4.533818060343888,
+      "heading": 80.89364992626037,
+      "pitch": -5.160157835163931,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4617650,
@@ -605,8 +606,8 @@
         "z": 99.7
       },
       "placed": true,
-      "heading": 254.3749924975009,
-      "pitch": -2.3574567906933823,
+      "heading": 254.3642807483825,
+      "pitch": -0.7734403593828334,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4897575,
@@ -14430,7 +14431,7 @@
     "way/855459421": {
       "name": "鲁迅纪念馆",
       "floors": 2,
-      "floorHeight": 3.0
+      "floorHeight": 3
     },
     "way/1233313431": {
       "name": "食堂",

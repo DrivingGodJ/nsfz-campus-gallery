@@ -55,6 +55,44 @@ test('the boardwalk spans the marked lake, meets its pavilion without overlappin
   assert.ok(planks.getAttribute('position').count > 100); planks.dispose();
 });
 
+test('a custom timber bank has only its marked waterside rail, continuous post spacing and its own deck outline', () => {
+  const rail = [[0, 0], [1, 0], [1, 1], [2, 1], [2, 2], [3.4, 2]];
+  const outer = [...rail, [3.4, 4], [0, 4], [0, 0]];
+  const shore = { id: 'test/bank', type: 'boardwalk', points: [[.5, 1], [1.5, 2], [2.5, 3]], width: 2, height: .37, outer, railEdges: [rail] };
+  const layout = boardwalkLayout(shore, []);
+  assert.deepEqual(layout.deck, [{ outer, holes: [] }], 'The supplied shoreline outline replaces the centered route slab');
+  assert.deepEqual(layout.railChains, [rail.map(([x, z]) => [x, .37, z])], 'No rail appears on the open land side');
+  const expected = [[0, .37, 0], [1, .37, .6], [2, .37, 1.2], [2.8, .37, 2], [3.4, .37, 2]];
+  assert.equal(layout.posts.length, expected.length, 'Small curve segments do not create an extra post at each vertex');
+  layout.posts.forEach((point, i) => point.forEach((value, j) => assert.ok(Math.abs(value - expected[i][j]) < 1e-7, 'Posts continue every 1.6 m along the whole rail, with a final endpoint')));
+  const pad = { id: 'test/pad', type: 'lakePavilion', pavilion: { center: [2.5, 3], axis: [1, 0], span: .6 } };
+  const joined = boardwalkLayout({ ...shore, connectedTo: [pad.id] }, [pad]), platform = gardenFootprints(pad, [pad])[0];
+  assert.ok(area(clip.intersection(joined.deck.map(polygon), polygon(platform))) < 1e-7, 'Custom decks still leave the pavilion to own its floor');
+  assert.ok(Math.abs(area(layout.deck.map(polygon)) - area(joined.deck.map(polygon)) - .36) < 1e-7);
+  assert.deepEqual(boardwalkLayout({ ...shore, railEdges: [] }, []).railChains, [], 'An explicit empty list leaves the bank fully open');
+});
+
+test('the cafeteria wood bank follows the south shore with an open land side and no selectable region', () => {
+  const shore = campus.features.find(f => f.id === 'local/cafeteria-wood-shore');
+  const lake = campus.features.find(f => f.id === 'way/855459418');
+  const layout = boardwalkLayout(shore, campus.features);
+  assert.equal(shore.width, 1.5); assert.equal(layout.height, .26); assert.equal(shore.railHeight, .5);
+  assert.equal(layout.railChains.length, 1, 'Only the waterside edge has a low timber rail');
+  assert.ok(!campusLocations(campus, site).some(location => location.id === shore.id));
+  assert.ok(area(layout.deck.map(polygon)) > 30 && area(layout.deck.map(polygon)) < 36, 'The narrow bank is about 22.5 m long');
+  assert.ok(area(clip.intersection(layout.deck.map(polygon), polygon(lake))) < 1e-7, 'The deck adjoins the lake without filling it');
+  for (const building of campus.buildings) assert.ok(area(clip.intersection(layout.deck.map(polygon), polygon(building))) < 1e-7, 'The wood bank leaves the cafeteria and dormitory clear');
+  const photo = site.photos.find(p => p.id === '72cbcabe-914c-4ff3-b21a-fc6197bdd416');
+  assert.ok(inside([photo.position.x, photo.position.z], shore), 'The low night photo is taken from the wood bank');
+  const planks = boardwalkPlanks(shore, campus.features), details = boardwalkDetails(shore, campus.features);
+  try {
+    details.caps.computeBoundingBox();
+    assert.ok(Math.abs(details.caps.boundingBox.max.y - .76) < 1e-6, 'The capped low rail is only half a metre above the deck');
+    assert.ok(planks.getAttribute('position').count > 30, 'Crosswise plank seams remain visible through the curved section');
+    for (const geometry of Object.values(details)) assert.ok(geometry.userData.photoOcclusionMask.every(value => value === 0), 'Low wood details do not hide nearby photo markers');
+  } finally { planks.dispose(); Object.values(details).forEach(geometry => geometry.dispose()); }
+});
+
 test('the smaller pavilion has an open interior and curved roof, and the simple wisteria building joins the back of the library', () => {
   const roof = pavilionRoofGeometry(pavilion.pavilion, pavilion.height);
   const material = new THREE.MeshBasicMaterial({side: THREE.DoubleSide});
