@@ -6,7 +6,7 @@ import { Edges, Html, Line } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { ArrowDown, ArrowUp, Crosshair } from 'lucide-react';
-import { buildingInfo, type Campus, type Photo, type Point, type Shape, type Site } from './types';
+import { buildingInfo, type Campus, type Feature, type Photo, type Point, type Shape, type Site } from './types';
 import CampusStructures from './CampusStructures';
 import MapModelLayer from './MapModelLayer';
 import MapLevelSwitch, { type MapLevelMode } from './MapLevelSwitch';
@@ -42,7 +42,7 @@ import BasketballCourts from './BasketballCourts';
 import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from './LocationSelection';
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
 import { groundSurfaces } from './ground-geometry';
-import { passageFootprint } from './underground-geometry';
+import { roadFootprint } from './road-geometry';
 import { isAerialPhoto, photoCameraHeightRange, photoLocationId, photoMapHeight } from './locations';
 import { mapLocationTarget } from './location-geometry';
 import { photoPlacementPoint } from './photo-placement';
@@ -144,9 +144,9 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     {(selected || !!building.name || !!site.buildingOverrides[building.id]?.name) && <LocationHtml portal={labelPortal} key={info.name} position={[info.center[0], height + 3, info.center[1]]} center zIndexRange={[5, 1]}><LocationName id={building.id} name={info.name} building /></LocationHtml>}
   </group>;
 });
-function Roads({ points, width }: { points: Point[]; width: number }) {
+function Roads({ feature }: { feature: Feature }) {
   const mapColor = useMapColor();
-  const geometry = useMemo(() => buildingGeometry(passageFootprint(points, width), .04, 3.6), [points, width]);
+  const geometry = useMemo(() => buildingGeometry(roadFootprint(feature), .04, 3.6), [feature]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return <mesh userData={{ photoOpacityOccluder: true }} geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, .075, 0]}><meshStandardMaterial color={mapColor('#e9e4d4')} roughness={1} /></mesh>;
 }
@@ -312,7 +312,7 @@ export default function MapView(props: Props) {
         {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={(undergroundView ? undergroundFloor : 0) - .08} unlit />)}
         <MapModelLayer underground={undergroundView}>
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}
-        {campus.features.map(feature => feature.waterfall ? <BoundaryWaterGarden key={feature.id} feature={feature} /> : feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} features={campus.features} labelPortal={labelPortal} /> : feature.type === 'path' && feature.points && !feature.representedBy ? <Roads key={feature.id} points={feature.points} width={feature.width || 3} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
+        {campus.features.map(feature => feature.waterfall ? <BoundaryWaterGarden key={feature.id} feature={feature} /> : feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} features={campus.features} labelPortal={labelPortal} /> : feature.type === 'path' && (feature.outer || feature.points) && !feature.representedBy ? <Roads key={feature.id} feature={feature} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
         <Line points={campus.boundary.map(([x, z]) => [x, .2, z])} color={mapColor('#97a188')} lineWidth={1.5} />
         {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
         <RiverLandscape features={campus.features} buildings={campus.buildings} />

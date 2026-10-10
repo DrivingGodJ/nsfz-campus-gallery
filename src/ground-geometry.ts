@@ -1,5 +1,6 @@
 import polygonClipping from 'polygon-clipping';
-import { passageFootprint, undergroundLayout } from './underground-geometry.ts';
+import { undergroundLayout } from './underground-geometry.ts';
+import { roadFootprint } from './road-geometry.ts';
 import { bridgeLayout } from './bridge-geometry.ts';
 import { garageRampFootprint } from './garage-ramp-geometry.ts';
 import { snapFootprint } from './building-geometry.ts';
@@ -23,8 +24,8 @@ export function groundSurfaces(campus: Campus) {
   });
   const waters = campus.features.filter(feature => feature.type === 'water' && feature.outer);
   const waterMask = union(waters.map(featureShape));
-  const roads = campus.features.filter(feature => feature.type === 'path' && feature.points && !feature.representedBy)
-    .map(feature => passageFootprint(feature.points!, feature.width || 3));
+  const roads = campus.features.filter(feature => feature.type === 'path' && (feature.outer || feature.points) && !feature.representedBy)
+    .map(roadFootprint);
   // Road-level bridges replace their source paths. Cut water below their decks
   // too, so the nearly coplanar faces cannot flicker at distant camera angles.
   const lowBridges = campus.features.filter(feature => feature.type === 'bridge' && feature.points

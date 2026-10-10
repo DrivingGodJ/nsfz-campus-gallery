@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 735,
+  "revision": 740,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -829,8 +829,8 @@
         "z": 51.4
       },
       "placed": true,
-      "heading": 299.15844961503717,
-      "pitch": 7.267152554731522,
+      "heading": 299.6172978735542,
+      "pitch": 8.735271450059658,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4996457,
@@ -873,8 +873,8 @@
         "z": 41.4
       },
       "placed": true,
-      "heading": 302.2869032583458,
-      "pitch": -3.0918972639062225,
+      "heading": 302.57531285265463,
+      "pitch": 1.4943041154395467,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4738233,
@@ -913,12 +913,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": 133,
-        "z": 57.1
+        "x": 134.09637997957196,
+        "z": 57.18916804581116
       },
       "placed": true,
-      "heading": 190.83264953193373,
-      "pitch": 0.982247690081842,
+      "heading": 184.3924795853245,
+      "pitch": 1.8152137048340449,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4988506,
@@ -1045,12 +1045,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": 66.9,
-        "z": 71.4
+        "x": 66.92897389136849,
+        "z": 72.3995801686803
       },
       "placed": true,
-      "heading": 264.2400331870897,
-      "pitch": -14.216871710020044,
+      "heading": 269.8531030767949,
+      "pitch": -13.257787601484916,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4982340,

@@ -7,14 +7,15 @@ import { groundSurfaces } from '../src/ground-geometry.ts';
 import { buildingGeometry, snapFootprint } from '../src/building-geometry.ts';
 import { passageFootprint, undergroundLayout } from '../src/underground-geometry.ts';
 import { curvedStairPoint } from '../src/structure-geometry.ts';
+import { roadFootprint } from '../src/road-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const polygon = shape => [shape.outer, ...(shape.holes || [])];
 const polygons = shapes => shapes.map(polygon);
 const ringArea = ring => Math.abs(ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0) / 2);
 const area = geometry => geometry.reduce((sum, [outer, ...holes]) => sum + ringArea(outer) - holes.reduce((n, ring) => n + ringArea(ring), 0), 0);
-const roads = campus.features.filter(feature => feature.type === 'path' && feature.points && !feature.representedBy)
-  .map(feature => passageFootprint(feature.points, feature.width || 3));
+const roads = campus.features.filter(feature => feature.type === 'path' && (feature.outer || feature.points) && !feature.representedBy)
+  .map(roadFootprint);
 roads.push(...campus.features.filter(feature => feature.type === 'bridge' && !feature.archRise && feature.deckHeight <= .12)
   .map(feature => passageFootprint(feature.points, feature.width)));
 const roadMask = polygonClipping.union(...roads.map(polygon));
