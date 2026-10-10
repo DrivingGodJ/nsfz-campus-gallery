@@ -1838,7 +1838,11 @@
       ],
       "holes": [],
       "floors": 2,
-      "classroomWindows": null
+      "classroomWindows": null,
+      "facade": {
+        "type": "luxun-memorial"
+      },
+      "floorHeight": 3
     },
     {
       "id": "way/1233313430",

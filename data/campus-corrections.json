@@ -3241,7 +3241,11 @@
     },
     {
       "id": "way/855459421",
-      "classroomWindows": null
+      "classroomWindows": null,
+      "facade": {
+        "type": "luxun-memorial"
+      },
+      "floorHeight": 3
     },
     {
       "id": "way/1277841229",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 724,
+  "revision": 728,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -513,12 +513,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": 149.12197418365224,
-        "z": 43.230229596465676
+        "x": 148.41210255058408,
+        "z": 43.792441535653225
       },
       "placed": true,
-      "heading": 318.59171415593437,
-      "pitch": -0.7441443452130873,
+      "heading": 316.64820245004785,
+      "pitch": 4.0833417941416075,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 4848417,
@@ -14370,6 +14370,50 @@
       "depthUpdatedAt": "a9b75301-b7c7-4c52-b9b9-8b7252655ef6",
       "locationId": "way/855459420",
       "cameraHeight": 1.1000000000000014
+    },
+    {
+      "id": "3ec87b74-432c-47c8-b2a8-0dbe917e10de",
+      "title": "IMG_9807-已增强-降噪",
+      "description": "",
+      "capturedAt": "2023-09-23T17:27:02",
+      "metadata": {
+        "recordedAt": "2023-09-23T17:27:02",
+        "utcOffset": "+08:00",
+        "cameraMake": "Canon",
+        "cameraModel": "Canon EOS 90D",
+        "lensModel": "EF-S18-200mm f/3.5-5.6 IS",
+        "focalLengthMm": 50,
+        "aperture": 5,
+        "exposureSeconds": 0.016666666666666666,
+        "iso": 6400,
+        "author": "DGJ"
+      },
+      "buildingId": "",
+      "floor": 0,
+      "author": "DGJ",
+      "copyright": "",
+      "uploadedAt": "2026-10-10T10:43:03.950Z",
+      "captureType": "ground",
+      "position": {
+        "x": 128.16529124834503,
+        "z": 33.296015698573086
+      },
+      "placed": true,
+      "heading": 76.48463031680876,
+      "pitch": 0.08057218994027077,
+      "width": 6960,
+      "height": 4640,
+      "downloadBytes": 4760630,
+      "files": {
+        "thumbnail": "media/3ec87b74-432c-47c8-b2a8-0dbe917e10de/thumbnail.webp",
+        "preview": "media/3ec87b74-432c-47c8-b2a8-0dbe917e10de/preview.webp",
+        "display": "media/3ec87b74-432c-47c8-b2a8-0dbe917e10de/display.webp",
+        "download": "media/3ec87b74-432c-47c8-b2a8-0dbe917e10de/download.jpg",
+        "depth": "media/3ec87b74-432c-47c8-b2a8-0dbe917e10de/depth.webp"
+      },
+      "depthUpdatedAt": "3423a312-5642-4ac6-a0ae-35c002a5a237",
+      "locationId": "",
+      "cameraHeight": 1.0999999999999996
     }
   ],
   "buildingOverrides": {
@@ -14386,7 +14430,7 @@
     "way/855459421": {
       "name": "鲁迅纪念馆",
       "floors": 2,
-      "floorHeight": 3.6
+      "floorHeight": 3.0
     },
     "way/1233313431": {
       "name": "食堂",
