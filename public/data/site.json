@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 740,
+  "revision": 743,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -1355,12 +1355,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": 64.6,
-        "z": 71.4
+        "x": 62.94278415450589,
+        "z": 68.89927297742372
       },
       "placed": true,
-      "heading": 236.02493783389184,
-      "pitch": 9.867353036733757,
+      "heading": 235.1733962859479,
+      "pitch": 9.72102997702179,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4946639,
@@ -1403,8 +1403,8 @@
         "z": 30.42679290217528
       },
       "placed": true,
-      "heading": 323.2446295053795,
-      "pitch": 14.585664211973535,
+      "heading": 319.21960476038544,
+      "pitch": 12.95851268159099,
       "width": 4664,
       "height": 6996,
       "downloadBytes": 4905830,
@@ -1447,8 +1447,8 @@
         "z": 54.8
       },
       "placed": true,
-      "heading": 177.8417513545669,
-      "pitch": -22.389804366478888,
+      "heading": 166.05333120378168,
+      "pitch": -24.924191988070547,
       "width": 4672,
       "height": 1988,
       "downloadBytes": 1370819,

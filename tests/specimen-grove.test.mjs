@@ -10,16 +10,15 @@ import { photoCameraPose } from '../src/photo-camera.ts';
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const grove = campus.features.find(feature => feature.id === 'local/specimen-forest');
 const photos = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url))).photos.filter(photo => photo.locationId === grove.id);
-const inside = point => {
+const inside = (point, ring = grove.outer) => {
   let hit = false;
-  const ring = grove.outer;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     if ((ring[i][1] > point[1]) !== (ring[j][1] > point[1]) && point[0] < (ring[j][0] - ring[i][0]) * (point[1] - ring[i][1]) / (ring[j][1] - ring[i][1]) + ring[i][0]) hit = !hit;
   }
   return hit;
 };
 
-test('grove details stay within the confirmed grove and paths clear trunks and photo positions', () => {
+test('grove details and adjacent bars stay in their confirmed areas and paths clear trunks and photo positions', () => {
   const original = JSON.stringify(grove), trees = specimenTrees(grove), paths = specimenPaths(), geometry = specimenGroveGeometry(grove);
   assert.equal(JSON.stringify(grove), original, 'The measured photo/model data is not mutated');
   assert.equal(trees.length, grove.trees.length);
@@ -36,7 +35,7 @@ test('grove details stay within the confirmed grove and paths clear trunks and p
       const point = [p.getX(i), p.getZ(i)];
       assert.ok(Number.isFinite(p.getY(i)) && p.getY(i) >= .07, key + ' has finite above-ground geometry');
       // Path ends are clipped on the exact boundary; other objects stay inset.
-      if (key !== 'paths' && key !== 'edging') assert.ok(inside(point), key + ' crosses the grove boundary');
+      if (key !== 'paths' && key !== 'edging') assert.ok(inside(point, key === 'fitness' ? campus.boundary : grove.outer), key + ' crosses its boundary');
     }
   }
   const floor = new THREE.Mesh(geometry.paths, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
