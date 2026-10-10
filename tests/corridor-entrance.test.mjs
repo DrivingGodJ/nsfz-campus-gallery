@@ -114,7 +114,8 @@ test('the gym door, shifted bridge stair and podium edge remain aligned without 
   const photo = site.photos.find(item => item.id === '13411ce1-b933-425c-ac78-0a0569842170');
   close(groundElevationAt(campus, [photo.position.x, photo.position.z]), 0, 'DSC06881 stands outside the podium entrance');
   close(photoMapHeight(photo, campus, site), photo.cameraHeight ?? 1.6, 'The completed podium keeps the user-calibrated eye height above ground');
-  assert.equal(campus.buildings.length, 19);
-  assert.equal(campusLocations(campus, site).length, 41, 'The entrance is part of the existing corridor, with no extra selectable destination');
+  const locations = campusLocations(campus, site);
+  assert.equal(locations.filter(location => location.id === area.feature.id).length, 1, 'The entrance keeps one existing corridor destination');
+  assert.equal(campus.features.filter(feature => /地下走廊.*入口|操场.*门洞/.test(feature.name)).length, 0, 'The entrance has no extra selectable destination');
   assert.equal(campus.features.filter(feature => feature.entranceStair).length, 1);
 });

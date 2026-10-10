@@ -80,7 +80,7 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
     if (!section || 'passageIndex' in corridor) continue;
     const ring = 'holeIndex' in corridor ? section.holes[corridor.holeIndex] : section.outer;
     const edges = 'holeIndex' in corridor ? Array.from({ length: ring.length - 1 }, (_, i) => i) : 'edge' in corridor ? [corridor.edge] : 'edges' in corridor ? corridor.edges : [];
-    const segments = 'points' in corridor ? (corridor.railEdges || []).flatMap(points => points.slice(1).map((to, i) => [points[i], to])) : edges.map(edge => [ring[edge], ring[edge + 1]]);
+    const segments = corridor.railEdges ? corridor.railEdges.flatMap(points => points.slice(1).map((to, i) => [points[i], to])) : edges.map(edge => [ring[edge], ring[edge + 1]]);
     const area = ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0);
     const inset = 'points' in corridor ? -.09 : .09 * (area >= 0 ? 1 : -1) * ('holeIndex' in corridor ? 1 : -1);
     const rooftop = 'rooftop' in corridor;

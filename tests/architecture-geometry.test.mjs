@@ -87,6 +87,18 @@ test('walkway guard rails follow both courtyard rings, respect floor cutaways, a
           assert.equal(geometry.userData.photoOcclusionMask[hit.faceIndex], 0);
         }
       }
+      const corridor = teaching.floorCorridors.find(c => c.partId === 'main' && c.edge === 19);
+      assert.equal(corridor.railEdges[0].length, 3, 'The unchanged long guard turns along the exposed east return');
+      const [a, b] = corridor.railEdges[0], along = vector(b).sub(vector(a)).normalize();
+      const normal = new THREE.Vector3(-along.z, 0, along.x), guard = mesh(geometry);
+      const storeys = Math.min(info.sections.find(s => s.id === 'main').floors, floor || Infinity);
+      for (let level = 0; level < storeys; level++) for (const t of [.2, .5, .8]) {
+        const origin = vector(a).lerp(vector(b), t).addScaledVector(normal, -.4);
+        origin.y = .12 + level * info.floorHeight + .25 + 1.05;
+        assert.equal(new THREE.Raycaster(origin, normal, 0, .8).intersectObject(guard).length > 0, level > 0,
+          'The side return is guarded on every upper floor and stays open at ground level');
+      }
+      guard.material.dispose();
     }
     assert.ok(vertices.count / 3 < 14000, 'Rail detail stays modest even with every floor visible');
     geometry.dispose();

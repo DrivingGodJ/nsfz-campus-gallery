@@ -17,6 +17,7 @@ import RiverLandscape from './RiverLandscape';
 import BoundaryWaterGarden from './BoundaryWaterGarden';
 import HistoryPavilion from './HistoryPavilion';
 import BoundaryHouse from './BoundaryHouse';
+import PrintRoom from './PrintRoom';
 import BuildingFacade from './BuildingFacade';
 import BuildingSkylights from './BuildingSkylights';
 import BuildingArchitecture from './BuildingArchitecture';
@@ -92,7 +93,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
   useEffect(() => () => { if (gym) for (const geometry of Object.values(gym)) geometry.dispose(); }, [gym]);
   const stands = useMemo(() => building.id === STANDS_ID ? standsArchitecture(building, info.height, info.floorHeight, cutawayHeight) : undefined, [building, info.height, info.floorHeight, cutawayHeight]);
   useEffect(() => () => { if (stands) Object.values(stands).forEach(geometry => geometry.dispose()); }, [stands]);
-  const geometries = useMemo(() => building.facade?.type === 'boundary-house' ? [] : info.sections.map(section => {
+  const geometries = useMemo(() => building.facade?.type === 'boundary-house' || building.facade?.type === 'print-room' ? [] : info.sections.map(section => {
     const height = Math.min(section.height, cutawayHeight ?? section.height);
     const cutaway = cutawayHeight !== undefined && cutawayHeight <= section.height + 1e-6;
     if (gym) return gym.body;
@@ -124,7 +125,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     </group> : <group
       onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }}
       onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
-    {building.facade?.type === 'boundary-house' ? <BoundaryHouse building={building} height={height} cutaway={cutawayHeight !== undefined} /> : info.sections.map((section, i) => <group key={section.id}><mesh geometry={geometries[i]} rotation={[-Math.PI / 2, 0, 0]} position={[0, .12, 0]}>
+    {building.facade?.type === 'boundary-house' ? <BoundaryHouse building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'print-room' ? <PrintRoom building={building} height={height} cutaway={cutawayHeight !== undefined} /> : info.sections.map((section, i) => <group key={section.id}><mesh geometry={geometries[i]} rotation={[-Math.PI / 2, 0, 0]} position={[0, .12, 0]}>
       <meshStandardMaterial color={mapColor(color)} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />
       {building.facade?.type !== 'cafeteria' && <Edges color={mapColor(selected ? '#567760' : '#aaa895')} threshold={25} />}
     </mesh>

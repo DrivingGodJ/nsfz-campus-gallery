@@ -29,7 +29,7 @@ function model(override = site.buildingOverrides[building.id], floor) {
 }
 
 test('the marked forest-facing facade and both atriums are recessed three metres on every floor', async () => {
-  assert.deepEqual(building.floorCorridors.filter(corridor => !('points' in corridor)).map(({ slabInfill, ...corridor }) => corridor), [{ partId: 'main', edge: 19, depth: 3 }, { partId: 'main', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', edges: [0, 1, 2], depth: 3 }, { partId: 'sixth-floor-wing', edges: [19, 20, 21, 22], depth: 3 }, { partId: 'sixth-floor-wing', passageIndex: 1, depth: 3 }]);
+  assert.deepEqual(building.floorCorridors.filter(corridor => !('points' in corridor)).map(({ slabInfill, railEdges, ...corridor }) => corridor), [{ partId: 'main', edge: 19, depth: 3 }, { partId: 'main', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', holeIndex: 0, depth: 3 }, { partId: 'sixth-floor-wing', edges: [0, 1, 2], depth: 3 }, { partId: 'sixth-floor-wing', edges: [19, 20, 21, 22], depth: 3 }, { partId: 'sixth-floor-wing', passageIndex: 1, depth: 3 }]);
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   assert.deepEqual(applyCampusCorrections(campus, corrections), campus, 'Corridors persist after an OSM map refresh');
   const original = JSON.stringify([building, site]);
