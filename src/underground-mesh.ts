@@ -9,9 +9,11 @@ export type UndergroundMaterialView = 'inside' | 'nearby' | 'plan' | 'surface' |
 export function undergroundCameraInside(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace) {
   return camera.y >= space.floor - .02 && camera.y < space.floor + space.height - .025 && space.footprints.some(shape => pointOnStairTread([camera.x,camera.z],shape.outer) && !shape.holes.some(hole=>pointOnStairTread([camera.x,camera.z],hole)));
 }
-export function undergroundViewMode(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace, spaces: UndergroundViewSpace[], mode: UndergroundInspectionMode, photoPerspective = false): UndergroundMaterialView {
+export function undergroundViewMode(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace, _spaces: UndergroundViewSpace[], mode: UndergroundInspectionMode, photoPerspective = false): UndergroundMaterialView {
+  // Photo views use the complete physical shell from either side of an entrance.
+  // Depth testing and real openings determine visibility, never a plan overlay.
+  if (photoPerspective) return 'inside';
   const inside = undergroundCameraInside(camera, space);
-  if (photoPerspective) return inside ? 'inside' : spaces.some(item => undergroundCameraInside(camera, item)) ? 'nearby' : 'plan';
   return mode === 'surface' ? 'surface' : inside ? 'inside' : 'overview';
 }
 export function undergroundPartVisible(part: 'volume' | 'plan' | 'ceiling', mode: UndergroundMaterialView, cameraHeight: number, ceilingHeight: number) {

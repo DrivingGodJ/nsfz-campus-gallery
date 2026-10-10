@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { groundSurfaces } from '../src/ground-geometry.ts';
 import { buildingGeometry, snapFootprint } from '../src/building-geometry.ts';
 import { passageFootprint, undergroundLayout } from '../src/underground-geometry.ts';
+import { curvedStairPoint } from '../src/structure-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const polygon = shape => [shape.outer, ...(shape.holes || [])];
@@ -17,6 +18,30 @@ const roads = campus.features.filter(feature => feature.type === 'path' && featu
 roads.push(...campus.features.filter(feature => feature.type === 'bridge' && !feature.archRise && feature.deckHeight <= .12)
   .map(feature => passageFootprint(feature.points, feature.width)));
 const roadMask = polygonClipping.union(...roads.map(polygon));
+
+test('curved underground entrances leave a real opening in every ground layer while adjacent land stays solid', () => {
+  const layout = groundSurfaces(campus), material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const surfaces = [...layout.campus, ...layout.background,
+    ...campus.features.flatMap(feature => layout.features.get(feature.id) || [])];
+  const meshes = surfaces.map(shape => {
+    const outline = new THREE.Shape(shape.outer.map(([x,z]) => new THREE.Vector2(x,-z)));
+    outline.holes = shape.holes.map(ring => new THREE.Path(ring.map(([x,z]) => new THREE.Vector2(x,-z))));
+    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(outline), material);
+    mesh.rotation.x = -Math.PI / 2; mesh.updateMatrixWorld();
+    return mesh;
+  });
+  const above = point => new THREE.Raycaster(new THREE.Vector3(point[0],1,point[2]),new THREE.Vector3(0,-1,0),0,2).intersectObjects(meshes);
+  try {
+    const entrances = campus.features.filter(feature => feature.type === 'tunnelEntrance' && feature.curvedStair);
+    assert.ok(entrances.length);
+    for (const { curvedStair: stair } of entrances) {
+      for (const progress of [.2,.5,.8]) {
+        assert.equal(above(curvedStairPoint(stair,progress)).length,0,'No ground sheet seals the stairs or blocks an entrance sightline');
+      }
+      assert.ok(above(curvedStairPoint(stair,.5,stair.radius + stair.width / 2 + .5)).length,'The hole does not expose unrelated underground land');
+    }
+  } finally { meshes.forEach(mesh => mesh.geometry.dispose()); material.dispose(); }
+});
 
 test('ground layers leave all rooms that cross ground level hollow while preserving ordinary tunnel cover', () => {
   const layout = groundSurfaces(campus);

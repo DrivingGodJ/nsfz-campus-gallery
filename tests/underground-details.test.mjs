@@ -50,6 +50,37 @@ test('different passage ceiling heights keep an open join below the shorter ceil
   } finally {objects.forEach(o=>{o.geometry.dispose();o.material.dispose();});}
 });
 
+test('the detailed corridor roof covers its merged exit and lightwell seams while preserving glazing and doors', () => {
+  const area=undergroundLayout(levels).areas.get('local/underground-corridor');
+  const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings);
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const objects=Object.fromEntries(['walls','ceiling','skylights'].map(kind=>{
+    const object=new THREE.Mesh(model[kind],material);object.updateMatrixWorld();return [kind,object];
+  }));
+  const eye=area.feature.height+1.6;
+  const roofHits=(point,object)=>new THREE.Raycaster(new THREE.Vector3(point[0],eye,point[1]),new THREE.Vector3(0,1,0),0,area.feature.wallHeight).intersectObject(object);
+  try {
+    for(const route of [area.feature,...area.connections].map(feature=>feature.points)) {
+      for(let i=1;i<route.length;i++)for(const t of [.25,.5,.75]) {
+        const point=route[i-1].map((n,j)=>n+(route[i][j]-n)*t);
+        assert.ok(roofHits(point,objects.ceiling).length,'Every closed route and merged return has an opaque roof');
+      }
+    }
+    const [from,to]=area.feature.points,dx=to[0]-from[0],dz=to[1]-from[1],length=Math.hypot(dx,dz);
+    const glazing=[(from[0]+to[0])/2-dz/length*area.feature.width/4,(from[1]+to[1])/2+dx/length*area.feature.width/4];
+    assert.equal(roofHits(glazing,objects.ceiling).length,0,'The opaque roof does not fill the genuine skylight');
+    assert.ok(roofHits(glazing,objects.skylights).length,'The photographed roof glazing remains in its opening');
+    for(const opening of area.openings) {
+      const center=opening[0].map((n,i)=>(n+opening[1][i])/2);
+      const normal=new THREE.Vector3(opening[1][1]-opening[0][1],0,opening[0][0]-opening[1][0]).normalize();
+      for(const sign of [-1,1]) {
+        const start=new THREE.Vector3(center[0],eye,center[1]).addScaledVector(normal,-.15*sign);
+        assert.equal(new THREE.Raycaster(start,normal.clone().multiplyScalar(sign),0,.3).intersectObjects([objects.walls,objects.ceiling]).length,0,'The roof leaves real entrances open in both viewing directions');
+      }
+    }
+  } finally {Object.values(model).forEach(geometry=>geometry.dispose());material.dispose();}
+});
+
 test('all underground model batches stay within their floors and ceilings and add recognizable photo-backed fittings', () => {
   let triangles=0;
   for(const area of undergroundLayout(levels).areas.values()) {

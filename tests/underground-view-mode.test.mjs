@@ -42,18 +42,30 @@ test('underground overview exposes detailed floors and walls without translucent
   } finally { floor.dispose(); }
 });
 
-test('walking inside restores the real ceiling while photo perspective retains the original inside/nearby/plan behavior', () => {
+test('photo views retain opaque walls and ceilings from inside, outside, other rooms and above ground', () => {
   const camera = { x: 1, y: -2.2, z: 2 };
   assert.equal(undergroundViewMode(camera, room, [room, other], 'underground'), 'inside');
   assert.equal(undergroundPartVisible('ceiling', 'inside', camera.y, 2.4), true);
-  assert.equal(undergroundViewMode(camera, room, [room, other], 'surface', true), 'inside');
-  assert.equal(undergroundViewMode(camera, other, [room, other], 'surface', true), 'nearby');
-  const overhead = { ...camera, y: 30 };
-  assert.equal(undergroundViewMode(overhead, room, [room, other], 'surface', true), 'plan');
-  assert.equal(undergroundPartVisible('volume', 'nearby', camera.y, 2.4), true);
-  assert.equal(undergroundPartVisible('volume', 'inside', camera.y, 2.4), false);
-  assert.equal(undergroundPartVisible('plan', 'plan', overhead.y, 2.4), true);
-  assert.equal(undergroundPartVisible('ceiling', 'plan', overhead.y, 2.4), false);
+  const wall = new THREE.MeshStandardMaterial({ transparent: true, opacity: .75, depthTest: false, depthWrite: false });
+  try {
+    for (const position of [camera, { x: 21, y: -2.2, z: 2 }, { x: -5, y: -2.2, z: 2 }, { ...camera, y: 30 }]) {
+      for (const mode of ['surface', 'underground']) {
+        const view = undergroundViewMode(position, room, [room, other], mode, true);
+        assert.equal(view, 'inside', 'Every photo uses the same physical enclosure');
+        assert.equal(undergroundPartVisible('volume', view, position.y, 2.4), false);
+        assert.equal(undergroundPartVisible('plan', view, position.y, 2.4), false);
+        assert.equal(undergroundPartVisible('ceiling', view, position.y, 2.4), true);
+        undergroundMaterialView(wall, view, .75);
+        assert.equal(wall.transparent, false);
+        assert.equal(wall.opacity, 1);
+        assert.equal(wall.depthTest, true);
+        assert.equal(wall.depthWrite, true);
+        undergroundMaterialView(wall, view, .28, true);
+        assert.equal(wall.opacity, .28, 'Only genuine glass retains transparency');
+        assert.equal(wall.depthTest, true, 'Glass still obeys surrounding walls');
+      }
+    }
+  } finally { wall.dispose(); }
 });
 
 test('opening the underground lightwell roof preserves its photographed vertical windows', async () => {

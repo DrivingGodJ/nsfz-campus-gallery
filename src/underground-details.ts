@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { undergroundFootprints, type PassageOpening } from './underground-geometry.ts';
+import { passageFootprint, undergroundFootprints, type PassageOpening } from './underground-geometry.ts';
 import { undergroundWallPanels } from './underground-mesh.ts';
 import type { Feature, Point, Shape } from './types';
 
@@ -37,10 +38,11 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()));
     parts[kind].push(geometry.translate(...a.add(b).multiplyScalar(.5).toArray()));
   };
-  const flat = (shape: Shape, height: number, kind: Kind) => {
+  const flat = (shape: Shape, height: number, kind: Kind, thickness = 0) => {
     const outline = new THREE.Shape(shape.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
     outline.holes = shape.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
-    parts[kind].push(new THREE.ShapeGeometry(outline).rotateX(-Math.PI / 2).translate(0, height, 0));
+    const geometry = thickness ? new THREE.ExtrudeGeometry(outline, { depth: thickness, bevelEnabled: false }) : new THREE.ShapeGeometry(outline);
+    parts[kind].push(geometry.rotateX(-Math.PI / 2).translate(0, height, 0));
   };
   for (const shape of footprints) {
     flat(shape, floor + .045, feature.type === 'undergroundRoom' ? 'green' : 'floor');
@@ -71,6 +73,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       }
     }
   }
+  const roofOpenings: Shape[] = [];
   const routes = feature.points ? [feature.points, ...(feature.branches || [])] : [];
   for (const route of routes) for (let edge = 1; edge < route.length; edge++) {
     const a = route[edge - 1], b = route[edge], dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz), width = feature.width || 4;
@@ -115,8 +118,8 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     }
     if (lightwell) {
       segment(at(.1, -width / 4), at(length - .1, -width / 4), top - .05, .045, width / 2 - .25, 'skylights');
-      segment(at(.1, width / 4), at(length - .1, width / 4), top - .12, .08, width / 2, 'ceiling');
-    } else segment(at(.1), at(length - .1), top - .12, .08, width - .2, 'ceiling');
+      roofOpenings.push(passageFootprint([at(.1, -width / 4), at(length - .1, -width / 4)], width / 2 - .25));
+    }
     if (feature.type === 'tunnel') {
       // Orange guiding strip, suspended red service pipe and bright rectangular
       // ceiling panels are visible in _DSC8295 and the two exit-stair photos.
@@ -128,6 +131,13 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       // End high windows bring daylight into the photographed practice strip.
       for (const distance of [.12, length - .12]) segment(at(distance, -width / 2 + .25), at(distance, width / 2 - .25), top - 1.4, .95, .045, 'glass');
     }
+  }
+  if (feature.type !== 'undergroundRoom') {
+    // The full enclosure includes merged return passages and corner seams;
+    // only the photographed skylight footprint cuts through its opaque roof.
+    const polygons = footprints.map(shape => [shape.outer, ...shape.holes]);
+    const roofs = roofOpenings.length ? polygonClipping.difference(polygons, ...roofOpenings.map(shape => [shape.outer])) : polygons;
+    for (const [outer, ...holes] of roofs) flat({ outer, holes }, top - .12, 'ceiling', .08);
   }
   if (feature.type === 'undergroundRoom' && feature.outer) {
     const { at, width, length, along, across } = undergroundRoomFrame(feature), angle = -Math.atan2(across[1], across[0]);

@@ -3,6 +3,7 @@ import { passageFootprint, undergroundLayout } from './underground-geometry.ts';
 import { bridgeLayout } from './bridge-geometry.ts';
 import { garageRampFootprint } from './garage-ramp-geometry.ts';
 import { snapFootprint } from './building-geometry.ts';
+import { curvedStairTreads } from './structure-geometry.ts';
 import type { Campus, Feature, Shape } from './types';
 
 const polygon = (shape: Shape) => [shape.outer, ...shape.holes];
@@ -15,7 +16,11 @@ export function groundSurfaces(campus: Campus) {
   const undergroundVoids = shapes(snapFootprint([...undergroundLayout(campus.features).areas.values()]
     .filter(area => (area.feature.height ?? -3) < -.08 && (area.feature.height ?? -3) + (area.feature.wallHeight || 2.4) > .12)
     .flatMap(area => area.footprints).map(polygon)));
-  const entrances = campus.features.filter(feature => feature.type === 'garageEntrance' && feature.ramp && feature.points?.length === 2).map(garageRampFootprint);
+  const entrances = campus.features.flatMap(feature => {
+    if (feature.type === 'garageEntrance' && feature.ramp && feature.points?.length === 2) return [garageRampFootprint(feature)];
+    if (feature.type === 'tunnelEntrance' && feature.curvedStair) return curvedStairTreads(feature.curvedStair).map(tread => ({ outer: tread.ring, holes: [] }));
+    return [];
+  });
   const waters = campus.features.filter(feature => feature.type === 'water' && feature.outer);
   const waterMask = union(waters.map(featureShape));
   const roads = campus.features.filter(feature => feature.type === 'path' && feature.points && !feature.representedBy)
