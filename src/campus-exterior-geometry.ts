@@ -1,19 +1,37 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FACADE_COLORS } from './facade-geometry.ts';
-import { classroomGlazingGeometry } from './architecture-geometry.ts';
+import { architectureBar, classroomGlazingGeometry } from './architecture-geometry.ts';
 import { officeCurvedFacade, officeCurvedWindows } from './office-windows.ts';
 import type { Building, Point } from './types';
 
 export const OFFICE_ID = 'way/1233313430';
 export const LIBRARY_ID = 'way/855459419';
-export const EXTERIOR_COLORS = { glass: FACADE_COLORS.glass, frame: FACADE_COLORS.stone, accent: '#ad7961', darkFrame: '#354b50' };
+export const EXTERIOR_COLORS = { glass: FACADE_COLORS.glass, frame: FACADE_COLORS.stone, accent: '#ad7961', darkFrame: '#354b50', canopyGlass: '#b1c8bf', canopyFrame: '#c5cbc5' };
 type Kind = keyof typeof EXTERIOR_COLORS;
+
+export function libraryAnnexWindowsConfig(building: Building, floorHeight: number) {
+  const config = building.classroomWindows;
+  return config && { ...config, sill: .3, top: floorHeight - .35, transomFractions: [.5] };
+}
+
+// The marked door is at the south end of the curved annex. Projection and
+// member spacing are estimates from 34868811; no freestanding posts are seen.
+export function libraryEntranceLayout(building: Building, floorHeight: number) {
+  const a = building.outer[2], b = building.outer[3], length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const along: Point = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+  const area = building.outer.slice(1).reduce((sum, p, i) => sum + building.outer[i][0] * p[1] - p[0] * building.outer[i][1], 0);
+  const outward: Point = area > 0 ? [along[1], -along[0]] : [-along[1], along[0]];
+  const center: Point = [a[0] + along[0] * length * .62, a[1] + along[1] * length * .62];
+  const width = 4, depth = 2.3, wallHeight = .12 + floorHeight + .05;
+  const at = (u: number, v: number, y = wallHeight - .2 * v / depth) => new THREE.Vector3(center[0] + along[0] * u + outward[0] * v, y, center[1] + along[1] * u + outward[1] * v);
+  return { center, along, outward, width, depth, wallHeight, at };
+}
 
 // Observed brick panels and the deep west window reveals preserve the approved
 // footprint. Bay spacing is estimated; no unobserved entrance is added.
 export function campusExteriorGeometry(building: Building, floors: number, floorHeight: number, cutawayHeight?: number, annexFloors?: number) {
-  const parts: Record<Kind, THREE.BufferGeometry[]> = { glass: [], frame: [], accent: [], darkFrame: [] };
+  const parts: Record<Kind, THREE.BufferGeometry[]> = { glass: [], frame: [], accent: [], darkFrame: [], canopyGlass: [], canopyFrame: [] };
   const area = building.outer.slice(1).reduce((sum, p, i) => sum + building.outer[i][0] * p[1] - p[0] * building.outer[i][1], 0);
   const face = (edge: number) => {
     const a = building.outer[edge], b = building.outer[edge + 1];
@@ -95,6 +113,21 @@ export function campusExteriorGeometry(building: Building, floors: number, floor
           .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()))
           .translate(...from.add(to).multiplyScalar(.5).toArray()));
       }
+    }
+    const { width, depth, wallHeight, at } = libraryEntranceLayout(building, floorHeight), ceiling = .12 + (cutawayHeight ?? Infinity);
+    const corners = [at(-width / 2, .08), at(width / 2, .08), at(width / 2, depth), at(-width / 2, depth)];
+    if (corners.every(point => point.y <= ceiling)) {
+      const roof = new THREE.BufferGeometry().setFromPoints(corners);
+      roof.setIndex([0, 1, 2, 0, 2, 3]); roof.computeVertexNormals(); parts.canopyGlass.push(roof);
+    }
+    const member = (from: THREE.Vector3, to: THREE.Vector3, size = .065) => {
+      if (from.y <= ceiling && to.y <= ceiling) parts.canopyFrame.push(architectureBar(from.toArray(), to.toArray(), size));
+    };
+    for (let i = 0; i < corners.length; i++) member(corners[i], corners[(i + 1) % corners.length], .08);
+    for (let i = 1; i < 4; i++) member(at(-width / 2 + width * i / 4, .08), at(-width / 2 + width * i / 4, depth));
+    for (const u of [-width * .36, width * .36]) {
+      member(at(u, .06, wallHeight + .9), at(u, depth * .85), .035);
+      member(at(u, .06, wallHeight - .65), at(u, depth * .7, wallHeight - .2), .055);
     }
   }
   const merge = (list: THREE.BufferGeometry[]) => {

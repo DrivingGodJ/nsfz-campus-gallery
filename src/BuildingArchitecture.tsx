@@ -9,7 +9,7 @@ import { laboratoryLayout, laboratoryWindows } from './laboratory-geometry';
 import { cafeteriaLowerProfile, cafeteriaLowerWindowsConfig, cafeteriaUpperWindows, dormitoryProfile } from './facade-geometry';
 import { TEACHING_ID, teachingDetailGeometry } from './teaching-details';
 import { teachingClassroomFurniture } from './teaching-classroom-furniture';
-import { OFFICE_ID } from './campus-exterior-geometry';
+import { OFFICE_ID, LIBRARY_ID, libraryAnnexWindowsConfig } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
 import { STAND_OFFICE_ID, standOfficeWindows } from './stand-office-geometry';
 import type { Building, BuildingPart } from './types';
@@ -45,14 +45,16 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
       for (const geometry of Object.values(upper)) geometry.translate(0, boundary, 0);
       return { glass: architectureBatch([lower.glass, upper.glass], false), frames: architectureBatch([lower.frames, upper.frames], false) };
     }
-    return teachingWindowGeometry(building, sections, floorHeight, cutawayHeight);
+    return teachingWindowGeometry(building, building.id === LIBRARY_ID ? sections.filter(section => section.id !== 'curved-annex') : sections, floorHeight, cutawayHeight);
   }, [building, sections, floorHeight, cutawayHeight]);
+  const annexWindows = useMemo(() => building.id === LIBRARY_ID ? teachingWindowGeometry({ ...building, classroomWindows: libraryAnnexWindowsConfig(building, floorHeight) }, sections.filter(section => section.id === 'curved-annex'), floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
   const elevator = useMemo(() => teachingElevatorGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
   const teaching = useMemo(() => building.id === TEACHING_ID ? teachingDetailGeometry(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
   const furniture = useMemo(() => building.id === TEACHING_ID ? teachingClassroomFurniture(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
   useEffect(() => () => rails.dispose(), [rails]);
   useEffect(() => () => Object.values(stairs).forEach(geometry => geometry.dispose()), [stairs]);
   useEffect(() => () => Object.values(windows).forEach(geometry => geometry.dispose()), [windows]);
+  useEffect(() => () => { if (annexWindows) Object.values(annexWindows).forEach(geometry => geometry.dispose()); }, [annexWindows]);
   useEffect(() => () => Object.values(elevator).forEach(geometry => geometry.dispose()), [elevator]);
   useEffect(() => () => { if (teaching) Object.values(teaching).forEach(geometry => geometry.dispose()); }, [teaching]);
   useEffect(() => () => { if (furniture) Object.values(furniture).forEach(geometry => geometry.dispose()); }, [furniture]);
@@ -72,6 +74,10 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
       <mesh geometry={teaching.inlay} raycast={() => null}><meshStandardMaterial color={mapColor('#92a7a4')} roughness={1} /></mesh>
     </>}
     <mesh geometry={windows.glass} raycast={() => null}><meshStandardMaterial color={material('glass', '#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} forceSinglePass /></mesh>
+    {annexWindows && <>
+      <mesh geometry={annexWindows.glass} raycast={() => null}><meshStandardMaterial color={material('annexGlass', '#183d32')} roughness={.22} metalness={.15} transparent opacity={cutawayHeight === undefined ? .88 : .55} depthWrite={cutawayHeight === undefined} side={THREE.DoubleSide} forceSinglePass /></mesh>
+      <mesh geometry={annexWindows.frames} raycast={() => null}><meshStandardMaterial color={material('annexFrame', '#354b43')} roughness={.65} side={THREE.DoubleSide} /></mesh>
+    </>}
     <mesh geometry={elevator.glass} raycast={() => null}><meshStandardMaterial color={material('glass', '#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     <mesh geometry={elevator.doors} raycast={() => null}><meshStandardMaterial color={material('glass', ARCHITECTURE_COLORS.glass)} roughness={.35} transparent opacity={.3} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     <mesh geometry={stairs.concrete}><meshStandardMaterial color={material('trim', '#d7d2c3')} roughness={.95} /></mesh>

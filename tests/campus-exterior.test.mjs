@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
-import { campusExteriorGeometry, OFFICE_ID, LIBRARY_ID } from '../src/campus-exterior-geometry.ts';
+import { campusExteriorGeometry, libraryEntranceLayout, OFFICE_ID, LIBRARY_ID } from '../src/campus-exterior-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
 import { buildingGeometry } from '../src/building-geometry.ts';
 import { officeCurvedFacade, officeCurvedWindows, officeWindowLayout } from '../src/office-windows.ts';
@@ -24,12 +24,22 @@ test('observed office and library details stay attached to their approved faces 
         assert.equal(model.glass.getAttribute('position').count > 0, curvedWindows.length > 0,
           'Only the observed curved office panes belong to this layer; the ordinary panes retain their shared layout');
         assert.equal(model.frame.getAttribute('position').count > 0, id === LIBRARY_ID, 'Library diagonal braces remain without duplicate office strip frames');
-        for (const geometry of Object.values(model)) {
+        const entrance = id === LIBRARY_ID ? libraryEntranceLayout(building, floorHeight) : undefined;
+        for (const [kind, geometry] of Object.entries(model)) {
           const positions = geometry.getAttribute('position');
           for (let i = 0; i < positions.count; i++) {
             const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
             assert.ok(Number.isFinite(x + y + z));
             assert.ok(y <= .12 + Math.min(cutoff ?? Infinity, (id === LIBRARY_ID ? 3 : floors) * floorHeight + (curved && cutoff === undefined ? .9 : 0)) + .001, 'No detail restores a removed storey; only the photographed office end wall rises above its roof');
+            if (kind === 'canopyGlass' || kind === 'canopyFrame') {
+              assert.ok(entrance, 'Only the library has this photographed entrance canopy');
+              const dx = x - entrance.center[0], dz = z - entrance.center[1];
+              const station = dx * entrance.along[0] + dz * entrance.along[1], projection = dx * entrance.outward[0] + dz * entrance.outward[1];
+              assert.ok(Math.abs(station) <= entrance.width / 2 + .05 && projection >= .015 && projection <= entrance.depth + .05,
+                'The canopy projects from its marked doorway rather than relaxing the facade attachment limit');
+              assert.ok(y >= entrance.wallHeight - .7, 'Suspended canopy members cannot become ground columns');
+              continue;
+            }
             let distance = Infinity, outwardOffset = Infinity;
             for (let j = 1; j < building.outer.length; j++) {
               const [ax, az] = building.outer[j - 1], [bx, bz] = building.outer[j], dx = bx - ax, dz = bz - az;
@@ -49,6 +59,44 @@ test('observed office and library details stay attached to their approved faces 
     }
     assert.equal(JSON.stringify(building), before, 'Confirmed footprint and floor data are untouched');
   }
+});
+
+test('library entrance glass canopy projects outward above the south doorway without ground columns', () => {
+  const building = campus.buildings.find(building => building.id === LIBRARY_ID), before = JSON.stringify(building);
+  const a = building.outer[2], b = building.outer[3];
+  for (const floorHeight of [3.6, 4.2]) {
+    const entrance = libraryEntranceLayout(building, floorHeight);
+    assert.ok(entrance.center.every((value, axis) => Math.abs(value - (a[axis] + (b[axis] - a[axis]) * .62)) < 1e-8), 'The doorway stays on the marked half of the existing annex face');
+    for (const cutoff of [undefined, floorHeight, 2 * floorHeight]) {
+      const model = campusExteriorGeometry(building, 5, floorHeight, cutoff);
+      const glass = new THREE.Mesh(model.canopyGlass, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      glass.updateMatrixWorld();
+      try {
+        assert.equal(model.canopyGlass.getAttribute('position').count > 0, cutoff !== floorHeight, 'The first-floor cut omits roof glass above its ceiling');
+        if (cutoff !== floorHeight) {
+          const point = entrance.at(0, entrance.depth / 2, 30);
+          const hit = new THREE.Raycaster(point, new THREE.Vector3(0, -1, 0)).intersectObject(glass)[0];
+          assert.ok(hit && Math.abs(hit.point.y - (entrance.wallHeight - .1)) < 1e-4, 'The suspended glass roof slopes slightly toward its outer edge');
+          const roof = model.canopyGlass.getAttribute('position');
+          const outline = Array.from({ length: roof.count }, (_, i) => [roof.getX(i), roof.getZ(i)]);
+          // Use the four actual corner positions rather than the six duplicated triangle vertices.
+          const corners = [outline[0], outline[1], outline[2], outline[5], outline[0]];
+          assert.deepEqual(polygonClipping.intersection([corners], [building.outer]), [], 'The rain cover extends outside the wall instead of lying over the room');
+        }
+        for (const geometry of [model.canopyGlass, model.canopyFrame]) {
+          const positions = geometry.getAttribute('position');
+          for (let i = 0; i < positions.count; i++) {
+            assert.ok(positions.getY(i) >= entrance.wallHeight - .7, 'No support descends from the suspended canopy to the ground');
+            assert.ok(positions.getY(i) <= .12 + (cutoff ?? Infinity) + .001, 'A floor cut cannot leave canopy members floating above its ceiling');
+          }
+        }
+      } finally { glass.material.dispose(); Object.values(model).forEach(geometry => geometry.dispose()); }
+    }
+  }
+  const other = campusExteriorGeometry(campus.buildings.find(building => building.id === OFFICE_ID), 4, 3.6);
+  try { for (const kind of ['canopyGlass', 'canopyFrame']) assert.equal(other[kind].getAttribute('position').count, 0, 'Other buildings do not inherit the library canopy'); }
+  finally { Object.values(other).forEach(geometry => geometry.dispose()); }
+  assert.equal(JSON.stringify(building), before);
 });
 
 test('office curved top glazing and recessed lower band open the real body while retaining brick spandrels and existing front lights', () => {

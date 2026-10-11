@@ -4,6 +4,7 @@ import type { Building, Shape } from './types';
 export type BuildingColors = {
   body: string; trim?: string; roof?: string; frame?: string; glass?: string; rail?: string; brick?: string; metal?: string; base?: string;
   tierBlue?: string; tierRed?: string; tierGreen?: string; skylightFrame?: string; roofGlass?: string; court?: string; drum?: string; canopyUnderside?: string;
+  annexGlass?: string; annexFrame?: string; canopyGlass?: string;
 };
 
 // Each entry belongs to an identified building with a photo reference. Missing
@@ -13,8 +14,8 @@ export const BUILDING_COLOR_PROFILES: Readonly<Record<string, BuildingColors>> =
   'way/855459420': { body: '#e2ded3', trim: '#e2ded3', frame: '#c4c7bf', rail: '#168bbc', glass: '#95b8b9', roofGlass: '#95b8b9', skylightFrame: '#bfc3bf' },
   // Photos 252d968f-08a5-4ec9-9d27-c52017da3348, fbff44f9-92aa-4a4f-b4c4-d4401e30ff3c; brick only on the western curve.
   'way/1233313430': { body: '#e1ded4', trim: '#e1ded4', brick: '#a77962', frame: '#354b50', glass: '#94b9be' },
-  // Photos 6deb58ad-debc-4321-bdfb-d21c2d83fb97, 446107a7-73ac-4415-b8b1-41ad81f04330; grey curved-annex base.
-  'way/855459419': { body: '#b66d56', base: '#9b9c96', brick: '#b66d56', frame: '#e2e3da', trim: '#e0e0d7', metal: '#e2e3da', glass: '#aec2c0' },
+  // Photos 6deb58ad-debc-4321-bdfb-d21c2d83fb97, 446107a7-73ac-4415-b8b1-41ad81f04330; 34868811-15fa-4147-ac2e-f4e1278dc2f4 confirms green annex glass and the entry canopy.
+  'way/855459419': { body: '#b66d56', base: '#9b9c96', brick: '#b66d56', frame: '#e2e3da', trim: '#e0e0d7', metal: '#c5cbc5', glass: '#aec2c0', annexGlass: '#183d32', annexFrame: '#354b43', canopyGlass: '#b1c8bf' },
   // Photos af300476-2620-4026-a4b0-72f82d827f63, b3a57e0f-5806-43b8-b4ee-38336837f18d; roof excludes the pale observatory dome.
   'way/1233313434': { body: '#8a8e88', trim: '#d3d4c8', brick: '#b87c65', frame: '#263f3b', roof: '#4b5358', glass: '#849c94', rail: '#646d66', metal: '#adb7ae' },
   // Photos 622e02bd-0ee1-4841-98c7-6683a600f42e, 5fab16c1-c9f2-41fb-8609-74bd75117734.

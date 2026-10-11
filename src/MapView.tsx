@@ -29,7 +29,7 @@ import CampusExteriorDetails from './CampusExteriorDetails';
 import PhotoFacadeDetails from './PhotoFacadeDetails';
 import PhotoInteriorDetails from './PhotoInteriorDetails';
 import { PHOTO_INTERIOR_IDS } from './photo-interior-geometry';
-import { OFFICE_ID, LIBRARY_ID } from './campus-exterior-geometry';
+import { OFFICE_ID, LIBRARY_ID, libraryAnnexWindowsConfig } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
 import { STANDS_ID, THEATRE_ID, standsArchitecture } from './venue-geometry';
 import { STAND_OFFICE_ID, standOfficeOpenings } from './stand-office-geometry';
@@ -109,7 +109,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     if (building.facade?.type === 'dormitory') return dormitoryBodyGeometry(building, height, info.floorHeight, cutaway);
     return buildingGeometry(section, height, info.floorHeight, building.groundPassages,
       building.floorCorridors?.filter(corridor => corridor.partId === section.id),
-      building.stairwells?.filter(stair => stair.partId === section.id), building.classroomWindows,
+      building.stairwells?.filter(stair => stair.partId === section.id), building.id === LIBRARY_ID && section.id === 'curved-annex' ? libraryAnnexWindowsConfig(building, info.floorHeight) : building.classroomWindows,
       building.solidCores?.filter(core => core.partId === section.id),
       building.cutouts?.filter(cut => cut.partId === section.id), cutaway,
       building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight, info.floors) : building.id === STAND_OFFICE_ID ? standOfficeOpenings(building, height, info.floorHeight) : undefined);
