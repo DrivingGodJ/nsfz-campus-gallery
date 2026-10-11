@@ -29,6 +29,20 @@ const merge = (parts: THREE.BufferGeometry[]) => {
   parts.forEach(part => part.dispose()); return geometry;
 };
 
+// The same low, warm box lights are used in the grove and along the avenue.
+export const GARDEN_LAMP_COLORS = { metal: '#796e56', lamps: '#e3d4a2' };
+export function specimenLampParts(positions: Point[], base = BASE) {
+  const parts = { metal: [] as THREE.BufferGeometry[], lamps: [] as THREE.BufferGeometry[] };
+  const box = (key: keyof typeof parts, size: [number, number, number], position: [number, number, number]) =>
+    parts[key].push(new THREE.BoxGeometry(...size).translate(...position));
+  for (const [x, z] of positions) {
+    box('metal', [.38, .05, .38], [x, base + .5, z]); box('metal', [.38, .05, .38], [x, base + .025, z]);
+    box('lamps', [.32, .43, .32], [x, base + .26, z]);
+    for (const dx of [-.155, .155]) for (const dz of [-.155, .155]) box('metal', [.025, .47, .025], [x + dx, base + .26, z + dz]);
+  }
+  return parts;
+}
+
 export function specimenPaths() {
   return [...routes, ...loops].map((route, i) => new THREE.CatmullRomCurve3(route.map(([x, z]) => new THREE.Vector3(x, 0, z)), i >= routes.length, 'centripetal')
     .getSpacedPoints(route.length * 7).map(point => [point.x, point.z] as Point));
@@ -83,11 +97,8 @@ export function specimenGroveGeometry(feature: Feature) {
       parts[key].push(new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2).translate(0, y, 0));
     }
   }
-  for (const [x, z] of lamps) {
-    box('metal', [.38, .05, .38], [x, BASE + .5, z]); box('metal', [.38, .05, .38], [x, BASE + .025, z]);
-    box('lamps', [.32, .43, .32], [x, BASE + .26, z]);
-    for (const dx of [-.155, .155]) for (const dz of [-.155, .155]) box('metal', [.025, .47, .025], [x + dx, BASE + .26, z + dz]);
-  }
+  const lights = specimenLampParts(lamps);
+  parts.metal.push(...lights.metal); parts.lamps.push(...lights.lamps);
   // DSC06142 and the marked row: three bars share a line in the clearing east of the grove.
   const barScale = 1.15;
   for (let i = 0; i < 3; i++) {

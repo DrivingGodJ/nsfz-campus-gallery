@@ -14,6 +14,7 @@ import { isUndergroundFeature, isUndergroundPhoto } from './map-level-mode';
 import SportsGround from './SportsGround';
 import Forest, { Trees } from './Forest';
 import RiverLandscape from './RiverLandscape';
+import AvenueGarden from './AvenueGarden';
 import BoundaryWaterGarden from './BoundaryWaterGarden';
 import HistoryPavilion from './HistoryPavilion';
 import BoundaryHouse from './BoundaryHouse';
@@ -327,6 +328,7 @@ export default function MapView(props: Props) {
         <Line points={campus.boundary.map(([x, z]) => [x, .2, z])} color={mapColor('#97a188')} lineWidth={1.5} />
         {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
         <RiverLandscape features={campus.features} buildings={campus.buildings} />
+        <AvenueGarden features={campus.features} buildings={campus.buildings} />
         </MapModelLayer>
         <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground mode={sceneMode} photoPerspective={viewingPhoto || !!props.photoPreview} labelPortal={labelPortal} />
         <MapModelLayer underground={undergroundView}><FeatureTargets campus={campus} site={site} underground={false} labelPortal={labelPortal} /></MapModelLayer>

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { Feature } from './types';
 import { LocationHtml, LocationName } from './LocationSelection';
 import { palmCrownGeometry, treeInstances, treeTrunkGeometry } from './tree-geometry';
-import { specimenGroveGeometry, specimenTrees } from './specimen-grove';
+import { GARDEN_LAMP_COLORS, specimenGroveGeometry, specimenTrees } from './specimen-grove';
 
 function TreeBatch({ trees, columnar = false, palm = false, openCanopy = false }: { trees: Feature['trees']; columnar?: boolean; palm?: boolean; openCanopy?: boolean }) {
   const mapColor = useMapColor();
@@ -58,7 +58,7 @@ function SpecimenDetails({ feature }: { feature: Feature }) {
   const geometry = useMemo(() => specimenGroveGeometry(feature), [feature]);
   useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
   const lit = time === 'night' || time === 'dusk' || (!time && theme === 'dark');
-  const colors = { paths: '#b4a286', edging: '#d7d2c3', stone: '#b7b09a', metal: '#796e56', fitness: '#507b66', lattice: '#ad6e45', plants: '#718b66', lamps: '#e3d4a2' };
+  const colors = { paths: '#b4a286', edging: '#d7d2c3', stone: '#b7b09a', fitness: '#507b66', lattice: '#ad6e45', plants: '#718b66', ...GARDEN_LAMP_COLORS };
   return <group>{(Object.keys(colors) as (keyof typeof colors)[]).map(key => <mesh key={key} geometry={geometry[key]} raycast={() => null}>
     <meshStandardMaterial color={mapColor(colors[key])} roughness={.95} side={THREE.DoubleSide}
       emissive={key === 'lamps' && lit ? '#eab45d' : '#000000'} emissiveIntensity={key === 'lamps' && lit ? .85 : 0} />
