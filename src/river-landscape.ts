@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { passageFootprint } from './underground-geometry.ts';
+import { snapFootprint } from './building-geometry.ts';
 import type { Feature, Point, Shape } from './types';
 
 export const RIVER_IDS = ['way/1277839749', 'way/1277839748', 'local/lake-water-link'];
@@ -12,6 +13,17 @@ const BASE = .12;
 export const riverBenches: { center: Point; angle: number }[] = [
   { center: [68.65, 7.5], angle: 0 }, { center: [68.65, 11.2], angle: 0 },
   { center: [111.5, -.016], angle: Math.atan2(5.532578693011172, 41.98277460853406) },
+];
+export const riverGardenPaths: Point[][] = [
+  [[57.7, 30.3], [61.2, 24.6], [63.4, 18.1], [67, 12.6], [72, 9.1], [77.7, 6.7]],
+  [[66.1, 16.1], [70.2, 14.2], [74.7, 14.3], [79.4, 14.4]],
+  // DSC08084: the office-bank path bends along the narrowed river, then
+  // rejoins the approach of the smaller arched bridge.
+  [[82.852, 7.65], [85.2, 7.57], [87.45, 7.82], [89.37, 9.12],
+    [90.51, 10.26], [92.21, 9.72], [93.52, 9.85], [95.41, 11.19],
+    [97.77, 11.97], [100.24, 12.55], [102.87, 12.85], [105.16, 12.12],
+    [107.89, 10.8], [110.71, 8.61], [112.82, 7.4], [115.65, 5.81],
+    [118.59, 4.56], [120.42, 3.44], [122.87, 2.35], [124.87305168546537, 1.769979903731921]],
 ];
 const inside = (point: Point, ring: Point[]) => {
   let hit = false;
@@ -33,8 +45,8 @@ export function riverWaterFootprints(features: Feature[]): Shape[] {
   const [first, ...rest] = waters.map(feature => [feature.outer!, ...(feature.holes ?? [])]);
   return polygonClipping.union(first, ...rest).map(polygon => ({ outer: polygon[0], holes: polygon.slice(1) }));
 }
-// The OSM water outlines are retained. Join them before tracing banks so the
-// small water link never gains a false stone dam at its internal seam.
+// Join the calibrated river outlines before tracing banks so the small water
+// link never gains a false stone dam at its internal seam.
 export function riverBankSamples(features: Feature[], spacing = 1.35) {
   const samples: { position: Point; normal: Point; distance: number }[] = [];
   for (const footprint of riverWaterFootprints(features)) {
@@ -90,16 +102,12 @@ export function riverLandscapeGeometry(features: Feature[], buildings: Shape[] =
   }
   // Small garden paths and the seats surrounding the old tree are visible in
   // _DSC2471 / _DSC1493; only this photographed northern bank gets furniture.
-  const gardenPaths: Point[][] = [
-    [[57.7, 30.3], [61.2, 24.6], [63.4, 18.1], [67, 12.6], [72, 9.1], [77.7, 6.7]],
-    [[66.1, 16.1], [70.2, 14.2], [74.7, 14.3], [79.4, 14.4]],
-    [[91, 10.9], [99.2, 9.8], [109.6, 7.6], [119.3, 5.5]],
-  ];
-  const excluded = [...waters, ...buildings, ...roads].map(shape => [shape.outer, ...shape.holes]);
-  for (const route of gardenPaths) {
+  const excluded = snapFootprint([...waters, ...buildings, ...roads].map(shape => [shape.outer, ...shape.holes]));
+  for (const route of riverGardenPaths) {
     const points = new THREE.CatmullRomCurve3(route.map(([x,z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal').getSpacedPoints(route.length * 5).map(p => [p.x,p.z] as Point);
     const footprint = passageFootprint(points, 1.2);
-    for (const polygon of polygonClipping.difference([footprint.outer], ...excluded)) {
+    // Shared path endpoints need the same precision as their road masks.
+    for (const polygon of polygonClipping.difference(snapFootprint([[footprint.outer]]), ...excluded)) {
       const shape = new THREE.Shape(polygon[0].map(([x,z]) => new THREE.Vector2(x,-z))); shape.holes = polygon.slice(1).map(ring => new THREE.Path(ring.map(([x,z]) => new THREE.Vector2(x,-z))));
       parts.paths.push(new THREE.ShapeGeometry(shape).rotateX(-Math.PI/2).translate(0,.126,0));
     }
