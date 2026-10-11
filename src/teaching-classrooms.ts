@@ -78,7 +78,17 @@ export function classroomWallFootprint(core: MultiPolygon, thickness: number, st
   return polygonClipping.intersection(core, stabilize(polygonClipping.union(walls[0], ...walls.slice(1))));
 }
 
-export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = [], openEdges: { from: Point; to: Point }[] = []): ClassroomWindow[] {
+export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = [], openEdges: { from: Point; to: Point }[] = [], groundRecesses: polygonClipping.Polygon[] = []): ClassroomWindow[] {
+  if (groundRecesses.length) {
+    // A road-side classroom keeps ordinary windows on its recessed first-floor
+    // wall; upper floors retain the original facade and window stations.
+    const groundCore = polygonClipping.difference(core, groundRecesses[0], ...groundRecesses.slice(1));
+    return [
+      ...classroomWindowLayout(core, { ...config, startFloor: Math.max(2, config.startFloor ?? 1) }, height, floorHeight, groundOpenings, solidCores, openEdges),
+      ...classroomWindowLayout(groundCore, { ...config, endFloor: Math.min(1, config.endFloor ?? 1) }, Math.min(height, floorHeight), floorHeight,
+        groundOpenings.filter(opening => !groundRecesses.includes(opening)), solidCores, openEdges),
+    ];
+  }
   const result: ClassroomWindow[] = [];
   const facadeEdges = config.facadeLines?.flatMap(points => points.slice(1).map((to, i) => ({ from: points[i], to })));
   if (facadeEdges && !facadeEdges.length) return result;

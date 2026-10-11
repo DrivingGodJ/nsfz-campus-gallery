@@ -154,8 +154,9 @@ export function teachingWindowGeometry(building: Building, sections: Section[], 
     const stairs = (building.stairwells || []).filter(stair => stair.partId === section.id);
     const core = buildingCoreFootprint(section, building.groundPassages || [], (building.floorCorridors || []).filter(corridor => corridor.partId === section.id), stairs, solids, (building.cutouts || []).filter(cut => cut.partId === section.id));
     const groundOpenings = (building.groundPassages || []).map(passage => { const shape = passageShape(passage); return [shape.outer, ...shape.holes]; });
+    const groundRecesses = groundOpenings.filter((_, i) => building.groundPassages![i].recessClassrooms);
     const windowExclusions = [...solids.map(core => [core.outer, ...core.holes]), ...stairs.filter(stair => stair.internal).map(stair => [stair.opening.outer, ...stair.opening.holes])];
-    windows.push(...classroomWindowLayout(core, config, height, floorHeight, groundOpenings, windowExclusions));
+    windows.push(...classroomWindowLayout(core, config, height, floorHeight, groundOpenings, windowExclusions, [], groundRecesses));
     windows.push(...solidCoreWindowLayout(solids, height, floorHeight));
   }
   return classroomGlazingGeometry(windows, config);

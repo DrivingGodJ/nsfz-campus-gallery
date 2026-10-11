@@ -156,8 +156,14 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     const shape = passageShape(passage);
     return [shape.outer, ...shape.holes];
   });
+  const groundRecesses = passageCuts.filter((_, i) => passages[i].recessClassrooms);
+  const groundCore = groundRecesses.length ? polygonClipping.difference(core, groundRecesses[0], ...groundRecesses.slice(1)) : undefined;
+  const groundClassrooms = groundCore && (windows || cutaway
+    ? snapFootprint(classroomWallFootprint(groundCore, windows?.wallThickness ?? .25, snapFootprint)) : groundCore);
+  const groundWalls = groundClassrooms && (elevatorSeams.length
+    ? polygonClipping.difference(groundClassrooms, elevatorSeams[0], ...elevatorSeams.slice(1)) : groundClassrooms);
   const windowExclusions = [...solids, ...stairs.filter(stair => stair.internal).map(stair => [stair.opening.outer, ...stair.opening.holes])];
-  const glazing = [...(windows ? windowLayout ?? classroomWindowLayout(core, windows, height, floorHeight, passageCuts, windowExclusions) : []),
+  const glazing = [...(windows ? windowLayout ?? classroomWindowLayout(core, windows, height, floorHeight, passageCuts, windowExclusions, [], groundRecesses) : []),
     ...solidCoreWindowLayout(solidCores, height, floorHeight)];
   const slabThickness = Math.min(CORRIDOR_SLAB_THICKNESS, floorHeight * .1, height * .1);
   const slabs = [[0, slabThickness], ...(!cutaway ? [[height - slabThickness, height]] : [])];
@@ -172,7 +178,7 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     // Upper-storey rooms leave the entrance beneath them open.
     const activeSolids = solids.flatMap((solid, index) => solidCores[index].elevator || middle < solidStarts[index] ? [] :
       solidCores[index].classroomWindows || cutaway && middle >= cutawayBottom ? coreShells[index] : [solid]);
-    const storeyWalls = cutawayWalls && middle >= cutawayBottom ? cutawayWalls : walls;
+    const storeyWalls = middle < floorHeight && groundWalls ? groundWalls : cutawayWalls && middle >= cutawayBottom ? cutawayWalls : walls;
     let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(storeyWalls, activeSolids[0], ...activeSolids.slice(1)) : storeyWalls;
     const openWindows = !slab && snapFootprint(glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut));
     if (openWindows && openWindows.length) footprint = polygonClipping.difference(footprint, openWindows[0], ...openWindows.slice(1));

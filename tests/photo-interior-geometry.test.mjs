@@ -78,10 +78,13 @@ test('telescope is an open optical truss on floor six and dining rows leave the 
     assert.ok(Math.abs(table.center[0]+59.5)>2);
     for(const column of columns)assert.equal(area(polygonClipping.intersection(polygon(table.shape),polygon(column.shape))),0,'Chair envelopes do not collide with round columns');
   }
-  const photo=site.photos.find(p=>p.id==='719592c1-5539-42c7-b21a-7d9492d273b0'), direction=[Math.sin(photo.heading*Math.PI/180),-Math.cos(photo.heading*Math.PI/180)];
+  // Furniture has fixed surveyed anchors; later review-camera edits do not
+  // relocate the photographed window bay or its original clear standing point.
+  const reference={position:{x:-46.10852749816313,z:98.22720571579251},heading:76.6788008101712};
+  const direction=[Math.sin(reference.heading*Math.PI/180),-Math.cos(reference.heading*Math.PI/180)];
   assert.equal(tables.filter(p=>p.id.startsWith('dining-window-bay')).length,3);
-  assert.ok(tables.some(p=>{const dx=p.center[0]-photo.position.x,dz=p.center[1]-photo.position.z,front=dx*direction[0]+dz*direction[1];return front>2&&front<5&&Math.abs(dx*direction[1]-dz*direction[0])<1;}),'A table lies in the photographed near window bay, not only behind the camera');
-  assert.ok(tables.every(p=>!pointOnStairTread([photo.position.x,photo.position.z],p.shape.outer)),'The shooting position stays clear');
+  assert.ok(tables.some(p=>{const dx=p.center[0]-reference.position.x,dz=p.center[1]-reference.position.z,front=dx*direction[0]+dz*direction[1];return front>2&&front<5&&Math.abs(dx*direction[1]-dz*direction[0])<1;}),'A table lies in the photographed near window bay, not only behind the original survey camera');
+  assert.ok(tables.every(p=>!pointOnStairTread([reference.position.x,reference.position.z],p.shape.outer)),'The original surveyed shooting position stays clear');
   const first=photoInteriorGeometry(buildings[1],21.6,3.6),repeat=photoInteriorGeometry(buildings[1],21.6,3.6);
   assert.ok(first.find(p=>p.kind==='dark').geometry.attributes.position.array.some((n,i)=>i%3===1&&n>22.5),'The tall reflector rises into the existing observatory dome, above the former generic lid');
   assert.deepEqual(first.map(x=>Array.from(x.geometry.attributes.position.array)),repeat.map(x=>Array.from(x.geometry.attributes.position.array)),'Model anchors are deterministic and independent of a live photo view');

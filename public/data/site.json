@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 762,
+  "revision": 768,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -1980,8 +1980,8 @@
         "z": 0.008901239040977393
       },
       "placed": true,
-      "heading": 255.1204330810649,
-      "pitch": 1.6900295477827267,
+      "heading": 254.8662406707465,
+      "pitch": 1.560535301016831,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 3435927,
@@ -2021,12 +2021,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": 27.482089516872087,
-        "z": -107.90782704709198
+        "x": 27.06815298252237,
+        "z": -107.95049284125574
       },
       "placed": true,
-      "heading": 212.1080983463395,
-      "pitch": 14.154635419186276,
+      "heading": 210.35651246933264,
+      "pitch": 19.88768587270346,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 3094253,
@@ -2041,7 +2041,7 @@
       "author": "DrivingGodJ",
       "copyright": "DGJ",
       "depthUpdatedAt": "96983794-5cb5-43a7-a538-a52fc937081e",
-      "cameraHeight": 1.0000000000000018
+      "cameraHeight": 0.6000000000000041
     },
     {
       "id": "aa553764-213d-4716-b3ad-545c60589bf8",
@@ -2111,12 +2111,12 @@
       "floor": 2,
       "captureType": "ground",
       "position": {
-        "x": -46.10852749816313,
-        "z": 98.22720571579251
+        "x": -50.494413857824334,
+        "z": 100.22099167785368
       },
       "placed": true,
-      "heading": 76.6788008101712,
-      "pitch": 5.549820029700418,
+      "heading": 74.66879745760605,
+      "pitch": -0.2992998318653427,
       "width": 7008,
       "height": 2982,
       "downloadBytes": 2791124,
@@ -2130,7 +2130,8 @@
       "locationId": "way/1233313431",
       "author": "DrivingGodJ",
       "copyright": "DGJ",
-      "depthUpdatedAt": "5a3ba781-2a02-4340-9e7d-db418a89af57"
+      "depthUpdatedAt": "5a3ba781-2a02-4340-9e7d-db418a89af57",
+      "cameraHeight": 1.899999999999999
     },
     {
       "id": "0441ecc7-6b59-42b9-b9d1-f929f93c2f0e",
@@ -2155,12 +2156,12 @@
       "floor": 3,
       "captureType": "ground",
       "position": {
-        "x": 121.4,
-        "z": 59
+        "x": 102.681949647917,
+        "z": 62.20838085815314
       },
       "placed": true,
-      "heading": 168.39609077556554,
-      "pitch": -24.947860724186135,
+      "heading": 169.6539827661278,
+      "pitch": -25.84512993022795,
       "width": 4672,
       "height": 4672,
       "downloadBytes": 3298968,

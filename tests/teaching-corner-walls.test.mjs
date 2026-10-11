@@ -39,16 +39,21 @@ function insideRing(x, z, ring) {
   return inside;
 }
 const insideArea = (x, z, area) => area.some(([outer, ...holes]) => insideRing(x, z, outer) && !holes.some(hole => insideRing(x, z, hole)));
-function crossing(from, to, height) {
+function crossing(from, to, height, fraction = .5) {
   const a = new THREE.Vector3(from[0], height, from[1]), b = new THREE.Vector3(to[0], height, to[1]);
   const along = b.clone().sub(a).normalize(), normal = new THREE.Vector3(-along.z, 0, along.x);
-  return new THREE.Raycaster(a.lerp(b, .5).addScaledVector(normal, -.45), normal, 0, .9);
+  return new THREE.Raycaster(a.lerp(b, fraction).addScaledVector(normal, -.45), normal, 0, .9);
 }
 
-test('the southwest room stays open below its original upper-floor shell while the teaching-wing end has its normal first-floor window wall', () => {
+test('the southwest room is one complete four-sided upper-floor enclosure while the first-floor road stays open beneath it', () => {
   assert.ok(room, 'The southwest classroom is selected independently of the northwest glazed room');
   assert.equal(room.startFloor, 2);
-  assert.deepEqual(room.openEdges, [1], 'Only the marked short wall beside the stairs is removed');
+  assert.deepEqual(room.outer, [
+    [89.47396089486412, 52.82109838093125], [100.96166897858963, 50.99788471690141],
+    [102.30248107746476, 59.1987892872771], [90.89710903849797, 61.06346443489119],
+    [89.47396089486412, 52.82109838093125],
+  ], 'The whole marked room has four sides without the former projecting north notch');
+  assert.equal(room.openEdges, undefined, 'The corrected whole room has no missing enclosure edge');
   assert.equal(room.door, undefined, 'The unsupported new doorway is removed');
   assert.deepEqual(room.classroomWindows, building.classroomWindows, 'The room uses its existing ordinary classroom window calibration');
   const original = JSON.stringify(building), meshes = bodies();
@@ -60,19 +65,13 @@ test('the southwest room stays open below its original upper-floor shell while t
     for (let edge = 0; edge < room.outer.length - 1; edge++) {
       const ground = crossing(room.outer[edge], room.outer[edge + 1], BASE + 1.6);
       assert.equal(ground.intersectObjects(meshes).length, 0, `The former room wall is absent on floor one, edge ${edge}`);
-      if (edge === 5) {
-        assert.ok(ground.intersectObject(glass).length, 'The normal first-floor teaching-wing end retains its existing window');
-        ground.ray.origin.y = BASE + .6;
-        assert.ok(ground.intersectObjects(meshes).length, 'The first-floor end has normal sill masonry beneath the existing window');
-      } else assert.equal(ground.intersectObjects([glass, frames]).length, 0, `No upper-room glazing descends into floor one, edge ${edge}`);
+      assert.equal(ground.intersectObjects([glass, frames]).length, 0, `No upper-room glazing descends into floor one or its road, edge ${edge}`);
     }
     assert.ok(windows.length >= 16 && windows.every(window => window.bottom >= info.floorHeight));
     for (let floor = 2; floor <= main.floors; floor++) {
-      for (const fraction of [.15, .5, .85]) for (const rise of [.65, 1.6, 3]) {
-        const a = room.outer[1], b = room.outer[2], center = [a[0] + (b[0] - a[0]) * fraction, a[1] + (b[1] - a[1]) * fraction];
-        const normal = [.9874333222610671, -.15803617968197048], y = BASE + (floor - 1) * info.floorHeight + rise;
-        const ray = new THREE.Raycaster(new THREE.Vector3(center[0] - normal[0] * .2, y, center[1] - normal[1] * .2), new THREE.Vector3(normal[0], 0, normal[1]), 0, .6);
-        assert.equal(ray.intersectObjects([...meshes, glass, frames]).length, 0, `The marked short wall and any glazing are absent across floor ${floor}`);
+      for (let edge = 0; edge < room.outer.length - 1; edge++) for (const fraction of [.15, .5, .85]) {
+        const ray = crossing(room.outer[edge], room.outer[edge + 1], BASE + (floor - 1) * info.floorHeight + .65, fraction);
+        assert.ok(ray.intersectObjects(meshes).length, `Floor ${floor} has real sill masonry along room edge ${edge}, t=${fraction}`);
       }
       const floorWindows = windows.filter(window => window.bottom > (floor - 1) * info.floorHeight && window.top < floor * info.floorHeight);
       assert.ok(floorWindows.length >= 4, `The original window faces remain on floor ${floor}`);
@@ -92,6 +91,31 @@ test('the southwest room stays open below its original upper-floor shell while t
       } finally { dispose(cut); }
     }
     assert.equal(JSON.stringify(building), original, 'Geometry generation preserves the saved campus data');
+  } finally { dispose(meshes); dispose([glass, frames]); }
+});
+
+test('the removed north projection has no residual masonry, glazing or frames above or below the room', () => {
+  const removed = [
+    [[99.92485154138201, 51.162437968502516], [99.60415634131584, 49.158687134536734]],
+    [[99.60415634131584, 49.158687134536734], [100.63406591920378, 48.9941427837548]],
+    [[100.63406591920378, 48.9941427837548], room.outer[1]],
+  ];
+  const meshes = bodies(), glazing = teachingWindowGeometry(building, info.sections, info.floorHeight);
+  const glass = mesh(glazing.glass), frames = mesh(glazing.frames);
+  try {
+    for (let floor = 1; floor <= main.floors; floor++) for (const [edge, [a, b]] of removed.entries()) {
+      for (const fraction of [.15, .5, .85]) for (const rise of [.65, 1.6, 3]) {
+        const ray = crossing(a, b, BASE + (floor - 1) * info.floorHeight + rise, fraction);
+        assert.equal(ray.intersectObjects([...meshes, glass, frames]).length, 0,
+          `The old north projection is clear on floor ${floor}, edge ${edge}, t=${fraction}, height ${rise}`);
+      }
+      const platform = new THREE.Vector3((a[0] + b[0]) / 2, BASE + (floor - 1) * info.floorHeight + .9, (a[1] + b[1]) / 2);
+      const along = new THREE.Vector3(b[0] - a[0], 0, b[1] - a[1]).normalize();
+      platform.addScaledVector(new THREE.Vector3(-along.z, 0, along.x), .12);
+      const hit = new THREE.Raycaster(platform, new THREE.Vector3(0, -1, 0), 0, 1).intersectObjects(meshes)[0];
+      assert.ok(hit && Math.abs(hit.point.y - (BASE + (floor - 1) * info.floorHeight + .25)) < 1e-4,
+        `Removing the old projection walls keeps the corridor floor ${floor}, edge ${edge}`);
+    }
   } finally { dispose(meshes); dispose([glass, frames]); }
 });
 

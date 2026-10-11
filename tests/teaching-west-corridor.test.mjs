@@ -92,7 +92,7 @@ test('the marked blue guard follows the straight boundaries and room facade whil
     const edge = corridor.railEdges[0];
     const room = building.solidCores.find(core => core.partId === main.id && Math.abs(core.outer[0][0] - 89.47396089486412) < 1e-6);
     assert.deepEqual(edge[0], west.outer[4], 'The west guard begins at the new small-room south-west corner');
-    assert.deepEqual(edge.at(-1), room.outer[3], 'The south return joins the actual corner-room east facade');
+    assert.deepEqual(edge.at(-1), room.outer[1], 'The south return joins the complete corner-room north-east corner');
     for (let i = 0; i < edge.length - 1; i++) {
       const { a, b, normal } = segment(edge[i], edge[i + 1]);
       const center = a.clone().lerp(b, .5).addScaledVector(normal, .09);
