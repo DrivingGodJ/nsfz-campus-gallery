@@ -42,7 +42,8 @@ export function libraryAnnexLayout(library: Shape) {
 }
 
 export function wisteriaArchitecture(feature: Feature, library: Shape) {
-  const layout = pergolaLayout(feature), { base, height, terminal, corridor } = layout;
+  const annex = libraryAnnexLayout(library);
+  const layout = pergolaLayout(feature, annex.roof), { base, height, terminal, corridor } = layout;
   const route = feature.points!, width = feature.width || 2.4;
   const structure: THREE.BufferGeometry[] = [], posts: THREE.BufferGeometry[] = [], details: THREE.BufferGeometry[] = [];
   const arches: THREE.BufferGeometry[] = [], canopy: THREE.BufferGeometry[] = [];
@@ -113,7 +114,7 @@ export function wisteriaArchitecture(feature: Feature, library: Shape) {
       const p = half.at(i / 3, .14); structure.push(beam([p[0], height, p[1]], [p[0], height + .65, p[1]], .06));
     }
   }
-  const annex = libraryAnnexLayout(library), roomFloor = base + .24;
+  const roomFloor = base + .24;
   const room = merged([slab(annex.footprint, roomFloor, height - .24)], true);
   const roof = merged([slab(annex.roof, height - .24, height)]);
   const steps: THREE.BufferGeometry[] = [];

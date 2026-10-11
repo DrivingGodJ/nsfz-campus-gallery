@@ -114,17 +114,18 @@ test('the smaller pavilion has an open interior and curved roof, and the simple 
   } finally { roof.geometry.dispose(); material.dispose(); }
   const pergolaPlan = pergolaLayout(pergola), footprint = pergolaPlan.footprint.map(polygon);
   const library = campus.buildings.find(b => b.id === 'way/855459419');
+  const annex = libraryAnnexLayout(library);
   assert.ok(pergola.connectedTo.includes(library.id));
-  assert.equal(clip.union(footprint, polygon(library)).length, 1, 'The corridor starts flush against the library wall');
+  assert.equal(clip.union(footprint, polygon(annex.footprint), polygon(library)).length, 1, 'The corridor starts flush against the warehouse that joins the library');
   for (const building of campus.buildings) assert.ok(area(clip.intersection(footprint, polygon(building))) < 1e-7, 'The connected corridor does not intrude into the library');
   for (const water of campus.features.filter(f => f.type === 'water')) assert.ok(area(clip.intersection(footprint, polygon(water))) < 1e-7);
   assert.equal(clip.union(footprint).length, 1, 'Curved corridor joins both half-circle end platforms');
   assert.equal(pergolaPlan.height - pergolaPlan.base, pergola.pergola.floors * pergola.pergola.floorHeight, 'Building height comes from its storey height');
-  const wall = library.outer.slice(13, 15), start = pergola.points[0];
-  const wallCross = (start[0] - wall[0][0]) * (wall[1][1] - wall[0][1]) - (start[1] - wall[0][1]) * (wall[1][0] - wall[0][0]);
-  assert.ok(Math.abs(wallCross) < 1e-7, 'Connection is on the marked back face');
-  const [a, b] = wall, startDistance = Math.hypot(start[0] - a[0], start[1] - a[1]);
-  assert.ok(startDistance > 0 && startDistance < Math.hypot(b[0] - a[0], b[1] - a[1]));
+  const [start, next] = pergola.points, door = annex.at(annex.u0, (annex.doorStart + annex.doorEnd) / 2);
+  assert.ok(Math.hypot(start[0] - door[0], start[1] - door[1]) < 1e-7, 'The walkway ends at the center of the straight shutter');
+  const approach = next.map((v, i) => v - start[i]), approachLength = Math.hypot(...approach);
+  assert.ok(Math.abs(approach[0] * annex.out[0] + approach[1] * annex.out[1]) < 1e-7, 'The short entrance segment meets the shutter squarely');
+  assert.ok(approachLength > .5 && approach[0] * annex.along[0] + approach[1] * annex.along[1] < 0, 'The approach leaves the warehouse instead of turning into the room');
   const hub = pergola.pergola.hub, middle = pergola.points[Math.floor(pergola.points.length / 2)];
   const bend = (hub[0] - start[0]) * (middle[1] - start[1]) - (hub[1] - start[1]) * (middle[0] - start[0]);
   assert.ok(bend > 0, 'The curve bows to the marked left side of the library, not toward the lake');
@@ -185,7 +186,13 @@ test('wisteria walkway stays open and its long library-side annex has a straight
     assert.deepEqual(annex.footprint.outer.slice(0, 3), library.outer.slice(11, 14).reverse(), 'The strip spans both segments of the marked side wall');
     for (const water of campus.features.filter(f => f.type === 'water')) assert.ok(area(clip.intersection(polygon(annex.roof), polygon(water))) < 1e-7);
     assert.ok(area(clip.intersection(polygon(annex.footprint), layout.footprint.map(polygon))) < 1e-7, 'The relocated annex leaves the curved walking route clear');
+    const connectedRoof = pergolaLayout(pergola, annex.roof);
+    assert.ok(area(clip.intersection(connectedRoof.corridor.map(polygon), polygon(annex.roof))) < 1e-7, 'The connected roof overhang is not drawn twice');
+    assert.equal(clip.union(connectedRoof.corridor.map(polygon), polygon(annex.roof)).length, 1, 'The white corridor roof meets the warehouse roof without a gap');
     const doorCenter = (annex.doorStart + annex.doorEnd) / 2;
+    const doorwayRoof = annex.at(annex.u0 - .06, doorCenter), outsideRoof = annex.at(annex.u0 - .2, doorCenter);
+    assert.equal(new THREE.Raycaster(new THREE.Vector3(doorwayRoof[0], layout.height + 1, doorwayRoof[1]), down, 0, 2).intersectObject(meshes.canopy).length, 0, 'The warehouse alone owns the roof above its doorway');
+    assert.ok(new THREE.Raycaster(new THREE.Vector3(outsideRoof[0], layout.height + 1, outsideRoof[1]), down, 0, 2).intersectObject(meshes.canopy).length, 'The corridor roof continues immediately outside the warehouse eave');
     for (let step = 0; step < 3; step++) {
       const p = annex.at(annex.u0 - .3 * (2.5 - step), doorCenter);
       const hit = new THREE.Raycaster(new THREE.Vector3(p[0], 1, p[1]), down, 0, 2).intersectObject(meshes.steps)[0];
@@ -193,6 +200,9 @@ test('wisteria walkway stays open and its long library-side annex has a straight
     }
     const outside = annex.at(annex.u0 - 1, doorCenter), towardDoor = vector(annex.at(annex.u0, doorCenter)).sub(vector(outside)).normalize();
     assert.ok(new THREE.Raycaster(new THREE.Vector3(outside[0], 1.6, outside[1]), towardDoor, 0, 2).intersectObject(meshes.door).length, 'The closed louver door faces the stepped approach');
+    const entrance = annex.at(annex.u0 - 2, doorCenter);
+    const enter = new THREE.Raycaster(new THREE.Vector3(entrance[0], layout.base + .24 + 1.6, entrance[1]), towardDoor, 0, 2);
+    for (const key of ['posts', 'arches', 'end', 'beams', 'details']) assert.equal(enter.intersectObject(meshes[key]).length, 0, 'Posts, fascia and shutter frames leave the direct stepped entrance clear');
     const positions = model.door.getAttribute('position');
     const frontU = Array.from({ length: positions.count }, (_, i) => (positions.getX(i) - library.outer[13][0]) * annex.along[0] + (positions.getZ(i) - library.outer[13][1]) * annex.along[1]);
     assert.ok(Math.max(...frontU) - Math.min(...frontU) < .031, 'The entire shutter is parallel to the straight front end, without the previous angled door face');

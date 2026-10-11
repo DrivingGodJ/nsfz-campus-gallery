@@ -66,7 +66,7 @@ test('library entrance glass canopy projects outward above the south doorway wit
   const a = building.outer[2], b = building.outer[3];
   for (const floorHeight of [3.6, 4.2]) {
     const entrance = libraryEntranceLayout(building, floorHeight);
-    assert.ok(entrance.center.every((value, axis) => Math.abs(value - (a[axis] + (b[axis] - a[axis]) * .62)) < 1e-8), 'The doorway stays on the marked half of the existing annex face');
+    assert.ok(entrance.center.every((value, axis) => Math.abs(value - (a[axis] + (b[axis] - a[axis]) * .3)) < 1e-8), 'The canopy follows the revised mark toward the middle of the annex facade');
     for (const cutoff of [undefined, floorHeight, 2 * floorHeight]) {
       const model = campusExteriorGeometry(building, 5, floorHeight, cutoff);
       const glass = new THREE.Mesh(model.canopyGlass, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));

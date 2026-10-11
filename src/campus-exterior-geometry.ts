@@ -22,7 +22,7 @@ export function libraryEntranceLayout(building: Building, floorHeight: number) {
   const along: Point = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
   const area = building.outer.slice(1).reduce((sum, p, i) => sum + building.outer[i][0] * p[1] - p[0] * building.outer[i][1], 0);
   const outward: Point = area > 0 ? [along[1], -along[0]] : [-along[1], along[0]];
-  const center: Point = [a[0] + along[0] * length * .62, a[1] + along[1] * length * .62];
+  const center: Point = [a[0] + along[0] * length * .3, a[1] + along[1] * length * .3];
   const width = 4, depth = 2.3, wallHeight = .12 + floorHeight + .05;
   const at = (u: number, v: number, y = wallHeight - .2 * v / depth) => new THREE.Vector3(center[0] + along[0] * u + outward[0] * v, y, center[1] + along[1] * u + outward[1] * v);
   return { center, along, outward, width, depth, wallHeight, at };

@@ -136,11 +136,13 @@ export function pavilionRoofGeometry(model: LakePavilion, base: number) {
   return { geometry, eaves: Array.from({ length: 4 }, (_, face) => Array.from({ length: 17 }, (_, i) => at(face, 1, i / 16))),
     ribs: Array.from({ length: 4 }, (_, face) => Array.from({ length: 17 }, (_, i) => at(face, i / 16, 0))), peak };
 }
-export function pergolaLayout(feature: Feature) {
+export function pergolaLayout(feature: Feature, annexRoof?: Shape) {
   const model = feature.pergola!, base = feature.height ?? .12;
   const terminal = pergolaHubLayout(feature);
   const footprint = pergolaFootprint(feature);
-  return { footprint, terminal, corridor: shapes(clip.difference(footprint.map(polygon), terminal.footprint.map(polygon))), base, height: base + model.floors * model.floorHeight };
+  // The warehouse owns its roof overhang at the connected shutter end.
+  const roofCuts = [...terminal.footprint.map(polygon), ...(annexRoof ? [polygon(annexRoof)] : [])];
+  return { footprint, terminal, corridor: shapes(clip.difference(footprint.map(polygon), roofCuts)), base, height: base + model.floors * model.floorHeight };
 }
 
 
