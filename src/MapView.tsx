@@ -108,7 +108,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
       building.stairwells?.filter(stair => stair.partId === section.id), building.classroomWindows,
       building.solidCores?.filter(core => core.partId === section.id),
       building.cutouts?.filter(cut => cut.partId === section.id), cutaway,
-      building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight) : building.id === STAND_OFFICE_ID ? standOfficeOpenings(building, height, info.floorHeight) : undefined);
+      building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight, info.floors) : building.id === STAND_OFFICE_ID ? standOfficeOpenings(building, height, info.floorHeight) : undefined);
   }), [building, info, cutawayHeight, gym, stands]);
   useEffect(() => () => { if (!gym && !stands) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym, stands]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;

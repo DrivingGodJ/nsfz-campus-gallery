@@ -6,7 +6,7 @@ import polygonClipping from 'polygon-clipping';
 import { campusExteriorGeometry, OFFICE_ID, LIBRARY_ID } from '../src/campus-exterior-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
 import { buildingGeometry } from '../src/building-geometry.ts';
-import { officeWindowLayout } from '../src/office-windows.ts';
+import { officeCurvedFacade, officeCurvedWindows, officeWindowLayout } from '../src/office-windows.ts';
 import { classroomGlazingGeometry } from '../src/architecture-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
@@ -19,15 +19,17 @@ test('observed office and library details stay attached to their approved faces 
       const cutoff = selectedFloor === undefined ? undefined : selectedFloor * floorHeight;
       const model = campusExteriorGeometry(building, floors, floorHeight, cutoff);
       try {
-        assert.equal(model.glass.getAttribute('position').count, 0,
-          'The detail layer does not duplicate glass already supplied by an actual window layout');
+        const curved = id === OFFICE_ID && officeCurvedFacade(building);
+        const curvedWindows = curved ? officeCurvedWindows(building, Math.min(floors * floorHeight, cutoff ?? Infinity), floorHeight, floors) : [];
+        assert.equal(model.glass.getAttribute('position').count > 0, curvedWindows.length > 0,
+          'Only the observed curved office panes belong to this layer; the ordinary panes retain their shared layout');
         assert.equal(model.frame.getAttribute('position').count > 0, id === LIBRARY_ID, 'Library diagonal braces remain without duplicate office strip frames');
         for (const geometry of Object.values(model)) {
           const positions = geometry.getAttribute('position');
           for (let i = 0; i < positions.count; i++) {
             const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
             assert.ok(Number.isFinite(x + y + z));
-            assert.ok(y <= .12 + Math.min(cutoff ?? Infinity, (id === LIBRARY_ID ? 3 : floors) * floorHeight) + .001, 'No detail restores a removed storey or exceeds the 3F annex');
+            assert.ok(y <= .12 + Math.min(cutoff ?? Infinity, (id === LIBRARY_ID ? 3 : floors) * floorHeight + (curved && cutoff === undefined ? .9 : 0)) + .001, 'No detail restores a removed storey; only the photographed office end wall rises above its roof');
             let distance = Infinity, outwardOffset = Infinity;
             for (let j = 1; j < building.outer.length; j++) {
               const [ax, az] = building.outer[j - 1], [bx, bz] = building.outer[j], dx = bx - ax, dz = bz - az;
@@ -38,8 +40,8 @@ test('observed office and library details stay attached to their approved faces 
                 outwardOffset = (area > 0 ? 1 : -1) * ((x - ax) * dz - (z - az) * dx) / Math.hypot(dx, dz);
               }
             }
-            assert.ok(distance < .31, 'The decorative panel stays on the approved wall, without a new volume');
-            assert.ok(outwardOffset >= .019, 'Panels sit outside the real wall rather than coplanar with it or buried inside it');
+            assert.ok(distance < (curved ? .87 : .31), 'Panels remain on the original facade, including the photographed recessed office glazing');
+            assert.ok(outwardOffset >= (curved ? -.84 : .019), 'The office window recess stays below 0.84 m; other panels sit outside their real wall');
           }
           assert.equal(geometry.userData.photoOcclusionMask.some(Boolean), false, 'Details do not add photograph occlusion layers');
         }
@@ -47,6 +49,80 @@ test('observed office and library details stay attached to their approved faces 
     }
     assert.equal(JSON.stringify(building), before, 'Confirmed footprint and floor data are untouched');
   }
+});
+
+test('office curved top glazing and recessed lower band open the real body while retaining brick spandrels and existing front lights', () => {
+  const saved = campus.buildings.find(building => building.id === OFFICE_ID), before = JSON.stringify(saved);
+  const building = { ...saved, classroomWindows: { ...saved.classroomWindows, facadeLines: [...saved.classroomWindows.facadeLines, saved.outer.slice(0, 6)] } };
+  const floorHeight = 3.6, height = 4 * floorHeight, windows = officeWindowLayout(building, height, floorHeight);
+  const curved = windows.filter(window => window.curvedOffice), facade = officeCurvedFacade(building);
+  assert.equal(curved.length, 10, 'The photo confirms two continuous storeys over five existing curve chords');
+  assert.ok(officeWindowLayout(saved, height, floorHeight).filter(window => !window.curvedOffice).every(window =>
+    windows.some(candidate => !candidate.curvedOffice && JSON.stringify(candidate) === JSON.stringify(window))), 'Previously calibrated flat faces retain every pane unchanged');
+  for (const facadeLines of [[], [building.outer.slice(0, 5)]]) assert.equal(officeCurvedWindows({ ...building, classroomWindows: { ...building.classroomWindows, facadeLines } }, height, floorHeight).length, 0,
+    'Partial or absent curve evidence cannot add a ribbon around an unconfirmed face');
+  const geometry = buildingGeometry(building, height, floorHeight, [], [], [], building.classroomWindows, [], [], false, windows);
+  const body = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  body.rotation.x = -Math.PI / 2; body.position.y = .12; body.updateMatrixWorld();
+  const details = campusExteriorGeometry(building, 4, floorHeight), panes = new THREE.Mesh(details.glass, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); panes.updateMatrixWorld();
+  const accents = new THREE.Mesh(details.accent, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); accents.updateMatrixWorld();
+  const soffits = new THREE.Mesh(details.darkFrame, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); soffits.updateMatrixWorld();
+  try {
+    for (const [i, face] of facade.faces.entries()) {
+      const p = [(face.a[0] + face.b[0]) / 2, (face.a[1] + face.b[1]) / 2];
+      const normal = new THREE.Vector3(face.normal[0], 0, face.normal[1]);
+      const ray = y => new THREE.Raycaster(new THREE.Vector3(p[0], .12 + y, p[1]).addScaledVector(normal, -.55), normal, 0, 1.5);
+      for (const floor of [2, 3]) {
+        const window = curved[floor === 2 ? i : 5 + i], y = (window.bottom + window.top) / 2;
+        assert.equal(ray(y).intersectObject(body).length, 0, 'The window is hollow through the body, including all 0.72 m of its deep reveal');
+        const hits = ray(y).intersectObject(panes);
+        assert.ok(hits.length, 'One continuous glazing panel fills the actual opening');
+        assert.ok(Math.abs(hits[0].distance - (floor === 2 ? 1.27 : .69)) < .02, 'Lower glazing is recessed while top glazing follows the original wall');
+      }
+      assert.ok(ray(3 * floorHeight).intersectObject(body).length, 'The projecting brick waist retains its concrete slab and wall');
+      assert.ok(ray(3 * floorHeight).intersectObject(accents).length, 'The broad waist has the photographed brick finish');
+      const at = new THREE.Vector3(p[0], .12 + curved[i].top - .2, p[1]).addScaledVector(normal, .4);
+      assert.ok(new THREE.Raycaster(at, new THREE.Vector3(0, 1, 0), 0, .5).intersectObject(soffits).length, 'A real dark underside spans the recessed lower window');
+    }
+    assert.equal(details.glass.getAttribute('position').count / 3, curved.length * 2, 'The curve has one thin pane per chord and storey');
+  } finally {
+    geometry.dispose(); Object.values(details).forEach(detail => detail.dispose()); [body, panes, accents, soffits].forEach(mesh => mesh.material.dispose());
+  }
+  assert.equal(JSON.stringify(saved), before, 'Rendering never moves the approved footprint or photograph calibration');
+});
+
+test('office floor override keeps body apertures and brick bands aligned without relocating glass when cutting lower floors', () => {
+  const saved = campus.buildings.find(building => building.id === OFFICE_ID), original = JSON.stringify(saved);
+  const building = { ...saved, classroomWindows: { ...saved.classroomWindows, facadeLines: [...saved.classroomWindows.facadeLines, saved.outer.slice(0, 6)] } };
+  const info = buildingLevels(building, { floors: 5, floorHeight: 3.6 }), height = info.height, floorHeight = info.floorHeight;
+  const full = officeCurvedWindows(building, height, floorHeight, info.floors);
+  assert.equal(full.length, 10);
+  assert.deepEqual([...new Set(full.map(window => Math.floor(window.bottom / floorHeight) + 1))], [4, 5], 'The override moves both observed bands to the actual top two floors');
+  const face = officeCurvedFacade(building).faces[2], normal = new THREE.Vector3(face.normal[0], 0, face.normal[1]);
+  const ray = y => new THREE.Raycaster(new THREE.Vector3((face.a[0] + face.b[0]) / 2, .12 + y, (face.a[1] + face.b[1]) / 2).addScaledVector(normal, -.55), normal, 0, 1.5);
+  for (const floor of [undefined, 3, 4, 5]) {
+    const cutoff = floor === undefined ? undefined : floor * floorHeight, visible = Math.min(height, cutoff ?? Infinity);
+    const windows = officeWindowLayout(building, visible, floorHeight, info.floors), curved = windows.filter(window => window.curvedOffice);
+    assert.deepEqual(curved, full.filter(window => window.bottom < visible), 'A cut hides higher bands without moving them down to its selected storey');
+    const geometry = buildingGeometry(building, visible, floorHeight, [], [], [], building.classroomWindows, [], [], cutoff !== undefined, windows);
+    const body = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); body.rotation.x = -Math.PI / 2; body.position.y = .12; body.updateMatrixWorld();
+    const details = campusExteriorGeometry(building, info.floors, floorHeight, cutoff), panes = new THREE.Mesh(details.glass, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); panes.updateMatrixWorld();
+    const bricks = new THREE.Mesh(details.accent, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); bricks.updateMatrixWorld();
+    try {
+      assert.equal(details.glass.getAttribute('position').count / 3, curved.length * 2);
+      for (const window of curved.filter((_, i) => i % 5 === 2)) {
+        const through = ray((window.bottom + window.top) / 2);
+        assert.equal(through.intersectObject(body).length, 0, 'Glazing has its corresponding opening after the override');
+        assert.ok(through.intersectObject(panes).length, 'The inset pane remains aligned with its actual opening');
+      }
+      if (visible > 4 * floorHeight) {
+        assert.ok(ray(4 * floorHeight).intersectObject(body).length);
+        assert.ok(ray(4 * floorHeight).intersectObject(bricks).length, 'The brick waist follows the same overridden upper-floor boundary');
+      }
+      assert.ok(ray(2 * floorHeight + 1.5).intersectObject(body).length, 'The former third-floor ribbon remains a solid wall after moving the observed bands up');
+    } finally { geometry.dispose(); Object.values(details).forEach(detail => detail.dispose()); [body, panes, bricks].forEach(mesh => mesh.material.dispose()); }
+  }
+  assert.equal(JSON.stringify(saved), original);
 });
 
 test('library annex facade follows the effective two-floor editor override', () => {

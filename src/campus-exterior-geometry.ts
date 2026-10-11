@@ -1,17 +1,19 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FACADE_COLORS } from './facade-geometry.ts';
+import { classroomGlazingGeometry } from './architecture-geometry.ts';
+import { officeCurvedFacade, officeCurvedWindows } from './office-windows.ts';
 import type { Building, Point } from './types';
 
 export const OFFICE_ID = 'way/1233313430';
 export const LIBRARY_ID = 'way/855459419';
-export const EXTERIOR_COLORS = { glass: FACADE_COLORS.glass, frame: FACADE_COLORS.stone, accent: '#ad7961' };
+export const EXTERIOR_COLORS = { glass: FACADE_COLORS.glass, frame: FACADE_COLORS.stone, accent: '#ad7961', darkFrame: '#354b50' };
 type Kind = keyof typeof EXTERIOR_COLORS;
 
-// These shallow panels enrich observed faces while preserving the approved body.
-// Bay spacing is estimated; no unobserved entrance or rooftop fixture is added.
+// Observed brick panels and the deep west window reveals preserve the approved
+// footprint. Bay spacing is estimated; no unobserved entrance is added.
 export function campusExteriorGeometry(building: Building, floors: number, floorHeight: number, cutawayHeight?: number, annexFloors?: number) {
-  const parts: Record<Kind, THREE.BufferGeometry[]> = { glass: [], frame: [], accent: [] };
+  const parts: Record<Kind, THREE.BufferGeometry[]> = { glass: [], frame: [], accent: [], darkFrame: [] };
   const area = building.outer.slice(1).reduce((sum, p, i) => sum + building.outer[i][0] * p[1] - p[0] * building.outer[i][1], 0);
   const face = (edge: number) => {
     const a = building.outer[edge], b = building.outer[edge + 1];
@@ -41,8 +43,42 @@ export function campusExteriorGeometry(building: Building, floors: number, floor
     } else {
       box(13, length * .19, length * .38 - .2, .12, height - .25, 'accent', .055);
     }
-    // Ordinary windows and the tall strip have one shared aperture/glazing
-    // layout. This shallow detail layer supplies only the observed brickwork.
+    // Ordinary windows and the tall strip keep their shared aperture/glazing
+    // layout. The curved panes below use the same cuts with their deep reveals.
+    const curved = officeCurvedFacade(building), windows = officeCurvedWindows(building, Math.min(floors * floorHeight, cutawayHeight ?? Infinity), floorHeight, floors);
+    if (curved) {
+      const glazing = classroomGlazingGeometry(windows, { ...building.classroomWindows!, transomFractions: [.5] });
+      parts.glass.push(glazing.glass); parts.darkFrame.push(glazing.frames);
+      for (let edge = 0; edge < curved.faces.length; edge++) {
+        const { length } = curved.faces[edge];
+        // The lower two unseen storeys retain the existing solid wall. Above,
+        // red-brown spandrels border the true continuous apertures.
+        box(edge, length / 2, length, .12, .12 + (floors - 2) * floorHeight, 'accent', .045, .06);
+        for (let floor = floors - 2; floor < floors; floor++) {
+          const bottom = .12 + floor * floorHeight, high = .12 + (floor + 1) * floorHeight;
+          const sill = floor === floors - 1 ? .35 : .95, head = floor === floors - 1 ? .28 : .72;
+          box(edge, length / 2, length, bottom, bottom + sill, 'accent', .045, .06);
+          box(edge, length / 2, length, high - head, high, 'accent', .045, .06);
+        }
+        for (const window of windows.filter(window => window.from[0] === curved.at(edge, .72)[0] && window.from[1] === curved.at(edge, .72)[1])) {
+          // A real deep reveal meets the inset glazing; the underside casts the
+          // dark shadow visible below the broad projecting brick waist band.
+          box(edge, length / 2, length, .12 + window.top - .035, .12 + window.top + .025, 'darkFrame', -.36, .78);
+          box(edge, length / 2, length, .12 + window.bottom - .025, .12 + window.bottom + .025, 'accent', -.36, .78);
+        }
+      }
+      // The photographed tall brick wing is the north return, not a new mass
+      // over the whole roof. Its cap stays on the existing end-wall footprint.
+      const wing = face(15);
+      box(15, wing.length / 2, wing.length, .12, height, 'accent', .045, .06);
+      if (cutawayHeight === undefined) box(15, wing.length / 2, wing.length, height, height + .9, 'accent', -.1, .2);
+      for (const index of [0, curved.faces.length]) {
+        const from = curved.at(index, .04), to = curved.at(index, .76), dx = to[0] - from[0], dz = to[1] - from[1];
+        const low = .12 + (floors - 2) * floorHeight + .95, high = Math.min(.12 + (floors - 1) * floorHeight - .72, .12 + (cutawayHeight ?? Infinity));
+        if (high > low) parts.darkFrame.push(new THREE.BoxGeometry(Math.hypot(dx, dz), high - low, .08)
+          .rotateY(-Math.atan2(dz, dx)).translate((from[0] + to[0]) / 2, (low + high) / 2, (from[1] + to[1]) / 2));
+      }
+    }
   } else if (building.id === LIBRARY_ID && building.outer.length > 14) {
     const levels = annexFloors ?? building.parts?.find(part => part.id === 'curved-annex')?.floors ?? 3;
     // Glazing belongs to the evidence-gated aperture layout. Missing window
@@ -62,7 +98,7 @@ export function campusExteriorGeometry(building: Building, floors: number, floor
     }
   }
   const merge = (list: THREE.BufferGeometry[]) => {
-    const plain = list.map(part => { const geometry = part.toNonIndexed(); geometry.deleteAttribute('uv'); return geometry; });
+    const plain = list.map(part => { const geometry = part.index ? part.toNonIndexed() : part.clone(); geometry.deleteAttribute('uv'); return geometry; });
     const geometry = plain.length ? mergeGeometries(plain)! : new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3));
     list.forEach(part => part.dispose()); plain.forEach(part => part.dispose());
     geometry.userData.photoOcclusionMask = new Uint8Array(geometry.getAttribute('position').count / 3);

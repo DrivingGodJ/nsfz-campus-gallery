@@ -29,7 +29,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   const windows = useMemo(() => {
     const visibleHeight = Math.min(Math.max(...sections.map(section => section.height)), cutawayHeight ?? Infinity);
     if (building.id === STAND_OFFICE_ID) return classroomGlazingGeometry(standOfficeWindows(building, visibleHeight, floorHeight), building.classroomWindows);
-    if (building.id === OFFICE_ID) return classroomGlazingGeometry(officeWindowLayout(building, visibleHeight, floorHeight), building.classroomWindows);
+    if (building.id === OFFICE_ID) return classroomGlazingGeometry(officeWindowLayout(building, visibleHeight, floorHeight, Math.max(...sections.map(section => section.floors))).filter(window => !window.curvedOffice), building.classroomWindows);
     if (building.facade?.type === 'laboratory') return classroomGlazingGeometry(laboratoryWindows(building, visibleHeight, floorHeight), building.classroomWindows);
     if (building.facade?.type === 'dormitory') {
       const shape = dormitoryProfile(building).shape;

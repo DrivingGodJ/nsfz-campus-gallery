@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { architectureBar, architectureBatch } from './architecture-geometry.ts';
 import { cafeteriaLowerProfile, cafeteriaStairStrip, dormitoryProfile } from './facade-geometry.ts';
-import { classroomWindowLayout } from './teaching-classrooms.ts';
+import { classroomWindowLayout, confirmedFacade } from './teaching-classrooms.ts';
+import { officeCurvedFacade } from './office-windows.ts';
 import type { Building, BuildingPart, Point, Shape } from './types';
 
 type Section = BuildingPart & { floors: number; height: number };
@@ -53,6 +54,8 @@ export function teachingRoundCanopyAnchor(section: Section) {
 // bays. All anchors come from the approved wall/part outlines, never a new box.
 export function photoFacadeDetailGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
   const parts: Record<Kind, THREE.BufferGeometry[]> = { stone: [], accent: [], glass: [], frame: [] };
+  const officeCurve = building.id === 'way/1233313430' && officeCurvedFacade(building);
+  const officeBrickEdges = officeCurve ? [...officeCurve.faces.map(face => ({ from: face.a, to: face.b })), { from: building.outer[15], to: building.outer[16] }] : [];
   const append = (kind: Kind, geometry: THREE.BufferGeometry) => parts[kind].push(geometry);
   const bar = (kind: Kind, from: Point, to: Point, bottom: number, top: number, thickness: number, offset = .07, sign = 1) => {
     top = Math.min(top, BASE + (cutawayHeight ?? Infinity));
@@ -64,7 +67,10 @@ export function photoFacadeDetailGeometry(building: Building, sections: Section[
   const band = (shape: Shape, y: number, thickness: number, depth = .14) => {
     shape = detailOutline(shape);
     const area = shape.outer.slice(1).reduce((sum, p, i) => sum + shape.outer[i][0] * p[1] - p[0] * shape.outer[i][1], 0), sign = area >= 0 ? 1 : -1;
-    for (let i = 1; i < shape.outer.length; i++) bar('stone', shape.outer[i - 1], shape.outer[i], y, y + thickness, depth, depth / 2, sign);
+    for (let i = 1; i < shape.outer.length; i++) {
+      if (confirmedFacade(shape.outer[i - 1], shape.outer[i], officeBrickEdges)) continue;
+      bar('stone', shape.outer[i - 1], shape.outer[i], y, y + thickness, depth, depth / 2, sign);
+    }
   };
   const outlines = building.facade?.type === 'dormitory' ? [{ ...sections[0], ...dormitoryProfile(building).shape }]
     : building.facade?.type === 'cafeteria' ? [

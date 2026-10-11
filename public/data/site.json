@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 773,
+  "revision": 775,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -2204,8 +2204,8 @@
         "z": 28
       },
       "placed": true,
-      "heading": 138.68099543516928,
-      "pitch": 17.42562039377786,
+      "heading": 139.54922586011514,
+      "pitch": 17.036781001010638,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 3342003,
@@ -2219,7 +2219,8 @@
       "locationId": "",
       "author": "DrivingGodJ",
       "copyright": "DGJ",
-      "depthUpdatedAt": "aa2bbf78-5d29-4169-8050-69560aa47542"
+      "depthUpdatedAt": "aa2bbf78-5d29-4169-8050-69560aa47542",
+      "cameraHeight": 2.299999999999995
     },
     {
       "id": "4aed67d1-6342-4523-b749-1c7a2e6ed99b",
