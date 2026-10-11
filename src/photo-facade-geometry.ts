@@ -6,7 +6,7 @@ import { officeCurvedFacade } from './office-windows.ts';
 import type { Building, BuildingPart, Point, Shape } from './types';
 
 type Section = BuildingPart & { floors: number; height: number };
-export const PHOTO_FACADE_COLORS = { stone: '#d4d1c7', accent: '#a87362', glass: '#8caeaf', frame: '#748786' };
+export const PHOTO_FACADE_COLORS = { stone: '#d4d1c7', roof: '#d4d1c7', accent: '#a87362', glass: '#8caeaf', frame: '#748786' };
 type Kind = keyof typeof PHOTO_FACADE_COLORS;
 const BASE = .12;
 
@@ -53,7 +53,7 @@ export function teachingRoundCanopyAnchor(section: Section) {
 // Roof and sill measurements are estimated from the photographed repeated
 // bays. All anchors come from the approved wall/part outlines, never a new box.
 export function photoFacadeDetailGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
-  const parts: Record<Kind, THREE.BufferGeometry[]> = { stone: [], accent: [], glass: [], frame: [] };
+  const parts: Record<Kind, THREE.BufferGeometry[]> = { stone: [], roof: [], accent: [], glass: [], frame: [] };
   const officeCurve = building.id === 'way/1233313430' && officeCurvedFacade(building);
   const officeBrickEdges = officeCurve ? [...officeCurve.faces.map(face => ({ from: face.a, to: face.b })), { from: building.outer[15], to: building.outer[16] }] : [];
   const append = (kind: Kind, geometry: THREE.BufferGeometry) => parts[kind].push(geometry);
@@ -64,12 +64,12 @@ export function photoFacadeDetailGeometry(building: Building, sections: Section[
     append(kind, new THREE.BoxGeometry(length, top - bottom, thickness).rotateY(-Math.atan2(dz, dx))
       .translate((from[0] + to[0]) / 2 + n[0] * offset, (bottom + top) / 2, (from[1] + to[1]) / 2 + n[1] * offset));
   };
-  const band = (shape: Shape, y: number, thickness: number, depth = .14) => {
+  const band = (shape: Shape, y: number, thickness: number, depth = .14, kind: Kind = 'stone') => {
     shape = detailOutline(shape);
     const area = shape.outer.slice(1).reduce((sum, p, i) => sum + shape.outer[i][0] * p[1] - p[0] * shape.outer[i][1], 0), sign = area >= 0 ? 1 : -1;
     for (let i = 1; i < shape.outer.length; i++) {
       if (confirmedFacade(shape.outer[i - 1], shape.outer[i], officeBrickEdges)) continue;
-      bar('stone', shape.outer[i - 1], shape.outer[i], y, y + thickness, depth, depth / 2, sign);
+      bar(kind, shape.outer[i - 1], shape.outer[i], y, y + thickness, depth, depth / 2, sign);
     }
   };
   const outlines = building.facade?.type === 'dormitory' ? [{ ...sections[0], ...dormitoryProfile(building).shape }]
@@ -84,8 +84,8 @@ export function photoFacadeDetailGeometry(building: Building, sections: Section[
     if (cutawayHeight === undefined) {
       // Double cornices and a low inset parapet give the observed stepped roof
       // silhouette while leaving the same footprint and floor heights intact.
-      band(section, BASE + section.height - .18, .18, .42);
-      band(section, BASE + section.height + .01, .32, .2);
+      band(section, BASE + section.height - .18, .18, .42, 'roof');
+      band(section, BASE + section.height + .01, .32, .2, 'roof');
     }
   }
   if (building.facade?.type === 'dormitory' && building.classroomWindows) {

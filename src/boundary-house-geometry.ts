@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { architectureBatch } from './architecture-geometry.ts';
 import type { Building } from './types';
 
-export const BOUNDARY_HOUSE_COLORS = { walls: '#73786e', joints: '#62685e', roof: '#4b5049', eaves: '#b1aea0', door: '#793c34', hardware: '#aaa391' };
+export const BOUNDARY_HOUSE_COLORS = { walls: '#85857e', joints: '#60625e', roof: '#454846', eaves: '#c1c0b5', door: '#793c34', hardware: '#aaa391' };
 type Kind = keyof typeof BOUNDARY_HOUSE_COLORS;
 
 // DSC06870 confirms a grey-brick shed, a solid red door and an overhanging

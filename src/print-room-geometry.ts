@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { architectureBar, architectureBatch } from './architecture-geometry.ts';
 import type { Building } from './types';
 
-export const PRINT_ROOM_COLORS = { walls: '#827e6e', joints: '#625f53', roof: '#a66147', tiles: '#bf7b58', eaves: '#afa696', plaque: '#77462e' };
+export const PRINT_ROOM_COLORS = { walls: '#8b8478', joints: '#615e58', roof: '#a66147', tiles: '#bf7b58', eaves: '#c6bfb0', plaque: '#814c39' };
 type Kind = keyof typeof PRINT_ROOM_COLORS;
 
 // The first edge is the long west-facing wall, ordered south to north.

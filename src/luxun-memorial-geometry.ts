@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { architectureBar, architectureBatch } from './architecture-geometry.ts';
 import type { Building } from './types';
 
-export const LUXUN_MEMORIAL_COLORS = { brick: '#888a80', joints: '#666c63', stone: '#b6b6a9', floor: '#a2a89f', frames: '#434b43', roof: '#a05d46', tiles: '#b57254' };
+export const LUXUN_MEMORIAL_COLORS = { brick: '#83898b', joints: '#596267', stone: '#c2c5c0', floor: '#929b9d', frames: '#394448', roof: '#a05d46', tiles: '#b57254' };
 type Kind = keyof typeof LUXUN_MEMORIAL_COLORS;
 
 export function luxunMemorialLayout(building: Building) {

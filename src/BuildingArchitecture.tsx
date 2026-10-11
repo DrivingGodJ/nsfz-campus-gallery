@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMapColor } from './MapTheme';
+import { buildingMaterialColor, type BuildingColors } from './building-colors';
 import { ARCHITECTURE_COLORS, GYM_ID, architectureBatch, classroomGlazingGeometry, gymArchitecture, teachingElevatorGeometry, teachingRailGeometry, teachingWindowGeometry } from './architecture-geometry';
 import { teachingStairGeometry } from './teaching-stairs';
 import { laboratoryLayout, laboratoryWindows } from './laboratory-geometry';
@@ -19,6 +20,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   gym?: ReturnType<typeof gymArchitecture>;
 }) {
   const mapColor = useMapColor();
+  const material = (kind: keyof BuildingColors, fallback: string) => buildingMaterialColor(building, kind, fallback, mapColor);
   const structure = useMemo(() => {
     if (building.facade?.type !== 'laboratory') return building;
     const layout = laboratoryLayout(building);
@@ -65,21 +67,21 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   // The roof remains visible at campus scale; only small rail details fade away.
   return <group>
     {teaching && <>
-      <mesh geometry={teaching.columns} raycast={() => null}><meshStandardMaterial color={mapColor('#c5c9be')} roughness={.95} /></mesh>
+      <mesh geometry={teaching.columns} raycast={() => null}><meshStandardMaterial color={material('trim', '#c5c9be')} roughness={.95} /></mesh>
       <mesh geometry={teaching.paving} raycast={() => null}><meshStandardMaterial color={mapColor('#bda995')} roughness={1} /></mesh>
       <mesh geometry={teaching.inlay} raycast={() => null}><meshStandardMaterial color={mapColor('#92a7a4')} roughness={1} /></mesh>
     </>}
-    <mesh geometry={windows.glass} raycast={() => null}><meshStandardMaterial color={mapColor('#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} forceSinglePass /></mesh>
-    <mesh geometry={elevator.glass} raycast={() => null}><meshStandardMaterial color={mapColor('#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
-    <mesh geometry={elevator.doors} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.glass)} roughness={.35} transparent opacity={.3} depthWrite={false} side={THREE.DoubleSide} /></mesh>
-    <mesh geometry={stairs.concrete}><meshStandardMaterial color={mapColor('#d7d2c3')} roughness={.95} /></mesh>
+    <mesh geometry={windows.glass} raycast={() => null}><meshStandardMaterial color={material('glass', '#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} forceSinglePass /></mesh>
+    <mesh geometry={elevator.glass} raycast={() => null}><meshStandardMaterial color={material('glass', '#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+    <mesh geometry={elevator.doors} raycast={() => null}><meshStandardMaterial color={material('glass', ARCHITECTURE_COLORS.glass)} roughness={.35} transparent opacity={.3} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+    <mesh geometry={stairs.concrete}><meshStandardMaterial color={material('trim', '#d7d2c3')} roughness={.95} /></mesh>
     {gym && building.id === GYM_ID && <>
-      <mesh geometry={gym.roof}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.roof)} roughness={.9} side={THREE.DoubleSide} /></mesh>
-      <mesh geometry={gym.stairs}><meshStandardMaterial color={mapColor('#d7d2c3')} roughness={.95} /></mesh>
-      <mesh geometry={gym.court}><meshStandardMaterial color={mapColor('#c2a47a')} roughness={.95} /></mesh>
+      <mesh geometry={gym.roof}><meshStandardMaterial color={material('roof', ARCHITECTURE_COLORS.roof)} roughness={.9} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={gym.stairs}><meshStandardMaterial color={material('trim', '#d7d2c3')} roughness={.95} /></mesh>
+      <mesh geometry={gym.court}><meshStandardMaterial color={material('court', '#c2a47a')} roughness={.95} /></mesh>
       <lineSegments geometry={gym.courtLines} raycast={() => null}><lineBasicMaterial color={mapColor('#f4efe2')} /></lineSegments>
-      <mesh geometry={gym.glass} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.glass)} roughness={.6} transparent opacity={.24} depthWrite={false} side={THREE.DoubleSide} /></mesh>
-      <mesh geometry={gym.stairGlass} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.glass)} roughness={.6} transparent opacity={.18} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={gym.glass} raycast={() => null}><meshStandardMaterial color={material('glass', ARCHITECTURE_COLORS.glass)} roughness={.6} transparent opacity={.24} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={gym.stairGlass} raycast={() => null}><meshStandardMaterial color={material('glass', ARCHITECTURE_COLORS.glass)} roughness={.6} transparent opacity={.18} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     </>}
     <group ref={detail}>
       {furniture && <>
@@ -89,17 +91,17 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
         <mesh geometry={furniture.storage} raycast={() => null}><meshStandardMaterial color={mapColor('#c8d3bf')} roughness={.95} /></mesh>
       </>}
       {teaching && <>
-        <mesh geometry={teaching.rails} raycast={() => null}><meshStandardMaterial color={mapColor('#5e99ac')} roughness={.85} /></mesh>
-        <mesh geometry={teaching.units} raycast={() => null}><meshStandardMaterial color={mapColor('#d2d6cc')} roughness={.85} /></mesh>
+        <mesh geometry={teaching.rails} raycast={() => null}><meshStandardMaterial color={material('rail', '#5e99ac')} roughness={.85} /></mesh>
+        <mesh geometry={teaching.units} raycast={() => null}><meshStandardMaterial color={material('trim', '#d2d6cc')} roughness={.85} /></mesh>
         <mesh geometry={teaching.vents} raycast={() => null}><meshStandardMaterial color={mapColor('#89968c')} roughness={.85} /></mesh>
       </>}
-      <mesh geometry={windows.frames} raycast={() => null}><meshStandardMaterial color={mapColor(building.classroomWindows?.frameColor ?? '#d2d6cc')} roughness={.8} side={THREE.DoubleSide} /></mesh>
-      <mesh geometry={elevator.frames} raycast={() => null}><meshStandardMaterial color={mapColor(ARCHITECTURE_COLORS.frame)} roughness={.5} metalness={.2} /></mesh>
-      <mesh geometry={stairs.rails} raycast={() => null}><meshStandardMaterial color={mapColor('#5e99ac')} roughness={.85} /></mesh>
-      {gym && <mesh geometry={gym.stairRails} raycast={() => null}><meshStandardMaterial color={mapColor('#879690')} roughness={.65} /></mesh>}
-      {gym && <mesh geometry={gym.frame}><meshStandardMaterial ref={frameMaterial} color={mapColor(ARCHITECTURE_COLORS.frame)} roughness={.9} transparent depthWrite /></mesh>}
+      <mesh geometry={windows.frames} raycast={() => null}><meshStandardMaterial color={material('frame', building.classroomWindows?.frameColor ?? '#d2d6cc')} roughness={.8} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={elevator.frames} raycast={() => null}><meshStandardMaterial color={material('frame', ARCHITECTURE_COLORS.frame)} roughness={.5} metalness={.2} /></mesh>
+      <mesh geometry={stairs.rails} raycast={() => null}><meshStandardMaterial color={material('rail', '#5e99ac')} roughness={.85} /></mesh>
+      {gym && <mesh geometry={gym.stairRails} raycast={() => null}><meshStandardMaterial color={material('rail', '#879690')} roughness={.65} /></mesh>}
+      {gym && <mesh geometry={gym.frame}><meshStandardMaterial ref={frameMaterial} color={material('frame', ARCHITECTURE_COLORS.frame)} roughness={.9} transparent depthWrite /></mesh>}
       <mesh geometry={rails} raycast={() => null}>
-      <meshStandardMaterial ref={railMaterial} color={mapColor(ARCHITECTURE_COLORS.rail)} roughness={.9} transparent depthWrite />
+      <meshStandardMaterial ref={railMaterial} color={material('rail', ARCHITECTURE_COLORS.rail)} roughness={.9} transparent depthWrite />
     </mesh></group>
   </group>;
 }

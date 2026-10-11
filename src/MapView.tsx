@@ -35,6 +35,7 @@ import { STANDS_ID, THEATRE_ID, standsArchitecture } from './venue-geometry';
 import { STAND_OFFICE_ID, standOfficeOpenings } from './stand-office-geometry';
 import { GYM_ID, gymArchitecture } from './architecture-geometry';
 import { buildingGeometry } from './building-geometry';
+import { buildingColors, buildingMaterialColor, buildingRoofMaterials, theatreDrumMaterials, theatreDrumTexture } from './building-colors';
 import { cafeteriaBodyGeometry, dormitoryBodyGeometry } from './facade-geometry';
 import { laboratoryBodyGeometry } from './laboratory-geometry';
 import { buildingFloorLineGeometry } from './building-floor-lines';
@@ -88,6 +89,10 @@ function Surface({ data, color, height = .06, stableDepth = false, unlit = false
 }
 const BuildingMesh = memo(function BuildingMesh({ building, site, index, selected, floor, onClick, placing, labelPortal, bridge }: { building: Campus['buildings'][number]; site: Site; index: number; selected: boolean; floor?: number; onClick?: (id: string) => void; placing?: boolean; labelPortal: RefObject<HTMLDivElement>; bridge?: Campus['features'][number] }) {
   const mapColor = useMapColor();
+  const colors = buildingColors(building);
+  const upperWallColor = building.id === STANDS_ID ? colors?.tower : undefined;
+  const drumTexture = useMemo(() => building.id === THEATRE_ID && colors?.drum ? theatreDrumTexture(colors.body, colors.drum) : undefined, [building.id, colors]);
+  useEffect(() => () => drumTexture?.dispose(), [drumTexture]);
   const [hover, setHover] = useState(false);
   const info = useMemo(() => buildingInfo(building, site, index), [building, site.buildingOverrides[building.id], index]);
   const cutawayHeight = selected && floor ? floor * info.floorHeight : undefined;
@@ -109,10 +114,14 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
       building.solidCores?.filter(core => core.partId === section.id),
       building.cutouts?.filter(cut => cut.partId === section.id), cutaway,
       building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight, info.floors) : building.id === STAND_OFFICE_ID ? standOfficeOpenings(building, height, info.floorHeight) : undefined);
-  }), [building, info, cutawayHeight, gym, stands]);
+  }).map((geometry, i) => {
+    if (colors) buildingRoofMaterials(geometry, cutawayHeight === undefined, upperWallColor ? info.floorHeight : undefined);
+    return drumTexture ? theatreDrumMaterials(geometry, info.sections[i], info.floorHeight) : geometry;
+  }), [building, info, cutawayHeight, gym, stands, colors, upperWallColor, drumTexture]);
   useEffect(() => () => { if (!gym && !stands) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym, stands]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;
-  const color = selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
+  const color = colors ? '#d7d2c3' : selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
+  const splitMaterials = !!colors && (cutawayHeight === undefined || !!upperWallColor || !!drumTexture);
   const floorLines = useMemo(() => buildingFloorLineGeometry(building, info.sections, info.floorHeight, selected ? floor : undefined), [building, info, selected, floor]);
   useEffect(() => () => floorLines.dispose(), [floorLines]);
   const floorLineMaterial = useRef<THREE.LineBasicMaterial>(null);
@@ -128,8 +137,11 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
       onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }}
       onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
     {building.facade?.type === 'boundary-house' ? <BoundaryHouse building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'print-room' ? <PrintRoom building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'campus-shop' ? <CampusShop building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'luxun-memorial' ? <LuxunMemorial building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} /> : info.sections.map((section, i) => <group key={section.id}><mesh geometry={geometries[i]} rotation={[-Math.PI / 2, 0, 0]} position={[0, .12, 0]}>
-      <meshStandardMaterial color={mapColor(color)} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />
-      {building.facade?.type !== 'cafeteria' && <Edges color={mapColor(selected ? '#567760' : '#aaa895')} threshold={25} />}
+      <meshStandardMaterial attach={splitMaterials ? 'material-0' : 'material'} color={buildingMaterialColor(building, building.id === LIBRARY_ID && section.id === 'curved-annex' ? 'base' : 'body', color, mapColor)} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />
+      {splitMaterials && <meshStandardMaterial attach="material-1" color={buildingMaterialColor(building, 'roof', color, mapColor)} roughness={.95} />}
+      {upperWallColor && <meshStandardMaterial attach="material-2" color={upperWallColor} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />}
+      {drumTexture && <meshStandardMaterial attach="material-2" map={drumTexture} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />}
+      {building.facade?.type !== 'cafeteria' && <Edges color={mapColor(selected || hover ? '#567760' : '#aaa895')} threshold={25} />}
     </mesh>
     </group>)}
     <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>

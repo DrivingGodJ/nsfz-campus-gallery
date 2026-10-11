@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { architectureBar, architectureBatch } from './architecture-geometry.ts';
 import type { Building } from './types';
 
-export const CAMPUS_SHOP_COLORS = { walls: '#d1c9ae', roof: '#5c9299', soffit: '#655446', fascia: '#ece1c8', frames: '#b7beb3', glass: '#8caaa8', floor: '#b8b5a5' };
+export const CAMPUS_SHOP_COLORS = { walls: '#e0d9c6', roof: '#558398', soffit: '#6e5947', fascia: '#e8e4d4', frames: '#bdc3ba', glass: '#91aaa6', floor: '#b8b5a5' };
 type Kind = keyof typeof CAMPUS_SHOP_COLORS;
 
 export function campusShopLayout(building: Building, height: number) {

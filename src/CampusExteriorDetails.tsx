@@ -1,8 +1,11 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useMapColor } from './MapTheme';
+import { buildingMaterialColor, type BuildingColors } from './building-colors';
 import { campusExteriorGeometry, EXTERIOR_COLORS } from './campus-exterior-geometry';
 import type { Building } from './types';
+
+const materials: Record<keyof typeof EXTERIOR_COLORS, keyof BuildingColors> = { glass: 'glass', frame: 'metal', accent: 'brick', darkFrame: 'frame' };
 
 export default function CampusExteriorDetails({ building, floors, floorHeight, cutawayHeight, annexFloors }: {
   building: Building; floors: number; floorHeight: number; cutawayHeight?: number; annexFloors?: number;
@@ -11,6 +14,6 @@ export default function CampusExteriorDetails({ building, floors, floorHeight, c
   const model = useMemo(() => campusExteriorGeometry(building, floors, floorHeight, cutawayHeight, annexFloors), [building, floors, floorHeight, cutawayHeight, annexFloors]);
   useEffect(() => () => Object.values(model).forEach(geometry => geometry.dispose()), [model]);
   return <group>{(Object.keys(model) as (keyof typeof model)[]).filter(kind => model[kind].getAttribute('position').count).map(kind => <mesh key={kind} geometry={model[kind]} raycast={() => null}>
-    <meshStandardMaterial color={mapColor(EXTERIOR_COLORS[kind])} side={THREE.DoubleSide} forceSinglePass roughness={kind === 'glass' ? .42 : .9} metalness={kind === 'glass' ? .12 : 0} transparent={cutawayHeight !== undefined} opacity={cutawayHeight ===undefined ? 1 : .6} depthWrite={cutawayHeight === undefined} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+    <meshStandardMaterial color={buildingMaterialColor(building, materials[kind], EXTERIOR_COLORS[kind], mapColor)} side={THREE.DoubleSide} forceSinglePass roughness={kind === 'glass' ? .42 : .9} metalness={kind === 'glass' ? .12 : 0} transparent={cutawayHeight !== undefined} opacity={cutawayHeight ===undefined ? 1 : .6} depthWrite={cutawayHeight === undefined} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
   </mesh>)}</group>;
 }
