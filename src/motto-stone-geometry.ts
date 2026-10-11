@@ -14,7 +14,7 @@ export function mottoStoneLayout(model: MottoStoneModel) {
     [-.1, .91], [.03, 1], [.12, .94], [.24, .95], [.38, .84], [.47, .74], [.5, .26],
     [.43, .11], [.24, .07], [.04, .1], [-.13, .06], [-.34, .08]];
   return {
-    outline: profile.map(([x, y]) => [x * w, y * h] as Point),
+    outline: (model.profile ?? profile).map(([x, y]) => [x * w, y * h] as Point),
     baseRocks: [
       { position: [-.36 * w, .15, 0] as [number, number, number], scale: [.9, .28, d * .84] as [number, number, number] },
       { position: [-.07 * w, .12, 0] as [number, number, number], scale: [1.15, .24, d * .95] as [number, number, number] },

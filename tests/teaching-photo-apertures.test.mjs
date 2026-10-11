@@ -78,7 +78,7 @@ test('the independently glazed west room keeps actual upper-floor windows and gr
 
 test('DSC06887 corridor-end walls have real panes and replace only the two marked upper-floor guards', () => {
   const wing = building.parts.find(part => part.id === 'sixth-floor-wing');
-  const enclosures = building.solidCores.filter(core => core.partId === wing.id && core.classroomWindows);
+  const enclosures = building.solidCores.filter(core => core.partId === wing.id && core.startFloor === 2 && core.classroomWindows);
   assert.equal(enclosures.length, 2, 'The saved end enclosure follows the two marked faces, without glazing the adjacent open corridor');
   const original = JSON.stringify(building);
   for (const cutoff of [undefined, 3 * info.floorHeight]) {

@@ -47,7 +47,8 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
   for (const stair of building.stairwells || []) {
     const section = sections.find(section => section.id === stair.partId);
     if (!section) continue;
-    const shown = Math.min(section.height, cutawayHeight ?? section.height);
+    const roofHeight = section.height + (stair.roofAccess?.height ?? 0);
+    const shown = Math.min(roofHeight, cutawayHeight ?? roofHeight);
     const { at, along } = stairwellFrame(stair);
     const point = (u: number, v: number, y: number): Vector => { const [x, z] = at(u, v); return [x, BASE + y, z]; };
     const box = (u0: number, u1: number, v0: number, v1: number, bottom: number, top: number) => {
@@ -93,8 +94,9 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
     const left: [number, number] = [-half, -gap / 2], right: [number, number] = [gap / 2, half];
     const [first, second] = stair.firstFlight === 'left' ? [left, right] : [right, left];
     // Each storey uses the same two flights with a shared half-height landing.
-    // There is no extra flight from the top floor through the retained roof.
-    for (let level = 0; level < section.floors - 1 && level * floorHeight + SLAB < shown; level++) {
+    // Only a stairwell with a roof exit continues above the last occupied floor.
+    const flights = section.floors - 1 + (stair.roofAccess ? 1 : 0);
+    for (let level = 0; level < flights && level * floorHeight + SLAB < shown; level++) {
       const bottom = level * floorHeight + SLAB, middle = bottom + floorHeight / 2;
       flight(near, far, ...first, bottom);
       box(far, far + stair.landingDepth, -half, half, middle - .22, middle);

@@ -27,10 +27,10 @@ export default function MottoStone({ feature }: { feature: Feature }) {
   }, [model.inscription]);
   useEffect(() => () => { geometry.dispose(); sign.dispose(); }, [geometry, sign]);
   useEffect(() => () => texture.dispose(), [texture]);
-  return <group name={feature.id} position={[model.center[0], .12, model.center[1]]} rotation={[0, mottoStoneRotation(model), 0]}
+  return <group name={feature.id} position={[model.center[0], .12 + (feature.height ?? 0), model.center[1]]} rotation={[0, mottoStoneRotation(model), 0]}
     onClick={e => { if (onSelect && !placing && featuresSelectable !== false && e.delta < 5) { e.stopPropagation(); onSelect(feature.id); } }}>
-    {layout.baseRocks.map((rock, i) => <mesh key={i} position={rock.position} scale={rock.scale}><icosahedronGeometry args={[1, 0]} /><meshStandardMaterial color={mapColor('#73786a')} roughness={1} /></mesh>)}
-    <mesh geometry={geometry}><meshStandardMaterial color={selectedId === feature.id ? mapColor('#5b7362') : mapColor('#43594f')} roughness={.97} /></mesh>
+    {layout.baseRocks.map((rock, i) => <mesh key={i} position={rock.position} scale={rock.scale}><icosahedronGeometry args={[1, 0]} /><meshStandardMaterial color={mapColor(model.color ?? '#73786a')} roughness={1} /></mesh>)}
+    <mesh geometry={geometry}><meshStandardMaterial color={selectedId === feature.id ? mapColor('#5b7362') : mapColor(model.color ?? '#43594f')} roughness={.97} /></mesh>
     <mesh geometry={sign} raycast={() => null}><meshBasicMaterial map={texture} transparent depthWrite={false} side={THREE.FrontSide} /></mesh>
   </group>;
 }

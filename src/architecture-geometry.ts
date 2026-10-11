@@ -148,6 +148,7 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
 
 export function teachingWindowGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
   const windows: ClassroomWindow[] = [], config = building.classroomWindows;
+  const dedicated: ReturnType<typeof classroomGlazingGeometry>[] = [];
   if (config) for (const section of sections) {
     const height = Math.min(section.height, cutawayHeight ?? section.height);
     const solids = (building.solidCores || []).filter(core => core.partId === section.id);
@@ -157,9 +158,13 @@ export function teachingWindowGeometry(building: Building, sections: Section[], 
     const groundRecesses = groundOpenings.filter((_, i) => building.groundPassages![i].recessClassrooms);
     const windowExclusions = [...solids.map(core => [core.outer, ...core.holes]), ...stairs.filter(stair => stair.internal).map(stair => [stair.opening.outer, ...stair.opening.holes])];
     windows.push(...classroomWindowLayout(core, config, height, floorHeight, groundOpenings, windowExclusions, [], groundRecesses));
-    windows.push(...solidCoreWindowLayout(solids, height, floorHeight));
+    for (const solid of solids) if (solid.classroomWindows) dedicated.push(classroomGlazingGeometry(solidCoreWindowLayout([solid], height, floorHeight), solid.classroomWindows));
   }
-  return classroomGlazingGeometry(windows, config);
+  const standard = classroomGlazingGeometry(windows, config);
+  return {
+    glass: combined([standard.glass, ...dedicated.map(geometry => geometry.glass)], false),
+    frames: combined([standard.frames, ...dedicated.map(geometry => geometry.frames)], false),
+  };
 }
 
 export function classroomGlazingGeometry(windows: ClassroomWindow[], config?: ClassroomWindows) {

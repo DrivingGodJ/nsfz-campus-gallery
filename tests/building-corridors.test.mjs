@@ -83,7 +83,7 @@ test('corridor slabs do not fill either atrium or block the existing ground road
   }
 });
 
-test('slabs have no duplicated triangles and both wings keep their original outer roof outlines', () => {
+test('slabs have no duplicated triangles and roof changes stay limited to the marked stair top room', () => {
   const { info, meshes, dispose } = model();
   const triangles = new Set(), vertices = meshes[0].geometry.getAttribute('position');
   for (let i = 0; i < vertices.count; i += 3) {
@@ -94,7 +94,9 @@ test('slabs have no duplicated triangles and both wings keep their original oute
   for (const [i, section] of info.sections.entries()) {
     const original = buildingGeometry(section, section.height, info.floorHeight, building.groundPassages);
     original.computeBoundingBox(); meshes[i].geometry.computeBoundingBox();
-    assert.ok(original.boundingBox.equals(meshes[i].geometry.boundingBox), 'Roof bounds and wing heights stay unchanged');
+    const roofAccess = building.stairwells.filter(stair => stair.partId === section.id).reduce((height, stair) => Math.max(height, stair.roofAccess?.height ?? 0), 0);
+    original.boundingBox.max.z += roofAccess;
+    assert.ok(original.boundingBox.min.distanceTo(meshes[i].geometry.boundingBox.min) < 1e-4 && original.boundingBox.max.distanceTo(meshes[i].geometry.boundingBox.max) < 1e-4, 'Only the roof-access stair room increases the section height');
     original.dispose();
   }
   dispose();

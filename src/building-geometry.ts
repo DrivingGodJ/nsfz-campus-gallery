@@ -152,6 +152,8 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   const elevatorSeams = solidCores.filter(core => core.elevator).flatMap(core => core.outer.slice(1).map((to, i) => [passageFootprint([core.outer[i], to], .1).outer]));
   const walls = elevatorSeams.length ? polygonClipping.difference(classrooms, elevatorSeams[0], ...elevatorSeams.slice(1)) : classrooms;
   const shafts = [...stairs.map(stair => [stairwellShaft(stair).outer]), ...solidCores.filter(core => core.elevator).map(core => [core.outer, ...core.holes])];
+  const roofStairs = cutaway ? [] : stairs.filter(stair => stair.roofAccess);
+  const roofShafts = roofStairs.map(stair => [stairwellShaft(stair).outer]);
   const passageCuts = passages.map(passage => {
     const shape = passageShape(passage);
     return [shape.outer, ...shape.holes];
@@ -185,12 +187,29 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     // Retain the base and roof; stairs and glass elevator shafts remain open
     // through intermediate slabs so they can connect the floors.
     if (slab && middle > slabThickness && middle < height - slabThickness && shafts.length) footprint = polygonClipping.difference(footprint, shafts[0], ...shafts.slice(1));
+    if (slab && middle >= height - slabThickness && roofShafts.length) footprint = polygonClipping.difference(footprint, roofShafts[0], ...roofShafts.slice(1));
     // Existing ground roads stay open across the full width, including the slabs.
     if (middle < floorHeight && passageCuts.length) footprint = polygonClipping.difference(footprint, passageCuts[0], ...passageCuts.slice(1));
     // Window jambs and wall shells share the same boundary. Weld microscopic
     // clipping differences before subtracting adjacent layers for their caps.
     return { bottom, top, footprint: windows || cutaway ? snapFootprint(footprint) : footprint, slab };
   });
+  // A roof exit is confined to its stair enclosure. The adjacent classrooms
+  // keep their original roof, while the last flight reaches a small top room.
+  const accesses = roofStairs.map(stair => {
+    const polygon = [stair.opening.outer, ...stair.opening.holes], access = stair.roofAccess!;
+    const openEdges = access.openEdges.map(edge => ({ from: stair.opening.outer[edge], to: stair.opening.outer[edge + 1] }));
+    const shell = snapFootprint(classroomWallFootprint([polygon], .28, snapFootprint, openEdges));
+    return { polygon, shell, shaft: [stairwellShaft(stair).outer], top: height + access.height };
+  });
+  const roofLevels = [...new Set(accesses.flatMap(access => [height, height + slabThickness, access.top - slabThickness, access.top]))].sort((a, b) => a - b);
+  for (let i = 0; i < roofLevels.length - 1; i++) {
+    const bottom = roofLevels[i], top = roofLevels[i + 1], middle = (bottom + top) / 2;
+    const pieces = accesses.filter(access => middle < access.top).map(access => middle < height + slabThickness
+      ? polygonClipping.difference(access.polygon, access.shaft)
+      : middle >= access.top - slabThickness ? [access.polygon] : access.shell);
+    if (pieces.length) layers.push({ bottom, top, footprint: snapFootprint(polygonClipping.union(pieces[0], ...pieces.slice(1))), slab: middle < height + slabThickness || accesses.every(access => middle >= access.top - slabThickness) });
+  }
   const positions: number[] = [], occlusionMask: number[] = [];
   const corners = [...new Map(layers.flatMap(layer => layer.footprint.flat(2)).map(point => [point.join(','), point])).values()];
   const insideRing = (point: Point, ring: Point[]) => {

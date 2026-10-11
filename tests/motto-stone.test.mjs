@@ -7,11 +7,29 @@ import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 import { campusLocations } from '../src/locations.ts';
 import { passageFootprint } from '../src/underground-geometry.ts';
 import { mottoStoneGeometry, mottoStoneInscriptionGeometry, mottoStoneRotation, mottoStoneWorldPoint } from '../src/motto-stone-geometry.ts';
+import { pavilionGeometry, PAVILION_BASE } from '../src/pavilion-geometry.ts';
 
 const read = async file => JSON.parse(await fs.readFile(new URL('../' + file, import.meta.url)));
 const campus = await read('public/data/campus.json'), site = await read('public/data/site.json');
 const stone = campus.features.find(f => f.id === 'local/motto-stone'), model = stone.stone;
 const polygon = shape => [shape.outer, ...(shape.holes || [])];
+
+test('the centenary stone stays on the history pavilion steps, faces the forecourt, and leaves the paths open', () => {
+  const feature = campus.features.find(f => f.id === 'local/centenary-stone');
+  const pavilion = campus.buildings.find(b => b.id === 'way/1233313451');
+  const body = pavilionGeometry(pavilion.appearance, 4.5);
+  assert.equal(clip.difference(polygon(feature), polygon(pavilion)).length, 0, 'The base is supported by the terrace');
+  for (const shape of [body.core, body.rearWing]) assert.equal(clip.intersection(polygon(feature), polygon(shape)).length, 0, 'The stone does not enter the pavilion');
+  for (const path of campus.features.filter(f => f.type === 'path' && f.points && !f.representedBy)) {
+    assert.equal(clip.intersection(polygon(feature), polygon(passageFootprint(path.points, path.width || 3))).length, 0, path.id + ' stays open');
+  }
+  assert.equal(feature.height + .12, PAVILION_BASE);
+  const front = new THREE.Vector2(-feature.stone.axis[1], feature.stone.axis[0]);
+  const forecourt = new THREE.Vector2(1.1 - feature.stone.center[0], 6.7 - feature.stone.center[1]).normalize();
+  assert.ok(front.dot(forecourt) > .95, 'The inscription faces the entrance approach');
+  assert.equal(feature.stone.inscription, '百年碑');
+  assert.equal(feature.name, undefined, 'The landmark remains part of the existing history pavilion destination');
+});
 
 test('the motto stone occupies the marked dry bank, aligns with the shore, and faces its lettering into the lake', async () => {
   const lake = campus.features.find(f => f.id === 'way/855459418');
