@@ -3767,10 +3767,10 @@
           0.7838895679370667
         ],
         "halfStraight": 32,
-        "innerRadius": 28,
-        "laneWidth": 1,
-        "lanes": 6,
-        "pitchLength": 81.91087739443766,
+        "innerRadius": 23.45,
+        "laneWidth": 1.1722222222222223,
+        "lanes": 9,
+        "pitchLength": 64,
         "pitchWidth": 46.86642346495621
       },
       "height": 2.6,
