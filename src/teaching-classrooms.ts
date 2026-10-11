@@ -50,8 +50,8 @@ function strip(from: Point, to: Point, normal: Point, start: number, end: number
 // Short chords describe the rounded bays, not separate blank wall ends. Keep
 // their actual curved boundary and distribute a window across the smooth run.
 // Sharp corners and short square returns still separate independent faces.
-function windowRuns(core: MultiPolygon) {
-  const edges = wallEdges(core), runs: (typeof edges)[] = [];
+function windowRuns(core: MultiPolygon, openEdges: { from: Point; to: Point }[] = []) {
+  const edges = wallEdges(core).filter(({ from, to }) => !confirmedFacade(from, to, openEdges)), runs: (typeof edges)[] = [];
   const joins = (a: typeof edges[number], b: typeof edges[number]) =>
     a.length < 4.5 && b.length < 4.5 && Math.hypot(a.to[0] - b.from[0], a.to[1] - b.from[1]) < 1e-6 &&
     a.normal[0] * b.normal[0] + a.normal[1] * b.normal[1] > .5;
@@ -71,18 +71,18 @@ function windowRuns(core: MultiPolygon) {
 // been removed; complete concrete slabs keep classrooms closed above and below.
 // Dense curved outlines can supply the same coordinate snapping used by their
 // slab layers, so near-coincident strip edges remain stable through both booleans.
-export function classroomWallFootprint(core: MultiPolygon, thickness: number, stabilize: (polygons: MultiPolygon) => MultiPolygon = polygons => polygons): MultiPolygon {
+export function classroomWallFootprint(core: MultiPolygon, thickness: number, stabilize: (polygons: MultiPolygon) => MultiPolygon = polygons => polygons, openEdges: { from: Point; to: Point }[] = []): MultiPolygon {
   core = stabilize(core);
-  const walls = stabilize(wallEdges(core).map(({ from, to, normal }) => strip(from, to, normal, -.001, thickness)));
+  const walls = stabilize(wallEdges(core).filter(({ from, to }) => !confirmedFacade(from, to, openEdges)).map(({ from, to, normal }) => strip(from, to, normal, -.001, thickness)));
   if (!walls.length) return [];
   return polygonClipping.intersection(core, stabilize(polygonClipping.union(walls[0], ...walls.slice(1))));
 }
 
-export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = []): ClassroomWindow[] {
+export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindows, height: number, floorHeight: number, groundOpenings: polygonClipping.Polygon[] = [], solidCores: polygonClipping.Polygon[] = [], openEdges: { from: Point; to: Point }[] = []): ClassroomWindow[] {
   const result: ClassroomWindow[] = [];
   const facadeEdges = config.facadeLines?.flatMap(points => points.slice(1).map((to, i) => ({ from: points[i], to })));
   if (facadeEdges && !facadeEdges.length) return result;
-  for (const run of windowRuns(core)) {
+  for (const run of windowRuns(core, openEdges)) {
     const length = run.reduce((sum, edge) => sum + edge.length, 0);
     // A photographed short end bay may be narrower than an ordinary classroom.
     // Keep the conservative minimum for facades without explicit evidence.
@@ -129,7 +129,8 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
 // their separate appearance and do not inherit ordinary classroom windows.
 export function solidCoreWindowLayout(cores: BuildingSolidCore[], height: number, floorHeight: number): ClassroomWindow[] {
   return cores.flatMap(core => !core.elevator && core.classroomWindows
-    ? classroomWindowLayout([[core.outer, ...core.holes]], core.classroomWindows, height, floorHeight)
+    ? classroomWindowLayout([[core.outer, ...core.holes]], core.classroomWindows, height, floorHeight, [], [],
+      (core.openEdges || []).map(edge => ({ from: core.outer[edge], to: core.outer[edge + 1] })))
       .filter(window => window.bottom >= ((core.startFloor ?? 1) - 1) * floorHeight)
     : []);
 }

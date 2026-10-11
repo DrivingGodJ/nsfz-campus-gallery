@@ -7,6 +7,20 @@ export function curvedStairPoint(stair: CurvedStair, progress: number, radius = 
     stair.center[1] + Math.sin(angle) * radius];
 }
 
+export function entrancePortalLayout(stair: CurvedStair) {
+  const pierWidth = .62, height = 3.35, depth = .72;
+  const width = stair.width + pierWidth * 2;
+  return {
+    position: curvedStairPoint(stair, 0),
+    rotation: Math.atan2(Math.sin(stair.startAngle) * Math.sign(stair.sweep), -Math.cos(stair.startAngle) * Math.sign(stair.sweep)),
+    boxes: [
+      ...[-1, 1].map(side => ({ position: [side * (stair.width + pierWidth) / 2, height / 2, 0] as [number, number, number], size: [pierWidth, height, depth] as [number, number, number] })),
+      { position: [0, 2.66, 0] as [number, number, number], size: [width, .44, depth] as [number, number, number] },
+    ],
+    sign: { position: [0, 2.66, depth / 2 + .006] as [number, number, number], size: [stair.width * .85, .3] as [number, number] },
+  };
+}
+
 export function curvedStairTreads(stair: CurvedStair) {
   return Array.from({ length: stair.steps }, (_, i) => {
     const ring: Point[] = [];

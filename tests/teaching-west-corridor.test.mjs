@@ -13,7 +13,7 @@ const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', im
 const building = campus.buildings.find(item => item.id === 'way/855459420');
 const info = buildingLevels(building, site.buildingOverrides[building.id]);
 const main = info.sections.find(section => section.id === 'main');
-const corridor = building.floorCorridors.find(item => item.partId === main.id && item.points?.length === 4 && Math.abs(item.points.at(-1)[0] - 92.5180706509) < 1e-6);
+const corridor = building.floorCorridors.find(item => item.partId === main.id && item.points?.length === 2 && item.slabInfill && item.railEdges?.[0]?.length === 4);
 const stair = building.stairwells.find(item => item.partId === main.id && !item.internal);
 const west = building.solidCores.find(item => item.partId === main.id && Math.abs(item.outer[0][0] - 91.74712393299268) < 1e-6);
 const BASE = .12, material = () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
@@ -45,6 +45,11 @@ test('the west corridor is saved consistently with its slab extension and preser
   assert.deepEqual(saved.floorCorridors, building.floorCorridors, 'Source corrections and generated campus retain the same corridor');
   assert.deepEqual(corridor.slabInfill, corridor.footprint, 'The calibrated extension receives a floor rather than only removing walls');
   assert.equal(corridor.railEdges.length, 1);
+  const { a, direction, normal } = segment(main.holes[0][2], main.holes[0][3]);
+  const station = point => new THREE.Vector3(point[0], 0, point[1]).sub(a).dot(normal);
+  assert.ok(Math.abs(station(corridor.footprint.outer[0]) + 3) < 1e-6 && Math.abs(station(corridor.footprint.outer[1]) + 3) < 1e-6, 'The upper edge continues the north-classroom south wall exactly three metres north of the atrium');
+  assert.ok(Math.abs(station(corridor.footprint.outer[2])) < 1e-6 && Math.abs(station(corridor.footprint.outer[3])) < 1e-6, 'The lower edge follows the atrium north edge without the former skew');
+  assert.ok(Math.abs(segment(...corridor.points).direction.dot(direction)) > 1 - 1e-8, 'The route is straight and parallel to both green boundaries');
   const original = JSON.stringify(building), object = body();
   object.geometry.dispose(); object.material.dispose();
   assert.equal(JSON.stringify(building), original, 'Building geometry leaves saved walls, corridors, floors and stairs intact');
@@ -79,12 +84,15 @@ test('all upper floors have a continuous walk with floor support and clear passa
   } finally { dispose([object]); }
 });
 
-test('the south edge and lake end have upper-floor guards while the stairs remain open from their landing', () => {
+test('the marked blue guard follows the straight boundaries and room facade while the old skewed guards and stair-entry barriers are absent', () => {
   const rails = mesh(teachingRailGeometry(building, info.sections, info.floorHeight));
   const stairs = teachingStairGeometry(building, info.sections, info.floorHeight), stairRails = mesh(stairs.rails);
   const { at, along } = stairwellFrame(stair);
   try {
     const edge = corridor.railEdges[0];
+    const room = building.solidCores.find(core => core.partId === main.id && Math.abs(core.outer[0][0] - 89.47396089486412) < 1e-6);
+    assert.deepEqual(edge[0], west.outer[4], 'The west guard begins at the new small-room south-west corner');
+    assert.deepEqual(edge.at(-1), room.outer[3], 'The south return joins the actual corner-room east facade');
     for (let i = 0; i < edge.length - 1; i++) {
       const { a, b, normal } = segment(edge[i], edge[i + 1]);
       const center = a.clone().lerp(b, .5).addScaledVector(normal, .09);
@@ -95,6 +103,14 @@ test('the south edge and lake end have upper-floor guards while the stairs remai
           if (floor === 1) assert.equal(hits.length, 0, 'No new upper-floor guard appears at ground level');
           else assert.ok(hits.length, `Floor ${floor} has a guard along edge ${i}, rise ${rise}`);
         }
+      }
+    }
+    const oldGuard = [[103.1583730911, 44.8985647193], [96.9518269172, 47.2639574737], [92.7543093176, 47.9333891598]];
+    for (let i = 0; i < oldGuard.length - 1; i++) for (const fraction of [.7, .85]) {
+      const { a, b, normal } = segment(oldGuard[i], oldGuard[i + 1]), point = a.lerp(b, fraction);
+      for (let floor = 2; floor <= main.floors; floor++) {
+        const origin = point.clone().addScaledVector(normal, -.25); origin.y = slabTop(floor) + .5;
+        assert.equal(new THREE.Raycaster(origin, normal, 0, .5).intersectObject(rails).length, 0, `The former skewed guard is absent on floor ${floor}, segment ${i}`);
       }
     }
     for (let floor = 2; floor <= main.floors; floor++) for (const side of [-1, 0, 1]) {
@@ -117,7 +133,7 @@ test('the new route keeps the approved northwest room wall and exposes its selec
       if (floor === 1) continue;
       const selected = body(floor * info.floorHeight);
       try {
-        const point = segment(corridor.points[2], corridor.points[3]).a.lerp(new THREE.Vector3(corridor.points[3][0], 0, corridor.points[3][1]), .5);
+        const point = segment(...corridor.points).a.lerp(new THREE.Vector3(...[corridor.points.at(-1)[0], 0, corridor.points.at(-1)[1]]), .9);
         slabAt(selected, point, floor, `Selecting floor ${floor} retains the new lake-end floor`);
         point.y = slabTop(floor) + 1.3;
         assert.equal(new THREE.Raycaster(point, new THREE.Vector3(0, 1, 0), 0, info.floorHeight).intersectObject(selected).length, 0, `Selecting floor ${floor} removes the extension ceiling`);

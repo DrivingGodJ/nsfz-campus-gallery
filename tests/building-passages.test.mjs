@@ -41,9 +41,9 @@ function model(override, selectedFloor) {
   return { info, meshes, dispose };
 }
 
-test('both teaching-building roads remain open, with slabs above and continuous upper connectors', async () => {
+test('the remaining teaching-building road stays open, with slabs above and continuous upper connectors', async () => {
   const original = JSON.stringify([building, site]);
-  assert.deepEqual(building.groundPassages.map(passage => passage.sourcePathId), ['way/1233313441', 'way/1233313444']);
+  assert.deepEqual(building.groundPassages.map(passage => passage.sourcePathId), ['way/1233313444']);
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   assert.deepEqual(applyCampusCorrections(campus, corrections), campus, 'Road openings survive repeated map refreshes');
   for (const passage of building.groundPassages) {

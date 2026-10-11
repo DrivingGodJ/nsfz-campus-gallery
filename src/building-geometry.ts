@@ -130,7 +130,8 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   const solids = solidCores.map(core => [core.outer, ...core.holes]);
   const solidStarts = solidCores.map(core => Math.max(0, ((core.startFloor ?? 1) - 1) * floorHeight));
   const coreShells = solids.map((solid, index) => cutaway || solidCores[index].classroomWindows
-    ? snapFootprint(classroomWallFootprint([solid], solidCores[index].classroomWindows?.wallThickness ?? .25, snapFootprint)) : []);
+    ? snapFootprint(classroomWallFootprint([solid], solidCores[index].classroomWindows?.wallThickness ?? .25, snapFootprint,
+      (solidCores[index].openEdges || []).map(edge => ({ from: solidCores[index].outer[edge], to: solidCores[index].outer[edge + 1] })))) : []);
   const openArea = openings.length ? polygonClipping.union(openings[0], ...openings.slice(1), ...infills) : [];
   const corridorArea = solids.length ? polygonClipping.difference(openArea, solids[0], ...solids.slice(1)) : openArea;
   // Stitch the small imported facade notch at slab levels only. The open

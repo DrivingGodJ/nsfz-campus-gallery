@@ -45,9 +45,10 @@ function crossing(from, to, height) {
   return new THREE.Raycaster(a.lerp(b, .5).addScaledVector(normal, -.45), normal, 0, .9);
 }
 
-test('the southwest room has no first-floor enclosure and retains its original upper-floor window shell', () => {
+test('the southwest room stays open below its original upper-floor shell while the teaching-wing end has its normal first-floor window wall', () => {
   assert.ok(room, 'The southwest classroom is selected independently of the northwest glazed room');
   assert.equal(room.startFloor, 2);
+  assert.deepEqual(room.openEdges, [1], 'Only the marked short wall beside the stairs is removed');
   assert.equal(room.door, undefined, 'The unsupported new doorway is removed');
   assert.deepEqual(room.classroomWindows, building.classroomWindows, 'The room uses its existing ordinary classroom window calibration');
   const original = JSON.stringify(building), meshes = bodies();
@@ -59,10 +60,20 @@ test('the southwest room has no first-floor enclosure and retains its original u
     for (let edge = 0; edge < room.outer.length - 1; edge++) {
       const ground = crossing(room.outer[edge], room.outer[edge + 1], BASE + 1.6);
       assert.equal(ground.intersectObjects(meshes).length, 0, `The former room wall is absent on floor one, edge ${edge}`);
-      assert.equal(ground.intersectObjects([glass, frames]).length, 0, `No upper-room glazing descends into floor one, edge ${edge}`);
+      if (edge === 5) {
+        assert.ok(ground.intersectObject(glass).length, 'The normal first-floor teaching-wing end retains its existing window');
+        ground.ray.origin.y = BASE + .6;
+        assert.ok(ground.intersectObjects(meshes).length, 'The first-floor end has normal sill masonry beneath the existing window');
+      } else assert.equal(ground.intersectObjects([glass, frames]).length, 0, `No upper-room glazing descends into floor one, edge ${edge}`);
     }
     assert.ok(windows.length >= 16 && windows.every(window => window.bottom >= info.floorHeight));
     for (let floor = 2; floor <= main.floors; floor++) {
+      for (const fraction of [.15, .5, .85]) for (const rise of [.65, 1.6, 3]) {
+        const a = room.outer[1], b = room.outer[2], center = [a[0] + (b[0] - a[0]) * fraction, a[1] + (b[1] - a[1]) * fraction];
+        const normal = [.9874333222610671, -.15803617968197048], y = BASE + (floor - 1) * info.floorHeight + rise;
+        const ray = new THREE.Raycaster(new THREE.Vector3(center[0] - normal[0] * .2, y, center[1] - normal[1] * .2), new THREE.Vector3(normal[0], 0, normal[1]), 0, .6);
+        assert.equal(ray.intersectObjects([...meshes, glass, frames]).length, 0, `The marked short wall and any glazing are absent across floor ${floor}`);
+      }
       const floorWindows = windows.filter(window => window.bottom > (floor - 1) * info.floorHeight && window.top < floor * info.floorHeight);
       assert.ok(floorWindows.length >= 4, `The original window faces remain on floor ${floor}`);
       for (const window of floorWindows) {
@@ -132,8 +143,10 @@ test('the northwest room ends at the new opaque wall and leaves the old wall bay
   assert.ok(west && west.startFloor === 2 && west.classroomWindows);
   const oldD = [96.49903916402369, 46.62730840918588], oldE = [92.6521153219028, 47.24082643573102];
   const [newD, newE] = west.outer.slice(3, 5);
-  assert.ok(Math.abs(Math.hypot(newD[0] - oldD[0], newD[1] - oldD[1]) - 2.3) < 1e-6);
-  assert.ok(Math.abs(Math.hypot(newE[0] - oldE[0], newE[1] - oldE[1]) - 2.3) < 1e-6);
+  const [holeA, holeB] = main.holes[0].slice(2, 4), length = Math.hypot(holeB[0] - holeA[0], holeB[1] - holeA[1]);
+  const south = [-(holeB[1] - holeA[1]) / length, (holeB[0] - holeA[0]) / length];
+  for (const point of [newD, newE]) assert.ok(Math.abs((point[0] - holeA[0]) * south[0] + (point[1] - holeA[1]) * south[1] + 3) < 1e-6, 'The room end aligns with the upper green boundary three metres north of the atrium');
+  assert.equal(west.classroomWindows.wallThickness, .18, 'The aligned small-room partition keeps the unchanged camera in clear interior space');
   const meshes = bodies(), glazing = teachingWindowGeometry(building, info.sections, info.floorHeight);
   const glass = mesh(glazing.glass), frames = mesh(glazing.frames);
   try {
@@ -160,11 +173,44 @@ test('the northwest room ends at the new opaque wall and leaves the old wall bay
     }, 'The reference camera calibration remains unchanged');
     assert.equal(photo.cameraHeight, undefined, 'The original default camera height remains in use');
     assert.ok(insideRing(photo.position.x, photo.position.z, west.outer), 'DSC9506 stays inside the remaining upper room');
-    assert.ok(insideArea(photo.position.x, photo.position.z, teachingClassroomInterior(building, main, photo.floor)), 'The camera remains clear of the new wall thickness');
     const point = new THREE.Vector3(photo.position.x, BASE + (photo.floor - 1) * info.floorHeight + 1.6, photo.position.z);
+    const wallDirection = new THREE.Vector3(south[0], 0, south[1]);
+    assert.equal(new THREE.Raycaster(point, wallDirection, 0, .02).intersectObjects(meshes).length, 0, 'The unchanged camera remains outside the actual thin wall rather than inside its masonry');
+    assert.ok(new THREE.Raycaster(point, wallDirection, 0, .08).intersectObjects(meshes).length, 'The aligned room-end wall remains just beyond the camera clearance');
     const cut = bodies(photo.floor * info.floorHeight);
     try {
       assert.equal(new THREE.Raycaster(point, new THREE.Vector3(0, 1, 0), 0, info.floorHeight).intersectObjects(cut).length, 0, 'Selecting the photographed room floor removes its ceiling');
     } finally { dispose(cut); }
   } finally { dispose(meshes); dispose([glass, frames]); }
+});
+
+test('opening a windowed core edge removes its panes before their inset while retaining the other walls and floor slabs', () => {
+  const section = { id: 'main', name: 'test room', floors: 3, height: 3 * info.floorHeight, outer: [[0, 0], [14, 0], [14, 8], [0, 8], [0, 0]], holes: [] };
+  const closed = { ...section, partId: section.id, startFloor: 2, classroomWindows: building.classroomWindows };
+  const open = { ...closed, openEdges: [0] };
+  const objects = [];
+  const make = core => {
+    const geometry = buildingGeometry(section, section.height, info.floorHeight, [], [], [], building.classroomWindows, [core]);
+    geometry.rotateX(-Math.PI / 2); geometry.translate(0, BASE, 0);
+    const walls = mesh(geometry), glazing = teachingWindowGeometry({ ...section, id: 'test', classroomWindows: building.classroomWindows, solidCores: [core] }, [section], info.floorHeight);
+    const glass = mesh(glazing.glass), frames = mesh(glazing.frames); objects.push(walls, glass, frames);
+    return { walls, glass, frames };
+  };
+  const before = make(closed), after = make(open);
+  try {
+    for (const floor of [2, 3]) {
+      const y = BASE + (floor - 1) * info.floorHeight;
+      const pane = new THREE.Raycaster(new THREE.Vector3(3.5, y + 1.6, -.4), new THREE.Vector3(0, 0, 1), 0, .8);
+      assert.ok(pane.intersectObject(before.glass).length, 'The fixture edge originally has calibrated inset glazing');
+      assert.equal(pane.intersectObjects(Object.values(after)).length, 0, 'Opening the original edge removes concrete, glass and frames together');
+      pane.ray.origin.y = y + .6;
+      assert.ok(pane.intersectObject(before.walls).length, 'The original edge has masonry below its window');
+      assert.equal(pane.intersectObject(after.walls).length, 0, 'Opening the whole edge removes its sill as well');
+      const adjacent = new THREE.Raycaster(new THREE.Vector3(-.4, y + .6, 4), new THREE.Vector3(1, 0, 0), 0, .8);
+      assert.ok(adjacent.intersectObject(before.walls).length && adjacent.intersectObject(after.walls).length, 'The adjacent wall remains intact');
+      const down = new THREE.Raycaster(new THREE.Vector3(3.5, y + .8, .12), new THREE.Vector3(0, -1, 0), 0, .8);
+      const hit = down.intersectObject(after.walls)[0];
+      assert.ok(hit && Math.abs(hit.point.y - (y + .25)) < 1e-4, 'The newly exposed edge still has its floor slab');
+    }
+  } finally { dispose(objects); }
 });

@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { memo, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
 import * as THREE from 'three';
 import type { Building, BuildingOverride, Feature, Point, Shape } from './types';
-import { bridgeHeight, bridgeSurfaceHeight, curvedStairPoint, curvedStairTreads, straightStairTreads } from './structure-geometry';
+import { bridgeHeight, bridgeSurfaceHeight, curvedStairPoint, curvedStairTreads, entrancePortalLayout, straightStairTreads } from './structure-geometry';
 import { undergroundFootprints, undergroundLayout, type PassageOpening } from './underground-geometry';
 import { undergroundBoundaryLines, undergroundVolume, undergroundMaterialView, undergroundViewMode, undergroundPartVisible, type UndergroundViewSpace, type UndergroundInspectionMode } from './underground-mesh';
 import { undergroundDetailGeometry, UNDERGROUND_COLORS } from './underground-details';
@@ -139,6 +139,21 @@ function Bridge({ feature, buildings, overrides, labelPortal }: { feature: Featu
     {!feature.hideLabel && feature.name && <LocationHtml portal={labelPortal} position={[center[0], bridgeSurfaceHeight(feature, y, center) + 4, center[1]]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name} /></LocationHtml>}
   </group>;
 }
+function EntrancePortal({ feature }: { feature: Feature }) {
+  const mapColor = useMapColor(), layout = useMemo(() => entrancePortalLayout(feature.curvedStair!), [feature]);
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 128;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = mapColor('#9b4c3c'); context.font = '76px "Songti SC", "Noto Serif SC", serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    [...'地下通道'].forEach((character, i) => context.fillText(character, 512 + (i - 1.5) * 205, 66));
+    const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; return texture;
+  }, [mapColor]);
+  useEffect(() => () => texture.dispose(), [texture]);
+  return <group name={feature.id + '-portal'} position={layout.position} rotation={[0, layout.rotation, 0]}>
+    {layout.boxes.map((box, i) => <mesh key={i} position={box.position}><boxGeometry args={box.size} /><meshStandardMaterial color={mapColor('#e4e4d6')} roughness={.93} /></mesh>)}
+    <mesh position={layout.sign.position} raycast={() => null}><planeGeometry args={layout.sign.size} /><meshBasicMaterial map={texture} transparent depthWrite={false} /></mesh>
+  </group>;
+}
 function Entrance({ feature, underground, mode, photoPerspective, labelPortal, spaces }: { feature: Feature; underground: boolean; mode: UndergroundInspectionMode; photoPerspective: boolean; labelPortal: RefObject<HTMLDivElement>; spaces: UndergroundViewSpace[] }) {
   const mapColor = useMapColor();
   const stair = feature.curvedStair;
@@ -167,8 +182,9 @@ function Entrance({ feature, underground, mode, photoPerspective, labelPortal, s
   const below = viewSpace && <UndergroundView space={viewSpace} spaces={spaces} mode={mode} photoPerspective={photoPerspective}>{steps}</UndergroundView>;
   return <group>
     <MapModelLayer underground={mode === 'underground' && !photoPerspective}>
+    <EntrancePortal feature={feature} />
     {canopy && <mesh position={[0, stair.topHeight + 2.35, 0]} rotation={[-Math.PI / 2, 0, 0]}><shapeGeometry args={[canopy]} /><meshStandardMaterial color={mapColor('#a6c4c1')} transparent opacity={.32} depthWrite={false} side={THREE.DoubleSide} /></mesh>}
-    {[0, .23, .46, .7].map(progress => {
+    {[.23, .46, .7].map(progress => {
       const a = curvedStairPoint(stair, progress, stair.radius - stair.width / 2), b = curvedStairPoint(stair, progress, stair.radius + stair.width / 2), roof = stair.topHeight + 2.35;
       return <group key={progress}><Segment from={[a[0], a[2]]} to={[b[0], b[2]]} width={.12} y={roof} thickness={.12} color="#788d87" />
         {[a, b].map((p, i) => <mesh key={i} position={[p[0], (roof + p[1]) / 2, p[2]]}><boxGeometry args={[.13, roof - p[1], .13]} /><meshStandardMaterial color={mapColor('#788d87')} roughness={.75} /></mesh>)}
