@@ -3,7 +3,7 @@ import type { Building, Shape } from './types';
 
 export type BuildingColors = {
   body: string; trim?: string; roof?: string; frame?: string; glass?: string; rail?: string; brick?: string; metal?: string; base?: string;
-  tierBlue?: string; tierRed?: string; tierGreen?: string; tower?: string; skylightFrame?: string; roofGlass?: string; court?: string; drum?: string; canopyUnderside?: string;
+  tierBlue?: string; tierRed?: string; tierGreen?: string; skylightFrame?: string; roofGlass?: string; court?: string; drum?: string; canopyUnderside?: string;
 };
 
 // Each entry belongs to an identified building with a photo reference. Missing
@@ -22,7 +22,7 @@ export const BUILDING_COLOR_PROFILES: Readonly<Record<string, BuildingColors>> =
   // Photos 88c65cc9-1f8f-4383-8ffb-f446bdc663dd, 5b3b44fb-616c-492c-82d0-4a2368792e7b (court/metal).
   'local/gymnasium': { body: '#d3b5a4', trim: '#e1d4c7', roof: '#b3b7b4', frame: '#414c50', glass: '#5d8893', rail: '#939b9d', metal: '#b5bbb6', court: '#ba954e' },
   // Photos 69774c0e-73b0-47e6-ad38-b6bac69d6f5f, 96ec0f44-3cbd-4ea6-9f6e-161bfd40650a.
-  'way/855459409': { body: '#e6e2dc', trim: '#dfded5', frame: '#8e9698', glass: '#748487', roof: '#c7c6c1', rail: '#939b9d', tierBlue: '#4280ae', tierRed: '#b24c36', tierGreen: '#617957', tower: '#a17864', canopyUnderside: '#977b69' },
+  'way/855459409': { body: '#e6e2dc', trim: '#dfded5', frame: '#8e9698', glass: '#748487', roof: '#c7c6c1', rail: '#939b9d', tierBlue: '#4280ae', tierRed: '#b24c36', tierGreen: '#617957', canopyUnderside: '#977b69' },
   // Photos 2fd556c9-9281-475e-ac98-18775ad99aba (striped upper drum), c4980ac9-8ff8-485b-9564-20c48356c2c4.
   'local/theatre': { body: '#dfded6', trim: '#d9dcd5', glass: '#829996', frame: '#aab5b2', rail: '#90999b', roof: '#bfc7c4', drum: '#47525e' },
   // Photo 8904ca53-186b-44ac-b32b-6603b313e39b confirms the top wall/canopy; continuing the grey finish below is an estimate.
@@ -48,9 +48,8 @@ export function buildingMaterialColor(building: Pick<Building, 'id'> | string, k
 }
 
 // Material groups leave the approved geometry and triangle order intact,
-// including the photo occlusion mask. Only the top cap is a roof finish; the
-// stand's existing control tower can have its own upper-wall finish.
-export function buildingRoofMaterials(geometry: THREE.BufferGeometry, roof = true, upperWallBottom?: number) {
+// including the photo occlusion mask. Only the top cap is a roof finish.
+export function buildingRoofMaterials(geometry: THREE.BufferGeometry, roof = true) {
   const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), index = geometry.getIndex();
   if (!positions?.count || !normals) return geometry;
   const count = index?.count ?? positions.count;
@@ -60,8 +59,7 @@ export function buildingRoofMaterials(geometry: THREE.BufferGeometry, roof = tru
   let start = 0, current = -1;
   for (let i = 0; i < count; i += 3) {
     const vertices = [0, 1, 2].map(j => index ? index.getX(i + j) : i + j);
-    const material = roof && vertices.every(vertex => positions.getZ(vertex) >= top - .001 && normals.getZ(vertex) > .5) ? 1
-      : upperWallBottom !== undefined && vertices.reduce((sum, vertex) => sum + positions.getZ(vertex), 0) / 3 > upperWallBottom + .001 ? 2 : 0;
+    const material = roof && vertices.every(vertex => positions.getZ(vertex) >= top - .001 && normals.getZ(vertex) > .5) ? 1 : 0;
     if (material !== current) {
       if (current >= 0) geometry.addGroup(start, i - start, current);
       start = i; current = material;

@@ -96,20 +96,13 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     for (const x of [u - cut.width / 2, u, u + cut.width / 2]) add(frames, box(frame, x, .13, .65, top, .06, .065));
     for (const y of [.65, 2.55]) add(frames, box(frame, u, .13, y - .03, y + .03, cut.width, .065, shown));
   }
-  // A stair/control block occupies the photographed end; it does not change the
-  // imported building footprint or add a false third storey over all the seats.
-  const towerWidth = 6.2, tower: Shape = { outer: [at(0, 0), at(towerWidth, 0), at(towerWidth, width), at(0, width), at(0, 0)], holes: [] };
-  if (shown > floorHeight) {
-    const towerHeight = shown - floorHeight;
-    const geometry = buildingGeometry(tower, towerHeight, floorHeight, [], [], [], undefined, [], [], cutawayHeight !== undefined);
-    geometry.translate(0, 0, floorHeight); bodyParts.push(geometry);
-  }
-  const rows = 10, deck = floorHeight, tread = (width - 2.1) / rows, rise = Math.min(.32, floorHeight / rows), aisles = [length * .27, length * .53, length * .78];
+  // The confirmed end has continuous seating, with no building above it.
+  const seatStart = .2, rows = 10, deck = floorHeight, tread = (width - 2.1) / rows, rise = Math.min(.32, floorHeight / rows), aisles = [length * .27, length * .53, length * .78];
   if (shown > deck + .001) {
-    add(frames, box(frame, (towerWidth + length) / 2, .95, deck - .18, deck, length - towerWidth, 1.9, shown));
+    add(frames, box(frame, length / 2, .95, deck - .18, deck, length - 2 * seatStart, 1.9, shown));
     for (let row = 0; row < rows; row++) {
       const top = deck + (row + 1) * rise, v = 1.9 + (row + .5) * tread;
-      const boundaries = [towerWidth, ...aisles.flatMap(u => [u - 1.1, u + 1.1]), length - .2];
+      const boundaries = [seatStart, ...aisles.flatMap(u => [u - 1.1, u + 1.1]), length - .2];
       for (let section = 0; section < boundaries.length - 1; section += 2) {
         const from = boundaries[section], to = boundaries[section + 1];
         const parts = section % 6 === 0 ? blue : section % 6 === 2 ? red : green;
@@ -119,9 +112,14 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     }
     for (const v of [.1, width - .12]) {
       const base = v < 1 ? deck : deck + rows * rise;
-      for (const y of [.55, 1.02]) add(rails, bar(point(towerWidth, v, base + y), point(length - .2, v, base + y), .05, shown));
-      for (let u = towerWidth; u < length; u += 1.4) add(rails, bar(point(u, v, base), point(u, v, base + 1.05), .045, shown));
+      for (const y of [.55, 1.02]) add(rails, bar(point(seatStart, v, base + y), point(length - .2, v, base + y), .05, shown));
+      for (let u = seatStart; u < length; u += 1.4) add(rails, bar(point(u, v, base), point(u, v, base + 1.05), .045, shown));
     }
+    for (const y of [.55, 1.02]) {
+      add(rails, bar(point(seatStart, .1, deck + y), point(seatStart, 1.9, deck + y), .05, shown));
+      add(rails, bar(point(seatStart, 1.9, deck + y), point(seatStart, width - .12, deck + rows * rise + y), .05, shown));
+    }
+    for (let row = 0; row <= rows; row++) add(rails, bar(point(seatStart, 1.9 + row * tread, deck + row * rise), point(seatStart, 1.9 + row * tread, deck + row * rise + 1.05), .045, shown));
     for (const u of aisles) for (const offset of [-1.1, 1.1]) add(rails, bar(point(u + offset, 1.9, deck + 1), point(u + offset, width - .1, deck + rows * rise + 1), .055, shown));
   }
   const canopyBottom = Math.min(height - .45, deck + rows * rise + 2.55), canopyShown = cutawayHeight === undefined || cutawayHeight > canopyBottom + .32;

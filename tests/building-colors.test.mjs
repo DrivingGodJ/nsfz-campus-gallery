@@ -23,20 +23,18 @@ test('photo palettes belong to exact building ids and preserve missing material 
   }
 });
 
-test('the existing stand control tower alone gets the upper brick finish, including floor cuts', () => {
+test('stands retain ground housing finishes without any obsolete tower material, including floor cuts', () => {
   const building = campus.buildings.find(building => building.id === STANDS_ID), floorHeight = 3.6;
+  assert.equal(buildingColors(STANDS_ID).tower, undefined, 'The removed tower has no surviving color profile');
   for (const cutoff of [undefined, 5.4]) {
     const model = standsArchitecture(building, 7.2, floorHeight, cutoff);
     try {
       const positions = model.body.getAttribute('position'), before = Array.from(positions.array);
-      buildingRoofMaterials(model.body, cutoff === undefined, floorHeight);
+      buildingRoofMaterials(model.body, cutoff === undefined);
       assert.deepEqual(Array.from(positions.array), before);
-      assert.ok(model.body.groups.some(group => group.materialIndex === 2));
-      for (const group of model.body.groups) for (let i = group.start; i < group.start + group.count; i += 3) {
-        const average = [0, 1, 2].reduce((sum, j) => sum + positions.getZ(i + j), 0) / 3;
-        if (group.materialIndex === 2) assert.ok(average > floorHeight + .001, 'Bottom rooms and their roof are not turned to brick');
-        if (average <= floorHeight + .001) assert.equal(group.materialIndex, 0);
-      }
+      assert.ok(model.body.groups.every(group => group.materialIndex === 0 || group.materialIndex === 1), 'Ground housing only uses its body and roof finishes');
+      for (let i = 0; i < positions.count; i++) assert.ok(positions.getZ(i) <= floorHeight + 1e-4, 'Recoloring cannot restore the removed upper tower');
+      if (cutoff === undefined) assert.ok(model.body.groups.some(group => group.materialIndex === 1));
       if (cutoff !== undefined) assert.ok(model.body.groups.every(group => group.materialIndex !== 1), 'The section cap remains a cut rather than a restored roof');
     } finally { Object.values(model).forEach(geometry => geometry.dispose()); }
   }

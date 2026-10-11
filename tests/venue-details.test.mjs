@@ -48,12 +48,32 @@ test('stands have real ascending terraces, clear stair aisles, a partial canopy,
   assert.equal(new THREE.Raycaster(new THREE.Vector3(origin[0], 1.6, origin[1]), new THREE.Vector3(frame.along[0], 0, frame.along[1]), 0, 3).intersectObject(body).length, 0, 'Ground housing is hollow');
   const entry = frame.at(frame.length * .5, -1);
   assert.equal(new THREE.Raycaster(new THREE.Vector3(entry[0], 1.6, entry[1]), new THREE.Vector3(frame.across[0], 0, frame.across[1]), 0, 1.5).intersectObjects([body, mesh(model.glass)]).length, 0, 'A glass window never closes a room doorway');
-  const towerEye = frame.at(1.55, -1), towerRay = new THREE.Raycaster(new THREE.Vector3(towerEye[0], .12 + info.floorHeight + 1.2, towerEye[1]), new THREE.Vector3(frame.across[0], 0, frame.across[1]), 0, 1.6);
-  assert.ok(towerRay.intersectObject(body).length, 'Unconfirmed tower faces remain solid above the seating level');
-  assert.equal(towerRay.intersectObject(mesh(model.glass)).length, 0, 'No guessed tower glazing is added');
   assert.ok(Object.values(model).reduce((sum, geometry) => sum + geometry.getAttribute('position').count / 3, 0) < 7000);
   assert.equal(JSON.stringify(stands), original);
   dispose(model);
+});
+
+test('stands extend their seats, platform and guardrails to the end without an upper tower', () => {
+  const info = buildingLevels(stands, site.buildingOverrides[stands.id]), frame = standsFrame(stands);
+  for (const cutoff of [undefined, 2 * info.floorHeight]) {
+    const model = standsArchitecture(stands, info.height, info.floorHeight, cutoff);
+    try {
+      const tiers = ['tiersBlue', 'tiersGreen', 'tiersRed'].map(key => mesh(model[key]));
+      const platform = mesh(model.frames), rails = mesh(model.rails), body = mesh(model.body, true);
+      for (const u of [.35, 3.1, 5.9]) {
+        const front = down(tiers, frame.at(u, 2.25))[0], back = down(tiers, frame.at(u, frame.width - .6))[0];
+        assert.ok(front && back && back.point.y > front.point.y + 2, 'Ascending seats fill the former tower area');
+        assert.ok(down([platform], frame.at(u, .95)).length, 'The front platform reaches the same end');
+        assert.ok(down([rails], frame.at(u, .1)).length, 'The front guardrail continues across the former tower area');
+        if (cutoff === undefined) assert.ok(down([rails], frame.at(u, frame.width - .12)).length, 'The rear guardrail also reaches the end');
+      }
+      assert.ok(down([rails], frame.at(.2, frame.width / 2)).length, 'The exposed end of the rising terraces has a side guardrail');
+      const positions = model.body.getAttribute('position');
+      for (let i = 0; i < positions.count; i++) assert.ok(positions.getZ(i) <= info.floorHeight + 1e-4, 'The ground housing cannot generate a tower above the seating level');
+      const formerTower = frame.at(3.1, frame.width / 2);
+      assert.ok(down([body], formerTower)[0].point.y <= .12 + info.floorHeight + 1e-4);
+    } finally { dispose(model); }
+  }
 });
 
 test('venue details disappear above selected floors and never add photo-marker obstruction', () => {
