@@ -78,8 +78,8 @@ export function specimenGroveGeometry(feature: Feature) {
   const barScale = 1.15;
   for (let i = 0; i < 3; i++) {
     const z = 66.25 + i * 2.55 * barScale, top = BASE + (2.1 + (i % 2) * .2) * barScale;
-    for (const end of [z, z + 2.2 * barScale]) bar('fitness', [147, BASE, end], [147, top, end], .065 * barScale);
-    bar('fitness', [147, top, z], [147, top, z + 2.2 * barScale], .048 * barScale);
+    for (const end of [z, z + 2.2 * barScale]) bar('fitness', [150, BASE, end], [150, top, end], .065 * barScale);
+    bar('fitness', [150, top, z], [150, top, z + 2.2 * barScale], .048 * barScale);
   }
   // DSC2434: a low, open orange lattice enclosure, rather than a solid hut.
   const fence: Point[] = [[116.6, 84.4], [120.4, 84.4], [120.4, 86.9], [116.6, 86.9], [116.6, 84.4]];
