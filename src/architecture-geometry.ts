@@ -13,6 +13,24 @@ export const GYM_ID = 'local/gymnasium';
 const BASE = .12;
 const lerp = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
+// DSC09888/_DSC0260 show this three-metre corner projection only on floor two.
+export function teachingCornerBalconyLayout(section: Section) {
+  if (section.id !== 'main' || section.floors < 2 || section.holes[0]?.length !== 5) return;
+  const ring = section.holes[0], corner = ring[0], radius = 3;
+  const axis = (to: Point): Point => {
+    const length = Math.hypot(to[0] - corner[0], to[1] - corner[1]);
+    return [(to[0] - corner[0]) / length, (to[1] - corner[1]) / length];
+  };
+  const u = axis(ring[1]), v = axis(ring[3]);
+  const at = (fraction: number, inset = 0): Point => {
+    const angle = fraction * Math.PI / 2;
+    return corner.map((value, i) => value - inset * (u[i] + v[i]) + (radius + inset) * (u[i] * Math.cos(angle) + v[i] * Math.sin(angle))) as Point;
+  };
+  const arc = Array.from({ length: 25 }, (_, i) => at(i / 24));
+  const footprint: Shape = { outer: [corner, ...arc, corner], holes: [] };
+  return { corner, radius, u, v, arc, footprint, guardAt: (fraction: number) => at(fraction, .09) };
+}
+
 function combined(parts: THREE.BufferGeometry[], photoBlocking = true) {
   const plain = parts.filter(part => part.getAttribute('position')?.count).map(part => {
     const geometry = part.index ? part.toNonIndexed() : part.clone();
@@ -84,13 +102,19 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
     const area = ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0);
     const inset = 'points' in corridor ? -.09 : .09 * (area >= 0 ? 1 : -1) * ('holeIndex' in corridor ? 1 : -1);
     const rooftop = 'rooftop' in corridor;
+    const balcony = building.id === 'way/855459420' && 'holeIndex' in corridor && corridor.holeIndex === 0 ? teachingCornerBalconyLayout(section) : undefined;
     const height = Math.min(section.height + (rooftop ? floorHeight : 0), cutawayHeight ?? Infinity);
     for (let floor = (corridor.startFloor ?? 2) - 1; floor * floorHeight + 1.3 < height; floor++) {
       const y = BASE + (rooftop ? section.height : floor * floorHeight + .25);
       const enclosed = (building.solidCores || []).filter(core => core.partId === section.id &&
         floor + 1 >= (core.startFloor ?? 1) && !rooftop);
       const posts = new Map<string, Point>();
-      for (const [a, b] of segments) {
+      for (const [first, last] of segments) {
+        let a = first, b = last;
+        if (floor === 1 && balcony) {
+          if (Math.hypot(a[0] - balcony.corner[0], a[1] - balcony.corner[1]) < 1e-6) a = balcony.arc[0];
+          if (Math.hypot(b[0] - balcony.corner[0], b[1] - balcony.corner[1]) < 1e-6) b = balcony.arc.at(-1)!;
+        }
         const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
         if (length < .05) continue;
         const offset: Point = [(b[1] - a[1]) / length * inset, -(b[0] - a[0]) / length * inset];
@@ -104,6 +128,15 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
             const point = lerp(start, end, i / count);
             posts.set(point.map(v => v.toFixed(2)).join(','), point);
           }
+        }
+      }
+      if (floor === 1 && balcony) {
+        for (let i = 0; i < 24; i++) {
+          const a = balcony.guardAt(i / 24), b = balcony.guardAt((i + 1) / 24);
+          for (const rise of [.5, 1.05]) parts.push(bar([a[0], y + rise, a[1]], [b[0], y + rise, b[1]], .055));
+        }
+        for (let i = 0; i <= 4; i++) {
+          const point = balcony.guardAt(i / 4); posts.set(point.map(value => value.toFixed(2)).join(','), point);
         }
       }
       for (const [x, z] of posts.values()) parts.push(bar([x, y, z], [x, y + 1.075, z], .055));

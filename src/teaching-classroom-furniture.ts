@@ -29,6 +29,14 @@ export function teachingClassroomInterior(building: Building, section: Section, 
     (building.cutouts || []).filter(item => item.partId === section.id));
   const walls = classroomWallFootprint(core, (building.classroomWindows?.wallThickness ?? .28) + .12);
   let inside = walls.length ? polygonClipping.difference(core, walls) : core;
+  // A photo-confirmed ordinary classroom can have its own upper-floor shell.
+  // The fixed photo-confirmed bay list still decides which room receives desks.
+  for (const room of (building.solidCores || []).filter(item => item.partId === section.id && item.classroomWindows && !item.elevator && floor >= (item.startFloor ?? 1))) {
+    const footprint = [[room.outer, ...room.holes]];
+    const enclosure = classroomWallFootprint(footprint, (room.classroomWindows?.wallThickness ?? .28) + .12);
+    const roomInside = enclosure.length ? polygonClipping.difference(footprint, enclosure) : footprint;
+    if (roomInside.length) inside = polygonClipping.union(inside, roomInside);
+  }
   if (floor === 1) for (const passage of building.groundPassages || []) {
     const opening = passageShape(passage); inside = polygonClipping.difference(inside, [opening.outer, ...opening.holes]);
   }

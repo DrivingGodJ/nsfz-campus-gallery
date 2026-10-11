@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
-import { architectureBar as bar, architectureBatch as batch } from './architecture-geometry.ts';
-import { passageShape } from './building-geometry.ts';
+import { architectureBar as bar, architectureBatch as batch, teachingCornerBalconyLayout } from './architecture-geometry.ts';
+import { buildingGeometry, passageShape } from './building-geometry.ts';
 import type { Building, BuildingPart, Point } from './types';
 
 export const TEACHING_ID = 'way/855459420';
@@ -20,6 +20,7 @@ export function teachingDetailGeometry(building: Building, sections: Section[], 
     for (const corridor of building.floorCorridors || []) {
       if (corridor.partId !== section.id || !('holeIndex' in corridor)) continue;
       const ring = section.holes[corridor.holeIndex], center = ring.slice(0, -1).reduce((sum, p) => [sum[0] + p[0] / (ring.length - 1), sum[1] + p[1] / (ring.length - 1)] as Point, [0, 0]);
+      const balcony = building.id === TEACHING_ID && corridor.holeIndex === 0 ? teachingCornerBalconyLayout(section) : undefined;
       const area = ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0), sign = area > 0 ? 1 : -1;
       const shape = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
       const floor = new THREE.ShapeGeometry(shape); floor.rotateX(-Math.PI / 2); floor.translate(0, BASE + .015, 0); paving.push(floor);
@@ -37,13 +38,31 @@ export function teachingDetailGeometry(building: Building, sections: Section[], 
           column.rotateY(-Math.atan2(dz, dx)); column.translate(x, BASE + (shown + bottom) / 2, z); columns.push(column);
         }
         for (let level = 1; level * floorHeight + 1.35 < shown; level++) {
-          const panels = Math.ceil(length / 2.7), y = BASE + level * floorHeight + .25;
+          const from = balcony && level === 1 && edge === 0 ? balcony.radius / length : 0;
+          const to = balcony && level === 1 && edge === ring.length - 2 ? 1 - balcony.radius / length : 1;
+          const station = (fraction: number) => from + (to - from) * fraction;
+          const panels = Math.ceil(length * (to - from) / 2.7), y = BASE + level * floorHeight + .25;
           for (let panel = 0; panel < panels; panel++) {
-            const start = at((panel + .05) / panels, .09), end = at((panel + .95) / panels, .09), middle = at((panel + .5) / panels, .09);
+            const start = at(station((panel + .05) / panels), .09), end = at(station((panel + .95) / panels), .09), middle = at(station((panel + .5) / panels), .09);
             for (const p of [start, end]) for (const rise of [.53, .88]) rails.push(bar([p[0], y + .705, p[1]], [middle[0], y + rise, middle[1]], .035));
           }
-          const start = at(0, .09), end = at(1, .09);
+          const start = at(from, .09), end = at(to, .09);
           rails.push(bar([start[0], y + .28, start[1]], [end[0], y + .28, end[1]], .035));
+        }
+      }
+      if (balcony && shown > floorHeight) {
+        const slab = buildingGeometry(balcony.footprint, Math.min(.25, shown - floorHeight), floorHeight);
+        slab.rotateX(-Math.PI / 2); slab.translate(0, BASE + floorHeight, 0); columns.push(slab);
+        if (floorHeight + 1.35 < shown) {
+          const y = BASE + floorHeight + .25, panels = Math.ceil(Math.PI * balcony.radius / 2 / 2.7);
+          for (let panel = 0; panel < panels; panel++) {
+            const start = balcony.guardAt((panel + .05) / panels), end = balcony.guardAt((panel + .95) / panels), middle = balcony.guardAt((panel + .5) / panels);
+            for (const p of [start, end]) for (const rise of [.53, .88]) rails.push(bar([p[0], y + .705, p[1]], [middle[0], y + rise, middle[1]], .035));
+          }
+          for (let i = 0; i < 24; i++) {
+            const start = balcony.guardAt(i / 24), end = balcony.guardAt((i + 1) / 24);
+            rails.push(bar([start[0], y + .28, start[1]], [end[0], y + .28, end[1]], .035));
+          }
         }
       }
       if (section.id === 'main') {

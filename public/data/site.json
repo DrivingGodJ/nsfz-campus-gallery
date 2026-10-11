@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 750,
+  "revision": 757,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -1669,8 +1669,8 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": -18.401807023493745,
-        "z": -135.56049026470484
+        "x": -18.983910392303777,
+        "z": -136.2468980647917
       },
       "placed": true,
       "heading": 229.70062042873815,
@@ -1689,7 +1689,7 @@
       "author": "DrivingGodJ",
       "copyright": "DGJ",
       "depthUpdatedAt": "68ae7d76-742c-43c2-898c-12138b23d2fb",
-      "cameraHeight": 1.6
+      "cameraHeight": 2.300000000000001
     },
     {
       "id": "e93e02ac-f00d-4e8d-af01-3c09706f2856",
@@ -1714,12 +1714,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 82.6,
-        "z": 34.3
+        "x": 83.57804289920439,
+        "z": 33.162804129743456
       },
       "placed": true,
-      "heading": 130.4153601594889,
-      "pitch": 10.80196082297329,
+      "heading": 131.82416770321885,
+      "pitch": 10.711364362839833,
       "width": 4638,
       "height": 6957,
       "downloadBytes": 4947996,
@@ -1733,7 +1733,8 @@
       "locationId": "",
       "author": "DrivingGodJ",
       "copyright": "DGJ",
-      "depthUpdatedAt": "26704d05-2864-4914-8c84-6fd3df50b1b0"
+      "depthUpdatedAt": "26704d05-2864-4914-8c84-6fd3df50b1b0",
+      "cameraHeight": 1.4000000000000012
     },
     {
       "id": "da1c1aee-1f3d-4389-a101-e4b35f487666",
@@ -1758,12 +1759,12 @@
       "floor": 1,
       "captureType": "ground",
       "position": {
-        "x": 107.6,
-        "z": 58.3
+        "x": 108.262942519234,
+        "z": 58.20580535747584
       },
       "placed": true,
-      "heading": 55.04610831719026,
-      "pitch": 31.384923580382768,
+      "heading": 56.56050310222639,
+      "pitch": 33.21151767767777,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4835327,
@@ -1890,12 +1891,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": 113,
-        "z": 27
+        "x": 114.01368435991735,
+        "z": 27.955219356199926
       },
       "placed": true,
-      "heading": 292.2616369219911,
-      "pitch": 7.817511433414271,
+      "heading": 292.3759805607783,
+      "pitch": 8.36188658328836,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 3677402,
@@ -1910,7 +1911,7 @@
       "author": "DrivingGodJ",
       "copyright": "DGJ",
       "depthUpdatedAt": "7f8fab40-59f7-42c8-bada-ea82e668c363",
-      "cameraHeight": 0.9000000000000222
+      "cameraHeight": 0.7000000000000199
     },
     {
       "id": "2669769a-31d5-4200-a7e2-9a441c66e533",
@@ -1931,12 +1932,12 @@
       "floor": 3,
       "captureType": "ground",
       "position": {
-        "x": 149.9,
-        "z": 54.6
+        "x": 146.05158811327476,
+        "z": 55.04896891519749
       },
       "placed": true,
-      "heading": 151.97032334580808,
-      "pitch": -20.970099202596597,
+      "heading": 153.9444995467718,
+      "pitch": -15.750879168940237,
       "width": 5333,
       "height": 4000,
       "downloadBytes": 3132222,
