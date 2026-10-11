@@ -9,10 +9,20 @@ const routes: Point[][] = [
   [[116.9, 67.22], [116.9, 69], [115.5, 74.8], [118.1, 80.6], [125, 82.4], [132, 79.9], [138.3, 73.4], [142.5, 70.7]],
   [[118.1, 80.6], [112.8, 85.2], [109.8, 91], [107.8, 99.3]],
   [[125, 82.4], [127.8, 88.2], [125.1, 96.4], [121, 101.2]],
+  [[106, 78.2], [106.1, 79.3], [106.1, 79.8]],
+  [[108.3, 86.15], [111.4, 85.8], [112.8, 85.2]],
+  [[103, 70.18], [103, 71.2]],
+];
+// April 25 balcony view: a small round island and curved paths around nearby
+// planting beds on the teaching-building side, rather than one large outer ring.
+const loops: Point[][] = [
+  [[103, 71.2], [106.3, 71.6], [107.6, 74.4], [107.6, 76.8], [106, 78.2], [103.3, 79.6], [99.4, 78.1], [98.5, 75.3], [99.6, 71.9]],
+  [[106.1, 79.8], [108.3, 80.85], [109.2, 83.4], [108.3, 86.15], [106.1, 87.3], [103.9, 86.15], [103, 83.4], [103.9, 80.85]],
+  [[104.5, 87.9], [107.5, 88.5], [109, 91.6], [108.8, 94.6], [106.7, 96.7], [102.8, 96.4], [100.2, 93.3], [100.6, 90], [102.1, 88.5]],
 ];
 const lamps: Point[] = [[118.45, 68.2], [114.1, 71.9], [117.7, 77.1], [121.9, 83.7], [128.9, 80.3], [133.4, 77], [139.5, 72.8], [111.5, 87.9], [129, 90.2]];
 const rocks: [number, number, number, number][] = [[122.8, 77.8, 1.25, 1.3], [130.2, 74.4, 1.45, .65], [110.9, 83.2, 1, .7], [125.1, 91.3, 1.2, .9], [139.8, 79.8, .8, .6]];
-const planting: Point[] = [[120.8, 75.4], [123.5, 77.1], [128.3, 74], [135.3, 82.1], [139.9, 78.5], [113.6, 88.7], [129.1, 92.8], [118.1, 93.7], [103.2, 82.2], [105.7, 97.3]];
+const planting: Point[] = [[120.8, 75.4], [123.5, 77.1], [128.3, 74], [135.3, 82.1], [139.9, 78.5], [113.6, 88.7], [129.1, 92.8], [118.1, 93.7], [105.1, 83.4], [104.3, 93.1]];
 
 const merge = (parts: THREE.BufferGeometry[]) => {
   const geometry = parts.length ? mergeGeometries(parts)! : new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3));
@@ -20,7 +30,7 @@ const merge = (parts: THREE.BufferGeometry[]) => {
 };
 
 export function specimenPaths() {
-  return routes.map(route => new THREE.CatmullRomCurve3(route.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal')
+  return [...routes, ...loops].map((route, i) => new THREE.CatmullRomCurve3(route.map(([x, z]) => new THREE.Vector3(x, 0, z)), i >= routes.length, 'centripetal')
     .getSpacedPoints(route.length * 7).map(point => [point.x, point.z] as Point));
 }
 
@@ -59,7 +69,11 @@ export function specimenGroveGeometry(feature: Feature) {
     geometry.translate(...a.add(b).multiplyScalar(.5).toArray()); parts[key].push(geometry);
   };
   const pathShapes = (width: number) => {
-    const [first, ...rest] = specimenPaths().map(path => [passageFootprint(path, width).outer]);
+    const [first, ...rest] = specimenPaths().map((path, i) => {
+      // Extend across a closed seam so both sides share its mitered corner.
+      const route = i >= routes.length ? [path.at(-2)!, ...path, path[1]] : path;
+      return [passageFootprint(route, width).outer];
+    });
     return polygonClipping.intersection(polygonClipping.union(first, ...rest), [feature.outer!]);
   };
   for (const [key, width, y] of [['edging', PATH_WIDTH + .2, BASE - .005], ['paths', PATH_WIDTH, BASE + .003]] as const) {

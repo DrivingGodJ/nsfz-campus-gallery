@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as THREE from 'three';
+import clip from 'polygon-clipping';
 import { specimenGroveGeometry, specimenPaths, specimenTrees } from '../src/specimen-grove.ts';
 import { treeInstances, treeTrunkGeometry } from '../src/tree-geometry.ts';
 import { photoMapHeight } from '../src/locations.ts';
@@ -51,6 +52,46 @@ test('grove details and adjacent bars stay in their confirmed areas and paths cl
     assert.equal(ray.intersectObjects(furniture).length, 0, 'Tree trunks do not intersect fixed grove furniture');
   }
   floor.material.dispose(); Object.values(geometry).forEach(part => part.dispose());
+});
+
+test('teaching-side garden loops are paved continuously, keep green islands and connect to the original paths without moving trees', () => {
+  assert.deepEqual(specimenTrees(grove), grove.trees, 'Garden paths preserve every stored tree root, radius and height');
+  const paths = specimenPaths(), loops = paths.slice(-3), geometry = specimenGroveGeometry(grove);
+  const floor = new THREE.Mesh(geometry.paths, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  floor.updateMatrixWorld();
+  const paved = ([x, z]) => new THREE.Raycaster(new THREE.Vector3(x, 1, z), new THREE.Vector3(0, -1, 0), 0, 2).intersectObject(floor);
+  try {
+    for (const [i, path] of loops.entries()) {
+      assert.ok(Math.hypot(path[0][0] - path.at(-1)[0], path[0][1] - path.at(-1)[1]) < 1e-6, 'Each garden loop is closed');
+      const center = [[103, 75.3], [106.1, 83.4], [104.5, 92.3]][i];
+      assert.ok(inside(center, path), 'The photographed planting island is enclosed by its loop');
+      assert.equal(paved(center).length, 0, 'The center of each planting island remains unpaved');
+      for (let direction = 0; direction < 8; direction++) {
+        const angle = direction * Math.PI / 4;
+        assert.equal(paved([center[0] + .75 * Math.cos(angle), center[1] + .75 * Math.sin(angle)]).length, 0, 'A green island remains inside each paved loop');
+      }
+      for (let segment = 1; segment < path.length; segment++) {
+        const from = path[segment - 1], to = path[segment], dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+        for (const t of [0, .25, .5, .75, 1]) for (const offset of [-.45, 0, .45]) {
+          const hits = paved([from[0] + dx * t + dz / length * offset, from[1] + dz * t - dx / length * offset]);
+          assert.ok(hits.length, `Loop ${i + 1}, segment ${segment}, t=${t}, offset=${offset} retains a walkable paved width through its closing seam`);
+          assert.ok(Math.abs(hits[0].point.y - .123) < 1e-6, 'Loops retain the existing path surface height');
+        }
+      }
+    }
+    const positions = geometry.paths.getAttribute('position'), indices = geometry.paths.getIndex(), triangles = [];
+    for (let i = 0; i < (indices?.count ?? positions.count); i += 3) {
+      const ring = [0, 1, 2].map(j => {
+        const vertex = indices ? indices.getX(i + j) : i + j;
+        return [positions.getX(vertex), positions.getZ(vertex)];
+      });
+      ring.push(ring[0]); triangles.push([ring]);
+    }
+    assert.equal(clip.union(triangles).length, 1, 'All actual paving forms one network, so no loop or connector is isolated from the original routes');
+    assert.ok(paved([112.8, 85.2]).length, 'The new loops join the existing photographed branch');
+  } finally {
+    floor.material.dispose(); Object.values(geometry).forEach(part => part.dispose());
+  }
 });
 
 test('batched tree lobes preserve tree radius/height while producing stable branching variation', () => {
