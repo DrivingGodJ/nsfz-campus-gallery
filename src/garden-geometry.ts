@@ -35,8 +35,8 @@ export function pergolaHubLayout(feature: Feature) {
   return { axis, normal, halves, passage, footprint, contains: (point: Point) => footprint.some(shape => inside(point, shape.outer)) };
 }
 export function pergolaFootprint(feature: Feature): Shape[] {
-  const route = passageFootprint(feature.points!, feature.width || 2.4);
-  return shapes(clip.union(polygon(route), ...pergolaHubLayout(feature).footprint.map(polygon)));
+  const routes = [feature.points!, ...(feature.branches || [])].map(points => polygon(passageFootprint(points, feature.width || 2.4)));
+  return shapes(clip.union(routes[0], ...routes.slice(1), ...pergolaHubLayout(feature).footprint.map(polygon)));
 }
 export function gardenFootprints(feature: Feature, features: Feature[]): Shape[] {
   if (feature.type === 'lakePavilion' && feature.pavilion) return [pavilionFootprint(feature.pavilion)];

@@ -138,9 +138,13 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
 // Use an explicit saved window calibration; elevator and opaque cores keep
 // their separate appearance and do not inherit ordinary classroom windows.
 export function solidCoreWindowLayout(cores: BuildingSolidCore[], height: number, floorHeight: number): ClassroomWindow[] {
-  return cores.flatMap(core => !core.elevator && core.classroomWindows
-    ? classroomWindowLayout([[core.outer, ...core.holes]], core.classroomWindows, height, floorHeight, [], [],
-      (core.openEdges || []).map(edge => ({ from: core.outer[edge], to: core.outer[edge + 1] })))
-      .filter(window => window.bottom >= ((core.startFloor ?? 1) - 1) * floorHeight)
-    : []);
+  return cores.flatMap(core => {
+    if (core.elevator || !core.classroomWindows) return [];
+    const facades = core.classroomWindows.facadeLines?.flatMap(points => points.slice(1).map((to, i) => ({ from: points[i], to })));
+    // Dedicated rooms may add an opaque return beside an unchanged window bay.
+    const opaque = facades ? core.outer.slice(1).flatMap((to, i) => confirmedFacade(core.outer[i], to, facades) ? [] : [{ from: core.outer[i], to }]) : [];
+    const open = [...(core.openEdges || []), ...(core.doors || []).map(door => door.edge)].map(edge => ({ from: core.outer[edge], to: core.outer[edge + 1] }));
+    return classroomWindowLayout([[core.outer, ...core.holes]], core.classroomWindows, height, floorHeight, [], [], [...open, ...opaque])
+      .filter(window => window.bottom >= ((core.startFloor ?? 1) - 1) * floorHeight && window.top <= (core.endFloor ?? Infinity) * floorHeight);
+  });
 }

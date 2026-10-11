@@ -119,7 +119,7 @@ test('the smaller pavilion has an open interior and curved roof, and the simple 
   assert.equal(clip.union(footprint, polygon(annex.footprint), polygon(library)).length, 1, 'The corridor starts flush against the warehouse that joins the library');
   for (const building of campus.buildings) assert.ok(area(clip.intersection(footprint, polygon(building))) < 1e-7, 'The connected corridor does not intrude into the library');
   for (const water of campus.features.filter(f => f.type === 'water')) assert.ok(area(clip.intersection(footprint, polygon(water))) < 1e-7);
-  assert.equal(clip.union(footprint).length, 1, 'Curved corridor joins both half-circle end platforms');
+  assert.equal(clip.union(footprint, polygon(annex.footprint)).length, 1, 'Curved corridors join the end platforms and existing covered annex');
   assert.equal(pergolaPlan.height - pergolaPlan.base, pergola.pergola.floors * pergola.pergola.floorHeight, 'Building height comes from its storey height');
   const [start, next] = pergola.points, door = annex.at(annex.u0, (annex.doorStart + annex.doorEnd) / 2);
   assert.ok(Math.hypot(start[0] - door[0], start[1] - door[1]) < 1e-7, 'The walkway ends at the center of the straight shutter');
@@ -207,7 +207,7 @@ test('wisteria walkway stays open and its long library-side annex has a straight
     const frontU = Array.from({ length: positions.count }, (_, i) => (positions.getX(i) - library.outer[13][0]) * annex.along[0] + (positions.getZ(i) - library.outer[13][1]) * annex.along[1]);
     assert.ok(Math.max(...frontU) - Math.min(...frontU) < .031, 'The entire shutter is parallel to the straight front end, without the previous angled door face');
     for (const key of ['floor', 'beams', 'posts', 'roof']) assert.ok(model[key].userData.photoOcclusionMask.every(v => v === 0), 'Thin open structure does not hide corridor photos');
-    assert.ok(Object.values(model).reduce((n, geometry) => n + geometry.getAttribute('position').count / 3, 0) < 5000, 'The independent half-circle rims, arches, canopy and annex retain a simple merged model');
+    assert.ok(Object.values(model).reduce((n, geometry) => n + geometry.getAttribute('position').count / 3, 0) < 9000, 'The original shelter and new branch remain a compact merged model');
     assert.equal(JSON.stringify(pergola), original);
   } finally {
     Object.values(meshes).forEach(mesh => mesh.material.dispose()); Object.values(model).forEach(geometry => geometry.dispose());

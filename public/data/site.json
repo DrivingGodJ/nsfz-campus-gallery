@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 807,
+  "revision": 828,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -3559,12 +3559,12 @@
       "uploadedAt": "2026-10-07T06:34:20.692Z",
       "captureType": "ground",
       "position": {
-        "x": 108.56590977961311,
-        "z": -0.3244499052252863
+        "x": 111.38466360727477,
+        "z": -1.6189583790327675
       },
       "placed": true,
-      "heading": 212.7684915736886,
-      "pitch": 5.303603980984386,
+      "heading": 214.85225654240526,
+      "pitch": 6.57687106462061,
       "width": 4607,
       "height": 6911,
       "downloadBytes": 4935288,
@@ -3576,7 +3576,8 @@
         "depth": "media/1149f758-0ca0-44a3-84ba-aa2ef9c00184/depth.webp"
       },
       "depthUpdatedAt": "fcf67d8e-5980-4e66-8faf-0d3f78461c14",
-      "locationId": ""
+      "locationId": "",
+      "cameraHeight": 1.4
     },
     {
       "id": "15671d1f-e615-4671-8e39-b5a94f0d7c9d",
@@ -4325,12 +4326,12 @@
       "uploadedAt": "2026-10-08T12:03:20.403Z",
       "captureType": "ground",
       "position": {
-        "x": 116.3,
-        "z": 59.813597256405934
+        "x": 123.30065815770737,
+        "z": 58.74131502636277
       },
       "placed": true,
-      "heading": 203.09604098323825,
-      "pitch": -23.112722994755885,
+      "heading": 203.7673526098588,
+      "pitch": -22.37446513981264,
       "width": 7008,
       "height": 4672,
       "downloadBytes": 4979032,
@@ -4419,8 +4420,8 @@
         "z": 61.1
       },
       "placed": true,
-      "heading": 261.40221158983354,
-      "pitch": 8.267156590710151,
+      "heading": 260.0970359681271,
+      "pitch": 9.778618396821546,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4876413,
@@ -4432,7 +4433,8 @@
         "depth": "media/56c71ffd-6c08-4dbf-85c1-2428d43406b9/depth.webp"
       },
       "depthUpdatedAt": "866e9aef-01c3-4e4d-830d-c935c0b43551",
-      "locationId": ""
+      "locationId": "",
+      "cameraHeight": 1.2999999999999998
     },
     {
       "id": "bd0f5e4d-e812-43df-8efa-04fe05854648",
@@ -4464,8 +4466,8 @@
         "z": 11.3
       },
       "placed": true,
-      "heading": 158.79589259874365,
-      "pitch": 3.4739937778611387,
+      "heading": 155.4353729851864,
+      "pitch": 2.3901638107812584,
       "width": 4456,
       "height": 6684,
       "downloadBytes": 4828076,
@@ -4505,12 +4507,12 @@
       "uploadedAt": "2026-10-08T12:12:36.898Z",
       "captureType": "ground",
       "position": {
-        "x": 116.44505882214463,
-        "z": 60.231320332709316
+        "x": 117.46037157632557,
+        "z": 59.72014549184337
       },
       "placed": true,
-      "heading": 138.9519588984275,
-      "pitch": -56.12261497671501,
+      "heading": 130.81541297061938,
+      "pitch": -44.40209481708187,
       "width": 7008,
       "height": 2982,
       "downloadBytes": 4610890,
@@ -4596,12 +4598,12 @@
       "uploadedAt": "2026-10-08T12:16:20.508Z",
       "captureType": "ground",
       "position": {
-        "x": -15.052673959119577,
-        "z": -122.06869432159688
+        "x": -14.72947170089869,
+        "z": -126.82352353142993
       },
       "placed": true,
-      "heading": 25.374962958855235,
-      "pitch": 20.063629313539685,
+      "heading": 16.423999585180468,
+      "pitch": 22.861436177917827,
       "width": 7008,
       "height": 2982,
       "downloadBytes": 4645616,
@@ -4646,8 +4648,8 @@
         "z": -112.42505704453984
       },
       "placed": true,
-      "heading": 239.41894924265443,
-      "pitch": -2.555446506241771,
+      "heading": 240.6892045892032,
+      "pitch": -0.6689110601503977,
       "width": 6229,
       "height": 4672,
       "downloadBytes": 4788167,
@@ -4660,7 +4662,7 @@
       },
       "depthUpdatedAt": "e66661f7-932f-4ece-9604-a3a5e1622418",
       "locationId": "local/sheltered-runway",
-      "cameraHeight": 1.6
+      "cameraHeight": 0.8999999999999995
     },
     {
       "id": "5e41f64f-b5b3-4a25-8a29-4f13090d3d87",
@@ -4778,12 +4780,12 @@
       "uploadedAt": "2026-10-08T12:23:14.075Z",
       "captureType": "ground",
       "position": {
-        "x": 138.6,
-        "z": 56.4
+        "x": 138.71924299330345,
+        "z": 56.12471631260094
       },
       "placed": true,
-      "heading": 203.52939608718998,
-      "pitch": -8.885906469189182,
+      "heading": 200.13814519009838,
+      "pitch": -19.648565976824255,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 4926260,
@@ -4795,7 +4797,8 @@
         "depth": "media/7ada314c-855a-45a4-906e-aebdf049a56c/depth.webp"
       },
       "depthUpdatedAt": "483a567d-89a7-439c-b4f9-941f37310bf8",
-      "locationId": "way/855459420"
+      "locationId": "way/855459420",
+      "cameraHeight": 1.799999999999999
     },
     {
       "id": "ff6b8d02-73d4-4a82-9e78-049c5e53c456",
@@ -4827,8 +4830,8 @@
         "z": 74.5
       },
       "placed": true,
-      "heading": 88.47752535641354,
-      "pitch": 5.5283627385595535,
+      "heading": 86.64958959353442,
+      "pitch": 5.986702714711773,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 4999565,
@@ -4868,12 +4871,12 @@
       "uploadedAt": "2026-10-08T12:28:00.017Z",
       "captureType": "ground",
       "position": {
-        "x": 66.42507816633864,
-        "z": 71.60325030112227
+        "x": 66.02873224628124,
+        "z": 70.26052549251334
       },
       "placed": true,
-      "heading": 253.7085818580424,
-      "pitch": -12.361152990550885,
+      "heading": 256.0569203174714,
+      "pitch": -12.874424302458065,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4987546,
@@ -4962,8 +4965,8 @@
         "z": -102.82572397450672
       },
       "placed": true,
-      "heading": 322.4055602101721,
-      "pitch": 0.11430978445962989,
+      "heading": 323.2212542379183,
+      "pitch": 6.211972969916788,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4885194,
@@ -4976,7 +4979,7 @@
       },
       "depthUpdatedAt": "2bfd32b3-df76-406f-9b27-2dc969bbc335",
       "locationId": "local/underground-badminton",
-      "cameraHeight": 1.6
+      "cameraHeight": 1.0999999999999996
     },
     {
       "id": "ebb58a49-95eb-475d-af39-f0bb484b57ce",
@@ -5050,12 +5053,12 @@
       "uploadedAt": "2026-10-08T12:34:00.987Z",
       "captureType": "ground",
       "position": {
-        "x": 140.9,
-        "z": 56.50124594098166
+        "x": 136.28943998944936,
+        "z": 56.58978425085097
       },
       "placed": true,
-      "heading": 202.51636232981105,
-      "pitch": -5.044644338660186,
+      "heading": 192.2007495633918,
+      "pitch": -16.79779697939077,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4847275,
@@ -5099,8 +5102,8 @@
         "z": 55.2
       },
       "placed": true,
-      "heading": 238.24389267952938,
-      "pitch": -2.3399952195900027,
+      "heading": 237.11545619527647,
+      "pitch": -3.3098878986086606,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4915879,
@@ -5140,12 +5143,12 @@
       "uploadedAt": "2026-10-08T12:37:20.463Z",
       "captureType": "ground",
       "position": {
-        "x": 125.2,
-        "z": 58.5
+        "x": 132.05046612656037,
+        "z": 57.30316605930704
       },
       "placed": true,
-      "heading": 209.32091255493276,
-      "pitch": -36.903293102414516,
+      "heading": 211.11089873008711,
+      "pitch": -38.233692342877895,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4877242,
@@ -5185,8 +5188,8 @@
       "uploadedAt": "2026-10-08T12:39:00.773Z",
       "captureType": "ground",
       "position": {
-        "x": 146.4,
-        "z": 55
+        "x": 143.84181039900645,
+        "z": 55.46439849845645
       },
       "placed": true,
       "heading": 169.71091337125097,
@@ -5227,12 +5230,12 @@
       "uploadedAt": "2026-10-08T12:40:58.115Z",
       "captureType": "ground",
       "position": {
-        "x": 114.5504340776156,
-        "z": 60.1
+        "x": 120.45138861534299,
+        "z": 59.16471698097386
       },
       "placed": true,
-      "heading": 180.1294686578849,
-      "pitch": -26.820310230517585,
+      "heading": 182.83844620595642,
+      "pitch": -29.52618533865892,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4831387,
@@ -5275,12 +5278,12 @@
       "uploadedAt": "2026-10-08T12:42:19.286Z",
       "captureType": "ground",
       "position": {
-        "x": 91.6,
-        "z": 43.5
+        "x": 92.45628377079797,
+        "z": 42.98352608947833
       },
       "placed": true,
-      "heading": 328.16143050174594,
-      "pitch": 3.2942053170962606,
+      "heading": 329.81433552233057,
+      "pitch": 3.916374572702061,
       "width": 7008,
       "height": 3942,
       "downloadBytes": 4917125,
@@ -5292,7 +5295,8 @@
         "depth": "media/8eb26c5d-2e66-44e7-963b-b661e662e27b/depth.webp"
       },
       "depthUpdatedAt": "3f85f2e2-0e2c-470e-a19c-bfc568153bef",
-      "locationId": ""
+      "locationId": "",
+      "cameraHeight": 1.5
     },
     {
       "id": "b87e9c8e-5e80-4de4-8b17-76a406d741c3",

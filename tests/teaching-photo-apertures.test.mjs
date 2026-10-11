@@ -49,7 +49,8 @@ test('the three photographed north-facing windows are not plugged by window jamb
 
 test('the independently glazed west room keeps actual upper-floor windows and ground-floor stair space', () => {
   assert.ok(room.classroomWindows, 'DSC09912 and DSC09803 identify a dedicated glazed room above the open stairs');
-  const windows = solidCoreWindowLayout([room], info.sections[0].height, info.floorHeight);
+  const rooms = building.solidCores.filter(core => core.partId === room.partId && core.outer[0][0] === room.outer[0][0]);
+  const windows = solidCoreWindowLayout(rooms, info.sections[0].height, info.floorHeight);
   assert.ok(windows.length > 5 && windows.every(window => window.bottom >= info.floorHeight));
   for (const cutoff of [undefined, 2 * info.floorHeight, 3 * info.floorHeight]) {
     const meshes = bodies(cutoff);

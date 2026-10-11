@@ -7,6 +7,12 @@ import type { Feature, Point, Shape } from './types';
 export const RIVER_IDS = ['way/1277839749', 'way/1277839748', 'local/lake-water-link'];
 export const RIVER_COLORS = { bank: '#a6a18e', rock: '#7e8274', paths: '#b3a58c', timber: '#795e46', stone: '#c4bdab', leaves: '#648064', shrubs: '#67805e' };
 const BASE = .12;
+// The seat beside the northern-bank tree was moved to the main path; the
+// matching seat on its water side has been removed.
+export const riverBenches: { center: Point; angle: number }[] = [
+  { center: [68.65, 7.5], angle: 0 }, { center: [68.65, 11.2], angle: 0 },
+  { center: [111.5, -.016], angle: Math.atan2(5.532578693011172, 41.98277460853406) },
+];
 const inside = (point: Point, ring: Point[]) => {
   let hit = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -98,13 +104,14 @@ export function riverLandscapeGeometry(features: Feature[], buildings: Shape[] =
       parts.paths.push(new THREE.ShapeGeometry(shape).rotateX(-Math.PI/2).translate(0,.126,0));
     }
   }
-  for (const center of [[68.65, 9.35], [102.6, 8.1]] as Point[]) {
-    for (const side of [-1,1]) {
-      // Benches on opposite sides of the tree, with open approaches between.
-      const x = center[0], z = center[1] + side * 1.85;
-      if (!onLand([x,z])) continue;
-      for (let plank = 0; plank < 3; plank++) box('timber', [3.25,.07,.16], [x,.49,z+(plank-1)*.19]);
-      for (const dx of [-1.3,1.3]) box('stone', [.28,.44,.58], [x+dx,.25,z]);
+  for (const { center: [x, z], angle } of riverBenches) {
+    if (!onLand([x,z])) continue;
+    const at = (along: number, across: number): [number, number] => [x + along * Math.cos(angle) + across * Math.sin(angle), z - along * Math.sin(angle) + across * Math.cos(angle)];
+    for (let plank = 0; plank < 3; plank++) {
+      const p = at(0, (plank - 1) * .19); box('timber', [3.25,.07,.16], [p[0],.49,p[1]], angle);
+    }
+    for (const dx of [-1.3,1.3]) {
+      const p = at(dx, 0); box('stone', [.28,.44,.58], [p[0],.25,p[1]], angle);
     }
   }
   // The low bridge edge in DSC03644 is a single broad timber beam, not a fence.

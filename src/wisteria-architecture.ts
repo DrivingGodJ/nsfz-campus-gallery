@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import clip from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Feature, Point, Shape } from './types';
 import { pergolaLayout } from './garden-geometry.ts';
@@ -44,18 +45,10 @@ export function libraryAnnexLayout(library: Shape) {
 export function wisteriaArchitecture(feature: Feature, library: Shape) {
   const annex = libraryAnnexLayout(library);
   const layout = pergolaLayout(feature, annex.roof), { base, height, terminal, corridor } = layout;
-  const route = feature.points!, width = feature.width || 2.4;
+  const width = feature.width || 2.4;
   const structure: THREE.BufferGeometry[] = [], posts: THREE.BufferGeometry[] = [], details: THREE.BufferGeometry[] = [];
   const arches: THREE.BufferGeometry[] = [], canopy: THREE.BufferGeometry[] = [];
   const floor = merged(layout.footprint.map(shape => slab(shape, base, base + .08)));
-  const cumulative = [0];
-  for (let i = 1; i < route.length; i++) cumulative.push(cumulative.at(-1)! + Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]));
-  const at = (distance: number, side = 0): Point => {
-    const i = Math.min(route.length - 1, Math.max(1, cumulative.findIndex(d => d >= distance)));
-    const a = route[i - 1], b = route[i], length = cumulative[i] - cumulative[i - 1], t = Math.max(0, Math.min(1, (distance - cumulative[i - 1]) / length));
-    return [a[0] + (b[0] - a[0]) * t - (b[1] - a[1]) / length * side,
-      a[1] + (b[1] - a[1]) * t + (b[0] - a[0]) / length * side];
-  };
   // DJI_0008 shows a white curved roof; DSC08047 / DSC2503 show arches below it.
   // A thin fascia above each arch keeps the full walkway open at eye height.
   const arch = (point: (t: number, side: number) => Point, count = 8) => {
@@ -81,25 +74,36 @@ export function wisteriaArchitecture(feature: Feature, library: Shape) {
     }
   }
   const end = merged(endParts, true);
-  let length = cumulative.at(-1)!;
-  while (length > 0 && terminal.contains(at(length))) length -= .05;
-  const bays = Math.max(1, Math.round(length / 4.2));
-  for (let i = 0; i < bays; i++) for (const side of [-1, 1]) {
-    const from = i / bays * length, to = (i + 1) / bays * length;
-    arches.push(arch((t, thickness) => at(from + .17 + (to - from - .34) * t, side * (width / 2 - .16) + thickness)));
-  }
-  for (let i = 0; i <= bays; i++) for (const side of [-1, 1]) {
-    const p = at(i / bays * length, side * (width / 2 - .16));
-    posts.push(beam([p[0], base + .08, p[1]], [p[0], height - .18, p[1]], .32));
-    structure.push(beam([p[0], height, p[1]], [p[0], height + .65, p[1]], .06));
-  }
-  // The metal frame stands above the opaque roof, with an open central band at the round end.
-  for (let i = 1; i < route.length; i++) {
-    const distance = Math.min(length, cumulative[i]), previous = cumulative[i - 1];
-    if (previous >= length) break;
-    for (const side of [-1, 1]) for (const y of [height + .12, height + .65]) {
-      const a = at(previous, side * (width / 2 - .16)), b = at(distance, side * (width / 2 - .16));
-      structure.push(beam([a[0], y, a[1]], [b[0], y, b[1]], .055));
+  for (const [routeIndex, route] of [feature.points!, ...(feature.branches || [])].entries()) {
+    const cumulative = [0];
+    for (let i = 1; i < route.length; i++) cumulative.push(cumulative.at(-1)! + Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]));
+    const at = (distance: number, side = 0): Point => {
+      const i = Math.min(route.length - 1, Math.max(1, cumulative.findIndex(d => d >= distance)));
+      const a = route[i - 1], b = route[i], length = cumulative[i] - cumulative[i - 1], t = Math.max(0, Math.min(1, (distance - cumulative[i - 1]) / length));
+      return [a[0] + (b[0] - a[0]) * t - (b[1] - a[1]) / length * side,
+        a[1] + (b[1] - a[1]) * t + (b[0] - a[0]) / length * side];
+    };
+    let length = cumulative.at(-1)!;
+    while (length > 0 && terminal.contains(at(length))) length -= .05;
+    const bays = Math.max(1, Math.round(length / 4.2));
+    for (let i = 0; i < bays; i++) for (const side of [-1, 1]) {
+      const from = i / bays * length, to = (i + 1) / bays * length;
+      arches.push(arch((t, thickness) => at(from + .17 + (to - from - .34) * t, side * (width / 2 - .16) + thickness)));
+    }
+    for (let i = 0; i <= bays; i++) for (const side of [-1, 1]) {
+      if (routeIndex && i === 0) continue; // The junction stays open to the existing walkway.
+      const p = at(i / bays * length, side * (width / 2 - .16));
+      posts.push(beam([p[0], base + .08, p[1]], [p[0], height - .18, p[1]], .32));
+      structure.push(beam([p[0], height, p[1]], [p[0], height + .65, p[1]], .06));
+    }
+    // The metal frame stands above the opaque roof, with an open central band at the round end.
+    for (let i = 1; i < route.length; i++) {
+      const distance = Math.min(length, cumulative[i]), previous = cumulative[i - 1];
+      if (previous >= length) break;
+      for (const side of [-1, 1]) for (const y of [height + .12, height + .65]) {
+        const a = at(previous, side * (width / 2 - .16)), b = at(distance, side * (width / 2 - .16));
+        structure.push(beam([a[0], y, a[1]], [b[0], y, b[1]], .055));
+      }
     }
   }
   // Each half has its own rim and supports; their straight inner edges stay staggered.
@@ -115,13 +119,33 @@ export function wisteriaArchitecture(feature: Feature, library: Shape) {
     }
   }
   const roomFloor = base + .24;
-  const room = merged([slab(annex.footprint, roomFloor, height - .24)], true);
+  const sideEntries = (feature.branches || []).flatMap(([start]) => {
+    const offset = [start[0] - annex.at(0, 0)[0], start[1] - annex.at(0, 0)[1]];
+    const u = offset[0] * annex.along[0] + offset[1] * annex.along[1];
+    const v = offset[0] * annex.out[0] + offset[1] * annex.out[1];
+    return Math.abs(v - annex.depth) < .01 && u > 2 && u < annex.u1 - 2 ? [u] : [];
+  });
+  // A side junction needs an actual opening into the existing covered end,
+  // rather than a new canopy ending against its solid wall.
+  const polygon = (shape: Shape) => [shape.outer, ...shape.holes];
+  const inner = annex.rectangle(.2, annex.u1 - .2, .2, annex.depth - .2);
+  const shell = clip.difference(polygon(annex.footprint), polygon(inner));
+  const doorCuts = [annex.rectangle(-.2, .2, annex.doorStart, annex.doorEnd),
+    ...sideEntries.map(u => annex.rectangle(u - 1.4, u + 1.4, annex.depth - .3, annex.depth + .3))];
+  const doorwayTop = height - .62;
+  const roomParts = (polygons: ReturnType<typeof clip.difference>, bottom: number, top: number) =>
+    polygons.map(([outer, ...holes]) => slab({ outer, holes }, bottom, top));
+  const room = merged([...roomParts(clip.difference(shell, ...doorCuts.map(polygon)), roomFloor, doorwayTop),
+    ...roomParts(shell, doorwayTop, height - .24)], true);
   const roof = merged([slab(annex.roof, height - .24, height)]);
   const steps: THREE.BufferGeometry[] = [];
   for (let step = 0; step < 3; step++) {
     steps.push(slab(annex.rectangle(annex.u0 - .3 * (3 - step), annex.u0 - .3 * (2 - step), annex.doorStart - .15, annex.doorEnd + .15), base, base + .08 * (step + 1)));
   }
   steps.push(slab(annex.footprint, base, roomFloor));
+  for (const u of sideEntries) for (let step = 0; step < 2; step++) {
+    steps.push(slab(annex.rectangle(u - 1.35, u + 1.35, annex.depth + .3 * (1 - step), annex.depth + .3 * (2 - step)), base, base + .16 + .08 * (step + 1)));
+  }
   const [a, b] = [annex.at(annex.u0 - .015, annex.doorStart), annex.at(annex.u0 - .015, annex.doorEnd)], bottom = roomFloor, top = height - .62;
   const door = new THREE.BoxGeometry(Math.hypot(b[0] - a[0], b[1] - a[1]), top - bottom, .03);
   door.rotateY(-Math.atan2(b[1] - a[1], b[0] - a[0]));

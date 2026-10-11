@@ -4,6 +4,7 @@ import { buildingCoreFootprint, buildingGeometry, passageShape } from './buildin
 import { classroomWindowLayout, solidCoreWindowLayout, type ClassroomWindow } from './teaching-classrooms.ts';
 import { GYM_WALL, gymFrame, gymStairGeometry, gymWindowOpenings } from './gym-interior.ts';
 import { bridgeHeight } from './structure-geometry.ts';
+import { passageFootprint } from './underground-geometry.ts';
 import type { Building, BuildingPart, ClassroomWindows, Feature, GroundPassage, Point, Shape } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -107,7 +108,10 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
     for (let floor = (corridor.startFloor ?? 2) - 1; floor * floorHeight + 1.3 < height; floor++) {
       const y = BASE + (rooftop ? section.height : floor * floorHeight + .25);
       const enclosed = (building.solidCores || []).filter(core => core.partId === section.id &&
-        floor + 1 >= (core.startFloor ?? 1) && !rooftop);
+        floor + 1 >= (core.startFloor ?? 1) && floor + 1 <= (core.endFloor ?? Infinity) && !rooftop);
+      // Guards are inset from their saved edge. Include the wall's edge band
+      // so a rail just outside a new room cannot survive alongside its wall.
+      const enclosures = enclosed.flatMap(core => [core, ...core.outer.slice(1).map((to, i) => passageFootprint([core.outer[i], to], .25))]);
       const posts = new Map<string, Point>();
       for (const [first, last] of segments) {
         let a = first, b = last;
@@ -121,7 +125,7 @@ export function teachingRailGeometry(building: Building, sections: Section[], fl
         const from = a.map((v, i) => v + offset[i]) as Point, to = b.map((v, i) => v + offset[i]) as Point;
         // The photographed corridor end has masonry and glazing; its guards
         // stop at the enclosure rather than continuing through the window.
-        for (const [start, end] of outsideOpenings(from, to, [...(floor === 0 ? groundOpenings : []), ...enclosed])) {
+        for (const [start, end] of outsideOpenings(from, to, [...(floor === 0 ? groundOpenings : []), ...enclosures])) {
           for (const rise of [.5, 1.05]) parts.push(bar([start[0], y + rise, start[1]], [end[0], y + rise, end[1]], .055));
           const count = Math.max(1, Math.ceil(Math.hypot(end[0] - start[0], end[1] - start[1]) / 2.7));
           for (let i = 0; i <= count; i++) {

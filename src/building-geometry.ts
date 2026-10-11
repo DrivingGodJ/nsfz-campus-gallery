@@ -116,7 +116,11 @@ function corridorFootprint(section: Shape, corridor: FloorCorridor, passages: Gr
 }
 
 export function buildingCoreFootprint(section: Shape, passages: GroundPassage[], corridors: FloorCorridor[], stairs: BuildingStairwell[], solidCores: Shape[] = [], cutouts: Shape[] = []) {
-  const cuts = [...corridors.map(corridor => [corridorFootprint(section, corridor, passages).outer]), ...stairs.map(stair => [stair.opening.outer, ...stair.opening.holes]), ...solidCores.map(core => [core.outer, ...core.holes]), ...cutouts.map(cut => [cut.outer, ...cut.holes])];
+  // Storey-specific rooms can share the same facade. Join their cuts
+  // before subtracting them so nested, coincident boundaries stay stable.
+  const solids = solidCores.map(core => [core.outer, ...core.holes]);
+  const solidCuts = solids.length ? polygonClipping.union(solids[0], ...solids.slice(1)) : [];
+  const cuts = [...corridors.map(corridor => [corridorFootprint(section, corridor, passages).outer]), ...stairs.map(stair => [stair.opening.outer, ...stair.opening.holes]), ...solidCuts, ...cutouts.map(cut => [cut.outer, ...cut.holes])];
   const polygon = [section.outer, ...section.holes];
   return cuts.length ? polygonClipping.difference(polygon, cuts[0], ...cuts.slice(1)) : [polygon];
 }
@@ -129,9 +133,13 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
   const openings = [...corridorCuts, ...stairCuts];
   const solids = solidCores.map(core => [core.outer, ...core.holes]);
   const solidStarts = solidCores.map(core => Math.max(0, ((core.startFloor ?? 1) - 1) * floorHeight));
+  const solidEnds = solidCores.map(core => Math.min(height, (core.endFloor ?? Infinity) * floorHeight));
   const coreShells = solids.map((solid, index) => cutaway || solidCores[index].classroomWindows
     ? snapFootprint(classroomWallFootprint([solid], solidCores[index].classroomWindows?.wallThickness ?? .25, snapFootprint,
       (solidCores[index].openEdges || []).map(edge => ({ from: solidCores[index].outer[edge], to: solidCores[index].outer[edge + 1] })))) : []);
+  const doorShells = solids.map((solid, index) => solidCores[index].doors?.length
+    ? snapFootprint(classroomWallFootprint([solid], solidCores[index].classroomWindows?.wallThickness ?? .25, snapFootprint,
+      [...(solidCores[index].openEdges || []), ...solidCores[index].doors!.map(door => door.edge)].map(edge => ({ from: solidCores[index].outer[edge], to: solidCores[index].outer[edge + 1] })))) : coreShells[index]);
   const openArea = openings.length ? polygonClipping.union(openings[0], ...openings.slice(1), ...infills) : [];
   const corridorArea = solids.length ? polygonClipping.difference(openArea, solids[0], ...solids.slice(1)) : openArea;
   // Stitch the small imported facade notch at slab levels only. The open
@@ -173,12 +181,15 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     const bottom = level * floorHeight;
     slabs.push([bottom, Math.min(bottom + slabThickness, height)]);
   }
-  const levels = [...new Set([0, height, Math.min(floorHeight, height), ...solidStarts.filter(bottom => bottom > 0 && bottom < height), ...slabs.flat(), ...glazing.flatMap(window => [window.bottom, window.top])])].sort((a, b) => a - b);
+  const doorTops = solidCores.flatMap((core, index) => Array.from({ length: Math.ceil(solidEnds[index] / floorHeight) }, (_, floor) =>
+    (core.doors || []).map(door => floor * floorHeight + door.height)).flat().filter(top => top > solidStarts[index] && top < solidEnds[index]));
+  const levels = [...new Set([0, height, Math.min(floorHeight, height), ...solidStarts, ...solidEnds, ...doorTops, ...slabs.flat(), ...glazing.flatMap(window => [window.bottom, window.top])])].filter(level => level >= 0 && level <= height).sort((a, b) => a - b);
   const layers = levels.slice(0, -1).map((bottom, i) => {
     const top = levels[i + 1], middle = (bottom + top) / 2;
     const slab = slabs.some(([a, b]) => middle >= a && middle <= b);
     // Upper-storey rooms leave the entrance beneath them open.
-    const activeSolids = solids.flatMap((solid, index) => solidCores[index].elevator || middle < solidStarts[index] ? [] :
+    const activeSolids = solids.flatMap((solid, index) => solidCores[index].elevator || middle < solidStarts[index] || middle >= solidEnds[index] ? [] :
+      solidCores[index].doors?.some(door => middle % floorHeight < door.height) ? doorShells[index] :
       solidCores[index].classroomWindows || cutaway && middle >= cutawayBottom ? coreShells[index] : [solid]);
     const storeyWalls = middle < floorHeight && groundWalls ? groundWalls : cutawayWalls && middle >= cutawayBottom ? cutawayWalls : walls;
     let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(storeyWalls, activeSolids[0], ...activeSolids.slice(1)) : storeyWalls;
@@ -261,12 +272,17 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     addCap(next ? polygonClipping.difference(layer.footprint, next) : layer.footprint, layer.top, true);
   }
   const geometry = new THREE.BufferGeometry();
-  // Clipped jamb corners may produce zero-area triangles at shared vertices.
+  // Clipped jamb corners may produce slivers narrower than the snapping grid.
   // Drop them before rendering or raycasting, keeping the face mask aligned.
-  const clean: number[] = [], masks: number[] = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const clean: number[] = [], masks: number[] = [], faces = new Set<string>(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
   for (let i = 0; i < positions.length; i += 9) {
     a.fromArray(positions, i); b.fromArray(positions, i + 3); c.fromArray(positions, i + 6);
-    if (b.sub(a).cross(c.sub(a)).lengthSq() < 1e-14) continue;
+    b.sub(a); c.sub(a);
+    const longestEdge = Math.max(b.lengthSq(), c.lengthSq(), b.distanceToSquared(c));
+    if (b.cross(c).lengthSq() < longestEdge * 1e-10) continue;
+    const face = [0, 3, 6].map(offset => positions.slice(i + offset, i + offset + 3).map(value => Math.fround(value).toFixed(5)).join(',')).sort().join(';');
+    if (faces.has(face)) continue;
+    faces.add(face);
     clean.push(...positions.slice(i, i + 9)); masks.push(occlusionMask[i / 9]);
   }
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(clean, 3));
