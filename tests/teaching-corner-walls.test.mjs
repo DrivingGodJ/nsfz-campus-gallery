@@ -121,7 +121,8 @@ test('the removed north projection has no residual masonry, glazing or frames ab
 
 test('the restored classroom keeps photo-approved third-floor desks without adding furniture to its open first floor', () => {
   assert.ok(room);
-  const [x, z] = classroomAt(85.7, 67.05 + 1.55);
+  const bay = CLASSROOM_BAYS.find(item => item.id === 'main-west-3');
+  const [x, z] = classroomAt(bay.u - 1.55, bay.v);
   assert.equal(insideArea(x, z, teachingClassroomInterior(building, main, 1)), false, 'The open ground-level corner is not treated as classroom interior');
   for (let floor = 2; floor <= main.floors; floor++) assert.ok(insideArea(x, z, teachingClassroomInterior(building, main, floor)), `The existing upper classroom interior remains on floor ${floor}`);
   assert.deepEqual(CLASSROOM_BAYS.map(bay => bay.id), ['main-west-3', 'wing-east-3', 'main-north-5', 'main-east-1'], 'Only the four photo-approved bays receive furniture');

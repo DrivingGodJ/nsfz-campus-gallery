@@ -3,6 +3,7 @@ import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildingGeometry, passageShape, snapFootprint } from './building-geometry.ts';
 import { classroomWindowLayout, type ClassroomWindow } from './teaching-classrooms.ts';
+import { dormitoryEntranceLayout } from './dormitory-entrance-geometry.ts';
 import type { Building, ClassroomWindows, Point, Shape } from './types';
 
 export const FACADE_BASE = .12;
@@ -82,6 +83,8 @@ export function dormitoryBodyGeometry(building: Building, height: number, floorH
       windows.push({ from, to, bottom, top, cut: [[move(from, .2), move(to, .2), move(to, -config!.wallThickness - .3), move(from, -config!.wallThickness - .3), move(from, .2)]] });
     }
   }
+  const lobby = dormitoryEntranceLayout(building);
+  if (windows && lobby) windows.push({ ...lobby.opening, top: Math.min(lobby.opening.top, height) });
   const body = buildingGeometry(shape, height, floorHeight, building.groundPassages, [], [], config, [], [], cutaway||!!observatory, windows);
   let geometry=body;
   if(observatory) {

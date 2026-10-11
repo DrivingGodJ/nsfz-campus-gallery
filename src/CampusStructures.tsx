@@ -22,6 +22,7 @@ import MemorialGallery from './MemorialGallery';
 import AircraftDisplay from './AircraftDisplay';
 import Bench from './Bench';
 import ParallelBars from './ParallelBars';
+import WoodenHut from './WoodenHut';
 import { garageRampGeometry, garageRampFootprint } from './garage-ramp-geometry';
 import MapModelLayer from './MapModelLayer';
 
@@ -255,6 +256,7 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
     if (feature.type === 'landmark' && feature.aircraft) return surface(<AircraftDisplay feature={feature} />);
     if (feature.type === 'landmark' && feature.bench) return surface(<Bench feature={feature} />);
     if (feature.type === 'landmark' && feature.parallelBars) return surface(<ParallelBars feature={feature} />);
+    if (feature.type === 'landmark' && feature.woodenHut) return surface(<WoodenHut feature={feature} />);
     if (feature.type === 'landmark' && feature.landmark) return surface(<GateLandmark feature={feature} labelPortal={labelPortal} />);
     if (['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction', 'undergroundTrack'].includes(feature.type)) {
       const area = layout.areas.get(feature.id);

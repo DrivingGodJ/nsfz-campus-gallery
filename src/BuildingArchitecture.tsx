@@ -9,6 +9,7 @@ import { laboratoryLayout, laboratoryWindows } from './laboratory-geometry';
 import { cafeteriaLowerProfile, cafeteriaLowerWindowsConfig, cafeteriaUpperWindows, dormitoryProfile } from './facade-geometry';
 import { TEACHING_ID, teachingDetailGeometry } from './teaching-details';
 import { teachingClassroomFurniture } from './teaching-classroom-furniture';
+import DormitoryEntrance from './DormitoryEntrance';
 import { OFFICE_ID, LIBRARY_ID, libraryAnnexWindowsConfig } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
 import { STAND_OFFICE_ID, standOfficeWindows } from './stand-office-geometry';
@@ -68,6 +69,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   });
   // The roof remains visible at campus scale; only small rail details fade away.
   return <group>
+    {building.facade?.lobbyEntry && <DormitoryEntrance building={building} visibleHeight={cutawayHeight} />}
     {teaching && <>
       <mesh geometry={teaching.columns} raycast={() => null}><meshStandardMaterial color={material('trim', '#c5c9be')} roughness={.95} /></mesh>
       <mesh geometry={teaching.paving} raycast={() => null}><meshStandardMaterial color={mapColor('#bda995')} roughness={1} /></mesh>
