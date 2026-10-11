@@ -166,6 +166,7 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     const shape = passageShape(passage);
     return [shape.outer, ...shape.holes];
   });
+  const groundCuts = [...passageCuts, ...corridorCuts.filter((_, i) => corridors[i].removeGroundFloor)];
   const groundRecesses = passageCuts.filter((_, i) => passages[i].recessClassrooms);
   const groundCore = groundRecesses.length ? polygonClipping.difference(core, groundRecesses[0], ...groundRecesses.slice(1)) : undefined;
   const groundClassrooms = groundCore && (windows || cutaway
@@ -199,8 +200,8 @@ function corridorGeometry(section: Shape, height: number, floorHeight: number, p
     // through intermediate slabs so they can connect the floors.
     if (slab && middle > slabThickness && middle < height - slabThickness && shafts.length) footprint = polygonClipping.difference(footprint, shafts[0], ...shafts.slice(1));
     if (slab && middle >= height - slabThickness && roofShafts.length) footprint = polygonClipping.difference(footprint, roofShafts[0], ...roofShafts.slice(1));
-    // Existing ground roads stay open across the full width, including the slabs.
-    if (middle < floorHeight && passageCuts.length) footprint = polygonClipping.difference(footprint, passageCuts[0], ...passageCuts.slice(1));
+    // Ground roads and removed balcony strips stay clear, including base slabs.
+    if (middle < floorHeight && groundCuts.length) footprint = polygonClipping.difference(footprint, groundCuts[0], ...groundCuts.slice(1));
     // Window jambs and wall shells share the same boundary. Weld microscopic
     // clipping differences before subtracting adjacent layers for their caps.
     return { bottom, top, footprint: windows || cutaway ? snapFootprint(footprint) : footprint, slab };
