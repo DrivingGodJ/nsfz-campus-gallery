@@ -131,8 +131,8 @@ test('the open ground corner and roads do not remove the complete upper-floor ro
       assert.ok(crossing(shared, .5, base + .65).intersectObjects(object.bodies).length,
         `The upper room shared-end sill remains on floor ${floor}`);
       const pane = crossing(shared, .5, base + 1.6);
-      assert.equal(pane.intersectObjects(object.bodies).length, 0, `Floor ${floor} keeps the ordinary upper-end window aperture`);
-      assert.ok(pane.intersectObject(object.glass).length, `Floor ${floor} keeps its upper-end window above the ground road`);
+      assert.ok(pane.intersectObjects(object.bodies).length, `Floor ${floor} now has masonry across the marked blank end wall`);
+      assert.equal(pane.intersectObjects([object.glass, object.frames]).length, 0, `Floor ${floor} has no upper-end window above the ground road`);
     }
   } finally { object.dispose(); }
 });

@@ -23,6 +23,7 @@ import AircraftDisplay from './AircraftDisplay';
 import Bench from './Bench';
 import ParallelBars from './ParallelBars';
 import WoodenHut from './WoodenHut';
+import StreetFence from './StreetFence';
 import { garageRampGeometry, garageRampFootprint } from './garage-ramp-geometry';
 import MapModelLayer from './MapModelLayer';
 
@@ -248,6 +249,7 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
   const spaces=useMemo(()=>[...layout.areas.values()].map(area=>({floor:area.feature.height??-3,height:area.feature.wallHeight||2.4,footprints:area.footprints})),[layout]);
   return <>{features.map(feature => {
     const surface = (children: ReactNode) => <MapModelLayer key={feature.id} underground={mode === 'underground' && !photoPerspective}>{children}</MapModelLayer>;
+    if (feature.type === 'fence' && feature.railEdges) return surface(<StreetFence feature={feature} />);
     if (feature.type === 'mottoStone' && feature.stone) return surface(<MottoStone feature={feature} />);
     if (feature.type === 'flagPlatform' && feature.flagPlatform) return surface(<FlagPlatform feature={feature} />);
     if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return surface(<LakeGarden feature={feature} features={features} connectedBuilding={buildings.find(building => feature.connectedTo?.includes(building.id))} labelPortal={labelPortal} />);

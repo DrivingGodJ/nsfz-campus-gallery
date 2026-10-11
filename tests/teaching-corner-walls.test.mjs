@@ -67,14 +67,14 @@ test('the southwest room is one complete four-sided upper-floor enclosure while 
       assert.equal(ground.intersectObjects(meshes).length, 0, `The former room wall is absent on floor one, edge ${edge}`);
       assert.equal(ground.intersectObjects([glass, frames]).length, 0, `No upper-room glazing descends into floor one or its road, edge ${edge}`);
     }
-    assert.ok(windows.length >= 16 && windows.every(window => window.bottom >= info.floorHeight));
+    assert.ok(windows.length >= 12 && windows.every(window => window.bottom >= info.floorHeight));
     for (let floor = 2; floor <= main.floors; floor++) {
       for (let edge = 0; edge < room.outer.length - 1; edge++) for (const fraction of [.15, .5, .85]) {
         const ray = crossing(room.outer[edge], room.outer[edge + 1], BASE + (floor - 1) * info.floorHeight + .65, fraction);
         assert.ok(ray.intersectObjects(meshes).length, `Floor ${floor} has real sill masonry along room edge ${edge}, t=${fraction}`);
       }
       const floorWindows = windows.filter(window => window.bottom > (floor - 1) * info.floorHeight && window.top < floor * info.floorHeight);
-      assert.ok(floorWindows.length >= 4, `The original window faces remain on floor ${floor}`);
+      assert.ok(floorWindows.length >= 3, `The three retained window faces remain on floor ${floor}; the connecting end is now a blank wall`);
       for (const window of floorWindows) {
         const ray = crossing(window.from, window.to, BASE + (window.bottom + window.top) / 2);
         assert.equal(ray.intersectObjects(meshes).length, 0, `Floor ${floor} glazing has an actual wall aperture`);

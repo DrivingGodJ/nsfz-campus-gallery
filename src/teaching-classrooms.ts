@@ -91,6 +91,7 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
   }
   const result: ClassroomWindow[] = [];
   const facadeEdges = config.facadeLines?.flatMap(points => points.slice(1).map((to, i) => ({ from: points[i], to })));
+  const blindEdges = config.blindFacadeLines?.flatMap(points => points.slice(1).map((to, i) => ({ from: points[i], to }))) || [];
   if (facadeEdges && !facadeEdges.length) return result;
   for (const run of windowRuns(core, openEdges)) {
     const length = run.reduce((sum, edge) => sum + edge.length, 0);
@@ -109,6 +110,7 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
         if (last - first < 1e-6) return [];
         const a = lerp(edge.from, edge.to, (first - origin) / edge.length), b = lerp(edge.from, edge.to, (last - origin) / edge.length);
         if (facadeEdges && !confirmedFacade(a, b, facadeEdges)) confirmed = false;
+        if (confirmedFacade(a, b, blindEdges)) confirmed = false;
         const inset = (p: Point): Point => [p[0] + edge.normal[0] * config.wallThickness / 2, p[1] + edge.normal[1] * config.wallThickness / 2];
         const divisions = (columns: number) => Array.from({ length: columns + 1 }, (_, column) => start + width * column / columns)
           .filter(at => at >= first - 1e-6 && at <= last + 1e-6).map(at => Math.max(0, Math.min(1, (at - first) / (last - first))));

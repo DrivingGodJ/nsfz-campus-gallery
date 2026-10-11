@@ -200,6 +200,6 @@ test('stair calibration survives map refresh without changing the photo records 
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   assert.deepEqual(applyCampusCorrections(campus, corrections), campus);
   assert.equal(stair.partId, 'main');
-  assert.equal(building.stairwells.length, 3, 'Both main stair bays and the separate six-floor wing stair survive the map refresh');
+  assert.equal(building.stairwells.length, 4, 'Both main stair bays and both six-floor wing stairs survive the map refresh');
   assert.equal(campus.features.some(f => f.type === 'stairs'), false);
 });

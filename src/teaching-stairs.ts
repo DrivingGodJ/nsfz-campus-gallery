@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import polygonClipping from 'polygon-clipping';
+import { classroomWallFootprint } from './teaching-classrooms.ts';
 import type { Building, BuildingPart, BuildingStairwell, Point, Shape } from './types';
 
 type Section = BuildingPart & { height: number; floors: number };
@@ -18,7 +20,12 @@ export function stairwellFrame(stair: BuildingStairwell) {
 export function stairwellShaft(stair: BuildingStairwell): Shape {
   const { at } = stairwellFrame(stair), half = stair.width / 2;
   const outer = [at(stair.landingDepth, -half), at(stair.landingDepth, half), at(stair.landingDepth * 2 + stair.run, half), at(stair.landingDepth * 2 + stair.run, -half)];
-  return { outer: [...outer, outer[0]], holes: [] };
+  const rectangle = [...outer, outer[0]];
+  if (stair.followWalls) {
+    const [ring, ...holes] = polygonClipping.intersection([rectangle], [stair.opening.outer, ...stair.opening.holes])[0];
+    return { outer: ring, holes };
+  }
+  return { outer: rectangle, holes: [] };
 }
 
 function combine(parts: THREE.BufferGeometry[]) {
@@ -50,9 +57,25 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
     const roofHeight = section.height + (stair.roofAccess?.height ?? 0);
     const shown = Math.min(roofHeight, cutawayHeight ?? roofHeight);
     const { at, along } = stairwellFrame(stair);
+    // Rounded enclosures keep their surveyed outline. Clip each tread and
+    // landing to the inside of its walls instead of leaving side walking gaps.
+    const polygon = [stair.opening.outer, ...stair.opening.holes];
+    const openEdges = (stair.roofAccess?.openEdges || []).map(edge => ({ from: stair.opening.outer[edge], to: stair.opening.outer[edge + 1] }));
+    const wallFootprint = stair.followWalls ? classroomWallFootprint([polygon], .28, undefined, openEdges) : [];
+    const interior = stair.followWalls ? polygonClipping.difference(polygon, wallFootprint) : [];
     const point = (u: number, v: number, y: number): Vector => { const [x, z] = at(u, v); return [x, BASE + y, z]; };
     const box = (u0: number, u1: number, v0: number, v1: number, bottom: number, top: number) => {
       top = Math.min(top, shown); if (top <= bottom) return;
+      if (stair.followWalls) {
+        const footprint = [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1), at(u0, v0)];
+        for (const [outer, ...holes] of polygonClipping.intersection([footprint], interior)) {
+          const shape = new THREE.Shape(outer.map(([x, z]) => new THREE.Vector2(x, -z)));
+          shape.holes = holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
+          const geometry = new THREE.ExtrudeGeometry(shape, { depth: top - bottom, bevelEnabled: false });
+          geometry.rotateX(-Math.PI / 2); concrete.push(geometry.translate(0, BASE + bottom, 0));
+        }
+        return;
+      }
       const geometry = new THREE.BoxGeometry(v1 - v0, top - bottom, u1 - u0);
       geometry.rotateY(Math.atan2(along[0], along[1]));
       concrete.push(geometry.translate(...point((u0 + u1) / 2, (v0 + v1) / 2, (bottom + top) / 2)));
@@ -79,6 +102,14 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
     const flight = (u0: number, u1: number, v0: number, v1: number, bottom: number) => {
       const rise = floorHeight / 2, steps = stair.stepsPerFlight, tread = (u1 - u0) / steps;
       if (bottom >= shown) return;
+      if (stair.followWalls) {
+        for (let i = 0; i < steps; i++) box(u0 + i * tread, u0 + (i + 1) * tread, v0, v1,
+          bottom + i * rise / steps - .22, bottom + (i + 1) * rise / steps);
+        // The walls guard the outside; the open central well has blue rails.
+        const inner = Math.abs(v0) < Math.abs(v1) ? v0 : v1;
+        guard(u0, u1, inner, bottom, bottom + rise);
+        return;
+      }
       const profile: Point[] = [[u0, bottom - .22]];
       for (let i = 0; i < steps; i++) profile.push([u0 + i * tread, bottom + (i + 1) * rise / steps], [u0 + (i + 1) * tread, bottom + (i + 1) * rise / steps]);
       profile.push([u1, bottom + rise - .22]);
@@ -101,8 +132,10 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
       flight(near, far, ...first, bottom);
       box(far, far + stair.landingDepth, -half, half, middle - .22, middle);
       flight(far, near, ...second, middle);
-      for (const v of [-half + .06, half - .06]) guard(far, far + stair.landingDepth - .06, v, middle, middle);
-      for (const rise of [.48, RAIL_HEIGHT]) bar(point(far + stair.landingDepth - .06, -half + .06, middle + rise), point(far + stair.landingDepth - .06, half - .06, middle + rise));
+      if (!stair.followWalls) {
+        for (const v of [-half + .06, half - .06]) guard(far, far + stair.landingDepth - .06, v, middle, middle);
+        for (const rise of [.48, RAIL_HEIGHT]) bar(point(far + stair.landingDepth - .06, -half + .06, middle + rise), point(far + stair.landingDepth - .06, half - .06, middle + rise));
+      }
     }
     // Thin front supports, kept off the two flights, hold the rounded floor edge.
     if (!stair.internal) for (const u of [.35, stair.landingDepth * 2 + stair.run - .35]) box(u - .15, u + .15, -half - .65, -half - .35, SLAB, shown);
