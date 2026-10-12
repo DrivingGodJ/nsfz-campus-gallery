@@ -25,7 +25,8 @@ test('every public selectable destination has a camera focus inside its real loc
 test('location focus retains underground elevations and building floor cuts without mutating content', () => {
   const before = JSON.stringify({ campus, site });
   for (const feature of campus.features.filter(f => ['tunnel', 'undergroundRoom', 'undergroundCorridor', 'undergroundTrack'].includes(f.type))) {
-    assert.equal(mapLocationTarget(campus, site, feature.id).target[1], feature.height, `${feature.name} focuses its underground level`);
+    const floor = feature.riseStair ? (feature.riseStair.bottomHeight + feature.riseStair.topHeight)/2 : feature.height;
+    assert.equal(mapLocationTarget(campus, site, feature.id).target[1], floor, `${feature.name} focuses its underground floor range`);
   }
   const building = campusFilterLocations(campus, site).find(location => location.name === '主教学楼').building;
   const full = mapLocationTarget(campus, site, building.id), cut = mapLocationTarget(campus, site, building.id, 1);

@@ -147,7 +147,7 @@ test('all building heights follow floor counts and floor height even when legacy
   assert.ok(map.buildings.every(b => !Object.hasOwn(b, 'height')), 'Regenerated buildings store floors instead of total heights');
 });
 
-test('underground court and corridor connect to the tunnel on the same level; new building survives refresh', async () => {
+test('underground court and corridor connect to the raised tunnel landing; new building survives refresh', async () => {
   const map = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
   const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   const regenerated = applyCampusCorrections(map, corrections);
@@ -155,7 +155,7 @@ test('underground court and corridor connect to the tunnel on the same level; ne
   const tunnel = find('local/underpass'), exit = find('local/underpass-exit');
   const corridor = find('local/underground-corridor'), court = find('local/underground-badminton');
   assert.equal(exit.type, 'tunnelJunction');
-  assert.equal(exit.height, tunnel.height);
+  assert.equal(exit.height, tunnel.riseStair.topHeight);
   assert.equal(corridor.height, exit.height);
   assert.equal(court.height, corridor.height);
   const sportsDeck = map.buildings.find(b => b.id === 'local/gymnasium').baseElevation;

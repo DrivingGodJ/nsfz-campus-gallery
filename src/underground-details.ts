@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { undergroundFootprints, undergroundEntranceStair, undergroundSkylights, undergroundCeilingSections, type PassageOpening } from './underground-geometry.ts';
+import { passageFootprint, undergroundFootprints, undergroundEntranceStair, undergroundRiseStair, undergroundFloorElevation, undergroundSkylights, undergroundCeilingSections, type PassageOpening } from './underground-geometry.ts';
 import { undergroundWallPanels } from './underground-mesh.ts';
 import { undergroundRailGeometry } from './underground-rail-geometry.ts';
 import { pointOnStairTread } from './structure-geometry.ts';
@@ -35,6 +35,21 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
   const floor = feature.height ?? -3, clear = feature.wallHeight || 2.4, top = floor + clear;
   const sections = undergroundCeilingSections(feature, footprints, openings, connections);
   const stair = undergroundEntranceStair(feature);
+  const rise = undergroundRiseStair(feature);
+  const floorAt = (p: Point) => undergroundFloorElevation(feature, p);
+  const walkingSegments = (from: Point, to: Point) => {
+    const cuts = [0, 1];
+    if (rise) {
+      const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+      for (let i = 0; i <= rise.steps; i++) {
+        const p = rise.at(rise.length * i / rise.steps);
+        const t = ((p[0] - from[0]) * dx + (p[1] - from[1]) * dz) / (length * length);
+        if (t > 0 && t < 1) cuts.push(t);
+      }
+    }
+    const ordered = [...new Set(cuts)].sort((a,b) => a-b), at = (t: number): Point => [from[0] + (to[0]-from[0])*t, from[1] + (to[1]-from[1])*t];
+    return ordered.slice(1).map((end,i) => ({from:at(ordered[i]),to:at(end),height:floorAt(at((ordered[i]+end)/2))}));
+  };
   const heightAt = (p: Point) => sections.find(section => section.footprints.some(shape => pointOnStairTread(p, shape.outer)
     && !shape.holes.some(hole => pointOnStairTread(p, hole))))?.height ?? clear;
   const roofSegments = (from: Point, to: Point) => {
@@ -73,8 +88,12 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     parts[kind].push(geometry.rotateX(-Math.PI / 2).translate(0, height, 0));
   };
   for (const shape of footprints) {
-    const floors = stair ? polygonClipping.difference([shape.outer, ...shape.holes], [stair.footprint.outer]) : [[shape.outer, ...shape.holes]];
+    const platform = rise ? passageFootprint([rise.to, rise.at(rise.length + 20)], feature.width || rise.width) : null;
+    const cuts = [...(stair ? [[stair.footprint.outer]] : []), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
+    const floors = cuts.length ? polygonClipping.difference([shape.outer, ...shape.holes], ...cuts) : [[shape.outer, ...shape.holes]];
     for (const [outer, ...holes] of floors) flat({ outer, holes }, floor + .045, feature.type === 'undergroundRoom' ? 'green' : 'floor');
+    if (platform) for (const [outer, ...holes] of polygonClipping.intersection([shape.outer, ...shape.holes], [platform.outer]))
+      flat({ outer, holes }, rise!.topHeight + .045, 'floor');
   }
   for (const section of sections) for (const shape of section.footprints) {
     const clear = section.height, top = floor + clear;
@@ -117,6 +136,15 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
         stair.topHeight + (stair.bottomHeight - stair.topHeight) * distance / stair.length))], 1.045));
     }
   }
+  if (rise) {
+    for (const tread of rise.treads) segment(tread.from, tread.to, rise.bottomHeight + .045, tread.height - rise.bottomHeight, rise.width, 'floor');
+    for (const side of [-1, 1]) {
+      const offset = side * (rise.width / 2 - .09);
+      const chain = [-1, 0, rise.length, rise.length + 1].map(distance => point(rise.at(distance, offset),
+        rise.bottomHeight + .045 + (rise.topHeight - rise.bottomHeight) * Math.max(0, Math.min(1, distance / rise.length))));
+      parts.rails.push(undergroundRailGeometry([chain], 1.045));
+    }
+  }
   const roofOpenings = undergroundSkylights(feature);
   const routes = feature.points ? [feature.points, ...(feature.branches || [])] : [];
   for (const route of routes) for (let edge = 1; edge < route.length; edge++) {
@@ -135,8 +163,8 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       box(light, floor + heightAt(light) - .45, .06, lightwell ? 1.2 : .95, .32, -Math.atan2(dz, dx), 'lights');
       for (const side of [-1, 1]) {
         const wallLight = at(distance, side * (width / 2 - .17));
-        box(wallLight, floor + 1.85, .22, .22, .08, -Math.atan2(dz, dx), 'lights');
-        if (i % 3 === 0) box(wallLight, floor + .15, .16, .34, .09, -Math.atan2(dz, dx), 'green');
+        box(wallLight, floorAt(wallLight) + 1.85, .22, .22, .08, -Math.atan2(dz, dx), 'lights');
+        if (i % 3 === 0) box(wallLight, floorAt(wallLight) + .15, .16, .34, .09, -Math.atan2(dz, dx), 'green');
       }
       if (lightwell && i % 2 === 0 && i > 0 && i < positions) {
         const pillar = at(distance, .15);
@@ -162,12 +190,12 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       const from = at(.35, side), to = at(length - .35, side);
       for (const piece of roofSegments(from, to))
         bar(point(piece.from, floor + piece.height - .58), point(piece.to, floor + piece.height - .58), .035, 'pipes');
-      segment(from, to, floor + .065, .025, .2, 'tiles');
+      for (const piece of walkingSegments(from, to)) segment(piece.from, piece.to, piece.height + .065, .025, .2, 'tiles');
     }
     if (feature.type === 'tunnel') {
       // Orange guiding strip, suspended red service pipe and bright rectangular
       // ceiling panels are visible in _DSC8295 and the two exit-stair photos.
-      segment(at(.2, -.8), at(length - .2, -.8), floor + .07, .015, .12, 'wood');
+      for (const piece of walkingSegments(at(.2,-.8),at(length-.2,-.8))) segment(piece.from,piece.to,piece.height+.07,.015,.12,'wood');
       bar(point(at(.3, .7), top - .45), point(at(length - .3, .7), top - .45), .055, 'pipes');
     }
     if (feature.type === 'undergroundTrack') {

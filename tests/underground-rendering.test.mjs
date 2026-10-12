@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import * as THREE from 'three';
-import { joinedPassages, undergroundConnections, undergroundFootprints, undergroundLayout } from '../src/underground-geometry.ts';
+import { joinedPassages, undergroundConnections, undergroundFootprints, undergroundLayout, undergroundFloorElevation } from '../src/underground-geometry.ts';
 import { undergroundBoundaryLines, undergroundVolume } from '../src/underground-mesh.ts';
 
 const area = ring => Math.abs(ring.slice(1).reduce((sum, point, i) => sum + ring[i][0] * point[1] - point[0] * ring[i][1], 0) / 2);
@@ -61,10 +61,10 @@ test('the tunnel and green exit align along a shared open seam, without overlapp
   const tunnel = layout.areas.get('local/underpass'), corridor = layout.areas.get('local/underground-corridor');
   const exit = corridor.connections.find(f => f.id === 'local/underpass-exit');
   const joined = joinedPassages(tunnel.feature, exit), seam = joined.seam;
-  assert.deepEqual(tunnel.openings[0], seam); assert.deepEqual(corridor.openings[0], seam);
+  assert.deepEqual(tunnel.openings[0], joined.incomingOpening); assert.deepEqual(corridor.openings[0], joined.outgoingOpening);
   assert.equal(tunnel.openings.length, 2, 'The entrance stair has its own real opening at the other tunnel end');
   assert.ok(corridor.openings.length >= 3, 'Sports halls also have real doors into the side passages');
-  assert.equal(tunnel.feature.height, corridor.feature.height);
+  assert.equal(undergroundFloorElevation(tunnel.feature,tunnel.feature.points.at(-1)), corridor.feature.height);
   const tunnelShape = tunnel.footprints[0], corridorShape = corridor.footprints[0];
   for (const p of seam) {
     assert.ok(distance(p, tunnelShape.outer) < 1e-8);
@@ -90,9 +90,13 @@ test('the tunnel and green exit align along a shared open seam, without overlapp
         const cross = [p[0] + normal.x * .06 * sign, p[1] + normal.z * .06 * sign];
         assert.ok(inside(cross, tunnelShape.outer) || inside(cross, corridorShape.outer), 'There is no crack across the seam');
       }
-      const start = new THREE.Vector3(p[0], tunnel.feature.height + 1.2, p[1]).addScaledVector(normal, -.12);
+      const start = new THREE.Vector3(p[0], corridor.feature.height + 1.2, p[1]).addScaledVector(normal, -.12);
       assert.equal(new THREE.Raycaster(start, normal, 0, .24).intersectObjects(meshes).length, 0, 'The connected underground space has no internal end wall');
       for (const area of [tunnel, corridor]) {
+        if (area.feature.riseStair) {
+          assert.ok(area.feature.height + .08 < undergroundFloorElevation(area.feature,p), 'The former low floor outline is buried below the upper walking platform');
+          continue;
+        }
         const lines = area.footprints.flatMap(shape => undergroundBoundaryLines(shape, area.openings));
         assert.ok(lines.every(line => distance(p, line) > .05), 'Neither colored outline adds a dashed barrier across the opening');
       }

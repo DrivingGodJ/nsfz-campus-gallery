@@ -67,6 +67,34 @@ export function undergroundEntranceStair(feature: Feature) {
   return { ...stair, at, length, opening, treads, footprint: passageFootprint([stair.from, stair.to], stair.width) };
 }
 
+// The exit flight rises inside the straight tunnel, then meets the unchanged
+// turning landing. Heights are logical floors; the rendered finish adds .045 m.
+export function undergroundRiseStair(feature: Feature) {
+  const stair = feature.riseStair;
+  if (!stair) return null;
+  const length = Math.hypot(stair.to[0] - stair.from[0], stair.to[1] - stair.from[1]);
+  const axis: Point = [(stair.to[0] - stair.from[0]) / length, (stair.to[1] - stair.from[1]) / length];
+  const at = (distance: number, side = 0): Point => [stair.from[0] + axis[0] * distance - axis[1] * side,
+    stair.from[1] + axis[1] * distance + axis[0] * side];
+  const treads = Array.from({ length: stair.steps }, (_, i) => ({
+    from: at(length * i / stair.steps), to: at(length * (i + 1) / stair.steps),
+    height: stair.bottomHeight + (stair.topHeight - stair.bottomHeight) * (i + 1) / stair.steps,
+  }));
+  return { ...stair, at, length, treads, footprint: passageFootprint([stair.from, stair.to], stair.width) };
+}
+
+export function undergroundFloorElevation(feature: Feature, point: Point) {
+  const floor = feature.height ?? -3, stair = feature.riseStair;
+  if (!stair) return floor;
+  const dx = stair.to[0] - stair.from[0], dz = stair.to[1] - stair.from[1], length = Math.hypot(dx, dz);
+  const distance = ((point[0] - stair.from[0]) * dx + (point[1] - stair.from[1]) * dz) / length;
+  const across = Math.abs((point[0] - stair.from[0]) * dz - (point[1] - stair.from[1]) * dx) / length;
+  // Include wall thickness and miter rounding, but not an unrelated side route.
+  if (distance < -1e-7 || across > Math.max(stair.width, feature.width || 4) / 2 + .12) return floor;
+  const tread = Math.min(stair.steps, Math.floor(Math.max(0, distance) / length * stair.steps + 1e-7) + 1);
+  return stair.bottomHeight + (stair.topHeight - stair.bottomHeight) * tread / stair.steps;
+}
+
 export function undergroundSkylights(feature: Feature) {
   if (feature.type !== 'undergroundCorridor' || !feature.points) return [];
   const width = feature.width || 4;
@@ -83,6 +111,8 @@ export function undergroundSkylights(feature: Feature) {
 export function joinedPassages(incoming: Feature, outgoing: Feature) {
   const before = incoming.points!, after = outgoing.points!, joint = before.at(-1)!;
   if (Math.hypot(joint[0] - after[0][0], joint[1] - after[0][1]) > 1e-7) return null;
+  const firstFloor = undergroundFloorElevation(incoming, joint), secondFloor = undergroundFloorElevation(outgoing, after[0]);
+  if (Math.abs(firstFloor - secondFloor) > 1e-7) return null;
   const unit = (from: Point, to: Point): Point => {
     const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
     return [(to[0] - from[0]) / length, (to[1] - from[1]) / length];
@@ -100,12 +130,22 @@ export function joinedPassages(incoming: Feature, outgoing: Feature) {
   }) as PassageOpening;
   const firstHeight = incoming.wallHeight || 2.4, secondHeight = outgoing.wallHeight || 2.4;
   if (firstHeight !== secondHeight) seam.height = Math.min(firstHeight, secondHeight);
+  let outgoingOpening = seam;
+  const incomingBase = incoming.height ?? -3, outgoingBase = outgoing.height ?? -3;
+  if (Math.abs(incomingBase - outgoingBase) > 1e-7) {
+    const incomingRoof = incomingBase + (incoming.ceilingSegments?.find(segment => segment.edge === before.length - 2)?.height ?? firstHeight);
+    const outgoingRoof = outgoingBase + (outgoing.ceilingSegments?.find(segment => segment.edge === 0)?.height ?? secondHeight);
+    const roof = Math.min(incomingRoof, outgoingRoof) - .12;
+    seam.bottom = firstFloor - incomingBase; seam.height = roof - incomingBase;
+    outgoingOpening = seam.map(point => [...point] as Point) as PassageOpening;
+    outgoingOpening.bottom = secondFloor - outgoingBase; outgoingOpening.height = roof - outgoingBase;
+  }
   const incomingShape = passageFootprint(before, incoming.width || 4), outgoingShape = passageFootprint(after, outgoing.width || 4);
   const middle = (incomingShape.outer.length - 1) / 2;
   incomingShape.outer[middle - 1] = seam[1]; incomingShape.outer[middle] = seam[0];
   outgoingShape.outer[0] = seam[1]; outgoingShape.outer[outgoingShape.outer.length - 2] = seam[0];
   outgoingShape.outer[outgoingShape.outer.length - 1] = seam[1];
-  return { incoming: incomingShape, outgoing: outgoingShape, seam };
+  return { incoming: incomingShape, outgoing: outgoingShape, seam, incomingOpening: seam, outgoingOpening };
 }
 
 // A lower final leg shares the original mitered turn with the high corridor.
@@ -152,6 +192,16 @@ export function undergroundCeilingSections(feature: Feature, footprints = underg
       const joined = joinedPassages({ ...feature, points: points.slice(edge - 1, edge + 1) },
         { ...feature, points: leg, wallHeight: segment.height });
       if (joined) { zone = joined.outgoing; seam = joined.seam; }
+      else {
+        const previous = points[edge - 1], from = leg[0], to = leg[1];
+        const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+        const beforeX = from[0] - previous[0], beforeZ = from[1] - previous[1];
+        if (Math.abs(beforeX * dz - beforeZ * dx) < 1e-7 * Math.hypot(beforeX, beforeZ) * length && beforeX * dx + beforeZ * dz > 0) {
+          const half = (feature.width || 4) / 2;
+          seam = [-1, 1].map(side => [from[0] + dz / length * half * side,
+            from[1] - dx / length * half * side]) as PassageOpening;
+        }
+      }
     }
     sections = sections.flatMap(section => {
       const polygons = section.footprints.map(shape => [shape.outer, ...shape.holes]);
@@ -170,12 +220,12 @@ export function undergroundLayout(features: Feature[]) {
   const aligned = new Map<string, Shape>(), openings = new Map<string, PassageOpening[]>();
   for (const exit of features.filter(f => f.type === 'tunnelJunction' && f.points && f.points.length >= 2)) {
     const tunnel = features.find(f => f.type === 'tunnel' && f.points && f.points.length >= 2 && exit.connectedTo?.includes(f.id)
-      && (f.height ?? -3) === (exit.height ?? -3));
+      && Math.abs(undergroundFloorElevation(f, f.points.at(-1)!) - undergroundFloorElevation(exit, exit.points![0])) < 1e-7);
     if (!tunnel) continue;
     const join = joinedPassages(tunnel, exit);
     if (!join) continue;
     aligned.set(tunnel.id, join.incoming); aligned.set(exit.id, join.outgoing);
-    openings.set(tunnel.id, [join.seam]); openings.set(exit.id, [join.seam]);
+    openings.set(tunnel.id, [join.incomingOpening]); openings.set(exit.id, [join.outgoingOpening]);
   }
   const underground = features.filter(f => ['tunnel', 'tunnelJunction', 'undergroundCorridor', 'undergroundRoom', 'undergroundTrack'].includes(f.type)
     && (f.outer || f.points && f.points.length >= 2));

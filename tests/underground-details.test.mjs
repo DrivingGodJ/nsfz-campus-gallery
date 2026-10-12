@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import polygonClipping from 'polygon-clipping';
 import * as THREE from 'three';
-import { undergroundLayout, joinedPassages } from '../src/underground-geometry.ts';
+import { undergroundLayout, joinedPassages, undergroundCeilingSections } from '../src/underground-geometry.ts';
 import { undergroundVolume, undergroundWallPanels, undergroundCameraInside, undergroundMaterialView } from '../src/underground-mesh.ts';
 import { undergroundDetailGeometry } from '../src/underground-details.ts';
 const campus = JSON.parse(fs.readFileSync(new URL('../public/data/campus.json', import.meta.url)));
-const levels = campus.features.map(feature => /tunnel|underground/.test(feature.type) ? { ...feature, height: -3.8, wallHeight: feature.type === 'undergroundRoom' || feature.type === 'undergroundTrack' ? 6.2 : feature.type === 'tunnel' ? 3.2 : feature.wallHeight || 4 } : feature);
+const levels = campus.features;
 const mesh = geometry => { const object = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({side:THREE.DoubleSide})); object.rotation.x=-Math.PI/2; object.updateMatrixWorld(); return object; };
 
 test('underground sports halls have open doors and a non-overlapping floor connection to the side passages', () => {
@@ -85,7 +85,7 @@ test('the detailed corridor roof covers its merged exit and lightwell seams whil
 test('all underground model batches stay within their floors and ceilings and add recognizable photo-backed fittings', () => {
   let triangles=0;
   for(const area of undergroundLayout(levels).areas.values()) {
-    const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings,area.connections), floor=area.feature.height, ceiling=floor+area.feature.wallHeight;
+    const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings,area.connections), floor=area.feature.height, ceiling=floor+Math.max(...undergroundCeilingSections(area.feature,area.footprints,area.openings,area.connections).map(section=>section.height));
     for(const [kind,geometry] of Object.entries(model)) {
       const vertices=geometry.attributes.position;triangles+=vertices.count/3;
       assert.equal(geometry.userData.photoOcclusionMask.length,vertices.count/3);
@@ -99,7 +99,7 @@ test('all underground model batches stay within their floors and ceilings and ad
     if(area.feature.type==='undergroundCorridor') for(const kind of ['glass','walls','lights','tiles','pipes']) assert.ok(model[kind].attributes.position.count,kind);
     Object.values(model).forEach(geometry=>geometry.dispose());
   }
-  assert.ok(triangles<35000,'Structure and sports details remain material-batched within a fixed geometry budget');
+  assert.ok(triangles<42000,'Structure, sports details and the new picketed stair guards remain material-batched within a fixed geometry budget');
 });
 
 test('partial doors keep their jambs, and overhead inspections remove the volume ceiling', () => {

@@ -1,7 +1,8 @@
-import { bridgeHeight, bridgeSurfaceHeight, curvedStairSurfaceHeight } from './structure-geometry.ts';
+import { bridgeHeight, bridgeSurfaceHeight, curvedStairSurfaceHeight, pointOnStairTread } from './structure-geometry.ts';
 import { buildingLevels } from './building-model.ts';
 import { groundElevationAt } from './sports-ground-geometry.ts';
 import { dormitoryObservatory } from './facade-geometry.ts';
+import { undergroundFloorElevation, undergroundCeilingSections } from './underground-geometry.ts';
 import type { Building, Campus, Feature, Photo, Site } from './types';
 
 export type CampusLocation = { id: string; name: string; kind: 'building' | 'feature'; surfaceHeight: number; levelText: string; building?: Building; feature?: Feature };
@@ -55,8 +56,14 @@ export const altitudeLabel = (photo: Photo) => photo.altitude?.reference === 'se
 export function photoCameraHeightRange(photo: Photo, campus: Campus, site: Site) {
   const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
   const feature = campus.features.find(f => f.id === id);
-  const clearHeight = building ? buildingLevels(building, site.buildingOverrides[id]).floorHeight
+  let clearHeight = building ? buildingLevels(building, site.buildingOverrides[id]).floorHeight
     : feature && (feature.height ?? 0) < 0 ? feature.wallHeight ?? 3.6 : 3.6;
+  if (feature?.riseStair) {
+    const point: [number, number] = [photo.position.x, photo.position.z];
+    const sections = undergroundCeilingSections(feature);
+    const roof = sections.find(section => section.footprints.some(shape => pointOnStairTread(point,shape.outer)))?.height ?? clearHeight;
+    clearHeight = (feature.height ?? 0) + roof - undergroundFloorElevation(feature,point);
+  }
   return { min: .1, max: Math.max(.1, clearHeight - .1) };
 }
 
@@ -80,6 +87,7 @@ export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {
   if (!feature) return groundElevationAt(campus, [photo.position.x, photo.position.z]) + cameraHeight;
   const surface = featureSurfaceHeight(feature, campus, site);
   if (feature.type === 'tunnelEntrance' && feature.curvedStair) return curvedStairSurfaceHeight(feature.curvedStair, [photo.position.x, photo.position.z]) + cameraHeight;
+  if (feature.riseStair) return undergroundFloorElevation(feature,[photo.position.x,photo.position.z]) + cameraHeight;
   return (feature.type === 'bridge' ? bridgeSurfaceHeight(feature, surface, [photo.position.x, photo.position.z]) : surface) + cameraHeight;
 }
 

@@ -229,7 +229,7 @@ export default function MapView(props: Props) {
   const onLocation = props.onLocation ? chooseLocation : undefined;
   const atMapHeight = (photo: Photo): MapPhoto => {
     const height = photoMapHeight(photo, campus, site);
-    const onStairs = !isAerialPhoto(photo) && campus.features.some(feature => feature.id === photoLocationId(photo, campus) && feature.type === 'tunnelEntrance' && feature.curvedStair);
+    const onStairs = !isAerialPhoto(photo) && campus.features.some(feature => feature.id === photoLocationId(photo, campus) && (feature.type === 'tunnelEntrance' && feature.curvedStair || feature.riseStair));
     return { ...photo, locationId: photoLocationId(photo, campus), position: { ...photo.position, height }, pointHeight: onStairs ? photoMapHeight({ ...photo, cameraHeight: .1 }, campus, site) - .1 + .08 : undefined };
   };
   const photos = useMemo(() => props.photos.map(atMapHeight), [props.photos, campus, site]);
@@ -247,7 +247,11 @@ export default function MapView(props: Props) {
     const update: PhotoViewAdjustment = { heading: adjustment.heading, pitch: adjustment.pitch, position: { ...props.editPhoto.position, x, z } };
     if (height !== undefined && cameraHeightRange) {
       if (isAerialPhoto(props.editPhoto)) update.altitude = { meters: height, reference: 'takeoff' };
-      else update.cameraHeight = THREE.MathUtils.clamp(height - floorBase, cameraHeightRange.min, cameraHeightRange.max);
+      else {
+        const moved = { ...props.editPhoto, position: { ...props.editPhoto.position, x, z }, cameraHeight: .1 };
+        const range = photoCameraHeightRange(moved,campus,site), base = photoMapHeight(moved,campus,site)-.1;
+        update.cameraHeight = THREE.MathUtils.clamp(height - base,range.min,range.max);
+      }
     }
     props.onPhotoOrientation?.(update);
   };

@@ -45,6 +45,7 @@ export function mapLocationTarget(campus: Campus, site: Site, id?: string, cutaw
       center = [middle[0], middle[2]];
       bottom = Math.min(stair.topHeight, stair.bottomHeight); top = Math.max(stair.topHeight, stair.bottomHeight);
     }
+    if (feature.riseStair) { bottom = Math.min(feature.riseStair.bottomHeight,feature.riseStair.topHeight); top = Math.max(feature.riseStair.bottomHeight,feature.riseStair.topHeight); }
   }
   if (!points.length) return null;
   const minX = Math.min(...points.map(p => p[0])), maxX = Math.max(...points.map(p => p[0]));
