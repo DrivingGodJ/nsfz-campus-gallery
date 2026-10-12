@@ -3,6 +3,7 @@ import { stadiumRing, trackWorldPoint } from './structure-geometry.ts';
 import polygonClipping from 'polygon-clipping';
 import { undergroundLayout, undergroundSkylights } from './underground-geometry.ts';
 import { snapFootprint } from './building-geometry.ts';
+import { insideShape, rampSurfaceHeight, stairSurfaceHeight } from './terrain-height.ts';
 
 export function sportsGroundPlatform(feature: Feature): Shape {
   if (feature.platform) return feature.platform;
@@ -34,23 +35,23 @@ export function sportsGroundPlatformLayers(feature: Feature, features: Feature[]
   });
 }
 
-function insideRing([x, z]: Point, ring: Point[]) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [ax, az] = ring[j], [bx, bz] = ring[i];
-    if ((az > z) !== (bz > z) && x < (bx - ax) * (z - az) / (bz - az) + ax) inside = !inside;
-  }
-  return inside;
-}
-
 // Outdoor photos without a named location still stand on the actual raised ground.
 export function groundElevationAt(campus: Campus, point: Point) {
+  for (const feature of campus.features) {
+    if (feature.type !== 'path' || !feature.riseStair) continue;
+    const height = stairSurfaceHeight(feature, point);
+    if (height !== undefined) return height;
+  }
+  for (const feature of campus.features) {
+    if (feature.type !== 'path' || !feature.ramp) continue;
+    const height = rampSurfaceHeight(feature, point);
+    if (height !== undefined) return height;
+  }
   let height = 0;
   for (const feature of campus.features) {
     const elevation = feature.height ?? 0;
-    if (feature.type !== 'runningTrack' || !feature.track || elevation <= height) continue;
-    const platform = sportsGroundPlatform(feature);
-    if (insideRing(point, platform.outer) && !platform.holes.some(hole => insideRing(point, hole))) height = elevation;
+    if (elevation <= height || (!feature.platform && (feature.type !== 'runningTrack' || !feature.track))) continue;
+    if (insideShape(point, sportsGroundPlatform(feature))) height = elevation;
   }
   return height;
 }

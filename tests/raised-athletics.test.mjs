@@ -16,6 +16,7 @@ const site = { buildingOverrides: {}, photos: [] };
 const field = campus.features.find(f => f.id === 'way/855459407');
 const gym = campus.buildings.find(b => b.id === 'local/gymnasium');
 const raisedIds = ['way/855459409', 'local/stand-office', gym.id];
+const westRaisedIds = ['way/1233313436', 'way/1233313437', 'way/1233313439', 'local/unknown-west-corner'];
 const bridge = campus.features.find(f => f.id === 'local/footbridge');
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} equals ${b}`);
 const ringArea = ring => Math.abs(ring.slice(1).reduce((sum, point, i) => sum + ring[i][0] * point[1] - point[0] * ring[i][1], 0) / 2);
@@ -70,7 +71,7 @@ test('bridge stays at its existing height above the lowered athletics base, whil
   close(photoMapHeight(aerial, campus, site), 80);
   const room = campus.features.find(f => f.id === 'local/underground-badminton');
   close(photoMapHeight(photo(room.id, room.outer[0]), campus, site), room.height + 1.6);
-  for (const building of campus.buildings.filter(b => !raisedIds.includes(b.id))) close(buildingLevels(building).baseElevation, 0);
+  for (const building of campus.buildings.filter(b => !raisedIds.includes(b.id) && !westRaisedIds.includes(b.id))) close(buildingLevels(building).baseElevation, 0);
 });
 
 test('the rounded teaching-wing end is shallower without shifting its shoulders, width or courtyard', () => {

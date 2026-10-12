@@ -12,6 +12,10 @@ import MapModelLayer from './MapModelLayer';
 import MapLevelSwitch, { type MapLevelMode } from './MapLevelSwitch';
 import { isUndergroundFeature, isUndergroundLocation, isUndergroundPhoto } from './map-level-mode';
 import SportsGround from './SportsGround';
+import WestCampusTerrain from './WestCampusTerrain';
+import WestColonnade from './WestColonnade';
+import { WEST_COLONNADE_ID } from './west-colonnade-geometry';
+import { terrainRoadGeometry } from './west-campus-terrain';
 import Forest, { Trees } from './Forest';
 import RiverLandscape from './RiverLandscape';
 import AvenueGarden from './AvenueGarden';
@@ -46,7 +50,6 @@ import BasketballCourts from './BasketballCourts';
 import { FeatureTargets, LocationHtml, LocationName, LocationSelection } from './LocationSelection';
 import { directionVector, photoFieldOfView, viewSectorRays } from './photo-view';
 import { groundSurfaces } from './ground-geometry';
-import { roadFootprint } from './road-geometry';
 import { isAerialPhoto, photoCameraHeightRange, photoLocationId, photoMapHeight } from './locations';
 import { mapLocationTarget } from './location-geometry';
 import { photoPlacementPoint } from './photo-placement';
@@ -101,7 +104,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
   useEffect(() => () => { if (gym) for (const geometry of Object.values(gym)) geometry.dispose(); }, [gym]);
   const stands = useMemo(() => building.id === STANDS_ID ? standsArchitecture(building, info.height, info.floorHeight, cutawayHeight) : undefined, [building, info.height, info.floorHeight, cutawayHeight]);
   useEffect(() => () => { if (stands) Object.values(stands).forEach(geometry => geometry.dispose()); }, [stands]);
-  const geometries = useMemo(() => building.facade?.type === 'boundary-house' || building.facade?.type === 'print-room' || building.facade?.type === 'luxun-memorial' || building.facade?.type === 'campus-shop' ? [] : info.sections.map(section => {
+  const geometries = useMemo(() => building.id === WEST_COLONNADE_ID || building.facade?.type === 'boundary-house' || building.facade?.type === 'print-room' || building.facade?.type === 'luxun-memorial' || building.facade?.type === 'campus-shop' ? [] : info.sections.map(section => {
     const height = Math.min(section.height, cutawayHeight ?? section.height);
     const cutaway = cutawayHeight !== undefined && cutawayHeight <= section.height + 1e-6;
     if (gym) return gym.body;
@@ -137,14 +140,14 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     </group> : <group
       onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }}
       onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
-    {building.facade?.type === 'boundary-house' ? <BoundaryHouse building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'print-room' ? <PrintRoom building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'campus-shop' ? <CampusShop building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'luxun-memorial' ? <LuxunMemorial building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} /> : info.sections.map((section, i) => <group key={section.id}><mesh geometry={geometries[i]} rotation={[-Math.PI / 2, 0, 0]} position={[0, .12, 0]}>
+    {building.id === WEST_COLONNADE_ID ? <WestColonnade building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} /> : building.facade?.type === 'boundary-house' ? <BoundaryHouse building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'print-room' ? <PrintRoom building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'campus-shop' ? <CampusShop building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'luxun-memorial' ? <LuxunMemorial building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} /> : info.sections.map((section, i) => <group key={section.id}><mesh geometry={geometries[i]} rotation={[-Math.PI / 2, 0, 0]} position={[0, .12, 0]}>
       <meshStandardMaterial attach={splitMaterials ? 'material-0' : 'material'} color={buildingMaterialColor(building, building.id === LIBRARY_ID && section.id === 'curved-annex' ? 'base' : 'body', color, mapColor)} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />
       {splitMaterials && <meshStandardMaterial attach="material-1" color={buildingMaterialColor(building, 'roof', color, mapColor)} roughness={.95} />}
       {drumTexture && <meshStandardMaterial attach="material-2" map={drumTexture} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />}
       {building.facade?.type !== 'cafeteria' && <Edges color={mapColor(selected || hover ? '#567760' : '#aaa895')} threshold={25} />}
     </mesh>
     </group>)}
-    <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>
+    {building.id !== WEST_COLONNADE_ID && <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>}
     {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor && floor > 0 ? floor * info.floorHeight : undefined} />}
     {(building.facade?.type === 'laboratory' || building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
     {(stands || gym || building.id === THEATRE_ID) && <VenueDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} stands={stands} />}
@@ -157,11 +160,11 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     {(selected || !!building.name || !!site.buildingOverrides[building.id]?.name) && <LocationHtml portal={labelPortal} key={info.name} position={[info.center[0], height + 3, info.center[1]]} center zIndexRange={[5, 1]}><LocationName id={building.id} name={info.name} building /></LocationHtml>}
   </group>;
 });
-function Roads({ feature }: { feature: Feature }) {
+function Roads({ feature, features }: { feature: Feature; features: Feature[] }) {
   const mapColor = useMapColor();
-  const geometry = useMemo(() => buildingGeometry(roadFootprint(feature), .04, 3.6), [feature]);
+  const geometry = useMemo(() => terrainRoadGeometry(feature, features), [feature, features]);
   useEffect(() => () => geometry.dispose(), [geometry]);
-  return <mesh userData={{ photoOpacityOccluder: true }} geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, .075, 0]}><meshStandardMaterial color={mapColor('#e9e4d4')} roughness={1} /></mesh>;
+  return <mesh userData={{ photoOpacityOccluder: true }} geometry={geometry}><meshStandardMaterial color={mapColor('#e9e4d4')} roughness={1} /></mesh>;
 }
 function Direction({ photo, editing = false, compact = false, onHeading, labelPortal }: { photo: MapPhoto; editing?: boolean; compact?: boolean; onHeading?: (heading: number) => void; labelPortal: RefObject<HTMLDivElement> }) {
   const mapColor = useMapColor();
@@ -329,9 +332,10 @@ export default function MapView(props: Props) {
         {ground.background.map((shape, i) => <Surface key={'background/' + i} data={shape} color="#eeeee5" height={(undergroundView ? undergroundFloor : 0) - .08} unlit />)}
         <MapModelLayer underground={undergroundView}>
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}
-        {campus.features.map(feature => feature.waterfall ? <BoundaryWaterGarden key={feature.id} feature={feature} /> : feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} planter={feature.treePlanter} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} features={campus.features} labelPortal={labelPortal} /> : feature.type === 'path' && (feature.outer || feature.points) && !feature.representedBy ? <Roads key={feature.id} feature={feature} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
+        {campus.features.map(feature => feature.waterfall ? <BoundaryWaterGarden key={feature.id} feature={feature} /> : feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} planter={feature.treePlanter} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} features={campus.features} labelPortal={labelPortal} /> : feature.type === 'path' && (feature.outer || feature.points) && !feature.representedBy ? <Roads key={feature.id} feature={feature} features={campus.features} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
         <Line points={campus.boundary.map(([x, z]) => [x, .2, z])} color={mapColor('#97a188')} lineWidth={1.5} />
         {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
+        <WestCampusTerrain features={campus.features} buildings={campus.buildings} />
         <RiverLandscape features={campus.features} buildings={campus.buildings} />
         <AvenueGarden features={campus.features} buildings={campus.buildings} />
         </MapModelLayer>
