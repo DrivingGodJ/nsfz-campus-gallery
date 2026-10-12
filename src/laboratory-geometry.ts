@@ -5,6 +5,7 @@ import { buildingGeometry, passageShape, snapFootprint } from './building-geomet
 import { passageFootprint } from './underground-geometry.ts';
 import { stairwellShaft } from './teaching-stairs.ts';
 import { classroomWindowLayout } from './teaching-classrooms.ts';
+import { laboratoryRearOpenings, laboratoryRearOpeningLevels, laboratoryRearCutsAt } from './laboratory-rear-geometry.ts';
 import type { Building, BuildingStairwell, FloorCorridor, GroundPassage, Point, Shape } from './types';
 
 const WALL = .28, SLAB = .25;
@@ -86,6 +87,7 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
   const platePolygons = snapFootprint([...layout.rooms, ...layout.walkways, layout.stair.opening].map(polygon));
   const floorPlate = polygonClipping.union(platePolygons[0], ...platePolygons.slice(1));
   const glazing = laboratoryWindows(building, height, floorHeight);
+  const rearGlazing = laboratoryRearOpenings(building, height, floorHeight);
   const add = (shape: Shape, bottom: number, top: number, photoBlocking: boolean, doors: GroundPassage[] = []) => {
     if (top <= bottom) return;
     const geometry = buildingGeometry(shape, top - bottom, floorHeight, doors);
@@ -97,11 +99,11 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
     const bottom = floor * floorHeight, top = Math.min(bottom + floorHeight, height);
     const groundPassages = floor === 0 ? building.groundPassages || [] : [];
     const openings = floor === 0 ? snapFootprint((building.groundFloorOpenings || []).map(polygon)) : [];
-    const levels = [...new Set([bottom + SLAB, top, Math.min(bottom + 2.65, top), ...glazing.filter(window => window.bottom >= bottom && window.bottom < top).flatMap(window => [window.bottom, window.top])])].sort((a, b) => a - b);
+    const levels = [...new Set([bottom + SLAB, top, Math.min(bottom + 2.65, top), ...glazing.filter(window => window.bottom >= bottom && window.bottom < top).flatMap(window => [window.bottom, window.top]), ...laboratoryRearOpeningLevels(rearGlazing).filter(y => y > bottom + SLAB && y < top)])].sort((a, b) => a - b);
     for (let i = 0; i < levels.length - 1; i++) {
       const low = levels[i], high = levels[i + 1], middle = (low + high) / 2;
       let layer = openings.length && middle < bottom + 2.65 ? polygonClipping.difference(walls, openings) : walls;
-      const cuts = glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut);
+      const cuts = [...glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut), ...laboratoryRearCutsAt(building, rearGlazing, middle)];
       if (cuts.length) layer = polygonClipping.difference(layer, ...snapFootprint(cuts));
       for (const [outer, ...holes] of layer) add({ outer: outer as Point[], holes: holes as Point[][] }, low, high, true, middle < bottom + 2.65 ? [...layout.doors, ...groundPassages] : groundPassages);
     }

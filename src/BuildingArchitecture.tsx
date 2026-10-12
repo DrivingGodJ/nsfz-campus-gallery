@@ -12,6 +12,7 @@ import { teachingClassroomFurniture } from './teaching-classroom-furniture';
 import { theatreEntranceGeometry, theatreGlazingGeometry } from './theatre-exterior-geometry';
 import { THEATRE_ID } from './venue-geometry';
 import DormitoryEntrance from './DormitoryEntrance';
+import LaboratoryRearDetails from './LaboratoryRearDetails';
 import { OFFICE_ID, LIBRARY_ID, libraryAnnexGlazingGeometry } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
 import { STAND_OFFICE_ID, standOfficeWindows } from './stand-office-geometry';
@@ -74,6 +75,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   });
   // The roof remains visible at campus scale; only small rail details fade away.
   return <group>
+    {building.facade?.type === 'laboratory' && <LaboratoryRearDetails building={building} height={Math.max(...sections.map(section => section.height))} floorHeight={floorHeight} cutawayHeight={cutawayHeight} />}
     {building.facade?.lobbyEntry && <DormitoryEntrance building={building} visibleHeight={cutawayHeight} />}
     {theatreEntry && <>
       <mesh geometry={theatreEntry.concrete}><meshStandardMaterial color={material('trim', '#d7d2c3')} roughness={.95} /></mesh>
