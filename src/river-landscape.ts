@@ -3,6 +3,7 @@ import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { passageFootprint } from './underground-geometry.ts';
 import { snapFootprint } from './building-geometry.ts';
+import { roadFootprint } from './road-geometry.ts';
 import type { Feature, Point, Shape } from './types';
 
 export const RIVER_IDS = ['way/1277839749', 'way/1277839748', 'local/lake-water-link'];
@@ -67,8 +68,8 @@ export function riverBankSamples(features: Feature[], spacing = 1.35) {
 export function riverLandscapeGeometry(features: Feature[], buildings: Shape[] = []) {
   const parts = Object.fromEntries(Object.keys(RIVER_COLORS).map(key => [key, [] as THREE.BufferGeometry[]])) as Record<keyof typeof RIVER_COLORS, THREE.BufferGeometry[]>;
   const waters = riverWaterFootprints(features), roadFeatures = features.filter(feature => ['path', 'bridge'].includes(feature.type) && feature.points);
-  const roads = roadFeatures.map(feature => passageFootprint(feature.points!, feature.width ?? 2));
-  const onLand = (point: Point) => !waters.some(water => inside(point, water.outer)) && !buildings.some(building => inside(point, building.outer)) && !roads.some(road => inside(point, road.outer));
+  const roads = roadFeatures.map(feature => roadFootprint({ ...feature, width: feature.width ?? 2 }));
+  const onLand = (point: Point) => !waters.some(water => inside(point, water.outer)) && !buildings.some(building => inside(point, building.outer)) && !roads.some(road => inside(point, road.outer) && !road.holes.some(hole => inside(point, hole)));
   const box = (key: keyof typeof parts, size: [number, number, number], position: [number, number, number], angle = 0) => parts[key].push(new THREE.BoxGeometry(...size).rotateY(angle).translate(...position));
   const shrub = (position: Point, seed: number) => {
     for (let i = 0; i < 3; i++) parts.shrubs.push(new THREE.IcosahedronGeometry(1, 0).scale(.5 + seed % 3 * .12, .42 + (seed % 2) * .12, .45)
@@ -104,14 +105,18 @@ export function riverLandscapeGeometry(features: Feature[], buildings: Shape[] =
   // _DSC2471 / _DSC1493; only this photographed northern bank gets furniture.
   const excluded = snapFootprint([...waters, ...buildings, ...roads.filter((_, i) => roadFeatures[i].representedBy !== 'river-landscape')].map(shape => [shape.outer, ...shape.holes]));
   const markedPath = features.find(feature => feature.id === RIVER_GARDEN_PATH_ID);
-  const gardenPaths = [...(markedPath?.points ? [markedPath.points, ...(markedPath.branches ?? []), ...riverGardenPaths.slice(1)] : riverGardenPaths),
-    ...features.filter(feature => feature.type === 'path' && feature.representedBy === 'river-landscape' && feature.id !== RIVER_GARDEN_PATH_ID && feature.points)
+  const gardenPaths = [...(markedPath?.points ? [...(markedPath.outer ? [] : [markedPath.points, ...(markedPath.branches ?? [])]), ...riverGardenPaths.slice(1)] : riverGardenPaths),
+    ...features.filter(feature => feature.type === 'path' && feature.representedBy === 'river-landscape' && feature.id !== RIVER_GARDEN_PATH_ID && feature.points && !feature.outer)
       .flatMap(feature => [feature.points!, ...(feature.branches ?? [])])];
+  const footprints: Shape[] = [];
   for (const route of gardenPaths) {
     const points = new THREE.CatmullRomCurve3(route.map(([x,z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal').getSpacedPoints(route.length * 5).map(p => [p.x,p.z] as Point);
-    const footprint = passageFootprint(points, 1.2);
+    footprints.push(passageFootprint(points, 1.2));
+  }
+  footprints.push(...features.filter(feature => feature.type === 'path' && feature.representedBy === 'river-landscape' && feature.outer).map(roadFootprint));
+  for (const footprint of footprints) {
     // Shared path endpoints need the same precision as their road masks.
-    for (const polygon of polygonClipping.difference(snapFootprint([[footprint.outer]]), ...excluded)) {
+    for (const polygon of polygonClipping.difference(snapFootprint([[footprint.outer, ...footprint.holes]]), ...excluded)) {
       const shape = new THREE.Shape(polygon[0].map(([x,z]) => new THREE.Vector2(x,-z))); shape.holes = polygon.slice(1).map(ring => new THREE.Path(ring.map(([x,z]) => new THREE.Vector2(x,-z))));
       parts.paths.push(new THREE.ShapeGeometry(shape).rotateX(-Math.PI/2).translate(0,.126,0));
     }
