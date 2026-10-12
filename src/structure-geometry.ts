@@ -66,7 +66,23 @@ export function bridgeSurfaceHeight(feature: Feature, height: number, point: Poi
   if (!feature.archRise || feature.points?.length !== 2) return height;
   const [from, to] = feature.points, dx = to[0] - from[0], dz = to[1] - from[1];
   const t = Math.max(0, Math.min(1, ((point[0] - from[0]) * dx + (point[1] - from[1]) * dz) / (dx * dx + dz * dz)));
+  if (feature.bridgeStyle === 'stone') {
+    const distance = t * Math.hypot(dx, dz), profile = stoneBridgeProfile(feature, height);
+    // Use the tread immediately after each riser along the bridge axis.
+    return profile.reduce((surface, [station, y]) => station <= distance + 1e-7 ? y : surface, height);
+  }
   return height + feature.archRise * 4 * t * (1 - t);
+}
+
+// The photographed stone bridge has a level crown and short stepped approaches.
+export function stoneBridgeProfile(feature: Feature, height: number): Point[] {
+  const [from, to] = feature.points!, length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  const rise = feature.archRise!, steps = Math.ceil(rise / .18 - 1e-7), run = Math.min(steps * .35, length / 3);
+  const profile: Point[] = [[0, height]];
+  for (let i = 1; i <= steps; i++) profile.push([i * run / steps, height + rise * (i - 1) / steps], [i * run / steps, height + rise * i / steps]);
+  profile.push([length - run, height + rise]);
+  for (let i = steps; i >= 1; i--) profile.push([length - i * run / steps, height + rise * (i - 1) / steps], [length - (i - 1) * run / steps, height + rise * (i - 1) / steps]);
+  return profile;
 }
 
 export function straightStairTreads(from: Point, to: Point, top: number, bottom: number) {

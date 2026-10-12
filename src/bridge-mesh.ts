@@ -1,10 +1,39 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Feature, Point } from './types';
-import { bridgeSurfaceHeight } from './structure-geometry.ts';
+import { bridgeSurfaceHeight, stoneBridgeProfile } from './structure-geometry.ts';
 import { BRIDGE_DECK_THICKNESS } from './bridge-geometry.ts';
+
+function stoneBridgeGeometry(feature: Feature, height: number) {
+  const [from, to] = feature.points!, dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+  const profile = stoneBridgeProfile(feature, height), half = (feature.width || 3.5) / 2, curb = .24;
+  const bottom = height - .32, spring = height - .25, crown = height + feature.archRise! - BRIDGE_DECK_THICKNESS;
+  const openingHalf = Math.min(length * .23, 2.1), middle = length / 2;
+  // Thick stone abutments stand on the banks; one low arch leaves the wet span open.
+  const outline: Point[] = [...profile, [length, bottom], [middle + openingHalf, bottom]];
+  for (let i = 0; i <= 32; i++) {
+    const angle = Math.PI * i / 32;
+    outline.push([middle + openingHalf * Math.cos(angle), spring + (crown - spring) * Math.sin(angle)]);
+  }
+  outline.push([middle - openingHalf, bottom], [0, bottom]);
+  const extrude = (points: Point[], width: number, across: number) => {
+    const shape = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
+    return new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: false }).translate(0, 0, across);
+  };
+  const run = profile.find(([, y]) => Math.abs(y - height - feature.archRise!) < 1e-7)![0];
+  const curbOutline: Point[] = [[0, height + .16], [run, height + feature.archRise! + .16],
+    [length - run, height + feature.archRise! + .16], [length, height + .16], ...[...profile].reverse()];
+  const parts = [extrude(outline, 2 * (half + curb), -half - curb), extrude(curbOutline, curb, half), extrude(curbOutline, curb, -half - curb)];
+  const geometry = mergeGeometries(parts)!;
+  parts.forEach(part => part.dispose());
+  const transform = new THREE.Matrix4().makeBasis(new THREE.Vector3(dx / length, 0, dz / length), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-dz / length, 0, dx / length));
+  transform.setPosition(from[0], 0, from[1]);
+  return geometry.applyMatrix4(transform);
+}
 
 // One closed curved slab: the water remains visible through the space below it.
 export function archedBridgeGeometry(feature: Feature, height: number) {
+  if (feature.bridgeStyle === 'stone') return stoneBridgeGeometry(feature, height);
   const [from, to] = feature.points!, dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
   const nx = -dz / length, nz = dx / length, half = (feature.width || 3.5) / 2;
   const positions: number[] = [], indices: number[] = [];

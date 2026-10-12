@@ -111,7 +111,7 @@ function ArchedBridgeDeck({ feature, height }: { feature: Feature; height: numbe
   const mapColor = useMapColor();
   const geometry = useMemo(() => archedBridgeGeometry(feature, height), [feature, height]);
   useEffect(() => () => geometry.dispose(), [geometry]);
-  return <mesh geometry={geometry}><meshStandardMaterial color={mapColor('#b6b39e')} roughness={.9} /></mesh>;
+  return <mesh geometry={geometry}><meshStandardMaterial color={mapColor(feature.bridgeStyle === 'stone' ? '#b9bfbd' : '#b6b39e')} roughness={feature.bridgeStyle === 'stone' ? .95 : .9} /></mesh>;
 }
 function BridgeStairs({ from, to, width, top, bottom }: { from: Point; to: Point; width: number; top: number; bottom: number }) {
   return <group>{straightStairTreads(from, to, top, bottom).map((step, i) => {
@@ -126,7 +126,7 @@ function Bridge({ feature, buildings, overrides, labelPortal }: { feature: Featu
   const layout = useMemo(() => bridgeLayout(feature, y), [feature, y]);
   const center: Point = [(first[0] + last[0]) / 2, (first[1] + last[1]) / 2];
   // RiverLandscape already supplies the lake bridge's photographed timber guard.
-  return <group>{feature.archRise ? <ArchedBridgeDeck feature={feature} height={y} /> : <BridgeDeck shapes={layout.deck} height={y} />}{feature.id !== 'local/lake-bridge' && <BridgeRails chains={layout.railChains} smooth={!!feature.archRise} />}
+  return <group>{feature.archRise ? <ArchedBridgeDeck feature={feature} height={y} /> : <BridgeDeck shapes={layout.deck} height={y} />}{feature.id !== 'local/lake-bridge' && feature.bridgeStyle !== 'stone' && <BridgeRails chains={layout.railChains} smooth={!!feature.archRise} />}
     {feature.sideNet && <BridgeNet feature={feature} chains={layout.railChains} />}
     {bridgeSupports(feature, y).map((support, i) => <mesh key={i} position={support.position}><boxGeometry args={support.size} /><meshStandardMaterial color={mapColor('#9b9f8e')} /></mesh>)}
     {layout.stairs.flatMap(stair => stair.flights.map((flight, i) => <BridgeStairs key={stair.id + i} {...flight} width={width} />))}
