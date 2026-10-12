@@ -76,6 +76,39 @@ test('stands extend their seats, platform and guardrails to the end without an u
   }
 });
 
+test('the office-side stand passage opens to the outside and turns right beneath the seats', () => {
+  const original = JSON.stringify(stands), info = buildingLevels(stands, site.buildingOverrides[stands.id]), frame = standsFrame(stands);
+  for (const cutoff of [undefined, info.floorHeight, 2 * info.floorHeight]) {
+    const model = standsArchitecture(stands, info.height, info.floorHeight, cutoff);
+    try {
+      const body = mesh(model.body, true), objects = [body, mesh(model.glass), mesh(model.frames), mesh(model.rails)];
+      const ray = (u, v, y, direction, distance) => {
+        const p = frame.at(u, v);
+        return new THREE.Raycaster(new THREE.Vector3(p[0], y, p[1]), new THREE.Vector3(direction[0], 0, direction[1]), 0, distance).intersectObjects(objects);
+      };
+      const entrance = frame.length - 3.85;
+      const photo = site.photos.find(photo => photo.title === '_DSC1046'), heading = photo.heading * Math.PI / 180;
+      const sightline = new THREE.Raycaster(new THREE.Vector3(photo.position.x, 1.6, photo.position.z), new THREE.Vector3(Math.sin(heading), 0, -Math.cos(heading)), 0, 40);
+      assert.equal(sightline.intersectObjects(objects).length, 0, 'The photographed eye-height sightline passes through both facades without a wall or glass plug');
+      assert.equal(ray(entrance, -1, 1.6, frame.across, 3).length, 0, 'The broad front entrance remains open');
+      assert.equal(ray(entrance, frame.width - 1.5, 1.6, frame.along.map(value => -value), 15).length, 0, 'The rear walkway stays clear when turning right');
+      assert.ok(ray(entrance, frame.width - 1, .5, frame.across, 2).length, 'The rear opening retains its low parapet');
+      assert.ok(ray(frame.length * .905, -1, 1.6, frame.across, 2).length, 'The adjoining room window remains beside the entrance');
+      const returnWall = ray(entrance, 2, 1.6, frame.along.map(value => -value), 6);
+      assert.ok(returnWall.length, 'A side wall separates the adjoining room from the open passage');
+      for (const [u, v] of [[entrance, 1], [entrance, frame.width - 1.5], [entrance - 10, frame.width - 1.5]]) {
+        const floor = down([body], frame.at(u, v), 1.6, 2)[0];
+        assert.ok(floor && Math.abs(floor.point.y - .32) < 1e-4, 'The entrance and right turn keep a continuous walkable floor');
+      }
+      if (cutoff !== info.floorHeight) {
+        const ceiling = down([body], frame.at(entrance, 1))[0];
+        assert.ok(ceiling && Math.abs(ceiling.point.y - (.12 + info.floorHeight)) < 1e-4, 'The seating deck remains above the new passage');
+      }
+    } finally { dispose(model); }
+  }
+  assert.equal(JSON.stringify(stands), original, 'The calibrated outline and photo positions are unchanged');
+});
+
 test('venue details disappear above selected floors and never add photo-marker obstruction', () => {
   for (const [building, create] of [[stands, standsArchitecture], [theatre, theatreInteriorGeometry], [gym, gymDetailGeometry]]) {
     const info = buildingLevels(building, site.buildingOverrides[building.id]);

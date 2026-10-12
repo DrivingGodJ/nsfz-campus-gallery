@@ -77,13 +77,18 @@ export function standsArchitecture(building: Building, height: number, floorHeig
   const shell: Shape = { outer: building.outer, holes: [[...inner, inner[0]]] };
   const opening = (u: number, span: number): GroundPassage => ({ id: `stand-${u}`, sourcePathId: '', width: span, points: [at(u, -1), at(u, 1)] });
   const doors = [length * .18, length * .5, length * .82].map(u => opening(u, 2.3));
+  // _DSC1046: the office-side end is an open passage, with a rear parapet
+  // and a right turn beneath the seats, rather than another glazed room.
+  const entrance = opening(length - 3.85, 6.3), entranceLeft = length - 7;
+  const rearCenter = length - 3.85 - width * .57;
+  const rearEntrance = { ...entrance, points: [at(rearCenter, width - 1), at(rearCenter, width + 1)] };
   const windows = Array.from({ length: 9 }, (_, i) => opening(length * (.065 + i * .105), 3.7))
     .filter(window => doors.every(door => Math.abs(Number(window.id.slice(6)) - Number(door.id.slice(6))) > (window.width + door.width) / 2 + .2));
-  const housingTop = Math.min(floorHeight, shown), bands = [0, .65, 2.55, 2.8, housingTop].filter(y => y >= 0 && y <= housingTop).sort((a, b) => a - b);
+  const housingTop = Math.min(floorHeight, shown), bands = [0, .65, .75, 2.55, 2.8, housingTop].filter(y => y >= 0 && y <= housingTop).sort((a, b) => a - b);
   for (let i = 1; i < bands.length; i++) {
     const bottom = bands[i - 1], top = bands[i];
     if (top <= bottom) continue;
-    const cuts = [...(top <= 2.8 ? doors : []), ...(bottom >= .65 && top <= 2.55 ? windows : [])];
+    const cuts = [...(top <= 2.8 ? [...doors, entrance] : []), ...(bottom >= .75 && top <= 2.8 ? [rearEntrance] : []), ...(bottom >= .65 && top <= 2.55 ? windows : [])];
     const geometry = buildingGeometry(shell, top - bottom, floorHeight, cuts); geometry.translate(0, 0, bottom); bodyParts.push(geometry);
   }
   for (const [bottom, top] of [[0, .2], [floorHeight - .22, floorHeight]]) {
@@ -91,6 +96,15 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     if (end <= bottom || (cutawayHeight !== undefined && top >= shown - 1e-6 && bottom > 0)) continue;
     const slab = buildingGeometry(building, end - bottom, floorHeight); slab.translate(0, 0, bottom); bodyParts.push(slab);
   }
+  if (housingTop > .2) {
+    // The room's return wall stops short of the rear walkway, leaving the
+    // photographed right turn clear without changing any seating above it.
+    const returnWall = [at(entranceLeft - .28, .35), at(entranceLeft, .35), at(entranceLeft, 2.1), at(entranceLeft - .28, 2.1)];
+    const geometry = buildingGeometry({ outer: [...returnWall, returnWall[0]], holes: [] }, housingTop - .2, floorHeight);
+    geometry.translate(0, 0, .2); bodyParts.push(geometry);
+  }
+  for (const y of [.93, 1.18]) add(rails, bar(point(rearCenter - 3.15, width - .16, y), point(rearCenter + 3.15, width - .16, y), .045, shown));
+  for (let u = rearCenter - 3.15; u <= rearCenter + 3.15; u += .45) add(rails, bar(point(u, width - .16, .75), point(u, width - .16, 1.2), .035, shown));
   for (const cut of windows) {
     const u = Number(cut.id.slice(6)), top = Math.min(2.55, shown);
     add(glass, box(frame, u, .13, .65, top, cut.width, .04));
