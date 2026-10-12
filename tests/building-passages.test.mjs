@@ -29,7 +29,10 @@ function model(override, selectedFloor) {
   const info = buildingLevels(building, override);
   const meshes = info.sections.map(section => {
     const height = selectedFloor ? Math.min(section.height, selectedFloor * info.floorHeight) : section.height;
-    const mesh = new THREE.Mesh(buildingGeometry(section, height, info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id)), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    // This passage-only fixture keeps the surveyed mass footprint. Part wall
+    // openings/partitions have their own production-model ray tests.
+    const shape = { outer: section.outer, holes: section.holes };
+    const mesh = new THREE.Mesh(buildingGeometry(shape, height, info.floorHeight, building.groundPassages, building.floorCorridors?.filter(corridor => corridor.partId === section.id)), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = .12;
     mesh.updateMatrixWorld();

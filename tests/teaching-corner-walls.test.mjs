@@ -45,7 +45,7 @@ function crossing(from, to, height, fraction = .5) {
   return new THREE.Raycaster(a.lerp(b, fraction).addScaledVector(normal, -.45), normal, 0, .9);
 }
 
-test('the southwest room is one complete four-sided upper-floor enclosure while the first-floor road stays open beneath it', () => {
+test('the southwest upper room opens into the expanded joining classroom while the first-floor road stays open beneath it', () => {
   assert.ok(room, 'The southwest classroom is selected independently of the northwest glazed room');
   assert.equal(room.startFloor, 2);
   assert.deepEqual(room.outer, [
@@ -53,7 +53,7 @@ test('the southwest room is one complete four-sided upper-floor enclosure while 
     [102.30248107746476, 59.1987892872771], [90.89710903849797, 61.06346443489119],
     [89.47396089486412, 52.82109838093125],
   ], 'The whole marked room has four sides without the former projecting north notch');
-  assert.equal(room.openEdges, undefined, 'The corrected whole room has no missing enclosure edge');
+  assert.deepEqual(room.openEdges, [3], 'The shared end opens toward the newly moved classroom partition');
   assert.equal(room.door, undefined, 'The unsupported new doorway is removed');
   assert.deepEqual(room.classroomWindows, building.classroomWindows, 'The room uses its existing ordinary classroom window calibration');
   const original = JSON.stringify(building), meshes = bodies();
@@ -71,7 +71,8 @@ test('the southwest room is one complete four-sided upper-floor enclosure while 
     for (let floor = 2; floor <= main.floors; floor++) {
       for (let edge = 0; edge < room.outer.length - 1; edge++) for (const fraction of [.15, .5, .85]) {
         const ray = crossing(room.outer[edge], room.outer[edge + 1], BASE + (floor - 1) * info.floorHeight + .65, fraction);
-        assert.ok(ray.intersectObjects(meshes).length, `Floor ${floor} has real sill masonry along room edge ${edge}, t=${fraction}`);
+        if(edge===3) assert.equal(ray.intersectObjects(meshes).length,0,`Floor ${floor} clears the former shared wall`);
+        else assert.ok(ray.intersectObjects(meshes).length, `Floor ${floor} has real sill masonry along room edge ${edge}, t=${fraction}`);
       }
       const floorWindows = windows.filter(window => window.bottom > (floor - 1) * info.floorHeight && window.top < floor * info.floorHeight);
       assert.ok(floorWindows.length >= 3, `The three retained window faces remain on floor ${floor}; the connecting end is now a blank wall`);

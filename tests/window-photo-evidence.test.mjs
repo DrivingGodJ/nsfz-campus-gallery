@@ -49,14 +49,25 @@ test('the photographed sixth-floor laboratory stair window has one aperture, fou
   } finally { geometry.dispose(); target.material.dispose(); }
 });
 
-test('theatre glazing is limited to the photographed outer curtain wall below the open fifth-floor terrace', () => {
+test('theatre glazing stays on the observed lower terrace face and fifth-floor inner gallery, with deleted outside walls clear', () => {
   const b = building('local/theatre'), info = buildingLevels(b, site.buildingOverrides[b.id]);
+  const ring=b.floorCorridors.find(c=>c.partId==='main').footprint.outer, galleryLines=[[ring[2],ring[3]],[ring[4],ring[5]]];
+  const distance=(point,[a,b])=>{
+    const dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((point[0]-a[0])*dx+(point[1]-a[1])*dz)/(dx*dx+dz*dz)));
+    return Math.hypot(point[0]-a[0]-t*dx,point[1]-a[1]-t*dz);
+  };
   for (const section of info.sections) {
     const model = teachingWindowGeometry(b, [section], info.floorHeight);
     try {
       const p = model.glass.attributes.position;
-      assert.equal(p.count > 0, section.id === 'curved-terrace', 'Neither laboratory connection nor inner auditorium wall gains glass');
-      for (let i = 0; i < p.count; i++) assert.ok(p.getY(i) < .12 + 4 * info.floorHeight, 'Fifth-floor terrace stays open');
+      assert.equal(p.count>0,['curved-terrace','main'].includes(section.id),'Only the two observed theatre facades receive glass');
+      if(section.id==='laboratory-connection')assert.equal(model.frames.attributes.position.count,0,'The removed outer connector facade leaves no hanging frames');
+      for(let i=0;i<p.count;i++) {
+        if(section.id==='main') {
+          assert.ok(p.getY(i)>=.12+4*info.floorHeight&&p.getY(i)<.12+5*info.floorHeight,'Inner gallery glass stays on its observed fifth floor');
+          assert.ok(Math.min(...galleryLines.map(line=>distance([p.getX(i),p.getZ(i)],line)))<=section.classroomWindows.wallThickness/2+1e-4,'The art wall, opaque short return and unobserved auditorium faces gain no glass');
+        } else assert.ok(p.getY(i)<.12+4*info.floorHeight,'The fifth-floor curved terrace remains open above the lower curtain wall');
+      }
     } finally { dispose(model); }
   }
 });

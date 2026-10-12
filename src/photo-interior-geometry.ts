@@ -82,7 +82,6 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
     add('leaning-canvas',1,'canvas',layout.at(60.5,4),axis,1.2,.35,1.6,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
     add('paint-pots',1,'paint-pots',layout.at(62,4),axis,1.15,.5,.36,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
     add('art-gallery-red-pipe',1,'red-pipe',layout.at(57.8,4),axis,8.7,.12,3.3,PHOTO_INTERIOR_EVIDENCE[4].photoId);
-    for (let i=0;i<4;i++) add(`gallery-barrel-seat-${i}`,1,'barrel-seat',layout.at(29.4+i*1.6,14.85),axis,.8,.8,.85,PHOTO_INTERIOR_EVIDENCE[5].photoId,walls);
     add('balcony-approach-ceiling',6,'slat-ceiling',layout.at(57.8,13.2),axis,12,2.35,3.35,PHOTO_INTERIOR_EVIDENCE[2].photoId);
     add('balcony-space-frame',6,'space-frame',layout.at(layout.circleU,23),axis,12.3,5.8,3.3,PHOTO_INTERIOR_EVIDENCE[3].photoId);
     for (const [i,u] of [layout.circleU-5.6,layout.circleU+5.6].entries()) add(`balcony-folded-umbrella-${i}`,6,'umbrella',layout.at(u,23),axis,.5,.5,2.35,PHOTO_INTERIOR_EVIDENCE[3].photoId,walls);
@@ -90,12 +89,11 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
   if (building.id === PHOTO_INTERIOR_IDS[3]) {
     const a: Point = [30.809226250687292,-45.18263028622997], b: Point = [69.18855840366079,-51.27513535610975];
     const f = frame(a,[b[0]-a[0],b[1]-a[1]]), source = PHOTO_INTERIOR_EVIDENCE[6].photoId;
-    // Furniture is attached to the outer wall side. The other side of the
-    // three-metre gallery stays open; the bench never follows the photo pose.
-    add('theatre-window-steps',5,'window-steps',f.at(31.8,-2.25),f.along,4.7,1.05,.54,source);
-    add('theatre-orange-bench',5,'bench',f.at(25.55,-2.4),f.along,2.4,.58,.87,source);
-    add('theatre-fire-case',5,'fire-case',f.at(24.05,-2.42),f.along,.5,.4,.65,source);
-    for (let i=0;i<5;i++) add(`theatre-gallery-exhibit-${i}`,5,'exhibit',f.at(7+i*3.7,-1.9),f.along,1.1,.08,1.85,PHOTO_INTERIOR_EVIDENCE[7].photoId);
+    // Facing west: the opaque exhibition wall is on the left (+across),
+    // with the glazed wall and window steps on the right (−across).
+    const facingHall: Point = [-f.along[0], -f.along[1]];
+    add('theatre-window-steps',5,'window-steps',f.at(31.8,-4.75),f.along,4.7,1.05,.54,source);
+    for (let i=0;i<5;i++) add(`theatre-gallery-exhibit-${i}`,5,'exhibit',f.at(7+i*3.7,-.1),facingHall,1.1,.08,1.85,PHOTO_INTERIOR_EVIDENCE[7].photoId);
     add('theatre-gallery-light-track',5,'light-track',f.at(16,-1.1),f.along,17,.15,3.28,PHOTO_INTERIOR_EVIDENCE[7].photoId);
   }
   return items;
@@ -182,19 +180,13 @@ export function photoInteriorGeometry(building: Building, height: number, floorH
       box('purple',-.14,-.09,.83,.48,.02,.75);
     } else if(item.kind==='paint-pots') {
       for(let i=0;i<5;i++) {const u=-.46+i*.23;cylinder(i%2?'blue':'stone',u,0,.13,.09,.25,10);cylinder('dark',u,0,.262,.088,.016,10);}
-    } else if(item.kind==='barrel-seat') {
-      cylinder('stone',0,0,.22,.38,.44,16);cylinder('blue',0,0,.45,.34,.04,16);
-      for(let i=0;i<8;i++) {const t=Math.PI*i/7;box('blue',Math.cos(t)*.33,Math.sin(t)*.33,.66,.12,.09,.42);}
     } else if(item.kind==='window-steps') {
       for(let i=0;i<3;i++)box('stone',0,.35-i*.35,(i+1)*.18/2,item.length,.35,(i+1)*.18);
     } else if(item.kind==='red-pipe') {
       const y=ceilingY(item.floor)-base-.15;
       bar('red',pos(-4.3,0,y),pos(4.3,0,y),.055);
       for(const u of [-3,-1,1,3])box('metal',u,0,y+.085,.04,.12,.14);
-    } else if(item.kind==='bench') {
-      box('wood',0,0,.2,2.35,.55,.3);box('orange',0,0,.41,2.4,.58,.13);box('orange',0,-.25,.65,2.4,.12,.44);
-    } else if(item.kind==='fire-case') {box('red',0,0,.33,.48,.35,.65);box('stone',0,.18,.38,.28,.016,.24);}
-    else if(item.kind==='exhibit') {box('wood',0,0,1.3,1.1,.055,1.1);box('stone',0,.036,1.3,1,.018,1);box('blue',0,.05,1.3,.63,.008,.73);}
+    } else if(item.kind==='exhibit') {box('wood',0,0,1.3,1.1,.055,1.1);box('stone',0,.036,1.3,1,.018,1);box('blue',0,.05,1.3,.63,.008,.73);}
     else if(item.kind==='light-track') {
       const y=ceilingY(item.floor)-base-.13;box('dark',0,0,y,item.length,.1,.055);
       for(let u=-7;u<=7;u+=2.8){box('dark',u,0,y-.16,.18,.16,.2);box('lights',u,.02,y-.27,.14,.13,.025);}

@@ -21,7 +21,7 @@ const bodies = (building, info, cutoff) => info.sections.map(section => {
   if (building.facade?.type === 'dormitory') return dormitoryBodyGeometry(building, height, info.floorHeight, cutaway);
   if (building.facade?.type === 'cafeteria') return cafeteriaBodyGeometry(building, height, info.floorHeight, cutaway);
   return buildingGeometry(section, height, info.floorHeight, building.groundPassages,
-    building.floorCorridors?.filter(c => c.partId === section.id), building.stairwells?.filter(s => s.partId === section.id), building.classroomWindows,
+    building.floorCorridors?.filter(c => c.partId === section.id), building.stairwells?.filter(s => s.partId === section.id), section.classroomWindows ?? building.classroomWindows,
     building.solidCores?.filter(c => c.partId === section.id), building.cutouts?.filter(c => c.partId === section.id), cutaway,
     building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight) : undefined);
 });

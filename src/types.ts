@@ -4,12 +4,12 @@ import { assetURL } from './asset-url';
 
 export type Point = [number, number];
 export type Shape = { outer: Point[]; holes: Point[][] };
-export type BuildingPart = Shape & { id: string; name: string; floors?: number; roofTerrace?: { railEdges: Point[][] } };
+export type BuildingPart = Shape & { id: string; name: string; floors?: number; roofTerrace?: { railEdges: Point[][] }; openEdges?: number[]; openEdgesStartFloor?: number; openEdgesEndFloor?: number; classroomWindows?: ClassroomWindows };
 export type GlassPavilion = { type: 'glass-pavilion'; center: Point; radius: number; canopyRadius: number; canopyStartAngle: number; canopySweep: number; rearDepth?: number };
 export type GroundPassage = { id: string; sourcePathId: string; points: Point[]; width: number; recessClassrooms?: boolean };
 export type FloorCorridor = { partId: string; depth: number; startFloor?: number; removeGroundFloor?: boolean; footprint?: Shape; slabInfill?: Shape; railEdges?: Point[][] } & ({ edge: number } | { edges: number[] } | { holeIndex: number } | { passageIndex: number } | { points: Point[] });
 export type ClassroomWindows = { wallThickness: number; bayWidth: number; windowWidth: number; sill: number; top: number; columns: number; transom: number; facadeLines?: Point[][]; blindFacadeLines?: Point[][]; pierWidth?: number; startFloor?: number; endFloor?: number; frameColor?: string; transomFractions?: number[]; upperColumns?: number };
-export type BuildingSolidCore = Shape & { partId: string; startFloor?: number; endFloor?: number; openEdges?: number[]; doors?: { edge: number; height: number }[]; classroomWindows?: ClassroomWindows; elevator?: { doorEdge: number } };
+export type BuildingSolidCore = Shape & { partId: string; startFloor?: number; endFloor?: number; partition?: boolean; openEdges?: number[]; doors?: { edge: number; height: number }[]; classroomWindows?: ClassroomWindows; elevator?: { doorEdge: number } };
 export type FacadeAnchor = { edge: number; at: number };
 export type BuildingFacade = { type: 'dormitory' | 'cafeteria' | 'laboratory' | 'boundary-house' | 'print-room' | 'luxun-memorial' | 'campus-shop'; connectionWall?: Point[]; upperConnectionWall?: Point[]; entry?: FacadeAnchor; lobbyEntry?: FacadeAnchor & { width: number; height: number; lanes: number }; frontCurve?: { start: FacadeAnchor; end: FacadeAnchor }; lowerBay?: { start: FacadeAnchor; end: FacadeAnchor; projection: number } };
 export type BuildingSkylight = { partId: string; holeIndex?: number; outline?: 'outer'; opacity?: number; columns?: number; rows?: number };

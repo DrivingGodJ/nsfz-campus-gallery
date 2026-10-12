@@ -115,7 +115,7 @@ test('the first-floor classroom is enclosed by its new recessed road-side wall a
   assert.equal(JSON.stringify(building), original, 'Recessed-wall geometry preserves saved data');
 });
 
-test('the open ground corner and roads do not remove the complete upper-floor room or its shared end wall', () => {
+test('the open ground corner remains clear while the upper shared end opens toward the relocated wall', () => {
   const room = building.solidCores.find(core => core.partId === main.id && Math.abs(core.outer[0][0] - 89.47396089486412) < 1e-6);
   assert.ok(room);
   const object = model();
@@ -128,10 +128,10 @@ test('the open ground corner and roads do not remove the complete upper-floor ro
     const shared = segment(room.outer[3], room.outer[4]);
     for (let floor = 2; floor <= main.floors; floor++) {
       const base = (floor - 1) * info.floorHeight;
-      assert.ok(crossing(shared, .5, base + .65).intersectObjects(object.bodies).length,
-        `The upper room shared-end sill remains on floor ${floor}`);
+      assert.equal(crossing(shared, .5, base + .65).intersectObjects(object.bodies).length,0,
+        `The former upper room shared-end sill is removed on floor ${floor}`);
       const pane = crossing(shared, .5, base + 1.6);
-      assert.ok(pane.intersectObjects(object.bodies).length, `Floor ${floor} now has masonry across the marked blank end wall`);
+      assert.equal(pane.intersectObjects(object.bodies).length,0, `Floor ${floor} opens across the former marked end wall`);
       assert.equal(pane.intersectObjects([object.glass, object.frames]).length, 0, `Floor ${floor} has no upper-end window above the ground road`);
     }
   } finally { object.dispose(); }

@@ -12,7 +12,7 @@ const BASE = .12;
 // remain estimates; no corridor, facade or saved photograph positions change.
 export const CLASSROOM_BAYS = [
   { id: 'main-west-3', partId: 'main', floor: 3, photoIds: ['5e41f64f-b5b3-4a25-8a29-4f13090d3d87'], u: 90.75, v: 70.55, columns: 5, rows: 5, board: true },
-  { id: 'wing-east-3', partId: 'sixth-floor-wing', floor: 3, photoIds: ['770e2faf-3af0-4a3a-97e3-bafd7ea4b394'], u: 79.1, v: 70.55, columns: 4, rows: 5, board: true },
+  { id: 'wing-east-3', partId: 'sixth-floor-wing', floor: 3, photoIds: ['770e2faf-3af0-4a3a-97e3-bafd7ea4b394'], u: 73.8, v: 70.55, columns: 4, rows: 5, board: true },
   { id: 'main-north-5', partId: 'main', floor: 5, photoIds: ['abc45dda-6054-4aa4-8e19-9f3508dde2fa'], u: 109.89, v: 54, columns: 4, rows: 5, board: false },
   { id: 'main-east-1', partId: 'main', floor: 1, photoIds: ['95bda1d8-b158-4526-b225-c9ff0b651ce4'], u: 138.59, v: 71, columns: 5, rows: 5, board: false },
 ];
@@ -37,6 +37,9 @@ export function teachingClassroomInterior(building: Building, section: Section, 
     const enclosure = classroomWallFootprint(footprint, (room.classroomWindows?.wallThickness ?? .28) + .12);
     const roomInside = enclosure.length ? polygonClipping.difference(footprint, enclosure) : footprint;
     if (roomInside.length) inside = polygonClipping.union(inside, roomInside);
+  }
+  for (const wall of (building.solidCores || []).filter(item => item.partition && item.partId === section.id && floor >= (item.startFloor ?? 1) && floor <= (item.endFloor ?? Infinity))) {
+    inside = polygonClipping.difference(inside, [wall.outer, ...wall.holes]);
   }
   if (floor === 1) for (const passage of building.groundPassages || []) {
     const opening = passageShape(passage); inside = polygonClipping.difference(inside, [opening.outer, ...opening.holes]);
@@ -91,7 +94,7 @@ export function teachingClassroomFurniture(building: Building, sections: Section
     if (bay.board) {
       // A simplified interior teaching end carries the board. Its back is set
       // clear of the unchanged shell/glazing; its exact setback is estimated.
-      box(storage, bay.u + .1025, bay.v, 0, floorHeight - Math.min(.25, floorHeight * .1), 7, .15);
+      box(storage, bay.u + .1025, bay.v, 0, floorHeight - Math.min(.25, floorHeight * .1), bay.id === 'wing-east-3' ? 6.8 : 7, .15);
       box(boards, bay.u, bay.v, .9, 2.35, 4.1, .055);
       box(wood, bay.u - .03, bay.v, .86, .90, 4.25, .11);
       // A modest teacher's table leaves a generous front aisle before row one.

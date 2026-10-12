@@ -16,7 +16,7 @@ const mesh = geometry => { const result = new THREE.Mesh(geometry, material); re
 const down = (object, x, y, z) => new THREE.Raycaster(new THREE.Vector3(x, y, z), new THREE.Vector3(0, 0, -1)).intersectObject(object)[0];
 const up = (object, x, y, z) => new THREE.Raycaster(new THREE.Vector3(x, y, z), new THREE.Vector3(0, 0, 1)).intersectObject(object)[0];
 const ordinary = (building, section, height, floorHeight, cutaway) => buildingGeometry(section, height, floorHeight, building.groundPassages,
-  building.floorCorridors?.filter(c => c.partId === section.id), building.stairwells?.filter(s => s.partId === section.id), building.classroomWindows,
+  building.floorCorridors?.filter(c => c.partId === section.id), building.stairwells?.filter(s => s.partId === section.id), section.classroomWindows ?? building.classroomWindows,
   building.solidCores?.filter(c => c.partId === section.id), building.cutouts?.filter(c => c.partId === section.id), cutaway);
 
 function exposedFloorSamples(geometry, height, floorHeight, label = "") {
@@ -53,7 +53,11 @@ test('all ordinary campus buildings open every selected storey, preserving floor
       const height = Math.min(section.height, floor * info.floorHeight), geometry = ordinary(building, section, height, info.floorHeight, true);
       assert.ok(exposedFloorSamples(geometry, height, info.floorHeight, `${building.id}/${floor}`) > 0, `${building.id}/${section.id}/${floor} retains an exposed floor`);
       geometry.computeBoundingBox();
-      assert.ok(Math.abs(geometry.boundingBox.max.z - height) < 1e-4, 'Walls retain the selected storey height');
+      const openPerimeter=section.holes.length===0&&section.outer.slice(0,-1).every((_,edge)=>section.openEdges?.includes(edge))
+        &&floor>=(section.openEdgesStartFloor??1)&&floor<=(section.openEdgesEndFloor??Infinity);
+      const floorBase=Math.max(0,(Math.ceil(height/info.floorHeight-1e-8)-1)*info.floorHeight);
+      const expectedTop=openPerimeter?floorBase+Math.min(.25,info.floorHeight*.1,height*.1):height;
+      assert.ok(Math.abs(geometry.boundingBox.max.z-expectedTop)<1e-4,openPerimeter?'An explicitly open perimeter retains only its selected-floor slab':'Walls retain the selected storey height');
       geometry.dispose();
     }
   }

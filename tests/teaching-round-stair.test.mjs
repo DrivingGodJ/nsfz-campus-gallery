@@ -81,7 +81,7 @@ test('the rounded shaft has a full corridor opening, wall-wide flights, subdivid
   shape.dispose();shell.material.dispose();steps.material.dispose();Object.values(geometry).forEach(g=>g.dispose());
 });
 
-test('the marked connecting end has continuous upper-floor masonry and no windows in either building part', () => {
+test('the moved joining wall clears its former position while the sixth-floor outside end stays blank', () => {
   const main=info.sections.find(s=>s.id==='main'),[a,b]=building.classroomWindows.blindFacadeLines[0];
   const along=new THREE.Vector3(b[0]-a[0],0,b[1]-a[1]).normalize(),normal=new THREE.Vector3(-along.z,0,along.x);
   const glassGeometry=teachingWindowGeometry(building,info.sections,info.floorHeight),glass=mesh(glassGeometry.glass),frames=mesh(glassGeometry.frames);
@@ -89,9 +89,11 @@ test('the marked connecting end has continuous upper-floor masonry and no window
   for (let floor=2;floor<=main.floors;floor++) for(const t of [.4,.6,.8]) {
     const p=new THREE.Vector3(a[0]+(b[0]-a[0])*t,.12+(floor-1)*info.floorHeight+1.6,a[1]+(b[1]-a[1])*t).addScaledVector(normal,-.5);
     const ray=new THREE.Raycaster(p,normal,0,1);
-    assert.ok(ray.intersectObjects(objects).length,'The old pane is replaced by real masonry');
+    assert.equal(ray.intersectObjects(objects).length,0,'The former masonry position opens into the expanded room');
     assert.equal(ray.intersectObjects([glass,frames]).length,0,'No pane or window frame remains on the shared end facade');
   }
+  const p=new THREE.Vector3((a[0]+b[0])/2,.12+5*info.floorHeight+1.6,(a[1]+b[1])/2).addScaledVector(normal,-.5);
+  assert.ok(new THREE.Raycaster(p,normal,0,1).intersectObjects(objects).length,'The sixth floor retains its original outside end wall above the five-floor part');
   for(const core of building.solidCores) for(const window of solidCoreWindowLayout([core],24,info.floorHeight)) {
     const cut=window.cut[0]; assert.equal(confirmedFacade(cut[0],cut[1],[{from:a,to:b}]),false);
   }

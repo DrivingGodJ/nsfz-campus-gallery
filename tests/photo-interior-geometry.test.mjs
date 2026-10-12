@@ -27,7 +27,7 @@ test('interior furniture is tied to evidence and its whole envelope fits the act
   assert.equal(PHOTO_INTERIOR_EVIDENCE.length,8);
 });
 
-test('art displays leave the interior garage ramp open and the window bench leaves a usable theatre gallery',()=>{
+test('art displays leave the garage ramp open and movable lab seats and theatre sofa are absent',()=>{
   const lab=buildings[2],layout=laboratoryLayout(lab);
   const garage=[...(lab.groundFloorOpenings||[]),...(lab.groundPassages||[]).map(passageShape)];
   const placements=photoInteriorPlacements(lab);
@@ -36,13 +36,28 @@ test('art displays leave the interior garage ramp open and the window bench leav
     assert.ok(area(polygonClipping.intersection(polygon(placement.shape),polygon(layout.stair.opening)))<1e-4,placement.id);
   }
   assert.ok(placements.find(p=>p.kind==='art-panel'));
+  assert.equal(placements.filter(p=>p.kind==='barrel-seat'||p.id.startsWith('gallery-barrel-seat-')).length,0,'The four crossed-out laboratory seats are removed');
+  const labFloor=photoInteriorGeometry(lab,21.6,3.6,3.6);
+  const labMeshes=labFloor.map(({geometry})=>new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({side:THREE.DoubleSide})));
+  for(let i=0;i<4;i++) {
+    const [x,z]=layout.at(29.4+i*1.6,14.85);
+    assert.equal(new THREE.Raycaster(new THREE.Vector3(x,2,z),new THREE.Vector3(0,-1,0),0,2).intersectObjects(labMeshes).length,0,'The four removed chair positions are clear of actual furniture geometry');
+  }
+  labMeshes.forEach(mesh=>mesh.material.dispose());
+  dispose(labFloor);
   const theatre=photoInteriorPlacements(buildings[3]);
   const axis=[.987633438,-.156780714],a=[30.80922625,-45.18263029];
   for(const u of [2,8,14,20,26,32,37]) {
     const center=[a[0]+axis[0]*u+.156780714*(-.55),a[1]+axis[1]*u+.987633438*(-.55)];
     assert.ok(theatre.filter(p=>!['exhibit','light-track'].includes(p.kind)).every(p=>!pointOnStairTread(center,p.shape.outer)),'The inner side of the gallery remains walkable');
   }
-  assert.ok(theatre.find(p=>p.kind==='window-steps'));assert.ok(theatre.find(p=>p.kind==='bench'));
+  assert.ok(theatre.find(p=>p.kind==='window-steps'));
+  assert.equal(theatre.some(p=>p.kind==='bench'||p.id==='theatre-orange-bench'),false,'The orange sofa is removed entirely');
+  assert.equal(theatre.some(p=>p.kind==='fire-case'||p.id==='theatre-fire-case'),false,'The fire case is removed entirely');
+  const gallery=photoInteriorGeometry(buildings[3],21.6,3.6,18);
+  assert.equal(gallery.some(batch=>batch.kind==='orange'),false,'No orange sofa geometry remains in the fifth-floor theatre view');
+  assert.equal(gallery.some(batch=>batch.kind==='red'),false,'No fire-case geometry remains in the fifth-floor theatre view');
+  dispose(gallery);
 });
 
 test('floor slicing removes the selected ceiling detail and every higher-floor object, while keeping furniture and zero marker occlusion',()=>{
