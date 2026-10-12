@@ -28,10 +28,12 @@ test('avenue lights cover both sides of the entire road and leave junctions clea
     assert.ok(![...roads, ...obstacles].some(shape => overlap(square(p, .19), shape)), 'No light occupies a road or another structure');
     assert.ok(!campus.features.flatMap(f => f.trees ?? []).some(tree => Math.hypot(tree.position[0] - p[0], tree.position[1] - p[1]) < .75));
   }
-  assert.ok(rails.length >= 2, 'Both stone sides retain openings at intersecting paths');
+  assert.equal(rails.length, 2, 'Both stone sides are continuous across the former avenue entrance');
+  assert.ok(rails.some(rail=>overlap(passageFootprint(rail,.33),roadFootprint(avenue))), 'Stone closes the former avenue entrance');
   for (const rail of rails) {
     const footprint = passageFootprint(rail, .33);
-    assert.ok(![...roads, ...obstacles].some(shape => overlap(footprint, shape)), 'Stone caps leave the road and adjacent structures clear');
+    assert.ok(![roadFootprint(feature('way/1233313445')), roadFootprint(feature('local/avenue-garden-branch')), ...obstacles]
+      .some(shape => overlap(footprint, shape)), 'The through road and the wider branch around the barrier end remain clear');
   }
   const geometry = avenueGardenGeometry(campus.features, campus.buildings);
   try {
@@ -43,6 +45,9 @@ test('avenue lights cover both sides of the entire road and leave junctions clea
 
 test('red garden branch connects both roads without crossing trunks or buildings', () => {
   const branch = feature('local/avenue-garden-branch'), footprint = roadFootprint(branch);
+  assert.ok(Math.min(...branch.points.map(p=>p[0]))<43, 'The enlarged bend reaches at least 1.25 metres outside the former small turn');
+  assert.ok(Math.hypot(...branch.points[0].map((v,i)=>v-[45.62,69.15][i]))<1e-6);
+  assert.ok(Math.hypot(...branch.points.at(-1).map((v,i)=>v-[44.55,74.76][i]))<1e-6, 'Both established junctions stay in place');
   for (const id of ['way/1233313449', 'way/1233313445']) assert.ok(overlap(footprint, roadFootprint(feature(id))));
   for (const obstacle of [...campus.buildings, ...campus.features.filter(f => ['pergola', 'water'].includes(f.type) && f.outer)])
     assert.ok(!overlap(footprint, obstacle));

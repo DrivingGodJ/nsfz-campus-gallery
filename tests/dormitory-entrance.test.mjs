@@ -16,7 +16,10 @@ test('the only photographed modern dorm entrance has a wide hollow glass doorway
   assert.equal(campus.buildings.filter(b => b.facade?.lobbyEntry).length, 1);
   assert.equal(layout.edge, 1); assert.equal(dorm.facade.entry.edge, 4, 'The old arch and observatory remain at their original entrance');
   const photo = site.photos.find(p => p.title === 'DSC07782');
-  assert.ok(Math.hypot(photo.position.x - layout.center[0], photo.position.z - layout.center[1]) < 3);
+  assert.ok(photo);
+  // The marked reference locates the entrance; an editable camera may move
+  // farther away or turn without moving the building doorway.
+  assert.ok(Math.hypot(-43.1 - layout.center[0], 135.2 - layout.center[1]) < 3);
   const body = dormitoryBodyGeometry(dorm, info.height, info.floorHeight);
   const sliced = dormitoryBodyGeometry(dorm, info.floorHeight, info.floorHeight, true);
   const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });

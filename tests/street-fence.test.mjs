@@ -22,16 +22,17 @@ function crosses(a, b, p, q) {
   return t >= 0 && t <= 1 && s >= 0 && s <= 1;
 }
 
-test('street fence follows only the main-campus frontage and leaves every crossing route and gate clear', () => {
+test('street fence follows the main-campus frontage, closes the marked footbridge gap and retains the other gate openings', () => {
   assert.ok(fence, 'The fence is included in the campus model');
   assert.equal(fence.type, 'fence');
-  assert.equal(fence.railEdges.length, 5, 'Four openings remain separate chains');
+  assert.equal(fence.railEdges.length, 4, 'Three gate openings remain after joining the marked footbridge gap');
   for (const [actual, expected] of [[fence.railEdges[0][0], frontage[0]], [fence.railEdges.at(-1).at(-1), frontage.at(-1)]]) {
     assert.ok(Math.hypot(actual[0] - expected[0], actual[1] - expected[1]) < 1e-6);
   }
   const routes = campus.features.filter(feature => (feature.type === 'path' || feature.type === 'bridge') && feature.points && !feature.representedBy
     && segments(frontage).some(([a, b]) => segments(feature.points).some(([p, q]) => crosses(a, b, p, q))));
   assert.deepEqual(routes.map(route => route.id).sort(), ['local/footbridge', 'way/1233313446', 'way/855459414', 'way/855459415']);
+  const openRoutes=routes.filter(route=>route.id!=='local/footbridge');
   const geometry = streetFenceGeometry(fence), vertices = geometry.attributes.position;
   const street = campus.features.find(feature => feature.id === 'way/424713229');
   const gates = campus.features.filter(feature => ['local/gate-monument', 'local/gate-bell-tower'].includes(feature.id));
@@ -39,11 +40,19 @@ test('street fence follows only the main-campus frontage and leaves every crossi
     const point = [vertices.getX(i), vertices.getZ(i)];
     assert.ok(distance(point, frontage) < .07, 'No part extends around the sports annex or away from the mapped frontage');
     assert.ok(distance(point, street.points) > street.width / 2 + .5, 'The fence stays clear of the external carriageway');
-    for (const route of routes) assert.ok(distance(point, route.points) > route.width / 2 + .7, `${route.id}: gate posts, pickets and ornaments all leave the full route width plus clearance`);
+    for (const route of openRoutes) assert.ok(distance(point, route.points) > route.width / 2 + .7, `${route.id}: gate posts, pickets and ornaments all leave the full route width plus clearance`);
     for (const gate of gates) assert.ok(distance(point, gate.outer) > 1.4, `${gate.id}: the wide main entrance also clears its landmark footprint`);
   }
   const length = fence.railEdges.flatMap(segments).reduce((sum, [a, b]) => sum + Math.hypot(b[0] - a[0], b[1] - a[1]), 0);
-  assert.ok(Math.abs(length - 341.911516) < .001, 'The four calibrated openings remove 35.35 m from the 377.27 m frontage');
+  assert.ok(Math.abs(length - 347.011516) < .001, 'The former 5.1 metre footbridge gap is now included in the continuous frontage');
+  const model=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
+  const [a,b]=[[37.7878347021563,-66.3761196469519],[33.495350491369194,-63.622065135602064]];
+  const normal=new THREE.Vector3(b[1]-a[1],0,a[0]-b[0]).normalize();
+  for(const t of [.1,.5,.9]) for(const level of STREET_FENCE_RAIL_LEVELS){
+    const p=new THREE.Vector3(a[0]+(b[0]-a[0])*t,.12+1.6*level,a[1]+(b[1]-a[1])*t);
+    assert.ok(new THREE.Raycaster(p.addScaledVector(normal,.3),normal.clone().negate(),0,.6).intersectObject(model).length,'Both rails fill every part of the marked gap');
+  }
+  model.material.dispose();
   geometry.dispose();
 });
 

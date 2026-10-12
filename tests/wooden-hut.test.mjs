@@ -21,7 +21,9 @@ test('the photo-positioned cabin and its overhanging roof occupy dry grass clear
   const correction = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
   assert.deepEqual(applyCampusCorrections(campus, correction), campus, 'Regeneration retains the cabin and new dorm entry');
   const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url))), photo = site.photos.find(p => p.title === 'DSC07783');
-  assert.ok(Math.hypot(photo.position.x - model.center[0], photo.position.z - model.center[1]) < 3);
+  assert.ok(photo);
+  // Use the authored location mark, not the user's live camera adjustment.
+  assert.ok(Math.hypot(-20.4 - model.center[0], 121.5 - model.center[1]) < 3);
 });
 
 test('timber shell has real side-door and window openings beneath a white-edged pitched roof', () => {

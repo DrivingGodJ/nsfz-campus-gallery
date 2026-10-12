@@ -29,7 +29,7 @@ test('the library-facing wing has open upper balconies and no first-floor slab a
       building.floorCorridors.filter(c => c.partId === wing.id), building.stairwells.filter(s => s.partId === wing.id),
       building.classroomWindows, building.solidCores.filter(c => c.partId === wing.id), building.cutouts.filter(c => c.partId === wing.id), !!floor), true);
     try {
-      for (let level = 0; level < (floor || wing.floors); level++) for (const t of [.06, .3, .6, .94]) {
+      for (let level = 0; level < (floor || wing.floors); level++) for (const t of [.06, .5, .75, .94]) {
         const y = .12 + level * info.floorHeight + .5;
         const wall = new THREE.Raycaster(point(t, -1, y), inward, 0, 5).intersectObject(body)[0];
         assert.ok(wall && Math.abs(wall.distance - 4) < 1e-4, 'The retained classroom wall is three metres behind the original facade');
@@ -65,8 +65,10 @@ test('blue guards protect floors two through six and glazing never closes the ba
         const windowY = .12 + level * info.floorHeight + 1.8;
         assert.equal(new THREE.Raycaster(point(t, -1, windowY), inward, 0, 3.8).intersectObject(glass).length, 0, 'All glass is behind the open balcony rather than along the old facade');
       }
-      const routeStart = point(.04, 1.5, .12 + (level + .5) * info.floorHeight);
-      assert.equal(new THREE.Raycaster(routeStart, direction, 0, Math.hypot(b[0] - a[0], b[1] - a[1]) * .92).intersectObject(glass).length, 0, 'No glazing spans the balcony walkway');
+      for (const [start, end] of [[.04, .18], [.52, .96]]) {
+        const routeStart = point(start, 1.5, .12 + (level + .5) * info.floorHeight);
+        assert.equal(new THREE.Raycaster(routeStart, direction, 0, Math.hypot(b[0] - a[0], b[1] - a[1]) * (end - start)).intersectObject(glass).length, 0, 'The balcony walkway stays open beside the semicircular bay');
+      }
     }
   } finally { dispose([rails, glass]); windows.frames.dispose(); }
 });

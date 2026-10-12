@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { architectureBatch } from './architecture-geometry.ts';
 import { roadFootprint } from './road-geometry.ts';
-import { passageFootprint } from './underground-geometry.ts';
-import { trimRailChains } from './garden-geometry.ts';
 import { specimenLampParts, GARDEN_LAMP_COLORS } from './specimen-grove.ts';
 import type { Feature, Point, Shape } from './types';
 
@@ -38,19 +36,15 @@ export function avenueGardenLayout(features: Feature[], buildings: Shape[]) {
       trees.some(tree => Math.hypot(tree.position[0] - point[0], tree.position[1] - point[1]) < .75)) continue;
     lamps.push(point);
   }
-  // Follow the marked stretch around the avenue junction. Keep its entrance
-  // and the new garden branch open, including clearance for the stone caps.
+  // The marked stone barrier continues across the avenue entrance. The garden
+  // branch bends around the barrier's end instead of passing through a gap.
   const junction = road.points[1], end = road.points[0];
   const run = Math.hypot(end[0] - junction[0], end[1] - junction[1]);
   const dx = (end[0] - junction[0]) / run, dz = (end[1] - junction[1]) / run;
   const chains = [-1, 1].map(side => [-3.5, 7.5].map(along =>
     [junction[0] + dx * along - dz * ((road.width ?? 4) / 2 + .2) * side,
       junction[1] + dz * along + dx * ((road.width ?? 4) / 2 + .2) * side] as Point));
-  const openings = features.filter(feature => feature.type === 'path' && feature.points && feature.id !== CROSS_ROAD)
-    .map(feature => passageFootprint(feature.points!, (feature.width ?? 2) + .7));
-  const rails = trimRailChains(chains.map(chain => chain.map(([x, z]) => [x, 0, z])), openings)
-    .map(chain => chain.map(([x, , z]): Point => [x, z]));
-  return { lamps, rails };
+  return { lamps, rails: chains };
 }
 
 export function avenueGardenGeometry(features: Feature[], buildings: Shape[]) {

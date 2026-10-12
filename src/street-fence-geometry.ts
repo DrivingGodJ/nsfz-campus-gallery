@@ -5,8 +5,8 @@ import type { Feature, Point } from './types';
 export const STREET_FENCE_COLOR = '#20382e';
 export const STREET_FENCE_RAIL_LEVELS = [.22, .72];
 
-// The frontage chains already stop at the school gates, crossing paths and
-// footbridge. Never join separate chains with a rail or an ornamental panel.
+// Authored frontage chains retain the confirmed gate openings. Never join
+// separate chains with a rail or an ornamental panel.
 export function streetFenceGeometry(feature: Feature) {
   const height = feature.railHeight ?? 1.6, base = feature.height ?? .12;
   const parts: THREE.BufferGeometry[] = [], posts = new Map<string, Point>();
