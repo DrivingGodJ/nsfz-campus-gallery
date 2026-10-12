@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import polygonClipping from 'polygon-clipping';
 import { cafeteriaLowerProfile, dormitoryProfile, dormitoryObservatory } from './facade-geometry.ts';
 import { laboratoryLayout } from './laboratory-geometry.ts';
-import { buildingGeometry, passageShape, snapFootprint } from './building-geometry.ts';
+import { passageShape } from './building-geometry.ts';
 import { pointOnStairTread } from './structure-geometry.ts';
 import type { Building, Point, Shape } from './types';
 
@@ -75,7 +74,6 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
   }
   if (building.id === PHOTO_INTERIOR_IDS[2]) {
     const layout = laboratoryLayout(building), a = layout.at(0,0), b = layout.at(1,0), axis: Point = [b[0]-a[0],b[1]-a[1]];
-    const walls = [...layout.walls, layout.stair.opening];
     // Thin artworks are on a classroom-side wall, clear of the garage opening.
     const garage = [...(building.groundFloorOpenings || []), ...(building.groundPassages || []).map(passageShape)];
     add('art-wall-panel',1,'art-panel',layout.at(58,3.8),axis,3.6,.1,2.15,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
@@ -84,7 +82,6 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
     add('art-gallery-red-pipe',1,'red-pipe',layout.at(57.8,4),axis,8.7,.12,3.3,PHOTO_INTERIOR_EVIDENCE[4].photoId);
     add('balcony-approach-ceiling',6,'slat-ceiling',layout.at(57.8,13.2),axis,12,2.35,3.35,PHOTO_INTERIOR_EVIDENCE[2].photoId);
     add('balcony-space-frame',6,'space-frame',layout.at(layout.circleU,23),axis,12.3,5.8,3.3,PHOTO_INTERIOR_EVIDENCE[3].photoId);
-    for (const [i,u] of [layout.circleU-5.6,layout.circleU+5.6].entries()) add(`balcony-folded-umbrella-${i}`,6,'umbrella',layout.at(u,23),axis,.5,.5,2.35,PHOTO_INTERIOR_EVIDENCE[3].photoId,walls);
   }
   if (building.id === PHOTO_INTERIOR_IDS[3]) {
     const a: Point = [30.809226250687292,-45.18263028622997], b: Point = [69.18855840366079,-51.27513535610975];
@@ -157,9 +154,6 @@ export function photoInteriorGeometry(building: Building, height: number, floorH
       for(let u=-5.8;u<=5.8;u+=.36)box('wood',u,0,y,.15,2.32,.11);
       const points=[[-5.4,-.62],[-2.8,-.62],[-1.1,.5],[1.6,.5],[3.2,-.62],[5.4,-.62]];
       for(let i=1;i<points.length;i++)bar('lights',pos(points[i-1][0],points[i-1][1],y-.1),pos(points[i][0],points[i][1],y-.1),.035);
-    } else if(item.kind==='umbrella') {
-      box('dark',0,0,.08,.48,.48,.16);cylinder('metal',0,0,1.05,.02,2.1,6);
-      const umbrella=new THREE.ConeGeometry(.24,1.4,8);append('dark',umbrella,matrix(pos(0,0,1.6)));
     } else if(item.kind==='space-frame') {
       const y=ceilingY(item.floor)-base-.12;
       for(let u=-6;u<=6;u+=2) {
@@ -191,13 +185,6 @@ export function photoInteriorGeometry(building: Building, height: number, floorH
       const y=ceilingY(item.floor)-base-.13;box('dark',0,0,y,item.length,.1,.055);
       for(let u=-7;u<=7;u+=2.8){box('dark',u,0,y-.16,.18,.16,.2);box('lights',u,.02,y-.27,.14,.13,.025);}
     }
-  }
-  // A thin wood finish is clipped to the already modelled balcony slab. It
-  // introduces no new floor bridge, room wall, external projection or doorway.
-  if(building.id===PHOTO_INTERIOR_IDS[2] && shown>5*floorHeight+.25 && height>=6*floorHeight) {
-    const layout=laboratoryLayout(building), a=layout.at(0,0), b=layout.at(1,0), f=frame(layout.at(layout.circleU,23),[b[0]-a[0],b[1]-a[1]]);
-    const finish=rectangle(f,12.5,6), polygons=polygonClipping.intersection(snapFootprint([[finish.outer]]),snapFootprint([[layout.walkways[1].outer]]));
-    for(const [outer,...holes] of polygons) {const g=buildingGeometry({outer:outer as Point[],holes:holes as Point[][]},.018,floorHeight);g.rotateX(-Math.PI/2);g.translate(0,floorY(6)+.005,0);append('wood',g);}
   }
   return Object.entries(vertices).filter(([,p])=>p.length).map(([kind,p])=>{
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(p,3));geometry.computeVertexNormals();geometry.computeBoundingSphere();

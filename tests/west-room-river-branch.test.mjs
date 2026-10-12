@@ -17,9 +17,11 @@ const mesh=g=>{const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({side:THREE.
 const cleanup=meshes=>meshes.forEach(m=>{m.geometry.dispose();m.material.dispose();});
 const area=polys=>polys.reduce((sum,poly)=>sum+poly.reduce((sum,ring,i)=>sum+(i?-1:1)*Math.abs(ring.slice(1).reduce((s,p,i)=>s+ring[i][0]*p[1]-p[0]*ring[i][1],0))/2,0),0);
 
-test('the west stair-side room is enclosed only on floors two and three, with a clear door below its lintel',()=>{
-  const room=building.solidCores.find(c=>c.partId==='main'&&c.endFloor===3);
+test('the west stair-side room is enclosed on floors two through four, with a clear door below its lintel',()=>{
+  const room=building.solidCores.find(c=>c.partId==='main'&&c.startFloor===2&&c.endFloor===4);
   assert.equal(room.startFloor,2);
+  const upper=building.solidCores.find(c=>c.partId==='main'&&c.startFloor===5&&c.outer[0][0]===room.outer[0][0]);
+  assert.ok(upper&&upper.outer.length===6,'Floor five keeps its original compact room');
   assert.deepEqual(corrections.buildings.find(b=>b.id===building.id).solidCores,building.solidCores);
   const geometry=buildingGeometry(section,section.height,info.floorHeight,building.groundPassages,building.floorCorridors.filter(c=>c.partId==='main'),building.stairwells.filter(s=>s.partId==='main'),building.classroomWindows,building.solidCores.filter(c=>c.partId==='main'),building.cutouts.filter(c=>c.partId==='main'));
   geometry.rotateX(-Math.PI/2);geometry.translate(0,.12,0);
@@ -34,9 +36,9 @@ test('the west stair-side room is enclosed only on floors two and three, with a 
   const at=(along,across,y)=>new THREE.Vector3(a[0],y,a[1]).addScaledVector(u,along).addScaledVector(v,across);
   try{
     for(let floor=1;floor<=5;floor++){
-      const base=.12+(floor-1)*info.floorHeight, enclosed=floor===2||floor===3;
+      const base=.12+(floor-1)*info.floorHeight, enclosed=floor>=2&&floor<=4;
       const wall=new THREE.Raycaster(at(width+.4,.5,base+1.5),u.clone().negate(),0,.8).intersectObject(body);
-      assert.equal(!!wall.length,enclosed,`Only the requested two storeys have the new side wall on floor ${floor}`);
+      assert.equal(!!wall.length,enclosed,`Only floors two through four have the copied side wall on floor ${floor}`);
       const door=new THREE.Raycaster(at(width+.4,1.4,base+1.5),u.clone().negate(),0,.8);
       assert.equal(door.intersectObject(body).length,0,'The corridor-side door is a real opening');
       assert.equal(!!new THREE.Raycaster(at(width+.4,1.4,base+2.8),u.clone().negate(),0,.8).intersectObject(body).length,enclosed,'The opening retains its lintel');

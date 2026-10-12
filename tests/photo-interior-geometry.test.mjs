@@ -5,7 +5,7 @@ import polygonClipping from 'polygon-clipping';
 import * as THREE from 'three';
 import { dormitoryBodyGeometry, dormitoryObservatory, facadeGeometry } from '../src/facade-geometry.ts';
 import { photoInteriorPlacements, photoInteriorGeometry, photoInteriorShapes, PHOTO_INTERIOR_IDS, PHOTO_INTERIOR_EVIDENCE } from '../src/photo-interior-geometry.ts';
-import { laboratoryLayout } from '../src/laboratory-geometry.ts';
+import { laboratoryBodyGeometry, laboratoryLayout } from '../src/laboratory-geometry.ts';
 import { pointOnStairTread } from '../src/structure-geometry.ts';
 import { passageShape } from '../src/building-geometry.ts';
 const campus=JSON.parse(fs.readFileSync(new URL('../public/data/campus.json',import.meta.url)));
@@ -60,6 +60,27 @@ test('art displays leave the garage ramp open and movable lab seats and theatre 
   dispose(gallery);
 });
 
+test('the crossed sixth-floor lab balcony has no decorative decking or umbrellas and retains its real floor',()=>{
+  const lab=buildings[2],layout=laboratoryLayout(lab),floorHeight=3.6;
+  const detail=photoInteriorGeometry(lab,21.6,floorHeight,21.6);
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const fittings=detail.map(({geometry})=>new THREE.Mesh(geometry,material));
+  const body=laboratoryBodyGeometry(lab,21.6,floorHeight,true),structure=new THREE.Mesh(body,material);
+  structure.rotation.x=-Math.PI/2;structure.position.y=.12;structure.updateMatrixWorld();
+  try {
+    for(const [u,v] of [[layout.circleU-5.6,23],[layout.circleU,23],[layout.circleU+5.6,23],[layout.circleU,21]]) {
+      const [x,z]=layout.at(u,v),floorY=.12+5*floorHeight+.25;
+      assert.equal(new THREE.Raycaster(new THREE.Vector3(x,floorY+2.6,z),new THREE.Vector3(0,-1,0),0,2.65).intersectObjects(fittings).length,0,'The marked sixth-floor deck and its two umbrella positions are clear of actual decoration');
+      for(let floor=0;floor<6;floor++) {
+        assert.ok(new THREE.Raycaster(new THREE.Vector3(x,.12+floor*floorHeight+.4,z),new THREE.Vector3(0,-1,0),0,.8).intersectObject(structure).length,'The structural balcony slab remains on every storey');
+      }
+    }
+    assert.equal(photoInteriorPlacements(lab).some(p=>p.kind==='umbrella'),false);
+    assert.ok(photoInteriorPlacements(lab).some(p=>p.id==='balcony-approach-ceiling'),'The photographed ceiling and light strips are retained');
+    assert.ok(photoInteriorPlacements(lab).some(p=>p.id==='balcony-space-frame'),'The photographed overhead frame is retained');
+  } finally {body.dispose();dispose(detail);material.dispose();}
+});
+
 test('floor slicing removes the selected ceiling detail and every higher-floor object, while keeping furniture and zero marker occlusion',()=>{
   let total=0;
   for(const building of buildings) {
@@ -79,7 +100,7 @@ test('floor slicing removes the selected ceiling detail and every higher-floor o
   }
   const lab=buildings[2],ceilingRemoved=photoInteriorGeometry(lab,21.6,3.6,21.6);
   assert.ok(!ceilingRemoved.some(batch=>batch.kind==='lights'),'Sixth-floor slats and light strips vanish with its ceiling');
-  assert.ok(ceilingRemoved.some(batch=>batch.kind==='wood'),'Balcony floor finish remains');
+  assert.ok(ceilingRemoved.some(batch=>batch.kind==='wood'),'The first-floor art display remains after removal of the sixth-floor finish');
   dispose(ceilingRemoved);
   assert.ok(total<26000,`Material-batched detail triangle budget: ${total}`);
 });

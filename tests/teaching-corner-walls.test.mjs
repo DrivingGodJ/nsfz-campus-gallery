@@ -165,9 +165,9 @@ test('removing the millimetre classroom strip clears walls on every floor and ke
   } finally { dispose(meshes); }
 });
 
-test('the unchanged upper northwest room retains its opaque wall above the expanded two-storey room', () => {
-  const west = building.solidCores.find(core => core.partId === main.id && core.startFloor === 4 && Math.abs(core.outer[0][0] - 91.74712393299268) < 1e-6);
-  assert.ok(west && west.startFloor === 4 && west.classroomWindows);
+test('the unchanged fifth-floor northwest room retains its opaque wall above the expanded floors two through four', () => {
+  const west = building.solidCores.find(core => core.partId === main.id && core.startFloor === 5 && Math.abs(core.outer[0][0] - 91.74712393299268) < 1e-6);
+  assert.ok(west && west.startFloor === 5 && west.classroomWindows);
   const oldD = [96.49903916402369, 46.62730840918588], oldE = [92.6521153219028, 47.24082643573102];
   const [newD, newE] = west.outer.slice(3, 5);
   const [holeA, holeB] = main.holes[0].slice(2, 4), length = Math.hypot(holeB[0] - holeA[0], holeB[1] - holeA[1]);
@@ -181,7 +181,7 @@ test('the unchanged upper northwest room retains its opaque wall above the expan
       for (const rise of [.65, 1.6, 3]) {
         const height = BASE + (floor - 1) * info.floorHeight + rise;
         const newWall = crossing(newD, newE, height);
-        if (floor <= 3) assert.equal(newWall.intersectObjects(meshes).length, 0, 'The former upper-room end wall leaves the expanded lower room and ground approach open');
+        if (floor <= 4) assert.equal(newWall.intersectObjects(meshes).length, 0, 'The former upper-room end wall leaves the expanded floors two through four and ground approach open');
         else assert.ok(newWall.intersectObjects(meshes).length, `The moved opaque wall remains on floor ${floor}, height ${rise}`);
         assert.equal(newWall.intersectObjects([glass, frames]).length, 0, 'The newly positioned end wall is masonry rather than a glass bay');
         assert.equal(crossing(oldD, oldE, height).intersectObjects([...meshes, glass, frames]).length, 0, `The former end wall is cleared at floor ${floor}, height ${rise}`);

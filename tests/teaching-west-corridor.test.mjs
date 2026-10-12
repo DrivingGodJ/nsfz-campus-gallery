@@ -16,7 +16,7 @@ const main = info.sections.find(section => section.id === 'main');
 const corridor = building.floorCorridors.find(item => item.partId === main.id && item.points?.length === 2 && item.slabInfill && item.railEdges?.[0]?.length === 4);
 const stair = building.stairwells.find(item => item.partId === main.id && !item.internal);
 const west = building.solidCores.find(item => item.partId === main.id && Math.abs(item.outer[0][0] - 91.74712393299268) < 1e-6);
-const upperWest = building.solidCores.find(item => item.partId === main.id && item.startFloor === 4 && item.outer[0][0] === west.outer[0][0]);
+const upperWest = building.solidCores.find(item => item.partId === main.id && item.startFloor === 5 && item.outer[0][0] === west.outer[0][0]);
 const BASE = .12, material = () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 function mesh(geometry) { const object = new THREE.Mesh(geometry, material()); object.updateMatrixWorld(); return object; }
 function body(cutawayHeight) {
@@ -63,7 +63,7 @@ test('upper floors retain continuous corridor access with floor support up to th
     for (let floor = 2; floor <= main.floors; floor++) {
       const door = west.outer[5].map((value, i) => (value + west.outer[6][i]) / 2 + [.9868977699662863, -.16134680547061092][i] * .4);
       const higherEnd = points.at(-1).map((v, i) => v + [.9868977699662863, -.16134680547061092][i] * .2);
-      const route = floor <= 3 ? [points[0], door] : [points[0], higherEnd];
+      const route = floor <= 4 ? [points[0], door] : [points[0], higherEnd];
       for (let i = 0; i < route.length - 1; i++) {
         const { a, b, direction, normal } = segment(route[i], route[i + 1]);
         const steps = Math.ceil(a.distanceTo(b) / .6);
@@ -104,7 +104,7 @@ test('the marked blue guard follows the straight boundaries and room facade whil
         for (const rise of [.5, 1.05]) {
           const origin = center.clone().addScaledVector(normal, -.3); origin.y = slabTop(floor) + rise;
           const hits = new THREE.Raycaster(origin, normal, 0, .6).intersectObject(rails);
-          if (floor === 1 || floor <= 3 && (i === 0 || i === 1 && a.distanceTo(b) / 2 < 3.9)) assert.equal(hits.length, 0, 'Ground circulation and the newly enclosed two-storey room have no internal guard');
+          if (floor === 1 || floor <= 4 && (i === 0 || i === 1 && a.distanceTo(b) / 2 < 3.9)) assert.equal(hits.length, 0, 'Ground circulation and the room on floors two through four have no internal guard');
           else assert.ok(hits.length, `Floor ${floor} has a guard along edge ${i}, rise ${rise}`);
         }
       }
@@ -128,7 +128,7 @@ test('the new route keeps the approved northwest room wall and exposes its selec
   const object = body(), glazing = teachingWindowGeometry(building, info.sections, info.floorHeight), glass = mesh(glazing.glass);
   try {
     for (let floor = 1; floor <= main.floors; floor++) {
-      const core = floor === 2 || floor === 3 ? west : upperWest;
+      const core = floor >= 2 && floor <= 4 ? west : upperWest;
       const { a, b, normal } = segment(core.outer[3], core.outer[4]);
       const origin = a.clone().lerp(b, .5).addScaledVector(normal, -.4); origin.y = slabTop(floor) + 1.3;
       const ray = new THREE.Raycaster(origin, normal, 0, .8);

@@ -19,6 +19,15 @@ export function undergroundRoomFrame(feature: Feature) {
   return { at, across, along, width, length };
 }
 
+export function undergroundBadmintonLayout({ width, length }: ReturnType<typeof undergroundRoomFrame>) {
+  // The photographed courts run across the hall in two rows. Keep the end
+  // timber bay clear and a central aisle between the full 13.4 m courts.
+  const rows = Math.max(1, Math.floor(width / 15.4)), cols = Math.max(1, Math.floor((length - 15) / 7.2));
+  const margin = (width - rows * 15.4) / 2;
+  const centers: Point[] = Array.from({ length: rows * cols }, (_, i) => [margin + Math.floor(i / cols) * 15.4 + 7.7, 2 + i % cols * 7.2 + 3.6]);
+  return { rows, cols, centers };
+}
+
 // Structure and recognizable fittings are retained; exact unseen court counts
 // and service routing are estimates, documented alongside the 13 source views.
 export function undergroundDetailGeometry(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = []) {
@@ -178,20 +187,19 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     }
   }
   if (feature.type === 'undergroundRoom' && feature.outer) {
-    const { at, width, length, along, across } = undergroundRoomFrame(feature), angle = -Math.atan2(across[1], across[0]);
+    const frame = undergroundRoomFrame(feature), { at, width, length, along, across } = frame, angle = -Math.atan2(across[1], across[0]);
     const roomPoint = (u: number, v: number, y: number) => point(at(u, v), y);
-    const cols = Math.max(1, Math.floor((width - 3.8) / 7.6)), rows = Math.max(1, Math.floor((length - 5.5) / 15.4));
-    const marginU = (width - cols * 7.6) / 2, marginV = (length - rows * 15.4) / 2;
-    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-      const u = marginU + col * 7.6 + 3.8, v = marginV + row * 15.4 + 7.7;
-      const line = (u0: number, v0: number, u1: number, v1: number) => segment(at(u + u0, v + v0), at(u + u1, v + v1), floor + .07, .012, .04, 'paint');
+    const courtAngle = -Math.atan2(along[1], along[0]);
+    for (const [u, v] of undergroundBadmintonLayout(frame).centers) {
+      const courtAt = (x: number, z: number) => at(u + z, v + x);
+      const line = (x0: number, z0: number, x1: number, z1: number) => segment(courtAt(x0, z0), courtAt(x1, z1), floor + .07, .012, .04, 'paint');
       for (const x of [-3.05, 3.05, -2.59, 2.59]) line(x, -6.7, x, 6.7);
       for (const z of [-6.7, -5.94, -1.98, 1.98, 5.94, 6.7]) line(-3.05, z, 3.05, z);
       for (const sign of [-1, 1]) line(0, sign * 1.98, 0, sign * 6.7);
-      for (const x of [-3.2, 3.2]) { bar(roomPoint(u + x, v, floor + .06), roomPoint(u + x, v, floor + 1.55), .035, 'wood'); box(at(u + x, v), floor + .05, .07, .55, .35, angle, 'wood'); }
-      segment(at(u - 3.2, v), at(u + 3.2, v), floor + 1.51, .026, .025, 'paint');
-      segment(at(u - 3.2, v), at(u + 3.2, v), floor + .78, .72, .014, 'nets');
-      for (const y of [.8, 1.05, 1.3]) segment(at(u - 3.2, v), at(u + 3.2, v), floor + y, .006, .018, 'tiles');
+      for (const x of [-3.2, 3.2]) { bar(point(courtAt(x, 0), floor + .06), point(courtAt(x, 0), floor + 1.55), .035, 'wood'); box(courtAt(x, 0), floor + .05, .07, .55, .35, courtAngle, 'wood'); }
+      segment(courtAt(-3.2, 0), courtAt(3.2, 0), floor + 1.51, .026, .025, 'paint');
+      segment(courtAt(-3.2, 0), courtAt(3.2, 0), floor + .78, .72, .014, 'nets');
+      for (const y of [.8, 1.05, 1.3]) segment(courtAt(-3.2, 0), courtAt(3.2, 0), floor + y, .006, .018, 'tiles');
     }
     // The pale timber multipurpose bay in DSC01480 is confined to the far end;
     // it does not turn the green badminton hall into an all-wood basketball hall.
