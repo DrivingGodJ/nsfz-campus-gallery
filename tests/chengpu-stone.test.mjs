@@ -46,7 +46,10 @@ test('the marked tree is replaced by the Chengpu stone with its adjacent benches
   assert.equal(stone.stone.variant, 'upright');
   assert.equal(stone.stone.inscription, '誠樸');
   assert.ok(!trees.some(t => t.position[0] === 68.65 && t.position[1] === 9.35));
-  assert.ok(trees.some(t => t.position[0] === 60.5 && t.position[1] === 11.1));
+  const neighbour = trees.find(t => t.position[0] === 71 && t.position[1] === 15.35);
+  assert.ok(neighbour, 'The neighbouring tree remains on this bank at the later marked ring-seat position');
+  assert.equal(neighbour.radius, 2.25);
+  assert.ok(Math.abs(neighbour.height - 9.95) < 1e-10);
   for (const path of campus.features.filter(f => f.type === 'path' && f.points && !f.representedBy)) {
     assert.equal(clip.intersection([stone.outer], [passageFootprint(path.points, path.width || 3).outer]).length, 0, path.id + ' remains open');
   }
