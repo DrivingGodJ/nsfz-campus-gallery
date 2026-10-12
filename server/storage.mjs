@@ -46,8 +46,8 @@ export function validatePhoto(input, existing, map, requirePlacement = true) {
   if (input.locationId !== undefined && input.buildingId !== undefined && resolveLocationId(input.buildingId, map) !== buildingId) throw new UserError('拍摄地点与建筑不一致，请重新选择地点。');
   const captureType = input.captureType ?? existing.captureType ?? (existing.metadata?.aerial ? 'aerial' : 'ground');
   if (!['ground', 'aerial'].includes(captureType)) throw new UserError('请选择普通照片或航拍照片。');
-  const floor = number(input.floor, 0, 50, '楼层');
-  if (!Number.isInteger(floor) || (captureType === 'aerial' ? floor !== 0 : (!building && floor !== 0) || (building && floor < 1))) throw new UserError('请检查拍摄地点和楼层。');
+  const floor = number(input.floor, -1, 50, '楼层');
+  if (!Number.isInteger(floor) || (captureType === 'aerial' ? floor !== 0 : (!building && floor !== 0) || (building && floor < 1 && !(floor === -1 && building.basement)))) throw new UserError('请检查拍摄地点和楼层。');
   const cameraHeight = input.cameraHeight === undefined ? undefined : number(input.cameraHeight, .1, 11.9, '拍摄高度');
   const xs = map.boundary.map(p => p[0]), zs = map.boundary.map(p => p[1]);
   const position = {

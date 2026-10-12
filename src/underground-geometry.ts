@@ -242,6 +242,16 @@ export function undergroundLayout(features: Feature[]) {
       openings: [...[feature, ...joined].flatMap(item => openings.get(item.id) || []),
         ...(stair ? [stair.opening] : [])] });
   }
+  // A garage's driveway notch ends at the basement floor. Retain its narrow
+  // sidewalls but open the end cap so the slope actually reaches the room.
+  for (const area of areas.values()) if (area.feature.roomUse === 'garage') {
+    const entrance=features.find(feature=>feature.type==='garageEntrance'&&area.feature.connectedTo?.includes(feature.id));
+    if (!entrance?.ramp || !entrance.points || Math.abs(entrance.ramp.bottomHeight-(area.feature.height??-3))>1e-6) continue;
+    const [from,to]=entrance.points,dx=to[0]-from[0],dz=to[1]-from[1],length=Math.hypot(dx,dz),width=entrance.width??4.5;
+    const opening=[-1,1].map(side=>[to[0]-dz/length*width/2*side,to[1]+dx/length*width/2*side]) as PassageOpening;
+    opening.height=Math.min(2.5,area.feature.wallHeight??2.7);
+    area.openings.push(opening);
+  }
   for (const area of areas.values()) if (area.feature.type === 'undergroundTrack') {
     const neighbors = [...areas.values()].filter(other => area.feature.connectedTo?.includes(other.feature.id)
       && (area.feature.height ?? -3) === (other.feature.height ?? -3));

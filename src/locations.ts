@@ -1,5 +1,5 @@
 import { bridgeHeight, bridgeSurfaceHeight, curvedStairSurfaceHeight, pointOnStairTread } from './structure-geometry.ts';
-import { buildingLevels } from './building-model.ts';
+import { buildingLevels, buildingFloorLabel } from './building-model.ts';
 import { groundElevationAt } from './sports-ground-geometry.ts';
 import { dormitoryObservatory } from './facade-geometry.ts';
 import { undergroundFloorElevation, undergroundCeilingSections } from './underground-geometry.ts';
@@ -56,7 +56,7 @@ export const altitudeLabel = (photo: Photo) => photo.altitude?.reference === 'se
 export function photoCameraHeightRange(photo: Photo, campus: Campus, site: Site) {
   const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
   const feature = campus.features.find(f => f.id === id);
-  let clearHeight = building ? buildingLevels(building, site.buildingOverrides[id]).floorHeight
+  let clearHeight = building ? photo.floor === -1 && building.basement ? building.basement.clearHeight : buildingLevels(building, site.buildingOverrides[id]).floorHeight
     : feature && (feature.height ?? 0) < 0 ? feature.wallHeight ?? 3.6 : 3.6;
   if (feature?.riseStair) {
     const point: [number, number] = [photo.position.x, photo.position.z];
@@ -77,6 +77,7 @@ export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {
   const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
   if (building) {
     const info = buildingLevels(building, site.buildingOverrides[id]);
+    if (photo.floor === -1 && building.basement) return building.basement.floorElevation + cameraHeight;
     if(photo.floor===info.observatoryFloor) {
       const observatory=dormitoryObservatory(building,info.floorHeight);
       if(observatory)return info.baseElevation+observatory.floorY+cameraHeight;
@@ -128,7 +129,7 @@ export function photosAtLocation(photos: Photo[], id: string, floor = 0, campus?
 export function photoLocationText(photo: Photo, campus: Campus, site: Site) {
   const location = campusLocations(campus, site).find(item => item.id === photoLocationId(photo, campus));
   if (isAerialPhoto(photo)) return (location?.name || '校园') + ' · 航拍';
-  if (location?.building) return location.name + ' · ' + photo.floor + ' 楼';
+  if (location?.building) return location.name + ' · ' + buildingFloorLabel(buildingLevels(location.building, site.buildingOverrides[location.id]), photo.floor);
   if (location) return location.name;
   return '校园室外';
 }

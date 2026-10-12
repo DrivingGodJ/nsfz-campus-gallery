@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as THREE from 'three';
+import polygonClipping from 'polygon-clipping';
 import { RIVER_IDS, riverWaterFootprints, riverBankSamples, riverLandscapeGeometry } from '../src/river-landscape.ts';
 import { palmCrownGeometry, treeInstances, treeTrunkGeometry } from '../src/tree-geometry.ts';
 import { passageFootprint } from '../src/underground-geometry.ts';
@@ -76,9 +77,25 @@ test('tree trunks leave physical roads, building bodies, water and ground photo 
   const cameras = site.photos.filter(photo => photo.captureType === 'ground' && !photo.floor);
   for (const tree of trees) {
     const radius = Math.max(.2, tree.radius * .13), point = tree.position;
+    let roots;
     for (const road of roads) {
       const clearance = Math.min(...road.outer.map((a,i) => edgeDistance(point, a, road.outer[(i + 1) % road.outer.length])));
-      assert.ok(!inside(point, road.outer) && clearance >= radius + .04, `${tree.group} trunk enters ${road.id}`);
+      if (!inside(point, road.outer) && clearance >= radius + .04) continue;
+      // The shared trunk is a rotated polygon, not its enclosing circle. A
+      // close road must clear the actual root edges by the same four centimetres.
+      if (!roots) {
+        const geometry = treeTrunkGeometry(tree.kind === 'columnar' || tree.kind === 'palm'), position = geometry.getAttribute('position');
+        const matrix = treeInstances(tree).trunk, corners = new Map();
+        for (let i = 0; i < position.count; i++) if (Math.abs(position.getY(i)) < 1e-6) {
+          const p = new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(matrix);
+          if (Math.hypot(p.x - point[0], p.z - point[1]) > radius / 2) corners.set(`${p.x},${p.z}`, [p.x, p.z]);
+        }
+        roots = [...corners.values()].sort((a,b) => Math.atan2(a[1]-point[1],a[0]-point[0]) - Math.atan2(b[1]-point[1],b[0]-point[0]));
+        roots.push(roots[0]); geometry.dispose();
+      }
+      const gap = Math.min(...roots.flatMap(p => road.outer.slice(1).map((b,i) => edgeDistance(p, road.outer[i], b))),
+        ...road.outer.flatMap(p => roots.slice(1).map((b,i) => edgeDistance(p, roots[i], b))));
+      assert.ok(!polygonClipping.intersection([roots], [road.outer]).length && gap >= .04, `${tree.group} trunk enters ${road.id}`);
     }
     assert.ok(!bodies.some(body => inside(point, body.outer) && !body.holes.some(hole => inside(point, hole))), tree.group + ' enters a building');
     assert.ok(!waters.some(water => inside(point, water.outer)), tree.group + ' is planted in the river');

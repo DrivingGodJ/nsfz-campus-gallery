@@ -97,7 +97,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     const platform = rise ? passageFootprint([rise.to, rise.at(rise.length + 20)], feature.width || rise.width) : null;
     const cuts = [...(stair ? [[stair.footprint.outer]] : []), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
     const floors = cuts.length ? polygonClipping.difference([shape.outer, ...shape.holes], ...cuts) : [[shape.outer, ...shape.holes]];
-    for (const [outer, ...holes] of floors) flat({ outer, holes }, floor + .045, feature.type === 'undergroundRoom' ? 'green' : 'floor');
+    for (const [outer, ...holes] of floors) flat({ outer, holes }, floor + .045, feature.type === 'undergroundRoom' && feature.roomUse !== 'garage' ? 'green' : 'floor');
     if (platform) for (const [outer, ...holes] of polygonClipping.intersection([shape.outer, ...shape.holes], [platform.outer]))
       flat({ outer, holes }, rise!.topHeight + .045, 'floor');
   }
@@ -123,7 +123,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
           (p[0] - stair.from[0]) * (stair.to[0] - stair.from[0]) + (p[1] - stair.from[1]) * (stair.to[1] - stair.from[1])) / stair.length < 1e-5);
         segment(panel.from, panel.to, floor + panel.bottom, panel.top - panel.bottom, .2, entranceFace ? 'podium' : 'walls');
       }
-      const trimHeight = feature.type === 'undergroundTrack' ? 1.55 : feature.type === 'undergroundCorridor' ? 1.1 : clear - 1;
+      const trimHeight = feature.roomUse === 'garage' ? 0 : feature.type === 'undergroundTrack' ? 1.55 : feature.type === 'undergroundCorridor' ? 1.1 : clear - 1;
       // Trim belongs to the solid panel, including the low wall buried beneath
       // a raised landing; it must never span the opening above that panel.
       for (let y = .55; y < trimHeight; y += .55) if (y > panel.bottom && y + .018 <= panel.top) segment(panel.from, panel.to, floor + y, .018, .215, 'tiles');
@@ -214,7 +214,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     }
   }
   for (const opening of roofOpenings) flat(opening, top - .05, 'skylights', .045);
-  if (feature.type !== 'undergroundRoom') {
+  if (feature.type !== 'undergroundRoom' || feature.roomUse === 'garage') {
     // The full enclosure includes merged return passages and corner seams;
     // only the photographed skylight footprint cuts through its opaque roof.
     for (const section of sections) {
@@ -223,7 +223,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       for (const [outer, ...holes] of roofs) flat({ outer, holes }, floor + section.height - .12, 'ceiling', .08);
     }
   }
-  if (feature.type === 'undergroundRoom' && feature.outer) {
+  if (feature.type === 'undergroundRoom' && feature.roomUse !== 'garage' && feature.outer) {
     const frame = undergroundRoomFrame(feature), { at, width, length, along, across } = frame, angle = -Math.atan2(across[1], across[0]);
     const roomPoint = (u: number, v: number, y: number) => point(at(u, v), y);
     const courtAngle = -Math.atan2(along[1], along[0]);

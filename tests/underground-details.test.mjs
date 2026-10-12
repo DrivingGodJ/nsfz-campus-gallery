@@ -95,7 +95,10 @@ test('all underground model batches stay within their floors and ceilings and ad
         assert.ok(vertices.getY(i)>=floor-.001&&vertices.getY(i)<=ceiling+.001,kind);
       }
     }
-    if(area.feature.type==='undergroundRoom') for(const kind of ['paint','nets','glass','green','wood','metal','lights','pipes']) assert.ok(model[kind].attributes.position.count,kind);
+    if(area.feature.roomUse==='garage') {
+      for(const kind of ['floor','walls','ceiling'])assert.ok(model[kind].attributes.position.count,kind);
+      for(const kind of ['paint','nets','green','wood'])assert.equal(model[kind].attributes.position.count,0,'A garage never inherits badminton hall fittings');
+    } else if(area.feature.type==='undergroundRoom') for(const kind of ['paint','nets','glass','green','wood','metal','lights','pipes']) assert.ok(model[kind].attributes.position.count,kind);
     if(area.feature.type==='undergroundCorridor') for(const kind of ['glass','walls','lights','tiles','pipes']) assert.ok(model[kind].attributes.position.count,kind);
     Object.values(model).forEach(geometry=>geometry.dispose());
   }

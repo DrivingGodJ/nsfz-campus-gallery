@@ -10,7 +10,7 @@ import { buildingInfo, type Campus, type Feature, type Photo, type Point, type S
 import CampusStructures from './CampusStructures';
 import MapModelLayer from './MapModelLayer';
 import MapLevelSwitch, { type MapLevelMode } from './MapLevelSwitch';
-import { isUndergroundFeature, isUndergroundPhoto } from './map-level-mode';
+import { isUndergroundFeature, isUndergroundLocation, isUndergroundPhoto } from './map-level-mode';
 import SportsGround from './SportsGround';
 import Forest, { Trees } from './Forest';
 import RiverLandscape from './RiverLandscape';
@@ -96,7 +96,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
   useEffect(() => () => drumTexture?.dispose(), [drumTexture]);
   const [hover, setHover] = useState(false);
   const info = useMemo(() => buildingInfo(building, site, index), [building, site.buildingOverrides[building.id], index]);
-  const cutawayHeight = selected && floor ? floor * info.floorHeight : undefined;
+  const cutawayHeight = selected && floor && floor > 0 ? floor * info.floorHeight : undefined;
   const gym = useMemo(() => building.id === GYM_ID ? gymArchitecture(building, info.height, info.floorHeight, bridge, cutawayHeight) : undefined, [building, info.height, info.floorHeight, bridge, cutawayHeight]);
   useEffect(() => () => { if (gym) for (const geometry of Object.values(gym)) geometry.dispose(); }, [gym]);
   const stands = useMemo(() => building.id === STANDS_ID ? standsArchitecture(building, info.height, info.floorHeight, cutawayHeight) : undefined, [building, info.height, info.floorHeight, cutawayHeight]);
@@ -120,10 +120,10 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     return drumTexture ? theatreDrumMaterials(geometry, info.sections[i], info.floorHeight, building) : geometry;
   }), [building, info, cutawayHeight, gym, stands, colors, drumTexture]);
   useEffect(() => () => { if (!gym && !stands) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym, stands]);
-  const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;
+  const height = selected && floor && floor > 0 ? Math.min(info.height, floor * info.floorHeight) : info.height;
   const color = colors ? '#d7d2c3' : selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
   const splitMaterials = !!colors && (cutawayHeight === undefined || !!drumTexture);
-  const floorLines = useMemo(() => buildingFloorLineGeometry(building, info.sections, info.floorHeight, selected ? floor : undefined), [building, info, selected, floor]);
+  const floorLines = useMemo(() => buildingFloorLineGeometry(building, info.sections, info.floorHeight, selected && floor && floor > 0 ? floor : undefined), [building, info, selected, floor]);
   useEffect(() => () => floorLines.dispose(), [floorLines]);
   const floorLineMaterial = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ camera }) => {
@@ -145,7 +145,7 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     </mesh>
     </group>)}
     <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>
-    {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor ? floor * info.floorHeight : undefined} />}
+    {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor && floor > 0 ? floor * info.floorHeight : undefined} />}
     {(building.facade?.type === 'laboratory' || building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
     {(stands || gym || building.id === THEATRE_ID) && <VenueDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} stands={stands} />}
     {building.id === STAND_OFFICE_ID && <StandOfficeDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
@@ -266,11 +266,10 @@ export default function MapView(props: Props) {
   useEffect(() => {
     const photo = props.editPhoto || props.selectedPhoto;
     const id = photo ? photoLocationId(photo, campus) : props.selectedLocation;
-    const feature = campus.features.find(item => item.id === id);
     if (!id) return;
-    if (photo ? isUndergroundPhoto(photo, campus, site) : isUndergroundFeature(feature)) setLevelMode('underground');
+    if (photo ? isUndergroundPhoto(photo, campus, site) : isUndergroundLocation(campus, id, props.floor)) setLevelMode('underground');
     else if (photo || props.selectedLocation) setLevelMode('surface');
-  }, [props.editPhoto?.id, props.selectedPhoto?.id, props.selectedLocation, campus]);
+  }, [props.editPhoto?.id, props.editPhoto?.floor, props.selectedPhoto?.id, props.selectedPhoto?.floor, props.selectedLocation, props.floor, campus, site]);
   const [moving, setMoving] = useState(false);
   const [picker, setPicker] = useState<PhotoCluster | null>(null);
   const pickerTrigger = useRef<HTMLButtonElement | null>(null);
@@ -296,7 +295,8 @@ export default function MapView(props: Props) {
   // Selection cuts above its floor; preview restores the building throughout the camera transition.
   const cutawayFloor = props.photoPreview || viewingPhoto ? undefined : floor;
   const selectedObject = useMemo(() => mapLocationTarget(campus, site, selectedLocation, cutawayFloor), [campus, site, selectedLocation, cutawayFloor]);
-  const focusObject = viewingPhoto || props.photoPreview || isUndergroundFeature(campus.features.find(feature => feature.id === selectedLocation)) === undergroundView ? selectedObject : null;
+  const selectedUnderground = isUndergroundLocation(campus, selectedLocation, floor);
+  const focusObject = viewingPhoto || props.photoPreview || selectedUnderground === undergroundView ? selectedObject : null;
   const labelPortal = useRef<HTMLDivElement>(null!);
   useEffect(() => {
     if (!props.photoPerspective) return;

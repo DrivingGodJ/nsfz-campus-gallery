@@ -25,7 +25,7 @@ function validateSubmission(file, photo, campus) {
   if (!photo.placed || !photo.title?.trim()) throw new Error('请填写标题并标记拍摄位置。');
   const finite = (value, min, max) => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
   if (!finite(photo.heading, 0, 360) || !finite(photo.pitch, -90, 90)) throw new Error('请检查拍摄方向与仰俯角。');
-  if (!Number.isInteger(photo.floor) || !finite(photo.floor, 0, 50)) throw new Error('请检查照片楼层。');
+  if (!Number.isInteger(photo.floor) || !finite(photo.floor, -1, 50) || (photo.floor === -1 && (photo.captureType === 'aerial' || campus && !campus.buildings.some(building => building.id === (photo.locationId ?? photo.buildingId) && building.basement)))) throw new Error('请检查照片楼层。');
   if (!finite(photo.position?.x, -1e6, 1e6) || !finite(photo.position?.z, -1e6, 1e6)) throw new Error('请检查拍摄位置。');
   if (campus) {
     const xs = campus.boundary.map(p => p[0]), zs = campus.boundary.map(p => p[1]);
