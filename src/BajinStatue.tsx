@@ -21,7 +21,7 @@ export default function BajinStatue({ feature }: { feature: Feature }) {
   useEffect(() => () => inscription?.dispose(), [inscription]);
   return <group name={feature.id} position={[model.center[0], feature.height ?? .02, model.center[1]]} rotation={[0, Math.atan2(-model.axis[1], model.axis[0]), 0]}>
     <mesh geometry={geometry.steps}><meshStandardMaterial color={mapColor('#b2b2a5')} roughness={.95} /></mesh>
-    <mesh geometry={geometry.pedestal}><meshStandardMaterial color={mapColor(model.variant === 'officeBust' ? '#8b8c83' : yuanLongping ? '#626660' : '#79534a')} roughness={.9} /></mesh>
+    <mesh geometry={geometry.pedestal}><meshStandardMaterial color={mapColor(model.variant === 'gardenHead' ? '#979792' : model.variant === 'officeBust' ? '#8b8c83' : yuanLongping ? '#626660' : '#79534a')} roughness={.9} /></mesh>
     <mesh geometry={geometry.bust}><meshStandardMaterial color={mapColor(model.variant === 'officeBust' ? '#c5c6bf' : yuanLongping ? '#b4bbb1' : '#d3dcd5')} vertexColors roughness={.85} metalness={.12} /></mesh>
     {inscription && <mesh position={[0, model.totalHeight * .44, model.depth * .42 + .003]} raycast={() => null}>
       <planeGeometry args={[model.width * .65, model.totalHeight * .105]} />

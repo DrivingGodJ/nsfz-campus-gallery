@@ -29,7 +29,23 @@ export function bajinStatueGeometry(model: BaJinStatueModel) {
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()));
     add(bust, geometry, a.add(b).multiplyScalar(.5).toArray(), color);
   };
-  if (yuanLongping || officeBust) {
+  if (model.variant === 'gardenHead') {
+    // _DSC4414 shows a head and neck on a tall grey column, without shoulders.
+    box(steps, model.width, .015 * model.totalHeight, model.depth, 0);
+    box(pedestal, model.width / model.totalHeight * .90, .705, model.depth / model.totalHeight * .90, .015);
+    box(pedestal, model.width / model.totalHeight, .025, model.depth / model.totalHeight, .72);
+    rod([0, .739, -.018], [0, .852, -.012], .044, '#343c36');
+    sphere([0, .903, 0], [.073, .097, .072], '#303831');
+    sphere([0, .853, .017], [.047, .037, .056], '#343c36');
+    sphere([0, .911, -.004], [.075, .089, .073], '#252d27', 0, Math.PI * 2, Math.PI * .48);
+    for (const side of [-1, 1]) {
+      sphere([side * .073, .895, .002], [.011, .026, .016], '#343c36');
+      sphere([side * .028, .919, .061], [.008, .006, .009], '#1e2721');
+      rod([side * .013, .935, .065], [side * .046, .930, .056], .004, '#3c443d');
+    }
+    sphere([0, .893, .070], [.013, .026, .018], '#3c443d');
+    rod([-.021, .862, .066], [.021, .862, .066], .003, '#202a23');
+  } else if (yuanLongping || officeBust) {
     // This portrait stands on a narrow stone column, without Ba Jin's broad stair podium.
     box(steps, model.width, .025 * model.totalHeight, model.depth, 0);
     box(pedestal, model.width / model.totalHeight * .84, .58, model.depth / model.totalHeight * .84, .025);
