@@ -26,6 +26,7 @@ import Bench from './Bench';
 import ParallelBars from './ParallelBars';
 import WoodenHut from './WoodenHut';
 import StreetFence from './StreetFence';
+import SecurityGate from './SecurityGate';
 import { garageRampGeometry, garageRampFootprint } from './garage-ramp-geometry';
 import MapModelLayer from './MapModelLayer';
 
@@ -257,6 +258,7 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
   return <>{features.map(feature => {
     const surface = (children: ReactNode) => <MapModelLayer key={feature.id} underground={mode === 'underground' && !photoPerspective}>{children}</MapModelLayer>;
     if (feature.type === 'fence' && feature.railEdges) return surface(<StreetFence feature={feature} />);
+    if (feature.type === 'landmark' && feature.securityGate) return surface(<SecurityGate feature={feature} />);
     if (feature.type === 'mottoStone' && feature.stone) return surface(<MottoStone feature={feature} />);
     if (feature.type === 'flagPlatform' && feature.flagPlatform) return surface(<FlagPlatform feature={feature} />);
     if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return surface(<LakeGarden feature={feature} features={features} connectedBuilding={buildings.find(building => feature.connectedTo?.includes(building.id))} labelPortal={labelPortal} />);
