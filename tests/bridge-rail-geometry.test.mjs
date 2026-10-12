@@ -35,7 +35,7 @@ test('batched bridge rails stay continuous on sloping and arched paths, with the
   for (const feature of campus.features.filter(f => f.type === 'bridge')) {
     const chains = bridgeLayout(feature, 5.5).railChains, smooth = !!feature.archRise;
     const geometry = bridgeRailGeometry(chains, smooth);
-    for (const [name, offset] of [['upper', 1], ['lower', .48]]) {
+    for (const [name, offset] of [['upper', 1], ['lower', .75]]) {
       const mesh = new THREE.Mesh(geometry[name], material), ray = new THREE.Raycaster();
       for (const chain of chains) for (let i = 1; i < chain.length; i++) {
         const from = new THREE.Vector3(...chain[i-1]), to = new THREE.Vector3(...chain[i]);
@@ -64,4 +64,23 @@ test('empty and repeated bridge points do not produce invalid vertices', () => {
       assert.ok(Array.from(g.attributes.position.array).every(Number.isFinite)); g.dispose();
     }
   }
+});
+
+test('iron guards have dense upright bars below an open handrail band, including on stairs', () => {
+  const geometry = bridgeRailGeometry([[[0, 0, 0], [6, 0, 0], [12, 2, 0]]]);
+  const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const guard = new THREE.Group();
+  Object.values(geometry).forEach(part => guard.add(new THREE.Mesh(part, material)));
+  guard.updateMatrixWorld();
+  const across = (x, y) => new THREE.Raycaster(new THREE.Vector3(x, y, -.2), new THREE.Vector3(0, 0, 1), 0, .4).intersectObject(guard);
+  try {
+    assert.equal(Object.keys(geometry).length, 3, 'All dense bars share the existing post batch');
+    for (const x of [.12, .36, 1.56, 6.12, 7.56, 11.88]) {
+      const floor = Math.max(0, (x - 6) / 3);
+      assert.ok(across(x, floor + .5).length, 'Vertical bars rise from the level or sloping deck');
+      assert.equal(across(x, floor + .86).length, 0, 'The band above the middle tube stays open');
+    }
+    assert.equal(across(.18, .5).length, 0, 'Gaps remain between pickets');
+    assert.ok(across(.18, .75).length && across(.18, 1).length, 'Both round horizontal tubes remain continuous');
+  } finally { Object.values(geometry).forEach(part => part.dispose()); material.dispose(); }
 });

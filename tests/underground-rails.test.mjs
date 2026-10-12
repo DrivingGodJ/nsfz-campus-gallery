@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as THREE from 'three';
-import { bridgeRailGeometry } from '../src/bridge-rail-geometry.ts';
 import { curvedStairPoint } from '../src/structure-geometry.ts';
 import { undergroundEntranceStair } from '../src/underground-geometry.ts';
 import { undergroundDetailGeometry } from '../src/underground-details.ts';
@@ -30,13 +29,12 @@ test('stainless guards have frequent slender vertical bars, a lower crossbar, an
 test('the actual curved entrance retains both rail routes and height envelopes while keeping its center clear', () => {
   const feature = campus.features.find(item => item.id === 'local/underpass-entrance'), stair = feature.curvedStair, before = JSON.stringify(feature);
   const chains = [-1, 1].map(side => Array.from({ length: stair.steps + 1 }, (_, i) => curvedStairPoint(stair, i / stair.steps, stair.radius + side * (stair.width / 2 - .12))));
-  const old = bridgeRailGeometry(chains, true), geometry = undergroundRailGeometry(chains), object = mesh(geometry);
+  const geometry = undergroundRailGeometry(chains), object = mesh(geometry);
   try {
-    const previous = new THREE.Box3();
-    for (const part of Object.values(old)) { part.computeBoundingBox(); previous.union(part.boundingBox); }
+    const heights = chains.flat().map(point => point[1]);
     geometry.computeBoundingBox();
-    assert.ok(Math.abs(geometry.boundingBox.max.y - previous.max.y) < 1e-6, 'The entrance rail height is unchanged');
-    assert.ok(Math.abs(geometry.boundingBox.min.y - previous.min.y) < 1e-6, 'Posts still reach the same stair bases');
+    assert.ok(Math.abs(geometry.boundingBox.max.y - Math.max(...heights) - 1.065) < 1e-6, 'The entrance rail height is unchanged');
+    assert.ok(Math.abs(geometry.boundingBox.min.y - Math.min(...heights)) < 1e-6, 'Posts still reach the same stair bases');
     const vertices = geometry.attributes.position;
     for (let i = 0; i < vertices.count; i++) {
       const radius = Math.hypot(vertices.getX(i) - stair.center[0], vertices.getZ(i) - stair.center[1]);
@@ -47,7 +45,7 @@ test('the actual curved entrance retains both rail routes and height envelopes w
       assert.equal(new THREE.Raycaster(eye, new THREE.Vector3(0, 1, 0), 0, 1.6).intersectObject(object).length, 0, 'The route remains open above every curved tread');
     }
     assert.equal(JSON.stringify(feature), before);
-  } finally { Object.values(old).forEach(part => part.dispose()); geometry.dispose(); object.material.dispose(); }
+  } finally { geometry.dispose(); object.material.dispose(); }
 });
 
 test('the corridor exit uses the same metal style at its original stair height, leaving the door and central treads clear', () => {

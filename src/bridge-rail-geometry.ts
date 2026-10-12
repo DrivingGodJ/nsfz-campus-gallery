@@ -9,13 +9,13 @@ const merge = (parts: THREE.BufferGeometry[]) => {
   return result;
 };
 
-// Keep the same round joints, post spacing and sloping rails, but render each
-// material once instead of issuing a draw call for every little rail segment.
+// Grey iron guard: dense upright bars below the middle tube, with an open band
+// under the round handrail. Keep the calibrated perimeter and three mesh batches.
 export function bridgeRailGeometry(chains: RailPoint[][], smooth = false) {
   const corners = [...new Map(chains.flat().map(point => [point.map(n => n.toFixed(6)).join(','), point])).values()];
   const unitBar = new THREE.CylinderGeometry(1, 1, 1, 8), unitJoint = new THREE.SphereGeometry(1, 8, 6), unitPost = new THREE.BoxGeometry(1, 1, 1);
   const up = new THREE.Vector3(0, 1, 0), transform = new THREE.Matrix4(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
-  const rails = [{ offset: 1, radius: .065 }, { offset: .48, radius: .04 }].map(({ offset, radius }) => {
+  const rails = [{ offset: 1, radius: .035 }, { offset: .75, radius: .0225 }].map(({ offset, radius }) => {
     const parts: THREE.BufferGeometry[] = [];
     for (const chain of chains) for (let i = 1; i < chain.length; i++) {
       const from = new THREE.Vector3(...chain[i - 1]), to = new THREE.Vector3(...chain[i]);
@@ -32,10 +32,13 @@ export function bridgeRailGeometry(chains: RailPoint[][], smooth = false) {
     }
     return merge(parts);
   });
-  const posts = merge(bridgeRailPosts(chains, 3, smooth).map(point => {
-    transform.makeScale(.13, 1, .13); transform.setPosition(point[0], point[1] + .5, point[2]);
+  const posts = merge([...bridgeRailPosts(chains, 3, smooth).map(point => {
+    transform.makeScale(.08, 1, .08); transform.setPosition(point[0], point[1] + .5, point[2]);
     return unitPost.clone().applyMatrix4(transform);
-  }));
+  }), ...bridgeRailPosts(chains, .12, smooth).map(point => {
+    transform.makeScale(.025, .73, .025); transform.setPosition(point[0], point[1] + .385, point[2]);
+    return unitPost.clone().applyMatrix4(transform);
+  })]);
   unitBar.dispose(); unitJoint.dispose(); unitPost.dispose();
   return { upper: rails[0], lower: rails[1], posts };
 }

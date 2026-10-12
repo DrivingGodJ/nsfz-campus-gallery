@@ -87,9 +87,9 @@ function BridgeRails({ chains, smooth = false }: { chains: RailPoint[][]; smooth
   const geometry = useMemo(() => bridgeRailGeometry(chains, smooth), [chains, smooth]);
   useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
   return <group>
-    <mesh geometry={geometry.upper}><meshStandardMaterial color={mapColor('#5c7866')} roughness={.9} /></mesh>
-    <mesh geometry={geometry.lower}><meshStandardMaterial color={mapColor('#738979')} roughness={.9} /></mesh>
-    <mesh geometry={geometry.posts}><meshStandardMaterial color={mapColor('#5c7866')} roughness={.9} /></mesh>
+    <mesh geometry={geometry.upper}><meshStandardMaterial color={mapColor('#8c969b')} metalness={.65} roughness={.35} /></mesh>
+    <mesh geometry={geometry.lower}><meshStandardMaterial color={mapColor('#7f898e')} metalness={.65} roughness={.4} /></mesh>
+    <mesh geometry={geometry.posts}><meshStandardMaterial color={mapColor('#7f898e')} metalness={.65} roughness={.4} /></mesh>
   </group>;
 }
 function BridgeNet({ feature, chains }: { feature: Feature; chains: RailPoint[][] }) {
