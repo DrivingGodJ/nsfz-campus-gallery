@@ -110,8 +110,33 @@ export function joinedPassages(incoming: Feature, outgoing: Feature) {
 
 // A lower final leg shares the original mitered turn with the high corridor.
 // Its door-height ceiling changes the shell, never the circulation footprint.
-export function undergroundCeilingSections(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = []) {
+export function undergroundCeilingSections(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = [], connections: Feature[] = []) {
   let sections = [{ height: feature.wallHeight || 2.4, footprints, openings }];
+  // Joining a return passage keeps its floor continuous, but must not raise
+  // its buried roof to the high corridor's above-ground podium.
+  const returnHeight = Math.min(sections[0].height, ...connections.map(item => item.wallHeight || 2.4));
+  if (feature.outer && returnHeight < sections[0].height) {
+    const polygons = footprints.map(shape => [shape.outer, ...shape.holes]);
+    const high = polygonClipping.intersection(polygons, [feature.outer, ...(feature.holes || [])]);
+    const low = polygonClipping.difference(polygons, [feature.outer, ...(feature.holes || [])]);
+    const seams: PassageOpening[] = low.flatMap(([ring]) => ring.slice(1).flatMap((to, i) => {
+      const from = ring[i];
+      const shared = feature.outer!.slice(1).some((b, j) => {
+        const a = feature.outer![j], dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz);
+        const off = (p: Point) => Math.abs((p[0] - a[0]) * dz - (p[1] - a[1]) * dx) / length;
+        const at = (p: Point) => ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / length;
+        return length > 1e-7 && [from, to].every(p => off(p) < 1e-5 && at(p) >= -1e-5 && at(p) <= length + 1e-5);
+      });
+      if (!shared) return [];
+      const seam = [from, to] as PassageOpening;
+      seam.height = returnHeight - .12;
+      return [seam];
+    }));
+    const shapes = (value: polygonClipping.MultiPolygon): Shape[] => value.map(([outer, ...holes]) => ({ outer, holes }));
+    const cuts = [...openings, ...seams];
+    sections = [...(high.length ? [{ height: sections[0].height, footprints: shapes(high), openings: cuts }] : []),
+      ...(low.length ? [{ height: returnHeight, footprints: shapes(low), openings: cuts }] : [])];
+  }
   for (const segment of feature.ceilingSegments || []) {
     const points = feature.points, edge = segment.edge;
     if (!points || edge < 0 || edge >= points.length - 1 || segment.height <= 0) continue;

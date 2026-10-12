@@ -5,7 +5,7 @@ import polygonClipping from 'polygon-clipping';
 import * as THREE from 'three';
 import { groundSurfaces } from '../src/ground-geometry.ts';
 import { buildingGeometry, snapFootprint } from '../src/building-geometry.ts';
-import { passageFootprint, undergroundLayout } from '../src/underground-geometry.ts';
+import { passageFootprint, undergroundLayout, undergroundCeilingSections } from '../src/underground-geometry.ts';
 import { curvedStairPoint } from '../src/structure-geometry.ts';
 import { roadFootprint } from '../src/road-geometry.ts';
 
@@ -47,7 +47,8 @@ test('curved underground entrances leave a real opening in every ground layer wh
 test('ground layers leave all rooms that cross ground level hollow while preserving ordinary tunnel cover', () => {
   const layout = groundSurfaces(campus);
   const voids = [...undergroundLayout(campus.features).areas.values()]
-    .filter(a => a.feature.height + a.feature.wallHeight > .12).flatMap(a => a.footprints);
+    .flatMap(a => undergroundCeilingSections(a.feature,a.footprints,a.openings,a.connections)
+      .filter(section=>a.feature.height+section.height>.12).flatMap(section=>section.footprints));
   assert.ok(voids.length > 0);
   const surfaces = [...layout.campus, ...layout.background, ...campus.features.filter(f => ['green', 'sport', 'plaza'].includes(f.type)).flatMap(f => layout.features.get(f.id) || [])];
   for (const surface of surfaces) assert.ok(area(polygonClipping.intersection(snapFootprint([polygon(surface)]), snapFootprint(polygons(voids)))) < .005,

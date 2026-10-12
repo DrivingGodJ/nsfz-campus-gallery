@@ -203,9 +203,9 @@ function Entrance({ feature, underground, mode, photoPerspective, labelPortal, s
 }
 const NO_CONNECTIONS: Feature[] = [];
 const NO_OPENINGS: PassageOpening[] = [];
-function UndergroundDetails({ feature, footprint, openings }: { feature: Feature; footprint: Shape; openings: PassageOpening[] }) {
+function UndergroundDetails({ feature, footprint, openings, connections }: { feature: Feature; footprint: Shape; openings: PassageOpening[]; connections: Feature[] }) {
   const mapColor = useMapColor();
-  const geometry = useMemo(() => undergroundDetailGeometry(feature, [footprint], openings), [feature, footprint, openings]);
+  const geometry = useMemo(() => undergroundDetailGeometry(feature, [footprint], openings, connections), [feature, footprint, openings, connections]);
   useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
   return <group>{Object.entries(geometry).map(([kind, part]) => <mesh key={kind} userData={{undergroundCeiling:kind === 'ceiling' || kind === 'skylights',undergroundSurface:kind==='podium'||kind==='skylights'}} geometry={part} renderOrder={kind === 'floor' || kind === 'green' ? 23 : 25}>
     <meshStandardMaterial color={mapColor(UNDERGROUND_COLORS[kind as keyof typeof UNDERGROUND_COLORS])} metalness={kind === 'rails' ? .72 : 0} roughness={kind === 'rails' ? .3 : kind === 'floor' || kind === 'green' ? .48 : .85}
@@ -221,7 +221,7 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
   const color = tunnel ? '#d8c6a7' : corridor ? '#bad0c3' : '#bdcedf';
   const lineColor = tunnel ? '#ad9879' : corridor ? '#8faa99' : '#91a7bf';
   const floorShapes = useMemo(() => footprints || undergroundFootprints(feature, connections), [feature, connections, footprints]);
-  const sections = useMemo(() => undergroundCeilingSections(feature, floorShapes, openings), [feature, floorShapes, openings]);
+  const sections = useMemo(() => undergroundCeilingSections(feature, floorShapes, openings, connections), [feature, floorShapes, openings, connections]);
   const viewSections = useMemo(() => sections.map(section => ({floor,height:section.height,footprints:section.footprints})), [floor, sections]);
   const shapes = useMemo(() => sections.flatMap(section => section.footprints.map(footprint => {
     const shape = new THREE.Shape(footprint.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
@@ -246,14 +246,14 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
       return <group key={n}>{model}</group>;
     })}
     <UndergroundView space={{floor,height:wallHeight,footprints:floorShapes,sections:viewSections}} spaces={spaces} mode={mode} photoPerspective={photoPerspective}>
-      {floorShapes.map((footprint, n) => <UndergroundDetails key={n} feature={feature} footprint={footprint} openings={openings} />)}
+      {floorShapes.map((footprint, n) => <UndergroundDetails key={n} feature={feature} footprint={footprint} openings={openings} connections={connections} />)}
     </UndergroundView>
     {(mode === 'underground' || photoPerspective) && [feature, ...connections].filter(item => !item.hideLabel && item.name?.trim()).map(item => <LocationHtml key={item.id} portal={labelPortal} position={labelPosition(item)} center zIndexRange={[5, 1]}><LocationName id={item.id} name={item.name!} underground /></LocationHtml>)}
   </group>;
 }
 export default memo(function CampusStructures({ features, buildings, overrides, underground, labelPortal, mode = 'surface', photoPerspective = false }: { features: Feature[]; buildings: Building[]; overrides: Record<string, BuildingOverride>; underground: boolean; labelPortal: RefObject<HTMLDivElement>; mode?: UndergroundInspectionMode; photoPerspective?: boolean }) {
   const layout = useMemo(() => undergroundLayout(features), [features]);
-  const spaces=useMemo(()=>[...layout.areas.values()].flatMap(area=>undergroundCeilingSections(area.feature,area.footprints,area.openings).map(section=>({floor:area.feature.height??-3,height:section.height,footprints:section.footprints}))),[layout]);
+  const spaces=useMemo(()=>[...layout.areas.values()].flatMap(area=>undergroundCeilingSections(area.feature,area.footprints,area.openings,area.connections).map(section=>({floor:area.feature.height??-3,height:section.height,footprints:section.footprints}))),[layout]);
   return <>{features.map(feature => {
     const surface = (children: ReactNode) => <MapModelLayer key={feature.id} underground={mode === 'underground' && !photoPerspective}>{children}</MapModelLayer>;
     if (feature.type === 'fence' && feature.railEdges) return surface(<StreetFence feature={feature} />);

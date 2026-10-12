@@ -32,7 +32,7 @@ const distanceToRing = (point, ring) => Math.min(...ring.slice(1).map((to, i) =>
 }));
 
 test('the podium entrance is a real right-half opening with a solid sill, jambs and head', () => {
-  const geometry = undergroundDetailGeometry(area.feature, area.footprints, area.openings);
+  const geometry = undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections);
   const meshes = ['walls', 'podium', 'ceiling'].map(kind => object(geometry[kind]));
   const direction = new THREE.Vector3(stair.to[0] - stair.from[0], 0, stair.to[1] - stair.from[1]).normalize();
   const through = (side, height) => ray(stair.at(-.25, side), height, direction, .5, meshes);
@@ -53,7 +53,7 @@ test('the podium entrance is a real right-half opening with a solid sill, jambs 
 });
 
 test('entrance treads descend continuously to the existing floor and retain usable headroom', () => {
-  const geometry = undergroundDetailGeometry(area.feature, area.footprints, area.openings);
+  const geometry = undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections);
   const floor = object(geometry.floor);
   const roof = ['walls', 'podium', 'ceiling', 'metal', 'skylights'].map(kind => object(geometry[kind]));
   const up = new THREE.Vector3(0, 1, 0), down = new THREE.Vector3(0, -1, 0);
@@ -81,7 +81,7 @@ test('entrance treads descend continuously to the existing floor and retain usab
 
 test('corridor roof glazing receives daylight without the field podium or gym covering it', () => {
   close(area.feature.height + area.feature.wallHeight, field.height, 'The glazing meets the raised athletics ground');
-  const geometry = undergroundDetailGeometry(area.feature, area.footprints, area.openings);
+  const geometry = undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections);
   const skylights = object(geometry.skylights), ceiling = object(geometry.ceiling);
   const blockers = [...sportsGroundPlatformLayers(field, campus.features).map(layer => prism(layer.shape, layer.bottom, layer.top)),
     prism(gym, gym.baseElevation, gym.baseElevation + 20)];

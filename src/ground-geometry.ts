@@ -1,5 +1,5 @@
 import polygonClipping from 'polygon-clipping';
-import { undergroundLayout } from './underground-geometry.ts';
+import { undergroundLayout, undergroundCeilingSections } from './underground-geometry.ts';
 import { roadFootprint } from './road-geometry.ts';
 import { bridgeLayout } from './bridge-geometry.ts';
 import { garageRampFootprint } from './garage-ramp-geometry.ts';
@@ -15,8 +15,9 @@ const featureShape = (feature: Feature): Shape => ({ outer: feature.outer!, hole
 
 export function groundSurfaces(campus: Campus) {
   const undergroundVoids = shapes(snapFootprint([...undergroundLayout(campus.features).areas.values()]
-    .filter(area => (area.feature.height ?? -3) < -.08 && (area.feature.height ?? -3) + (area.feature.wallHeight || 2.4) > .12)
-    .flatMap(area => area.footprints).map(polygon)));
+    .filter(area => (area.feature.height ?? -3) < -.08)
+    .flatMap(area => undergroundCeilingSections(area.feature, area.footprints, area.openings, area.connections)
+      .filter(section => (area.feature.height ?? -3) + section.height > .12).flatMap(section => section.footprints)).map(polygon)));
   const entrances = campus.features.flatMap(feature => {
     if (feature.type === 'garageEntrance' && feature.ramp && feature.points?.length === 2) return [garageRampFootprint(feature)];
     if (feature.type === 'tunnelEntrance' && feature.curvedStair) return curvedStairTreads(feature.curvedStair).map(tread => ({ outer: tread.ring, holes: [] }));

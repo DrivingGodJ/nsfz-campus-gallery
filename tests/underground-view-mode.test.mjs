@@ -79,7 +79,7 @@ test('photo views retain opaque walls and ceilings from inside, outside, other r
 test('opening the underground lightwell roof preserves its photographed vertical windows', async () => {
   const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
   const corridor = undergroundLayout(campus.features).areas.get('local/underground-corridor');
-  const geometry = undergroundDetailGeometry(corridor.feature, corridor.footprints, corridor.openings);
+  const geometry = undergroundDetailGeometry(corridor.feature, corridor.footprints, corridor.openings, corridor.connections);
   try {
     assert.ok(geometry.skylights.getAttribute('position').count > 0, 'Roof glazing is independently removable');
     assert.ok(geometry.glass.getAttribute('position').count > 0, 'The vertical window bays remain in the detailed model');

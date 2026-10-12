@@ -10,7 +10,7 @@ import { pointOnStairTread } from '../src/structure-geometry.ts';
 
 const campus = JSON.parse(fs.readFileSync(new URL('../public/data/campus.json', import.meta.url)));
 const layout = undergroundLayout(campus.features), area = layout.areas.get('local/underground-corridor');
-const sections = undergroundCeilingSections(area.feature, area.footprints, area.openings);
+const sections = undergroundCeilingSections(area.feature, area.footprints, area.openings, area.connections);
 const material = () => new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
 const mesh = geometry => { const object = new THREE.Mesh(geometry, material()); object.updateMatrixWorld(); return object; };
 const floor = area.feature.height, [from, turn, hallEnd] = area.feature.points;
@@ -21,8 +21,8 @@ const ray = (point, y, direction, length, objects) => new THREE.Raycaster(new TH
 
 test('only the marked right corridor leg has a door-height roof, with the original full-height floor plan retained', () => {
   assert.deepEqual(area.feature.ceilingSegments, [{ edge: 1, height: 2.82 }]);
-  assert.deepEqual(sections.map(section => section.height).sort(), [2.82, 6.4]);
-  assert.deepEqual(polygonClipping.intersection(...sections.map(section => polygons(section.footprints))), []);
+  assert.deepEqual(sections.map(section => section.height).sort(), [2.82, 3.2, 6.4]);
+  assert.deepEqual(polygonClipping.union(...sections.flatMap((a,i)=>sections.slice(i+1).map(b=>polygonClipping.intersection(polygons(a.footprints),polygons(b.footprints))))), []);
   assert.deepEqual(polygonClipping.xor(polygons(area.footprints), polygonClipping.union(...sections.map(section => polygons(section.footprints)))), []);
   const low = sections.find(section => section.height === 2.82);
   assert.ok(low.footprints.some(shape => pointOnStairTread(at(turn, hallEnd, .5), shape.outer)));
@@ -31,7 +31,7 @@ test('only the marked right corridor leg has a door-height roof, with the origin
 });
 
 test('actual ceiling and sidewalls are lowered all the way to the badminton door while the other legs stay at full height', () => {
-  const model = undergroundDetailGeometry(area.feature, area.footprints, area.openings), roof = mesh(model.ceiling), walls = mesh(model.walls);
+  const model = undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections), roof = mesh(model.ceiling), walls = mesh(model.walls);
   try {
     for (const t of [.1, .25, .5, .75, .98]) for (const offset of [-1.5, 0, 1.5]) {
       const point = at(turn, hallEnd, t, offset), hits = ray(point, floor + 1.6, new THREE.Vector3(0, 1, 0), 8, [roof]);
@@ -52,7 +52,7 @@ test('actual ceiling and sidewalls are lowered all the way to the badminton door
 });
 
 test('the lower section leaves its original badminton door and the internal turn open below the ceiling', () => {
-  const hall = layout.areas.get('local/underground-badminton'), corridorModel = undergroundDetailGeometry(area.feature, area.footprints, area.openings), hallModel = undergroundDetailGeometry(hall.feature, hall.footprints, hall.openings);
+  const hall = layout.areas.get('local/underground-badminton'), corridorModel = undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections), hallModel = undergroundDetailGeometry(hall.feature, hall.footprints, hall.openings);
   const objects = [mesh(corridorModel.walls), mesh(corridorModel.ceiling), mesh(hallModel.walls)];
   const door = hall.openings.toSorted((a, b) => Math.hypot(...a[0].map((n, i) => n - hallEnd[i])) - Math.hypot(...b[0].map((n, i) => n - hallEnd[i])))[0];
   assert.equal(door.height, 2.7);
@@ -81,7 +81,7 @@ test('the lower section leaves its original badminton door and the internal turn
 });
 
 test('suspended fittings follow the low roof rather than floating above it, and the remaining sections and stair guard stay unchanged', () => {
-  const model = undergroundDetailGeometry(area.feature, area.footprints, area.openings), baseline = undergroundDetailGeometry({...area.feature,ceilingSegments:[]}, area.footprints, area.openings);
+  const model = undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections), baseline = undergroundDetailGeometry({...area.feature,ceilingSegments:[]}, area.footprints, area.openings, area.connections);
   const low = sections.find(section => section.height === 2.82).footprints[0];
   const boundaryDistance = point => Math.min(...low.outer.slice(1).map((b, i) => {
     const a = low.outer[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0,Math.min(1,((point[0]-a[0])*dx+(point[1]-a[1])*dz)/(dx*dx+dz*dz)));

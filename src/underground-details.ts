@@ -30,10 +30,10 @@ export function undergroundBadmintonLayout({ width, length }: ReturnType<typeof 
 
 // Structure and recognizable fittings are retained; exact unseen court counts
 // and service routing are estimates, documented alongside the 13 source views.
-export function undergroundDetailGeometry(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = []) {
+export function undergroundDetailGeometry(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = [], connections: Feature[] = []) {
   const parts = Object.fromEntries(Object.keys(UNDERGROUND_COLORS).map(kind => [kind, [] as THREE.BufferGeometry[]])) as Record<Kind, THREE.BufferGeometry[]>;
   const floor = feature.height ?? -3, clear = feature.wallHeight || 2.4, top = floor + clear;
-  const sections = undergroundCeilingSections(feature, footprints, openings);
+  const sections = undergroundCeilingSections(feature, footprints, openings, connections);
   const stair = undergroundEntranceStair(feature);
   const heightAt = (p: Point) => sections.find(section => section.footprints.some(shape => pointOnStairTread(p, shape.outer)
     && !shape.holes.some(hole => pointOnStairTread(p, hole))))?.height ?? clear;

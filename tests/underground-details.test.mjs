@@ -52,7 +52,7 @@ test('different passage ceiling heights keep an open join below the shorter ceil
 
 test('the detailed corridor roof covers its merged exit and lightwell seams while preserving glazing and doors', () => {
   const area=undergroundLayout(levels).areas.get('local/underground-corridor');
-  const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings);
+  const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings,area.connections);
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
   const objects=Object.fromEntries(['walls','podium','ceiling','skylights'].map(kind=>{
     const object=new THREE.Mesh(model[kind],material);object.updateMatrixWorld();return [kind,object];
@@ -85,7 +85,7 @@ test('the detailed corridor roof covers its merged exit and lightwell seams whil
 test('all underground model batches stay within their floors and ceilings and add recognizable photo-backed fittings', () => {
   let triangles=0;
   for(const area of undergroundLayout(levels).areas.values()) {
-    const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings), floor=area.feature.height, ceiling=floor+area.feature.wallHeight;
+    const model=undergroundDetailGeometry(area.feature,area.footprints,area.openings,area.connections), floor=area.feature.height, ceiling=floor+area.feature.wallHeight;
     for(const [kind,geometry] of Object.entries(model)) {
       const vertices=geometry.attributes.position;triangles+=vertices.count/3;
       assert.equal(geometry.userData.photoOcclusionMask.length,vertices.count/3);
