@@ -38,7 +38,7 @@ test('the upright Chengpu stone stands alone and its vertical inscription faces 
   } finally { geometry.dispose(); sign.dispose(); material.dispose(); }
 });
 
-test('the marked tree is replaced by the Chengpu stone while the neighbouring tree, benches and paths stay clear', () => {
+test('the marked tree is replaced by the Chengpu stone with its adjacent benches removed and the neighbouring tree and paths retained', () => {
   const read = file => JSON.parse(fs.readFileSync(new URL('../' + file, import.meta.url)));
   const campus = read('public/data/campus.json'), stone = campus.features.find(f => f.id === 'local/chengpu-stone');
   const trees = campus.features.find(f => f.id === 'local/river-bank-trees').trees;
@@ -51,9 +51,8 @@ test('the marked tree is replaced by the Chengpu stone while the neighbouring tr
     assert.equal(clip.intersection([stone.outer], [passageFootprint(path.points, path.width || 3).outer]).length, 0, path.id + ' remains open');
   }
   for (const z of [7.5, 11.2]) {
-    assert.ok(riverBenches.some(b => b.center[0] === 68.65 && b.center[1] === z));
-    const bench = [[67, z - .3], [70.3, z - .3], [70.3, z + .3], [67, z + .3]];
-    assert.equal(clip.intersection([stone.outer], [bench]).length, 0, 'The new stone leaves both existing seats clear');
+    assert.ok(!riverBenches.some(b => b.center[0] === 68.65 && b.center[1] === z));
   }
+  assert.ok(riverBenches.some(b => b.center[0] === 111.5 && b.center[1] === -.016), 'The unrelated main-road bench stays');
   assert.deepEqual(applyCampusCorrections(campus, read('data/campus-corrections.json')), campus);
 });

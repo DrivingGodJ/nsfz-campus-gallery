@@ -12,7 +12,6 @@ const BASE = .12;
 // The seat beside the northern-bank tree was moved to the main path; the
 // matching seat on its water side has been removed.
 export const riverBenches: { center: Point; angle: number }[] = [
-  { center: [68.65, 7.5], angle: 0 }, { center: [68.65, 11.2], angle: 0 },
   { center: [111.5, -.016], angle: Math.atan2(5.532578693011172, 41.98277460853406) },
 ];
 export const riverGardenPaths: Point[][] = [
