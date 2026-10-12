@@ -30,7 +30,7 @@ test('the laboratory basement has a real ramp opening, stays below ground and le
     'A flat basement slab cannot fill or roof over the sloping driveway');
   assert.ok(area(polygonClipping.difference(garage.footprints.map(polygon), polygon(layout.rooms.at(-1)))) < 1e-4,
     'The basement stays beneath the existing occupied band');
-  for (const [u, v] of [[58, 11], [60.5, 10.8], [62, 10.8], [57.8, 10.8]]) {
+  for (const [u, v] of [[49, 11], [51.5, 10.8], [53, 10.8], [48.8, 10.8]]) {
     const p = layout.at(u, v);
     assert.ok(garage.footprints.some(shape => pointOnStairTread(p, shape.outer)
       && !shape.holes.some(hole => pointOnStairTread(p, hole))), 'The opposite-side art anchors stand inside the basement');
