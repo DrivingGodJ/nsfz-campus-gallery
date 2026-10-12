@@ -44,6 +44,8 @@ export default function VenueDetails({ building, height, floorHeight, cutawayHei
       <mesh geometry={stands.tiersGreen}>{material('#7f9881', false, 'tierGreen')}</mesh>
       <mesh geometry={canopy}>{material('#c1c5be', false, 'roof', 'material-0')}{material('#977b69', false, 'canopyUnderside', 'material-1')}</mesh>
       <mesh geometry={stands.glass} raycast={() => null}>{material('#8da7ac', true, 'glass')}</mesh>
+      <mesh geometry={stands.stairTreads}>{material('#c8bca5')}</mesh>
+      <mesh geometry={stands.stairFrames}>{material('#303a38')}</mesh>
     </>}
     <group ref={detail}>
       {stands && <>

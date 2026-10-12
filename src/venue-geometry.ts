@@ -5,6 +5,7 @@ import { gymRoofHeight } from './architecture-geometry.ts';
 import { gymFrame, gymStairLayout } from './gym-interior.ts';
 import { theatreEntranceLayout } from './theatre-exterior-geometry.ts';
 import { buildingGeometry } from './building-geometry.ts';
+import { straightStairTreads } from './structure-geometry.ts';
 import type { Building, GroundPassage, Point, Shape } from './types';
 
 export const STANDS_ID = 'way/855459409';
@@ -68,10 +69,20 @@ export function standsFrame(building: Building) {
   return { at, along, across, length, width };
 }
 
+export function standsStairLayout(building: Building) {
+  const frame = standsFrame(building), u0 = frame.length - 17, u1 = u0 + 5.6, end = u1 + 2;
+  const v0 = frame.width - 3.05, v1 = frame.width - .38, center = (v0 + v1) / 2;
+  const ring = [frame.at(u0, v0), frame.at(end, v0), frame.at(end, frame.width + .02), frame.at(u0, frame.width + .02)];
+  return { ...frame, u0, u1, end, v0, v1, center, top: .2, bottom: -(building.baseElevation ?? 2.6),
+    footprint: { outer: [...ring, ring[0]], holes: [] } as Shape };
+}
+
 export function standsArchitecture(building: Building, height: number, floorHeight: number, cutawayHeight?: number) {
   const frame = standsFrame(building), { at, length, width } = frame, shown = Math.min(height, cutawayHeight ?? height);
   const bodyParts: THREE.BufferGeometry[] = [], blue: THREE.BufferGeometry[] = [], green: THREE.BufferGeometry[] = [], red: THREE.BufferGeometry[] = [];
   const canopy: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [], rails: THREE.BufferGeometry[] = [], glass: THREE.BufferGeometry[] = [];
+  const stairTreads: THREE.BufferGeometry[] = [], stairFrames: THREE.BufferGeometry[] = [];
+  const stair = standsStairLayout(building);
   const point = (u: number, v: number, y: number): Vector => { const p = at(u, v); return [p[0], BASE + y, p[1]]; };
   const inner = [at(.35, .35), at(length - .35, .35), at(length - .35, width - .35), at(.35, width - .35)];
   const shell: Shape = { outer: building.outer, holes: [[...inner, inner[0]]] };
@@ -85,16 +96,21 @@ export function standsArchitecture(building: Building, height: number, floorHeig
   const windows = Array.from({ length: 9 }, (_, i) => opening(length * (.065 + i * .105), 3.7))
     .filter(window => doors.every(door => Math.abs(Number(window.id.slice(6)) - Number(door.id.slice(6))) > (window.width + door.width) / 2 + .2));
   const housingTop = Math.min(floorHeight, shown), bands = [0, .65, .75, 2.55, 2.8, housingTop].filter(y => y >= 0 && y <= housingTop).sort((a, b) => a - b);
+  const rearWindowEnd = rearCenter - 3.15;
+  const stairWindow: GroundPassage = { ...opening((stair.u0 + rearWindowEnd) / 2, rearWindowEnd - stair.u0), points: [at((stair.u0 + rearWindowEnd) / 2, width - 1), at((stair.u0 + rearWindowEnd) / 2, width + 1)] };
   for (let i = 1; i < bands.length; i++) {
     const bottom = bands[i - 1], top = bands[i];
     if (top <= bottom) continue;
-    const cuts = [...(top <= 2.8 ? [...doors, entrance] : []), ...(bottom >= .75 && top <= 2.8 ? [rearEntrance] : []), ...(bottom >= .65 && top <= 2.55 ? windows : [])];
+    const cuts = [...(top <= 2.8 ? [...doors, entrance] : []), ...(bottom >= .75 && top <= 2.8 ? [rearEntrance] : []), ...(bottom >= .65 && top <= 2.55 ? [...windows, stairWindow] : [])];
     const geometry = buildingGeometry(shell, top - bottom, floorHeight, cuts); geometry.translate(0, 0, bottom); bodyParts.push(geometry);
   }
   for (const [bottom, top] of [[0, .2], [floorHeight - .22, floorHeight]]) {
     const end = Math.min(top, shown);
     if (end <= bottom || (cutawayHeight !== undefined && top >= shown - 1e-6 && bottom > 0)) continue;
-    const slab = buildingGeometry(building, end - bottom, floorHeight); slab.translate(0, 0, bottom); bodyParts.push(slab);
+    const shapes = bottom === 0 ? polygonClipping.difference([building.outer, ...building.holes], [stair.footprint.outer]) : [[building.outer, ...building.holes]];
+    for (const [outer, ...holes] of shapes) {
+      const slab = buildingGeometry({ outer, holes }, end - bottom, floorHeight); slab.translate(0, 0, bottom); bodyParts.push(slab);
+    }
   }
   if (housingTop > .2) {
     // The room's return wall stops short of the rear walkway, leaving the
@@ -111,6 +127,48 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     for (const x of [u - cut.width / 2, u, u + cut.width / 2]) add(frames, box(frame, x, .13, .65, top, .06, .065));
     for (const y of [.65, 2.55]) add(frames, box(frame, u, .13, y - .03, y + .03, cut.width, .065, shown));
   }
+  // DJI_20231017112713_0004_D: the entry turns into a stair hall. Its lower
+  // landing exits to the rear low ground; the glazed room stays on the podium.
+  const prism = (u0: number, u1: number, v0: number, v1: number, bottom: number, top: number) => {
+    top = Math.min(top, shown); if (top <= bottom) return;
+    const ring = [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
+    const geometry = buildingGeometry({ outer: [...ring, ring[0]], holes: [] }, top - bottom, floorHeight);
+    geometry.translate(0, 0, bottom); bodyParts.push(geometry);
+  };
+  prism(stair.u0, stair.end, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
+  prism(stair.u0 - .2, stair.u0, stair.v0, width, stair.bottom - .12, .2);
+  prism(stair.end, stair.end + .2, stair.v0, width, stair.bottom - .12, .2);
+  prism(stair.u1, stair.end, stair.v0, width + .02, stair.bottom - .12, stair.bottom);
+  const flight = straightStairTreads(at(stair.u0, stair.center), at(stair.u1, stair.center), stair.top, stair.bottom);
+  for (const step of flight) {
+    const u = ((step.from[0] + step.to[0]) / 2 - building.outer[0][0]) * frame.along[0]
+      + ((step.from[1] + step.to[1]) / 2 - building.outer[0][1]) * frame.along[1];
+    const run = Math.hypot(step.to[0] - step.from[0], step.to[1] - step.from[1]);
+    add(stairTreads, box(frame, u, stair.center, Math.max(stair.bottom - .12, step.height - .16), step.height, run, stair.v1 - stair.v0, shown));
+    for (const offset of [run / 2 - .025, run / 2 - .055]) add(stairFrames, box(frame, u + offset, stair.center, step.height, step.height + .008, .012, stair.v1 - stair.v0, shown));
+  }
+  const doorStart = stair.u1 + .2, doorEnd = stair.end - .2;
+  prism(stair.u0, doorStart, width - .35, width, stair.bottom, stair.bottom + .38);
+  prism(stair.u0, stair.end, width - .35, width, stair.bottom + 2.35, 0);
+  prism(stair.end - .2, stair.end, width - .35, width, stair.bottom, 0);
+  const blackBar = (u0: number, v0: number, y0: number, u1: number, v1: number, y1: number, thickness = .055) =>
+    add(stairFrames, bar(point(u0, v0, y0), point(u1, v1, y1), thickness, shown));
+  // Lower rear glazing and an open door leaf let the landing actually reach outside.
+  add(glass, box(frame, (stair.u0 + doorStart) / 2, width - .16, stair.bottom + .38, stair.bottom + 2.35, doorStart - stair.u0, .035, shown));
+  for (const y of [stair.bottom + .38, stair.bottom + 2.35]) blackBar(stair.u0, width - .16, y, doorStart, width - .16, y);
+  for (let u = stair.u0; u <= doorStart; u += 1.1) blackBar(u, width - .16, stair.bottom + .38, u, width - .16, stair.bottom + 2.35);
+  for (const u of [doorStart, doorEnd]) blackBar(u, width - .16, stair.bottom, u, width - .16, stair.bottom + 2.35);
+  blackBar(doorStart, width - .16, stair.bottom + 2.35, doorEnd, width - .16, stair.bottom + 2.35);
+  // The left glass partition overlooks the descending flight from the level room.
+  add(glass, box(frame, (stair.u0 + stair.end) / 2, stair.v0 - .08, .2, Math.min(2.85, shown), stair.end - stair.u0, .035));
+  for (const y of [.2, 2.85]) blackBar(stair.u0, stair.v0 - .08, y, stair.end, stair.v0 - .08, y);
+  for (let u = stair.u0; u <= stair.end; u += 1.1) blackBar(u, stair.v0 - .08, .2, u, stair.v0 - .08, 2.85);
+  add(glass, box(frame, (stair.u0 + rearWindowEnd) / 2, width - .16, .65, Math.min(2.55, shown), rearWindowEnd - stair.u0, .035));
+  for (const y of [.65, 1.35, 2.55]) blackBar(stair.u0, width - .16, y, rearWindowEnd, width - .16, y);
+  for (let u = stair.u0; u <= rearWindowEnd; u += .95) blackBar(u, width - .16, .65, u, width - .16, 2.55);
+  for (const v of [stair.v0 + .08, stair.v1 - .06]) blackBar(stair.u0, v, stair.top + .95, stair.u1, v, stair.bottom + .95, .065);
+  for (const y of [.75, 1.22]) blackBar(stair.end + .01, stair.v0, y, stair.end + .01, stair.v1, y);
+  for (let v = stair.v0; v <= stair.v1; v += .35) blackBar(stair.end + .01, v, .2, stair.end + .01, v, 1.22, .04);
   // The confirmed end has continuous seating, with no building above it.
   const seatStart = .2, rows = 10, deck = floorHeight, tread = (width - 2.1) / rows, rise = Math.min(.32, floorHeight / rows), aisles = [length * .27, length * .53, length * .78];
   if (shown > deck + .001) {
@@ -148,7 +206,7 @@ export function standsArchitecture(building: Building, height: number, floorHeig
       add(frames, box(frame, u, width / 2, canopyBottom - .24, canopyBottom, .18, width - .35, shown));
     }
   }
-  return { body: combined(bodyParts, true), tiersBlue: combined(blue), tiersGreen: combined(green), tiersRed: combined(red), canopy: combined(canopy), frames: combined(frames), glass: combined(glass), rails: combined(rails) };
+  return { body: combined(bodyParts, true), tiersBlue: combined(blue), tiersGreen: combined(green), tiersRed: combined(red), canopy: combined(canopy), frames: combined(frames), glass: combined(glass), rails: combined(rails), stairTreads: combined(stairTreads), stairFrames: combined(stairFrames) };
 }
 
 export function theatreInteriorLayout(building: Building, floorHeight: number) {

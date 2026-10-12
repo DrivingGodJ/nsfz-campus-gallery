@@ -177,7 +177,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       }
       if (lightwell && i % 2 === 0 && i > 0 && i < positions) {
         const pillar = at(distance, .15);
-        bar(point(pillar, floor), point(pillar, top - .2), .28, 'walls', 10);
+        bar(point(pillar, floor), point(pillar, floor + heightAt(pillar) - .2), .28, 'walls', 10);
         bar(point(pillar, floor), point(pillar, floor + .18), .31, 'metal', 10);
         // The long corridor photographs show black steel window bays on the
         // building side of a glazed open lightwell, not a closed low tunnel.
@@ -205,15 +205,19 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       // Orange guiding strip, suspended red service pipe and bright rectangular
       // ceiling panels are visible in _DSC8295 and the two exit-stair photos.
       for (const piece of walkingSegments(at(.2,-.8),at(length-.2,-.8))) segment(piece.from,piece.to,piece.height+.07,.015,.12,'wood');
-      bar(point(at(.3, .7), top - .45), point(at(length - .3, .7), top - .45), .055, 'pipes');
+      for (const piece of roofSegments(at(.3, .7), at(length - .3, .7)))
+        bar(point(piece.from, floor + piece.height - .45), point(piece.to, floor + piece.height - .45), .055, 'pipes');
     }
     if (feature.type === 'undergroundTrack') {
       for (const side of [-width / 3, 0, width / 3]) segment(at(.3, side), at(length - .3, side), floor + .07, .013, .03, 'paint');
       // End high windows bring daylight into the photographed practice strip.
-      for (const distance of [.12, length - .12]) segment(at(distance, -width / 2 + .25), at(distance, width / 2 - .25), top - 1.4, .95, .045, 'glass');
+      for (const distance of [.12, length - .12]) for (const piece of roofSegments(at(distance, -width / 2 + .25), at(distance, width / 2 - .25)))
+        segment(piece.from, piece.to, floor + piece.height - 1.4, .95, .045, 'glass');
     }
   }
-  for (const opening of roofOpenings) flat(opening, top - .05, 'skylights', .045);
+  for (const opening of roofOpenings) for (const section of sections)
+    for (const [outer, ...holes] of polygonClipping.intersection(section.footprints.map(shape => [shape.outer, ...shape.holes]), [opening.outer, ...opening.holes]))
+      flat({ outer, holes }, floor + section.height - .05, 'skylights', .045);
   if (feature.type !== 'undergroundRoom' || feature.roomUse === 'garage') {
     // The full enclosure includes merged return passages and corner seams;
     // only the photographed skylight footprint cuts through its opaque roof.
@@ -242,28 +246,40 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     // it does not turn the green badminton hall into an all-wood basketball hall.
     box(at(width / 2, length - 8), floor + .075, .015, Math.min(15, width - 6), 10, angle, 'wood');
     for (const u of [.8, width - .8]) {
-      segment(at(u, .3), at(u, length - .3), floor + 4.25, .16, 1.1, 'metal');
-      for (const y of [4.75, 5.25]) bar(roomPoint(u, .3, floor + y), roomPoint(u, length - .3, floor + y), .025, 'paint');
-      for (let v = .3; v < length; v += 1.25) bar(roomPoint(u, v, floor + 4.4), roomPoint(u, v, floor + 5.3), .023, 'paint');
+      for (const piece of roofSegments(at(u, .3), at(u, length - .3)).filter(piece => piece.height > 5.3)) {
+        segment(piece.from, piece.to, floor + 4.25, .16, 1.1, 'metal');
+        for (const y of [4.75, 5.25]) bar(point(piece.from, floor + y), point(piece.to, floor + y), .025, 'paint');
+      }
+      for (let v = .3; v < length; v += 1.25) if (heightAt(at(u, v)) > 5.3)
+        bar(roomPoint(u, v, floor + 4.4), roomPoint(u, v, floor + 5.3), .023, 'paint');
     }
     const bays = Math.max(2, Math.round(length / 8));
     for (let i = 0; i <= bays; i++) {
       const v = .7 + (length - 1.4) * i / bays;
       for (const u of [.35, width * .5, width - .35]) {
+        const top = floor + heightAt(at(u, v));
         bar(roomPoint(u, v, floor + .05), roomPoint(u, v, top - .25), .26, 'walls', 8);
         box(at(u, v), top - .55, .4, .55, .6, angle, 'metal');
       }
-      segment(at(.35, v), at(width - .35, v), top - .5, .28, .25, 'metal');
-      for (const u of [width * .25, width * .75]) box(at(u, v), top - .6, .08, 1.5, .6, angle, 'lights');
-      for (const u of [width * .25, width * .75]) bar(roomPoint(u, v, top - .65), roomPoint(u, v, top - 1.1), .015, 'pipes');
+      for (const piece of roofSegments(at(.35, v), at(width - .35, v)))
+        segment(piece.from, piece.to, floor + piece.height - .5, .28, .25, 'metal');
+      for (const u of [width * .25, width * .75]) {
+        for (const piece of roofSegments(at(u - .75, v), at(u + .75, v)))
+          segment(piece.from, piece.to, floor + piece.height - .6, .08, .6, 'lights');
+        const top = floor + heightAt(at(u, v));
+        bar(roomPoint(u, v, top - .65), roomPoint(u, v, top - 1.1), .015, 'pipes');
+      }
     }
-    for (const u of [1.5, width * .33, width * .66, width - 1.5]) bar(roomPoint(u, .4, top - .7), roomPoint(u, length - .4, top - .7), .05, 'pipes');
-    segment(at(width * .5, .4), at(width * .5, length - .4), top - .6, .24, .75, 'metal');
-    for (const shape of footprints) flat(shape, top - .06, 'ceiling');
+    for (const u of [1.5, width * .33, width * .66, width - 1.5]) for (const piece of roofSegments(at(u, .4), at(u, length - .4)))
+      bar(point(piece.from, floor + piece.height - .7), point(piece.to, floor + piece.height - .7), .05, 'pipes');
+    for (const piece of roofSegments(at(width * .5, .4), at(width * .5, length - .4)))
+      segment(piece.from, piece.to, floor + piece.height - .6, .24, .75, 'metal');
+    for (const section of sections) for (const shape of section.footprints) flat(shape, floor + section.height - .06, 'ceiling');
     // Retractable ceiling frames are photographed above the timber bay.
     const boardV = length - 9.5, boardU = width * .5;
-    segment(at(boardU - .9, boardV), at(boardU + .9, boardV), floor + 3.1, 1.05, .045, 'glass');
-    bar(roomPoint(boardU, boardV, floor + 3.1), roomPoint(boardU, boardV, top - .4), .05, 'metal');
+    for (const piece of roofSegments(at(boardU - .9, boardV), at(boardU + .9, boardV)))
+      segment(piece.from, piece.to, floor + 3.1, Math.min(1.05, piece.height - 3.22), .045, 'glass');
+    bar(roomPoint(boardU, boardV, floor + 3.1), roomPoint(boardU, boardV, floor + heightAt(at(boardU, boardV)) - .4), .05, 'metal');
     const rim = new THREE.TorusGeometry(.225, .021, 5, 14).rotateX(Math.PI / 2); const p = at(boardU, boardV - .36); parts.pipes.push(rim.translate(p[0], floor + 3.05, p[1]));
     void along;
   }

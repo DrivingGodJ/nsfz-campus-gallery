@@ -21,13 +21,14 @@ export function sportsGroundPlatformLayers(feature: Feature, features: Feature[]
     // Embed the podium cap in the passage roof, away from its visible underside.
     - (room.feature.type === 'undergroundCorridor' ? .1 : 0);
   const glazing = features.flatMap(undergroundSkylights);
+  const stairVoids = features.flatMap(feature => feature.ceilingCutouts?.map(cutout => cutout.footprint) || []);
   const levels = [...new Set([-.06, top, ...rooms.flatMap(area => {
     const ceiling = ceilingAt(area);
     return ceiling > -.06 && ceiling < top ? [ceiling] : [];
   })])].sort((a, b) => a - b);
   return levels.slice(1).flatMap((to, index) => {
     const from = levels[index], middle = (from + to) / 2;
-    const voids = [...glazing, ...rooms.filter(area => (area.feature.height ?? -3) < middle
+    const voids = [...glazing, ...stairVoids, ...rooms.filter(area => (area.feature.height ?? -3) < middle
       && ceilingAt(area) > middle).flatMap(area => area.footprints)];
     const polygons = voids.length ? polygonClipping.difference(snapFootprint([[platform.outer, ...platform.holes]]),
       snapFootprint(voids.map(shape => [shape.outer, ...shape.holes]))) : [[platform.outer, ...platform.holes]];

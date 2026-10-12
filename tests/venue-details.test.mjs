@@ -6,7 +6,10 @@ import { buildingLevels } from '../src/building-model.ts';
 import { buildingGeometry } from '../src/building-geometry.ts';
 import { gymArchitecture } from '../src/architecture-geometry.ts';
 import { gymFrame, gymStairLayout } from '../src/gym-interior.ts';
-import { gymDetailGeometry, STANDS_ID, standsArchitecture, standsFrame, THEATRE_ID, theatreInteriorGeometry, theatreInteriorLayout } from '../src/venue-geometry.ts';
+import { sportsGroundPlatformLayers } from '../src/sports-ground-geometry.ts';
+import { undergroundLayout } from '../src/underground-geometry.ts';
+import { undergroundDetailGeometry } from '../src/underground-details.ts';
+import { gymDetailGeometry, STANDS_ID, standsArchitecture, standsFrame, standsStairLayout, THEATRE_ID, theatreInteriorGeometry, theatreInteriorLayout } from '../src/venue-geometry.ts';
 
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
@@ -91,12 +94,13 @@ test('the office-side stand passage opens to the outside and turns right beneath
       const sightline = new THREE.Raycaster(new THREE.Vector3(photo.position.x, 1.6, photo.position.z), new THREE.Vector3(Math.sin(heading), 0, -Math.cos(heading)), 0, 40);
       assert.equal(sightline.intersectObjects(objects).length, 0, 'The photographed eye-height sightline passes through both facades without a wall or glass plug');
       assert.equal(ray(entrance, -1, 1.6, frame.across, 3).length, 0, 'The broad front entrance remains open');
-      assert.equal(ray(entrance, frame.width - 1.5, 1.6, frame.along.map(value => -value), 15).length, 0, 'The rear walkway stays clear when turning right');
+      const corridor = standsStairLayout(stands).v0 - .6;
+      assert.equal(ray(entrance, corridor, 1.6, frame.along.map(value => -value), 15).length, 0, 'The room-side walkway reaches the stair head when turning right');
       assert.ok(ray(entrance, frame.width - 1, .5, frame.across, 2).length, 'The rear opening retains its low parapet');
       assert.ok(ray(frame.length * .905, -1, 1.6, frame.across, 2).length, 'The adjoining room window remains beside the entrance');
       const returnWall = ray(entrance, 2, 1.6, frame.along.map(value => -value), 6);
       assert.ok(returnWall.length, 'A side wall separates the adjoining room from the open passage');
-      for (const [u, v] of [[entrance, 1], [entrance, frame.width - 1.5], [entrance - 10, frame.width - 1.5]]) {
+      for (const [u, v] of [[entrance, 1], [entrance, corridor], [entrance - 10, corridor]]) {
         const floor = down([body], frame.at(u, v), 1.6, 2)[0];
         assert.ok(floor && Math.abs(floor.point.y - .32) < 1e-4, 'The entrance and right turn keep a continuous walkable floor');
       }
@@ -107,6 +111,45 @@ test('the office-side stand passage opens to the outside and turns right beneath
     } finally { dispose(model); }
   }
   assert.equal(JSON.stringify(stands), original, 'The calibrated outline and photo positions are unchanged');
+});
+
+test('the glazed stand stair hall descends to a real open low-ground exit', () => {
+  const info = buildingLevels(stands, site.buildingOverrides[stands.id]), layout = standsStairLayout(stands);
+  const model = standsArchitecture(stands, info.height, info.floorHeight), body = mesh(model.body, true), steps = mesh(model.stairTreads);
+  try {
+    const first = down([steps], layout.at(layout.u0 + .1, layout.center))[0];
+    const last = down([steps], layout.at(layout.u1 - .1, layout.center))[0];
+    assert.ok(first && last && first.point.y > last.point.y + 2.4, 'A full flight descends toward the office-side end');
+    assert.ok(Math.abs(last.point.y + info.baseElevation - .12) < 1e-4, 'The last tread meets low ground instead of a floating platform');
+    const objects = [body, steps, mesh(model.stairFrames), mesh(model.glass)];
+    const door = layout.at((layout.u1 + layout.end) / 2, layout.width - .5);
+    const exit = new THREE.Raycaster(new THREE.Vector3(door[0], .12 - info.baseElevation + 1.6, door[1]), new THREE.Vector3(layout.across[0], 0, layout.across[1]), 0, 2).intersectObjects(objects);
+    assert.equal(exit.length, 0, 'The lower doorway reaches outside without a pane or wall in the door');
+    const head = down([body], layout.at(layout.u0 - .3, layout.center), 1.6, 2)[0];
+    assert.ok(head && Math.abs(head.point.y - .32) < 1e-4, 'The upper corridor meets the stair head on the retained floor');
+    const shaft = down([body], layout.at((layout.u0 + layout.u1) / 2, layout.center), 1.6, 4);
+    assert.equal(shaft.length, 0, 'The old upper slab no longer seals the descending flight');
+  } finally { dispose(model); }
+});
+
+test('the built stand stair shaft clears the actual podium and underground sports roof', () => {
+  const layout = standsStairLayout(stands), track = campus.features.find(feature => feature.type === 'runningTrack');
+  const room = undergroundLayout(campus.features).areas.get('local/underground-badminton');
+  assert.deepEqual(room.feature.ceilingCutouts[0].footprint, layout.footprint, 'The building floor and sports roof share the same calibrated shaft');
+  const roof = undergroundDetailGeometry(room.feature, room.footprints, room.openings, room.connections);
+  const podium = sportsGroundPlatformLayers(track, campus.features).map(layer => {
+    const geometry = buildingGeometry(layer.shape, layer.top - layer.bottom, 3.6);
+    const object = mesh(geometry, true); object.position.y = layer.bottom; object.updateMatrixWorld(); return object;
+  });
+  try {
+    const above = Object.entries(roof).filter(([key]) => key !== 'floor' && key !== 'green' && key !== 'paint').map(([, geometry]) => mesh(geometry));
+    const p = layout.at((layout.u0 + layout.u1) / 2, layout.center);
+    const hits = down([...above, ...podium], p, 4.2, 4.2);
+    assert.ok(hits.every(hit => hit.point.y < .12), 'No podium slab, sports roof, beam or pipe obstructs the flight above its low-ground floor');
+    const doorway = layout.at((layout.u1 + layout.end) / 2, layout.width - .5);
+    const exit = new THREE.Raycaster(new THREE.Vector3(doorway[0], 1.6, doorway[1]), new THREE.Vector3(layout.across[0], 0, layout.across[1]), 0, 2).intersectObjects([...above, ...podium]);
+    assert.equal(exit.length, 0, 'The lower rear exit also clears the underlying sports enclosure');
+  } finally { dispose(roof); podium.forEach(object => object.geometry.dispose()); }
 });
 
 test('venue details disappear above selected floors and never add photo-marker obstruction', () => {

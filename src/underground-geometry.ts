@@ -213,6 +213,38 @@ export function undergroundCeilingSections(feature: Feature, footprints = underg
         ...(low.length ? [{ height: segment.height, footprints: low, openings: cuts }] : [])];
     });
   }
+  // A stair above a room replaces only the local roof, leaving the room floor
+  // and the rest of its tall enclosure intact. Shared edges stay open below
+  // the lower roof rather than becoming new floor-to-ceiling partitions.
+  for (const cutout of feature.ceilingCutouts || []) {
+    if (!Number.isFinite(cutout.height) || cutout.height <= 0) continue;
+    sections = sections.flatMap(section => {
+      if (cutout.height >= section.height) return [section];
+      const polygons = section.footprints.map(shape => [shape.outer, ...shape.holes]);
+      const zone = [cutout.footprint.outer, ...cutout.footprint.holes];
+      const shapes = (value: polygonClipping.MultiPolygon): Shape[] => value.map(([outer, ...holes]) => ({ outer, holes }));
+      const low = shapes(polygonClipping.intersection(polygons, zone)), high = shapes(polygonClipping.difference(polygons, zone));
+      if (!low.length) return [section];
+      const seams: PassageOpening[] = low.flatMap(shape => [shape.outer, ...shape.holes].flatMap(ring => ring.slice(1).flatMap((to, i) => {
+        const from = ring[i], dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
+        if (length < 1e-7) return [];
+        const at = (p: Point) => ((p[0] - from[0]) * dx + (p[1] - from[1]) * dz) / length;
+        const across = (p: Point) => Math.abs((p[0] - from[0]) * dz - (p[1] - from[1]) * dx) / length;
+        return high.flatMap(shape => [shape.outer, ...shape.holes].flatMap(ring => ring.slice(1).flatMap((b, j) => {
+          const a = ring[j];
+          if (across(a) > 1e-5 || across(b) > 1e-5) return [];
+          const start = Math.max(0, Math.min(at(a), at(b))), end = Math.min(length, Math.max(at(a), at(b)));
+          if (end - start < 1e-7) return [];
+          const seam = [start, end].map(t => [from[0] + dx / length * t, from[1] + dz / length * t]) as PassageOpening;
+          seam.height = cutout.height - .12;
+          return [seam];
+        })));
+      })));
+      const cuts = [...section.openings, ...seams];
+      return [...(high.length ? [{ ...section, footprints: high, openings: cuts }] : []),
+        { height: cutout.height, footprints: low, openings: cuts }];
+    });
+  }
   return sections;
 }
 
