@@ -12,19 +12,21 @@ export default function MottoStone({ feature }: { feature: Feature }) {
   const sign = useMemo(() => mottoStoneInscriptionGeometry(model), [model]);
   const layout = useMemo(() => mottoStoneLayout(model), [model]);
   const texture = useMemo(() => {
-    const canvas = document.createElement('canvas'); canvas.width = 1536; canvas.height = 384;
+    const upright = model.variant === 'upright';
+    const canvas = document.createElement('canvas'); canvas.width = upright ? 512 : 1536; canvas.height = upright ? 1024 : 384;
     const context = canvas.getContext('2d')!;
-    context.font = '280px "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif';
+    context.font = `${upright ? 430 : 280}px "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif`;
     context.textAlign = 'center'; context.textBaseline = 'middle';
-    const characters = [...model.inscription], gap = 1390 / characters.length;
+    const characters = [...model.inscription], gap = (upright ? 900 : 1390) / characters.length;
     characters.forEach((character, i) => {
-      const x = 768 + (i - (characters.length - 1) / 2) * gap;
-      context.strokeStyle = '#695028'; context.lineWidth = 4; context.strokeText(character, x, 200);
-      context.fillStyle = '#dcae51'; context.fillText(character, x, 196);
+      const x = upright ? 256 : 768 + (i - (characters.length - 1) / 2) * gap;
+      const y = upright ? 512 + (i - (characters.length - 1) / 2) * gap : 196;
+      context.strokeStyle = upright ? '#70251c' : '#695028'; context.lineWidth = 4; context.strokeText(character, x, y + 4);
+      context.fillStyle = upright ? '#ae2826' : '#dcae51'; context.fillText(character, x, y);
     });
     const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 4; return texture;
-  }, [model.inscription]);
+  }, [model.inscription, model.variant]);
   useEffect(() => () => { geometry.dispose(); sign.dispose(); }, [geometry, sign]);
   useEffect(() => () => texture.dispose(), [texture]);
   return <group name={feature.id} position={[model.center[0], .12 + (feature.height ?? 0), model.center[1]]} rotation={[0, mottoStoneRotation(model), 0]}

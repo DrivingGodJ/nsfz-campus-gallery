@@ -8,20 +8,20 @@ export function mottoStoneWorldPoint(model: MottoStoneModel, [x, y, z]: [number,
 }
 
 export function mottoStoneLayout(model: MottoStoneModel) {
-  const w = model.width, h = model.totalHeight, d = model.depth;
+  const w = model.width, h = model.totalHeight, d = model.depth, upright = model.variant === 'upright';
   // A broad, uneven natural stone, with a low left shoulder and sloping right end.
   const profile: Point[] = [[-.5, .12], [-.49, .49], [-.45, .76], [-.34, .87], [-.25, .94],
     [-.1, .91], [.03, 1], [.12, .94], [.24, .95], [.38, .84], [.47, .74], [.5, .26],
     [.43, .11], [.24, .07], [.04, .1], [-.13, .06], [-.34, .08]];
   return {
     outline: (model.profile ?? profile).map(([x, y]) => [x * w, y * h] as Point),
-    baseRocks: [
+    baseRocks: upright ? [] : [
       { position: [-.36 * w, .15, 0] as [number, number, number], scale: [.9, .28, d * .84] as [number, number, number] },
       { position: [-.07 * w, .12, 0] as [number, number, number], scale: [1.15, .24, d * .95] as [number, number, number] },
       { position: [.3 * w, .16, 0] as [number, number, number], scale: [1, .32, d * .8] as [number, number, number] }
     ],
     // PlaneGeometry faces +Z: its UVs read left to right from the lake side.
-    sign: { position: [0, h * .52, d / 2 + .025] as [number, number, number], size: [w * .84, h * .57] as [number, number] }
+    sign: { position: [0, h * .52, d / 2 + .025] as [number, number, number], size: [w * (upright ? .27 : .84), h * (upright ? .65 : .57)] as [number, number] }
   };
 }
 

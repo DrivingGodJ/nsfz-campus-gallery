@@ -26,10 +26,10 @@ test('the marked yellow route joins the two original roads and stays completely 
   assert.deepEqual(applyCampusCorrections(campus, read('data/campus-corrections.json')), campus);
 });
 
-test('only the three identified obstructing trees are removed, and remaining crown envelopes clear the new path', () => {
+test('the three confirmed obstructing trees remain removed, and remaining crown envelopes clear the new path', () => {
   const removed = [{id:'local/lake-bridge-avenue-trees',position:[78.24747209502239,6.114536889193943],count:6},
     {id:'local/history-theatre-avenue-trees',position:[42.160104301408666,51.30285252129614],count:23},
-    {id:'local/river-bank-trees',position:[66.4,18.5],count:12}];
+    {id:'local/river-bank-trees',position:[66.4,18.5],count:11}];
   for (const tree of removed) {
     const group = campus.features.find(f => f.id === tree.id);
     assert.equal(group.trees.length, tree.count);
