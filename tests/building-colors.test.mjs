@@ -82,6 +82,8 @@ test('the theatre drum texture uses sRGB photo finishes, dark piers and a contin
 test('theatre upper arc finishes preserve the exact walls, floor cuts and occlusion geometry with continuous unfolded UVs', () => {
   const building = campus.buildings.find(building => building.id === THEATRE_ID), floorHeight = 3.6;
   const section = building.parts.find(part => part.id === 'main'), bottom = 4 * floorHeight;
+  const terrace = building.parts.find(part => part.id === 'curved-terrace'), arc = terrace.outer.slice(terrace.roofTerrace.railEdges[0].length+4,-1);
+  const expectedEdges = arc.slice(0,-1).map((p,i)=>section.outer.findIndex((q,j)=>j<section.outer.length-1&&Math.hypot(p[0]-q[0],p[1]-q[1])<1e-5&&Math.hypot(arc[i+1][0]-section.outer[j+1][0],arc[i+1][1]-section.outer[j+1][1])<1e-5));
   for (const cutoff of [bottom, 5 * floorHeight, undefined]) {
     const height = cutoff ?? 6 * floorHeight;
     const geometry = buildingGeometry(section, height, floorHeight, building.groundPassages,
@@ -94,7 +96,7 @@ test('theatre upper arc finishes preserve the exact walls, floor cuts and occlus
       const before = Array.from(positions.array), oldNormals = Array.from(normals.array), mask = geometry.userData.photoOcclusionMask;
       buildingRoofMaterials(geometry, cutoff === undefined);
       const oldRoofGroups = geometry.groups.filter(group => group.materialIndex === 1).map(group => ({ ...group }));
-      theatreDrumMaterials(geometry, section, floorHeight);
+      theatreDrumMaterials(geometry, section, floorHeight, building);
       assert.deepEqual(Array.from(positions.array), before, 'No wall, opening or roof vertex can be moved by its finish');
       assert.deepEqual(Array.from(normals.array), oldNormals);
       assert.equal(geometry.userData.photoOcclusionMask, mask, 'The photo compositor retains its original face mask');
@@ -121,10 +123,10 @@ test('theatre upper arc finishes preserve the exact walls, floor cuts and occlus
           const to = section.outer[e + 1], line = new THREE.Line3(new THREE.Vector3(from[0], 0, from[1]), new THREE.Vector3(to[0], 0, to[1]));
           return line.closestPointToPoint(center, true, new THREE.Vector3()).distanceTo(center) < .002;
         });
-        assert.ok(edge >= 9 && edge <= 18, 'The rear connection, notch, straight walls and roof retain their original material');
+        assert.ok(expectedEdges.includes(edge), 'The rear connection, notch, straight walls and roof retain their original material');
         seenEdges.add(edge);
       }
-      assert.deepEqual([...seenEdges].sort((a, b) => a - b), [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+      assert.deepEqual([...seenEdges].sort((a, b) => a - b), expectedEdges.slice().sort((a,b)=>a-b));
       if (cutoff !== undefined) assert.ok(geometry.groups.every(group => group.materialIndex !== 1), 'A selected floor cap does not become a physical roof');
     } finally { geometry.dispose(); }
   }

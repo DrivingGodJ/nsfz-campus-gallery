@@ -26,12 +26,12 @@ const body = (s, floor) => buildingGeometry(s, floor ? floor * info.floorHeight 
   building.floorCorridors.filter(c => c.partId === s.id), building.stairwells.filter(c => c.partId === s.id), building.classroomWindows,
   building.solidCores.filter(c => c.partId === s.id), building.cutouts.filter(c => c.partId === s.id), !!floor);
 
-test('the second wing stair follows the marked left-outward and right-return ascent through six floors to the roof', () => {
+test('the rounded wing stair follows the marked left-outward and right-return ascent and ends at the sixth floor', () => {
   assert.equal(stair.firstFlight, 'left'); assert.ok(frame.along[0] < -.9);
-  assert.equal(section.floors, 6); assert.ok(stair.roofAccess);
+  assert.equal(section.floors, 6); assert.equal(stair.roofAccess,undefined);
   assert.equal(clip.difference([stairwellShaft(stair).outer], [stair.opening.outer]).length, 0);
   const geometry = teachingStairGeometry({ ...building, stairwells: [stair] }, info.sections, info.floorHeight), steps = mesh(geometry.concrete);
-  for (let level = 0; level < 6; level++) for (let i = 0; i < stair.stepsPerFlight; i++) {
+  for (let level = 0; level < 5; level++) for (let i = 0; i < stair.stepsPerFlight; i++) {
     const t = (i + .5) / stair.stepsPerFlight, base = .12 + level * info.floorHeight + .25;
     const rise = (i + 1) * info.floorHeight / 2 / stair.stepsPerFlight;
     const left = down(steps, point(stair.landingDepth + t * stair.run, -.7, base + info.floorHeight / 2 + .1));
@@ -40,6 +40,9 @@ test('the second wing stair follows the marked left-outward and right-return asc
     assert.ok(right && Math.abs(right.point.y - base - info.floorHeight / 2 - rise) < 1e-4);
   }
   const bounds = geometry.concrete.getAttribute('position');
+  geometry.concrete.computeBoundingBox();geometry.rails.computeBoundingBox();
+  assert.ok(geometry.concrete.boundingBox.max.y<=.12+5*info.floorHeight+.25+1e-4,'No sixth-to-roof flight remains');
+  assert.ok(geometry.rails.boundingBox.max.y<=.12+5*info.floorHeight+.25+1.05,'No sixth-to-roof flight guard remains');
   for (let i = 0; i < bounds.count; i++) {
     const [x, z] = [bounds.getX(i), bounds.getZ(i)], e = 2e-5;
     assert.ok(clip.intersection([stair.opening.outer], [[[x-e,z-e],[x+e,z-e],[x+e,z+e],[x-e,z+e],[x-e,z-e]]]).length, 'No tread or landing protrudes through the rounded enclosure');
@@ -47,7 +50,7 @@ test('the second wing stair follows the marked left-outward and right-return asc
   Object.values(geometry).forEach(g => g.dispose()); steps.material.dispose();
 });
 
-test('the rounded shaft has a full corridor opening, wall-wide flights, subdivided exterior glass and a separate roof exit', () => {
+test('the rounded shaft keeps six-floor openings and glass beneath a normal roof without an upper stair room', () => {
   const shape = body(section), shell = mesh(shape, true), geometry = teachingStairGeometry({ ...building, stairwells: [stair] }, info.sections, info.floorHeight), steps = mesh(geometry.concrete);
   const forward = new THREE.Vector3(frame.along[0], 0, frame.along[1]);
   for (let floor = 0; floor < 6; floor++) {
@@ -63,7 +66,7 @@ test('the rounded shaft has a full corridor opening, wall-wide flights, subdivid
       const wall = new THREE.Raycaster(point(2.5,0,y+.03),across,0,5).intersectObject(shell)[0];
       assert.ok(wall, 'The rounded outside retains its window sill');
       const edge = wall.point.clone().addScaledVector(across,-.015);edge.y=y+info.floorHeight+.1;
-      assert.ok(down(steps,edge), 'Each widened flight reaches the inside of the actual side wall');
+      if(floor<5)assert.ok(down(steps,edge), 'Each widened flight reaches the inside of the actual side wall');
     }
   }
   const windows = solidCoreWindowLayout([enclosure],section.height,info.floorHeight);
@@ -74,15 +77,15 @@ test('the rounded shaft has a full corridor opening, wall-wide flights, subdivid
   const tangent = new THREE.Vector3(window.to[0]-window.from[0],0,window.to[1]-window.from[1]).normalize(), normal = new THREE.Vector3(-tangent.z,0,tangent.x);
   assert.equal(new THREE.Raycaster(center.addScaledVector(normal,-.8),normal,0,1.6).intersectObject(shell).length,0,'Exterior glazing cuts a real aperture into the wall');
   const roof = .12 + section.height;
-  assert.ok(Math.abs(down(shell,point(.4,0,roof+4)).point.y-roof-stair.roofAccess.height)<1e-4);
-  assert.ok(Math.abs(down(shell,point(2.5,0,roof+.15)).point.y-.37)<1e-4,'The roof does not cap the shaft');
+  assert.ok(Math.abs(down(shell,point(.4,0,roof+4)).point.y-roof)<1e-4,'The round stair room ends at the ordinary sixth-floor roof');
+  assert.ok(Math.abs(down(shell,point(2.5,0,roof+.15)).point.y-roof)<1e-4,'The sixth-floor roof closes the former roof-access shaft');
   assert.equal(new THREE.Raycaster(point(-.4,0,roof+1.3),forward,0,.8).intersectObject(shell).length,0);
   const cut = body(section,3);cut.computeBoundingBox();assert.ok(cut.boundingBox.max.z<=3*info.floorHeight+1e-4);cut.dispose();
   shape.dispose();shell.material.dispose();steps.material.dispose();Object.values(geometry).forEach(g=>g.dispose());
 });
 
-test('the moved joining wall clears its former position while the sixth-floor outside end stays blank', () => {
-  const main=info.sections.find(s=>s.id==='main'),[a,b]=building.classroomWindows.blindFacadeLines[0];
+test('the moved joining wall clears its former position while the wrongly blanked sixth-floor outside window is restored', () => {
+  const main=info.sections.find(s=>s.id==='main'),[a,b]=[[91.40756430915667,64.01983915509366],[89.47396089486412,52.82109838093125]];
   const along=new THREE.Vector3(b[0]-a[0],0,b[1]-a[1]).normalize(),normal=new THREE.Vector3(-along.z,0,along.x);
   const glassGeometry=teachingWindowGeometry(building,info.sections,info.floorHeight),glass=mesh(glassGeometry.glass),frames=mesh(glassGeometry.frames);
   const objects=info.sections.map(s=>mesh(body(s),true));
@@ -93,7 +96,9 @@ test('the moved joining wall clears its former position while the sixth-floor ou
     assert.equal(ray.intersectObjects([glass,frames]).length,0,'No pane or window frame remains on the shared end facade');
   }
   const p=new THREE.Vector3((a[0]+b[0])/2,.12+5*info.floorHeight+1.6,(a[1]+b[1])/2).addScaledVector(normal,-.5);
-  assert.ok(new THREE.Raycaster(p,normal,0,1).intersectObjects(objects).length,'The sixth floor retains its original outside end wall above the five-floor part');
+  const ray=new THREE.Raycaster(p,normal,0,1);
+  assert.equal(ray.intersectObjects(objects).length,0,'The sixth floor restores an actual ordinary window opening above the five-floor part');
+  assert.ok(ray.intersectObject(glass).length,'The wrongly blanked sixth-floor end has its ordinary glass pane again');
   for(const core of building.solidCores) for(const window of solidCoreWindowLayout([core],24,info.floorHeight)) {
     const cut=window.cut[0]; assert.equal(confirmedFacade(cut[0],cut[1],[{from:a,to:b}]),false);
   }

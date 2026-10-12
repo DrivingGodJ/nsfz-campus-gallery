@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { buildingGeometry, buildingCoreFootprint, buildingSectionWindows } from '../src/building-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
+import { theatreBodyWindows, theatreGlazingGeometry } from '../src/theatre-exterior-geometry.ts';
 import { teachingWindowGeometry } from '../src/architecture-geometry.ts';
 import { photoInteriorGeometry, photoInteriorPlacements } from '../src/photo-interior-geometry.ts';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
@@ -21,9 +22,9 @@ const cast=(target,p,y,d,far)=>new THREE.Raycaster(new THREE.Vector3(p[0],y,p[1]
 const mesh=(g,extruded=false,side=THREE.DoubleSide)=>{const m=new THREE.Mesh(g,side===THREE.FrontSide?frontMaterial:material);if(extruded){m.rotation.x=-Math.PI/2;m.position.y=.12;}m.updateMatrixWorld();return m;};
 function model(floorHeight=3.6,cutoff,source=theatre,side=THREE.DoubleSide) {
   const info=buildingLevels(source,{floorHeight}),geometries=info.sections.map(section=>buildingGeometry(section,Math.min(section.height,cutoff??Infinity),floorHeight,
-    source.groundPassages,source.floorCorridors.filter(c=>c.partId===section.id),[],section.classroomWindows??source.classroomWindows,source.solidCores?.filter(c=>c.partId===section.id),source.cutouts?.filter(c=>c.partId===section.id),cutoff!==undefined&&cutoff<=section.height+1e-6));
+    source.groundPassages,source.floorCorridors.filter(c=>c.partId===section.id),[],section.classroomWindows??source.classroomWindows,source.solidCores?.filter(c=>c.partId===section.id),source.cutouts?.filter(c=>c.partId===section.id),cutoff!==undefined&&cutoff<=section.height+1e-6,source===baseline?undefined:theatreBodyWindows(source,section,Math.min(section.height,cutoff??Infinity),floorHeight)));
   const group=new THREE.Group();geometries.forEach(g=>group.add(mesh(g,true,side)));group.updateMatrixWorld();
-  const glazing=teachingWindowGeometry(source,info.sections,floorHeight,cutoff);
+  const glazing=source===baseline?teachingWindowGeometry(source,info.sections,floorHeight,cutoff):theatreGlazingGeometry(source,info.sections,floorHeight,cutoff);
   const furniture=photoInteriorGeometry(source,info.height,floorHeight,cutoff);
   return {info,group,geometries,glass:mesh(glazing.glass),frames:mesh(glazing.frames),furniture,dispose(){geometries.forEach(g=>g.dispose());Object.values(glazing).forEach(g=>g.dispose());furniture.forEach(b=>b.geometry.dispose());}};
 }
@@ -62,16 +63,24 @@ test('the west-facing fifth-floor gallery has a solid art wall on the left and t
   }
 });
 
-test('normal lower and sixth-storey facades match the original building and the mistaken east outside wall stays absent',()=>{
+test('normal south facades outside the widened curved passage match the original building and the mistaken east outside wall stays absent',()=>{
   const savedMain=baseline.parts.find(p=>p.id==='main'),main=theatre.parts.find(p=>p.id==='main');
   assert.equal(main.openEdgesStartFloor,5);assert.equal(main.openEdgesEndFloor,5);
   assert.deepEqual(theatre.parts.find(p=>p.id==='laboratory-connection'),baseline.parts.find(p=>p.id==='laboratory-connection'),'The complete original four-storey connector is restored');
-  assert.deepEqual(main.outer,savedMain.outer);assert.deepEqual(main.holes,savedMain.holes);assert.equal(main.floors,savedMain.floors);
+  assert.deepEqual(main.outer.slice(0,5),savedMain.outer.slice(0,5),'The complete original south outline remains');assert.deepEqual(main.outer.slice(-3),savedMain.outer.slice(-3),'The west join outline remains');assert.deepEqual(main.holes,savedMain.holes);assert.equal(main.floors,savedMain.floors);
   for(const floorHeight of [2.4,3.6,4.2]) {
     const lower=model(floorHeight,4*floorHeight),originalLower=model(floorHeight,4*floorHeight,baseline),built=model(floorHeight),original=model(floorHeight,undefined,baseline);
     try {
-      for(let i=0;i<lower.geometries.length;i++)assert.deepEqual(lower.geometries[i].attributes.position.array,originalLower.geometries[i].attributes.position.array,'Every lower-four-storey body vertex matches the448e5e7 baseline');
-      const lines=[...baseline.outer.slice(1).map((b,i)=>[baseline.outer[i],b]),[savedMain.outer[2],savedMain.outer[3]]];
+      assert.deepEqual(lower.geometries[1].attributes.position.array,originalLower.geometries[1].attributes.position.array,'Every unchanged laboratory-connector vertex matches the448e5e7 baseline');
+      const lines=[...savedMain.outer.slice(1,5).map((b,i)=>[savedMain.outer[i],b]),...savedMain.outer.slice(-2).map((b,i)=>[savedMain.outer[savedMain.outer.length-3+i],b])];
+      for(const [a,b] of lines.slice(0,4)) {
+        const dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),normal=[-dz/length,dx/length];
+        for(const t of [.13,.37,.61,.83])for(let floor=0;floor<4;floor++) {
+          const p=[a[0]+dx*t-normal[0]*.6,a[1]+dz*t-normal[1]*.6],y=.12+(floor+.5)*floorHeight;
+          const distances=target=>[...new Set(cast(target,p,y,normal,1.2).map(hit=>Math.round(hit.distance*1e4)))];
+          assert.deepEqual(distances(lower.group),distances(originalLower.group),'The unchanged south outside walls remain closed on every lower storey');
+        }
+      }
       for(const [a,b] of lines) {
         const dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),normal=[-dz/length,dx/length];
         for(const t of [.13,.37,.61,.83])for(const rise of [.2,.45,.72,.92]) {

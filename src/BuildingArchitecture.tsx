@@ -9,6 +9,8 @@ import { laboratoryLayout, laboratoryWindows } from './laboratory-geometry';
 import { cafeteriaLowerProfile, cafeteriaLowerWindowsConfig, cafeteriaUpperWindows, dormitoryProfile } from './facade-geometry';
 import { TEACHING_ID, teachingDetailGeometry } from './teaching-details';
 import { teachingClassroomFurniture } from './teaching-classroom-furniture';
+import { theatreEntranceGeometry, theatreGlazingGeometry } from './theatre-exterior-geometry';
+import { THEATRE_ID } from './venue-geometry';
 import DormitoryEntrance from './DormitoryEntrance';
 import { OFFICE_ID, LIBRARY_ID, libraryAnnexWindowsConfig } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
@@ -31,6 +33,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   const stairs = useMemo(() => teachingStairGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
   const windows = useMemo(() => {
     const visibleHeight = Math.min(Math.max(...sections.map(section => section.height)), cutawayHeight ?? Infinity);
+    if (building.id === THEATRE_ID) return theatreGlazingGeometry(building, sections, floorHeight, cutawayHeight);
     if (building.id === STAND_OFFICE_ID) return classroomGlazingGeometry(standOfficeWindows(building, visibleHeight, floorHeight), building.classroomWindows);
     if (building.id === OFFICE_ID) return classroomGlazingGeometry(officeWindowLayout(building, visibleHeight, floorHeight, Math.max(...sections.map(section => section.floors))).filter(window => !window.curvedOffice), building.classroomWindows);
     if (building.facade?.type === 'laboratory') return classroomGlazingGeometry(laboratoryWindows(building, visibleHeight, floorHeight), building.classroomWindows);
@@ -49,6 +52,8 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
     return teachingWindowGeometry(building, building.id === LIBRARY_ID ? sections.filter(section => section.id !== 'curved-annex') : sections, floorHeight, cutawayHeight);
   }, [building, sections, floorHeight, cutawayHeight]);
   const annexWindows = useMemo(() => building.id === LIBRARY_ID ? teachingWindowGeometry({ ...building, classroomWindows: libraryAnnexWindowsConfig(building, floorHeight) }, sections.filter(section => section.id === 'curved-annex'), floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
+  const theatreEntry = useMemo(() => building.id === THEATRE_ID ? theatreEntranceGeometry(building, floorHeight, cutawayHeight) : undefined, [building, floorHeight, cutawayHeight]);
+  useEffect(() => () => { if (theatreEntry) Object.values(theatreEntry).forEach(geometry => geometry.dispose()); }, [theatreEntry]);
   const elevator = useMemo(() => teachingElevatorGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
   const teaching = useMemo(() => building.id === TEACHING_ID ? teachingDetailGeometry(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
   const furniture = useMemo(() => building.id === TEACHING_ID ? teachingClassroomFurniture(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
@@ -70,6 +75,12 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
   // The roof remains visible at campus scale; only small rail details fade away.
   return <group>
     {building.facade?.lobbyEntry && <DormitoryEntrance building={building} visibleHeight={cutawayHeight} />}
+    {theatreEntry && <>
+      <mesh geometry={theatreEntry.concrete}><meshStandardMaterial color={material('trim', '#d7d2c3')} roughness={.95} /></mesh>
+      <mesh geometry={theatreEntry.glass} raycast={() => null}><meshStandardMaterial color={material('glass', '#a4bfbd')} roughness={.3} transparent opacity={.25} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+      <mesh geometry={theatreEntry.frames} raycast={() => null}><meshStandardMaterial color={material('frame', '#aab5b2')} roughness={.55} metalness={.35} /></mesh>
+      <mesh geometry={theatreEntry.rails} raycast={() => null}><meshStandardMaterial color={material('rail', '#90999b')} roughness={.65} metalness={.3} /></mesh>
+    </>}
     {teaching && <>
       <mesh geometry={teaching.columns} raycast={() => null}><meshStandardMaterial color={material('trim', '#c5c9be')} roughness={.95} /></mesh>
       <mesh geometry={teaching.paving} raycast={() => null}><meshStandardMaterial color={mapColor('#bda995')} roughness={1} /></mesh>

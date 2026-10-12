@@ -82,28 +82,29 @@ test('the windowed stair room stays separate from its neighbor and clear of the 
   shape.dispose(); model.material.dispose(); Object.values(glazing).forEach(g => g.dispose()); frames.material.dispose(); glass.material.dispose();
 });
 
-test('only the stair enclosure protrudes above the sixth-floor roof, with an open shaft and a usable roof exit', () => {
+test('the square stair roof room expands toward the courtyard while its separate lower neighbor stays unchanged', () => {
   const info = buildingLevels(building, site.buildingOverrides[building.id]), section = info.sections.find(s => s.id === stair.partId);
   const geometry = body(info), model = mesh(geometry, true), roof = .12 + section.height;
   const top = down(model, point(.4, 0, roof + 5));
-  assert.ok(top && Math.abs(top.point.y - roof - stair.roofAccess.height) < 1e-4, 'The small top room covers only the stair room');
+  assert.ok(top && Math.abs(top.point.y - roof - stair.roofAccess.height) < 1e-4, 'The top room rises 3.6 metres above the original wing roof');
   const landing = down(model, point(.4, 0, roof + 1));
   assert.ok(landing && Math.abs(landing.point.y - roof - .25) < 1e-4, 'The roof landing meets the final flight');
   const shaft = down(model, point(2, 0, roof + .15));
   assert.ok(shaft && Math.abs(shaft.point.y - .37) < 1e-4, 'The original roof slab does not cap the ascent');
   const center = room.outer.slice(0, -1).reduce((p, q) => [p[0] + q[0] / 4, p[1] + q[1] / 4], [0, 0]);
   const neighbor = down(model, new THREE.Vector3(center[0], roof + 5, center[1]));
-  assert.ok(neighbor && Math.abs(neighbor.point.y - roof) < 1e-4, 'The adjacent room retains its original roof height');
+  assert.ok(neighbor && Math.abs(neighbor.point.y - roof) < 1e-4, 'The separate room below the green box keeps its original roof rather than being included in the expansion');
   const forward = new THREE.Vector3(frame.along[0], 0, frame.along[1]);
   for (const edge of stair.roofAccess.openEdges) {
-    const [a, b] = [enclosure.outer[edge], enclosure.outer[edge + 1]];
+    const outer=stair.roofAccess.footprint.outer;
+    const [a, b] = [outer[edge], outer[edge + 1]];
     const exit = new THREE.Vector3((a[0] + b[0]) / 2, roof + 1.3, (a[1] + b[1]) / 2);
     assert.equal(new THREE.Raycaster(exit.addScaledVector(forward, -.6), forward, 0, 1.2).intersectObject(model).length, 0, 'The whole rear side stays open at the roof landing');
   }
   const vertices = geometry.getAttribute('position');
-  const bounds = enclosure.outer.reduce((b, p) => [Math.min(b[0], p[0]), Math.max(b[1], p[0]), Math.min(b[2], p[1]), Math.max(b[3], p[1])], [Infinity, -Infinity, Infinity, -Infinity]);
+  const bounds = stair.roofAccess.footprint.outer.reduce((b, p) => [Math.min(b[0], p[0]), Math.max(b[1], p[0]), Math.min(b[2], p[1]), Math.max(b[3], p[1])], [Infinity, -Infinity, Infinity, -Infinity]);
   for (let i = 0; i < vertices.count; i++) if (vertices.getZ(i) > section.height + 1e-4) {
-    assert.ok(vertices.getX(i) >= bounds[0] - 1e-4 && vertices.getX(i) <= bounds[1] + 1e-4 && -vertices.getY(i) >= bounds[2] - 1e-4 && -vertices.getY(i) <= bounds[3] + 1e-4, 'No neighboring building volume rises above the roof');
+    assert.ok(vertices.getX(i) >= bounds[0] - 1e-4 && vertices.getX(i) <= bounds[1] + 1e-4 && -vertices.getY(i) >= bounds[2] - 1e-4 && -vertices.getY(i) <= bounds[3] + 1e-4, 'Only the marked extended top room rises above the roof');
   }
   geometry.dispose(); model.material.dispose();
   for (const floor of [3, 6]) {

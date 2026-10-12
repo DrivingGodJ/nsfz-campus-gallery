@@ -233,11 +233,12 @@ function corridorGeometry(section: Section, height: number, floorHeight: number,
     // clipping differences before subtracting adjacent layers for their caps.
     return { bottom, top, footprint: hasShell || cutaway ? snapFootprint(footprint) : footprint, slab };
   });
-  // A roof exit is confined to its stair enclosure. The adjacent classrooms
-  // keep their original roof, while the last flight reaches a small top room.
+  // A separately calibrated top room may reach the building edge while its
+  // ordinary storeys and the last flight retain their original stair opening.
   const accesses = roofStairs.map(stair => {
-    const polygon = [stair.opening.outer, ...stair.opening.holes], access = stair.roofAccess!;
-    const openEdges = access.openEdges.map(edge => ({ from: stair.opening.outer[edge], to: stair.opening.outer[edge + 1] }));
+    const access = stair.roofAccess!, footprint = access.footprint ?? stair.opening;
+    const polygon = [footprint.outer, ...footprint.holes];
+    const openEdges = access.openEdges.map(edge => ({ from: footprint.outer[edge], to: footprint.outer[edge + 1] }));
     const shell = snapFootprint(classroomWallFootprint([polygon], .28, snapFootprint, openEdges));
     return { polygon, shell, shaft: [stairwellShaft(stair).outer], top: height + access.height };
   });

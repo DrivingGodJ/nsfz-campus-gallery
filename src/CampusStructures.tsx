@@ -5,9 +5,10 @@ import { memo, useEffect, useMemo, useRef, type ReactNode, type RefObject } from
 import * as THREE from 'three';
 import type { Building, BuildingOverride, Feature, Point, Shape } from './types';
 import { bridgeHeight, bridgeSurfaceHeight, curvedStairPoint, curvedStairTreads, entrancePortalLayout, straightStairTreads } from './structure-geometry';
-import { undergroundFootprints, undergroundLayout, type PassageOpening } from './underground-geometry';
+import { undergroundFootprints, undergroundLayout, undergroundCeilingSections, type PassageOpening } from './underground-geometry';
 import { undergroundBoundaryLines, undergroundVolume, undergroundMaterialView, undergroundViewMode, undergroundPartVisible, type UndergroundViewSpace, type UndergroundInspectionMode } from './underground-mesh';
 import { undergroundDetailGeometry, UNDERGROUND_COLORS } from './underground-details';
+import UndergroundRails from './UndergroundRails';
 import { BRIDGE_DECK_THICKNESS, bridgeLayout, bridgeSupports, type RailPoint } from './bridge-geometry';
 import { bridgeRailGeometry } from './bridge-rail-geometry';
 import { bridgeNetGeometry } from './bridge-net-geometry';
@@ -174,7 +175,7 @@ function Entrance({ feature, underground, mode, photoPerspective, labelPortal, s
     return below < 0 ? [] : chain.slice(Math.max(0, below - 1));
   }).filter(chain => chain.length > 1);
   const steps = <>
-    {!photoPerspective && <BridgeRails chains={belowRails} smooth />}
+    {!photoPerspective && <UndergroundRails chains={belowRails} />}
     <mesh userData={{undergroundPlanOnly:true}} rotation={[-Math.PI / 2, 0, 0]} position={[0, .14, 0]}><shapeGeometry args={[opening]} /><meshStandardMaterial color={mapColor('#6b8174')} transparent opacity={.12} depthWrite={false} side={THREE.DoubleSide} /></mesh>
     {treads.map((tread, i) => <group key={i}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, tread.height - .16, 0]} renderOrder={25}><extrudeGeometry args={[tread.shape, { depth: .16, bevelEnabled: false }]} /><meshStandardMaterial color={mapColor(i % 2 ? '#b2ae95' : '#c8c2a8')} roughness={1} transparent opacity={.25} depthTest={false} depthWrite={false} /></mesh>
@@ -193,7 +194,7 @@ function Entrance({ feature, underground, mode, photoPerspective, labelPortal, s
         {[a, b].map((p, i) => <mesh key={i} position={[p[0], (roof + p[1]) / 2, p[2]]}><boxGeometry args={[.13, roof - p[1], .13]} /><meshStandardMaterial color={mapColor('#788d87')} roughness={.75} /></mesh>)}
       </group>;
     })}
-    <BridgeRails chains={photoPerspective && underground ? rails : surfaceRails} smooth />
+    <UndergroundRails chains={photoPerspective && underground ? rails : surfaceRails} />
     </MapModelLayer>
     {underground && below ? below : <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .14, 0]}><shapeGeometry args={[opening]} /><meshStandardMaterial color={mapColor('#6b8174')} transparent opacity={.48} depthWrite={false} side={THREE.DoubleSide} /></mesh>}
     {!feature.hideLabel && feature.name && <LocationHtml portal={labelPortal} position={[top[0], top[1] + markerSize + 1.5, top[2]]} center zIndexRange={[5, 1]}><LocationName id={feature.id} name={feature.name} underground /></LocationHtml>}
@@ -206,7 +207,7 @@ function UndergroundDetails({ feature, footprint, openings }: { feature: Feature
   const geometry = useMemo(() => undergroundDetailGeometry(feature, [footprint], openings), [feature, footprint, openings]);
   useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
   return <group>{Object.entries(geometry).map(([kind, part]) => <mesh key={kind} userData={{undergroundCeiling:kind === 'ceiling' || kind === 'skylights',undergroundSurface:kind==='podium'||kind==='skylights'}} geometry={part} renderOrder={kind === 'floor' || kind === 'green' ? 23 : 25}>
-    <meshStandardMaterial color={mapColor(UNDERGROUND_COLORS[kind as keyof typeof UNDERGROUND_COLORS])} roughness={kind === 'floor' || kind === 'green' ? .48 : .85}
+    <meshStandardMaterial color={mapColor(UNDERGROUND_COLORS[kind as keyof typeof UNDERGROUND_COLORS])} metalness={kind === 'rails' ? .72 : 0} roughness={kind === 'rails' ? .3 : kind === 'floor' || kind === 'green' ? .48 : .85}
       emissive={kind === 'lights' ? mapColor('#ede2be') : '#000000'} emissiveIntensity={kind === 'lights' ? .25 : 0}
       userData={{undergroundGhostOpacity:kind === 'glass' || kind === 'skylights' ? .28 : kind === 'nets' ? .38 : kind === 'ceiling' ? .22 : .75,undergroundTranslucent:kind==='glass'||kind==='skylights'||kind==='nets'}}
       transparent opacity={kind === 'glass' || kind === 'skylights' ? .28 : kind === 'nets' ? .38 : kind === 'ceiling' ? .22 : .75} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
@@ -218,11 +219,14 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
   const corridor = feature.type === 'undergroundCorridor' || feature.type === 'tunnelJunction', tunnel = feature.type === 'tunnel';
   const color = tunnel ? '#d8c6a7' : corridor ? '#bad0c3' : '#bdcedf';
   const lineColor = tunnel ? '#ad9879' : corridor ? '#8faa99' : '#91a7bf';
-  const shapes = useMemo(() => (footprints || undergroundFootprints(feature, connections)).map(footprint => {
+  const floorShapes = useMemo(() => footprints || undergroundFootprints(feature, connections), [feature, connections, footprints]);
+  const sections = useMemo(() => undergroundCeilingSections(feature, floorShapes, openings), [feature, floorShapes, openings]);
+  const viewSections = useMemo(() => sections.map(section => ({floor,height:section.height,footprints:section.footprints})), [floor, sections]);
+  const shapes = useMemo(() => sections.flatMap(section => section.footprints.map(footprint => {
     const shape = new THREE.Shape(footprint.outer.map(([x, z]) => new THREE.Vector2(x, -z)));
     shape.holes = footprint.holes.map(ring => new THREE.Path(ring.map(([x, z]) => new THREE.Vector2(x, -z))));
-    return { footprint, shape, volume: undergroundVolume(footprint, wallHeight, openings, true), boundaries: undergroundBoundaryLines(footprint, openings) };
-  }), [feature, connections, footprints, openings, wallHeight]);
+    return { footprint, shape, height: section.height, volume: undergroundVolume(footprint, section.height, section.openings, true), boundaries: undergroundBoundaryLines(footprint, section.openings) };
+  })), [sections]);
   useEffect(() => () => shapes.forEach(item => item.volume.dispose()), [shapes]);
   const labelPosition = (item: Feature): [number, number, number] => {
     const points = item.points || item.outer!.slice(0, -1);
@@ -232,21 +236,23 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
     return [center[0], floor + wallHeight + 2, center[1]];
   };
   return <group>
-    {shapes.map(({ footprint, shape, volume, boundaries }, n) => {
-      const model = <UndergroundView space={{floor,height:wallHeight,footprints:[footprint]}} spaces={spaces} mode={mode} photoPerspective={photoPerspective}>
+    {shapes.map(({ footprint, shape, height, volume, boundaries }, n) => {
+      const model = <UndergroundView space={{floor,height,footprints:[footprint]}} spaces={spaces} mode={mode} photoPerspective={photoPerspective}>
       <mesh geometry={volume} userData={{undergroundPlanVolume:true}} position={[0, floor, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={22}><meshStandardMaterial color={mapColor(color)} userData={{undergroundGhostOpacity:.1}} side={THREE.DoubleSide} transparent opacity={.1} depthTest={false} depthWrite={false} /></mesh>
       <mesh userData={{undergroundPlanOnly:true}} position={[0, floor + .04, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={23}><shapeGeometry args={[shape]} /><meshBasicMaterial color={mapColor(color)} userData={{undergroundGhostOpacity:.24}} side={THREE.DoubleSide} transparent opacity={.24} depthTest={false} depthWrite={false} /></mesh>
       <group userData={{undergroundPlanOnly:true}}>{boundaries.map((ring, i) => <Line key={i} points={ring.map(([x, z]) => [x, floor + .08, z])} color={mapColor(lineColor)} lineWidth={1.2} transparent opacity={.7} dashed dashSize={2} gapSize={1} depthTest={false} depthWrite={false} renderOrder={24} />)}</group>
-      <UndergroundDetails feature={feature} footprint={footprint} openings={openings} />
       </UndergroundView>;
       return <group key={n}>{model}</group>;
     })}
+    <UndergroundView space={{floor,height:wallHeight,footprints:floorShapes,sections:viewSections}} spaces={spaces} mode={mode} photoPerspective={photoPerspective}>
+      {floorShapes.map((footprint, n) => <UndergroundDetails key={n} feature={feature} footprint={footprint} openings={openings} />)}
+    </UndergroundView>
     {(mode === 'underground' || photoPerspective) && [feature, ...connections].filter(item => !item.hideLabel && item.name?.trim()).map(item => <LocationHtml key={item.id} portal={labelPortal} position={labelPosition(item)} center zIndexRange={[5, 1]}><LocationName id={item.id} name={item.name!} underground /></LocationHtml>)}
   </group>;
 }
 export default memo(function CampusStructures({ features, buildings, overrides, underground, labelPortal, mode = 'surface', photoPerspective = false }: { features: Feature[]; buildings: Building[]; overrides: Record<string, BuildingOverride>; underground: boolean; labelPortal: RefObject<HTMLDivElement>; mode?: UndergroundInspectionMode; photoPerspective?: boolean }) {
   const layout = useMemo(() => undergroundLayout(features), [features]);
-  const spaces=useMemo(()=>[...layout.areas.values()].map(area=>({floor:area.feature.height??-3,height:area.feature.wallHeight||2.4,footprints:area.footprints})),[layout]);
+  const spaces=useMemo(()=>[...layout.areas.values()].flatMap(area=>undergroundCeilingSections(area.feature,area.footprints,area.openings).map(section=>({floor:area.feature.height??-3,height:section.height,footprints:section.footprints}))),[layout]);
   return <>{features.map(feature => {
     const surface = (children: ReactNode) => <MapModelLayer key={feature.id} underground={mode === 'underground' && !photoPerspective}>{children}</MapModelLayer>;
     if (feature.type === 'fence' && feature.railEdges) return surface(<StreetFence feature={feature} />);

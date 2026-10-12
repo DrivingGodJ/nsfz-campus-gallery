@@ -55,7 +55,8 @@ test('the southwest upper room opens into the expanded joining classroom while t
   ], 'The whole marked room has four sides without the former projecting north notch');
   assert.deepEqual(room.openEdges, [3], 'The shared end opens toward the newly moved classroom partition');
   assert.equal(room.door, undefined, 'The unsupported new doorway is removed');
-  assert.deepEqual(room.classroomWindows, building.classroomWindows, 'The room uses its existing ordinary classroom window calibration');
+  const upperConfig={...building.classroomWindows};delete upperConfig.groundBlindFacadeLines;
+  assert.deepEqual(room.classroomWindows, upperConfig, 'The upper room retains its ordinary calibration without the separate first-floor exception');
   const original = JSON.stringify(building), meshes = bodies();
   const windows = solidCoreWindowLayout([room], main.height, info.floorHeight);
   const glazing = teachingWindowGeometry(building, info.sections, info.floorHeight);
@@ -67,7 +68,7 @@ test('the southwest upper room opens into the expanded joining classroom while t
       assert.equal(ground.intersectObjects(meshes).length, 0, `The former room wall is absent on floor one, edge ${edge}`);
       assert.equal(ground.intersectObjects([glass, frames]).length, 0, `No upper-room glazing descends into floor one or its road, edge ${edge}`);
     }
-    assert.ok(windows.length >= 12 && windows.every(window => window.bottom >= info.floorHeight));
+    assert.ok(windows.length === 8 && windows.every(window => window.bottom >= info.floorHeight));
     for (let floor = 2; floor <= main.floors; floor++) {
       for (let edge = 0; edge < room.outer.length - 1; edge++) for (const fraction of [.15, .5, .85]) {
         const ray = crossing(room.outer[edge], room.outer[edge + 1], BASE + (floor - 1) * info.floorHeight + .65, fraction);
@@ -75,7 +76,7 @@ test('the southwest upper room opens into the expanded joining classroom while t
         else assert.ok(ray.intersectObjects(meshes).length, `Floor ${floor} has real sill masonry along room edge ${edge}, t=${fraction}`);
       }
       const floorWindows = windows.filter(window => window.bottom > (floor - 1) * info.floorHeight && window.top < floor * info.floorHeight);
-      assert.ok(floorWindows.length >= 3, `The three retained window faces remain on floor ${floor}; the connecting end is now a blank wall`);
+      assert.equal(floorWindows.length, 2, `Floor ${floor} retains its north and south windows; the atrium-facing west-side wall is opaque`);
       for (const window of floorWindows) {
         const ray = crossing(window.from, window.to, BASE + (window.bottom + window.top) / 2);
         assert.equal(ray.intersectObjects(meshes).length, 0, `Floor ${floor} glazing has an actual wall aperture`);

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import polygonClipping from 'polygon-clipping';
 import { gymRoofHeight } from './architecture-geometry.ts';
 import { gymFrame, gymStairLayout } from './gym-interior.ts';
+import { theatreEntranceLayout } from './theatre-exterior-geometry.ts';
 import { buildingGeometry } from './building-geometry.ts';
 import type { Building, GroundPassage, Point, Shape } from './types';
 
@@ -140,12 +141,15 @@ export function theatreInteriorLayout(building: Building, floorHeight: number) {
   // DSC2649 confirms a raked auditorium and overhead balcony; dimensions and
   // unseen stage depth are estimated, inside the unchanged main section.
   const section = building.parts?.find(part => part.id === 'main') ?? building;
-  const sideA = section.outer[18], sideB = section.outer[19];
+  const terrace = building.parts?.find(part => part.id === 'curved-terrace');
+  const sideA = terrace?.outer.at(-3) ?? section.outer[18], sideB = terrace?.outer.at(-2) ?? section.outer[19];
+  const innerWall = terrace ? terrace.outer.slice(terrace.roofTerrace!.railEdges[0].length + 4, -1) : section.outer.slice(9, 20);
+  const innerDoor = theatreEntranceLayout(building, floorHeight).innerDoor;
   const direction = new THREE.Vector2(sideA[0] - sideB[0], sideA[1] - sideB[1]).normalize();
   const across: Point = [direction.x, direction.y], along: Point = [direction.y, -direction.x];
   const origin: Point = [49.5, -36];
   const at = (u: number, v: number): Point => [origin[0] + along[0] * u + across[0] * v, origin[1] + along[1] * u + across[1] * v];
-  return { at, along, across, floor: floorHeight + .25, rows: 14, firstRadius: 8.5, rowDepth: .9, halfWidth: 11.5, rowRise: .105, section };
+  return { at, along, across, floor: floorHeight + .25, rows: 14, firstRadius: 8.5, rowDepth: .9, halfWidth: 11.5, rowRise: .105, section, innerWall, innerDoor };
 }
 
 export function theatreInteriorGeometry(building: Building, height: number, floorHeight: number, cutawayHeight?: number) {
@@ -190,10 +194,12 @@ export function theatreInteriorGeometry(building: Building, height: number, floo
       }
     }
     // Horizontal timber absorption bands stay just inside the curved room wall.
-    for (let edge = 9; edge < 19; edge++) {
-      const a = layout.section.outer[edge], b = layout.section.outer[edge + 1], midpoint: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    for (let edge = 0; edge < layout.innerWall.length - 1; edge++) {
+      const a = layout.innerWall[edge], b = layout.innerWall[edge + 1], midpoint: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
       const toward = new THREE.Vector2(51 - midpoint[0], -24 - midpoint[1]).normalize().multiplyScalar(.35);
-      for (let band = 0; band < 6; band++) add(wood, bar([a[0] + toward.x, BASE + floor + .65 + band * .32, a[1] + toward.y], [b[0] + toward.x, BASE + floor + .65 + band * .32, b[1] + toward.y], .2, shown));
+      const runs: [Point, Point][] = edge === 0
+        ? [[a, layout.innerDoor.from], [layout.innerDoor.to, b]] : [[a,b]];
+      for (const [from,to] of runs) for (let band = 0; band < 6; band++) add(wood, bar([from[0] + toward.x, BASE + floor + .65 + band * .32, from[1] + toward.y], [to[0] + toward.x, BASE + floor + .65 + band * .32, to[1] + toward.y], .2, shown));
     }
     const balcony = 2 * floorHeight + .25;
     if (shown > balcony + .001) {

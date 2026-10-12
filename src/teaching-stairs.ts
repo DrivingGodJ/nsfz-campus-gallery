@@ -60,7 +60,8 @@ export function teachingStairGeometry(building: Building, sections: Section[], f
     // Rounded enclosures keep their surveyed outline. Clip each tread and
     // landing to the inside of its walls instead of leaving side walking gaps.
     const polygon = [stair.opening.outer, ...stair.opening.holes];
-    const openEdges = (stair.roofAccess?.openEdges || []).map(edge => ({ from: stair.opening.outer[edge], to: stair.opening.outer[edge + 1] }));
+    const enclosure = building.solidCores?.find(core => core.partId === stair.partId && JSON.stringify(core.outer) === JSON.stringify(stair.opening.outer));
+    const openEdges = (enclosure?.openEdges ?? stair.roofAccess?.openEdges ?? []).map(edge => ({ from: stair.opening.outer[edge], to: stair.opening.outer[edge + 1] }));
     const wallFootprint = stair.followWalls ? classroomWallFootprint([polygon], .28, undefined, openEdges) : [];
     const interior = stair.followWalls ? polygonClipping.difference(polygon, wallFootprint) : [];
     const point = (u: number, v: number, y: number): Vector => { const [x, z] = at(u, v); return [x, BASE + y, z]; };

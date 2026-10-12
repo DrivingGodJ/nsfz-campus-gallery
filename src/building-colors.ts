@@ -92,15 +92,17 @@ export function theatreDrumTexture(body: string, drum: string) {
 
 // Only reassign the existing upper exterior wall triangles. Position, normal,
 // triangle order and photo occlusion masks remain unchanged, including cuts.
-export function theatreDrumMaterials(geometry: THREE.BufferGeometry, section: Shape & { id: string }, floorHeight: number) {
+export function theatreDrumMaterials(geometry: THREE.BufferGeometry, section: Shape & { id: string }, floorHeight: number, building?: Building) {
   if (section.id !== 'main') return geometry;
   const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), index = geometry.getIndex();
   if (!positions?.count || !normals) return geometry;
   const bottom = 4 * floorHeight, repeat = 3.3, uv = geometry.getAttribute('uv');
   const coordinates = uv ? Float32Array.from(uv.array) : new Float32Array(positions.count * 2);
   let distance = 0;
-  const edges = section.outer.slice(9, 19).map((from, i) => {
-    const to = section.outer[i + 10], dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz), start = distance;
+  const terrace = building?.parts?.find(part => part.id === 'curved-terrace');
+  const arc = terrace ? terrace.outer.slice(terrace.roofTerrace!.railEdges[0].length + 4, -1) : section.outer.slice(9, 20);
+  const edges = arc.slice(0, -1).map((from, i) => {
+    const to = arc[i + 1], dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz), start = distance;
     distance += length;
     return { from, dx, dz, length, start };
   });

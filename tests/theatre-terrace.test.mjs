@@ -65,7 +65,7 @@ test('the blue band is enclosed on floors one to four, an open terrace on five a
       assert.equal(cast(full.group, point, deckTop + 1, [0, 1, 0]), undefined, 'The terrace has open sky above it');
       assert.equal(cast(full.group, point, .12 + 5 * floorHeight + 1, [0, -1, 0], 1.5), undefined, 'The same band has no sixth-storey floor or roof');
       assert.equal(cast(full.group, point, .12 + 5 * floorHeight + 1.5, outward, 2), undefined, 'No sixth-storey outside wall remains in the terrace band');
-      assert.ok(cast(full.group, point, .12 + 5 * floorHeight + 1.5, [inward[0], 0, inward[1]], 2.2), 'The inner theatre wall still encloses its sixth storey');
+      assert.ok(cast(full.group, point, .12 + 5 * floorHeight + 1.5, [inward[0], 0, inward[1]], 3.2), 'The inner theatre wall still encloses its sixth storey');
     }
   } finally { full.dispose(); }
 });

@@ -3,10 +3,11 @@ import type { Point, Shape } from './types';
 import type { PassageOpening } from './underground-geometry';
 import { pointOnStairTread } from './structure-geometry.ts';
 
-export type UndergroundViewSpace = { floor: number; height: number; footprints: Shape[] };
+export type UndergroundViewSpace = { floor: number; height: number; footprints: Shape[]; sections?: UndergroundViewSpace[] };
 export type UndergroundInspectionMode = 'surface' | 'underground';
 export type UndergroundMaterialView = 'inside' | 'nearby' | 'plan' | 'surface' | 'overview';
-export function undergroundCameraInside(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace) {
+export function undergroundCameraInside(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace): boolean {
+  if (space.sections) return space.sections.some(section => undergroundCameraInside(camera, section));
   return camera.y >= space.floor - .02 && camera.y < space.floor + space.height - .025 && space.footprints.some(shape => pointOnStairTread([camera.x,camera.z],shape.outer) && !shape.holes.some(hole=>pointOnStairTread([camera.x,camera.z],hole)));
 }
 export function undergroundViewMode(camera: { x: number; y: number; z: number }, space: UndergroundViewSpace, _spaces: UndergroundViewSpace[], mode: UndergroundInspectionMode, photoPerspective = false): UndergroundMaterialView {

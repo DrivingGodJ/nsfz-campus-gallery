@@ -148,7 +148,7 @@ export function bridgeRailPosts(chains: RailPoint[][], spacing = 3, smooth = fal
       }
       walked += length;
     }
-    if (Math.hypot(...chain.at(-1)!.map((n, j) => n - posts.at(-1)![j])) < .3) posts.pop();
+    if (Math.hypot(...chain.at(-1)!.map((n, j) => n - posts.at(-1)![j])) < Math.min(.3, spacing / 4)) posts.pop();
     posts.push(chain.at(-1)!); return posts;
   });
   const posts = new Map<string, RailPoint>();
@@ -160,6 +160,6 @@ export function bridgeRailPosts(chains: RailPoint[][], spacing = 3, smooth = fal
     }
   }
   const spaced: RailPoint[] = [];
-  for (const point of posts.values()) if (!spaced.some(existing => Math.hypot(...point.map((n, i) => n - existing[i])) < .3)) spaced.push(point);
+  for (const point of posts.values()) if (!spaced.some(existing => Math.hypot(...point.map((n, i) => n - existing[i])) < Math.min(.3, spacing / 4))) spaced.push(point);
   return spaced;
 }

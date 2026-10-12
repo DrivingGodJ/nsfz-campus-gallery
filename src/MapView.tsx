@@ -36,6 +36,7 @@ import { STANDS_ID, THEATRE_ID, standsArchitecture } from './venue-geometry';
 import { STAND_OFFICE_ID, standOfficeOpenings } from './stand-office-geometry';
 import { GYM_ID, gymArchitecture } from './architecture-geometry';
 import { buildingGeometry } from './building-geometry';
+import { theatreBodyWindows } from './theatre-exterior-geometry';
 import { buildingColors, buildingMaterialColor, buildingRoofMaterials, theatreDrumMaterials, theatreDrumTexture } from './building-colors';
 import { cafeteriaBodyGeometry, dormitoryBodyGeometry } from './facade-geometry';
 import { laboratoryBodyGeometry } from './laboratory-geometry';
@@ -113,10 +114,10 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
       building.stairwells?.filter(stair => stair.partId === section.id), section.classroomWindows ?? (building.id === LIBRARY_ID && section.id === 'curved-annex' ? libraryAnnexWindowsConfig(building, info.floorHeight) : building.classroomWindows),
       building.solidCores?.filter(core => core.partId === section.id),
       building.cutouts?.filter(cut => cut.partId === section.id), cutaway,
-      building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight, info.floors) : building.id === STAND_OFFICE_ID ? standOfficeOpenings(building, height, info.floorHeight) : undefined);
+      building.id === THEATRE_ID ? theatreBodyWindows(building, section, height, info.floorHeight) : building.id === OFFICE_ID ? officeWindowLayout(building, height, info.floorHeight, info.floors) : building.id === STAND_OFFICE_ID ? standOfficeOpenings(building, height, info.floorHeight) : undefined);
   }).map((geometry, i) => {
     if (colors) buildingRoofMaterials(geometry, cutawayHeight === undefined);
-    return drumTexture ? theatreDrumMaterials(geometry, info.sections[i], info.floorHeight) : geometry;
+    return drumTexture ? theatreDrumMaterials(geometry, info.sections[i], info.floorHeight, building) : geometry;
   }), [building, info, cutawayHeight, gym, stands, colors, drumTexture]);
   useEffect(() => () => { if (!gym && !stands) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym, stands]);
   const height = selected && floor ? Math.min(info.height, floor * info.floorHeight) : info.height;

@@ -108,6 +108,39 @@ export function joinedPassages(incoming: Feature, outgoing: Feature) {
   return { incoming: incomingShape, outgoing: outgoingShape, seam };
 }
 
+// A lower final leg shares the original mitered turn with the high corridor.
+// Its door-height ceiling changes the shell, never the circulation footprint.
+export function undergroundCeilingSections(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = []) {
+  let sections = [{ height: feature.wallHeight || 2.4, footprints, openings }];
+  for (const segment of feature.ceilingSegments || []) {
+    const points = feature.points, edge = segment.edge;
+    if (!points || edge < 0 || edge >= points.length - 1 || segment.height <= 0) continue;
+    const leg = points.slice(edge, edge + 2);
+    // The drawn final centerline stops half a width before the hall wall;
+    // intersect an extended end cap so the lower roof reaches that real door.
+    if (edge === points.length - 2) {
+      const [a, b] = leg, length = Math.hypot(b[0] - a[0], b[1] - a[1]), extend = feature.width || 4;
+      leg[1] = [b[0] + (b[0] - a[0]) / length * extend, b[1] + (b[1] - a[1]) / length * extend];
+    }
+    let zone = passageFootprint(leg, feature.width || 4), seam: PassageOpening | undefined;
+    if (edge > 0) {
+      const joined = joinedPassages({ ...feature, points: points.slice(edge - 1, edge + 1) },
+        { ...feature, points: leg, wallHeight: segment.height });
+      if (joined) { zone = joined.outgoing; seam = joined.seam; }
+    }
+    sections = sections.flatMap(section => {
+      const polygons = section.footprints.map(shape => [shape.outer, ...shape.holes]);
+      const shapes = (value: polygonClipping.MultiPolygon): Shape[] => value.map(([outer, ...holes]) => ({ outer, holes }));
+      const low = shapes(polygonClipping.intersection(polygons, [zone.outer])), high = shapes(polygonClipping.difference(polygons, [zone.outer]));
+      if (seam) seam.height = Math.min(section.height, segment.height) - .12;
+      const cuts = seam ? [...section.openings, seam] : section.openings;
+      return [...(high.length ? [{ ...section, footprints: high, openings: cuts }] : []),
+        ...(low.length ? [{ height: segment.height, footprints: low, openings: cuts }] : [])];
+    });
+  }
+  return sections;
+}
+
 export function undergroundLayout(features: Feature[]) {
   const aligned = new Map<string, Shape>(), openings = new Map<string, PassageOpening[]>();
   for (const exit of features.filter(f => f.type === 'tunnelJunction' && f.points && f.points.length >= 2)) {
