@@ -17,7 +17,6 @@ export const riverBenches: { center: Point; angle: number }[] = [
 ];
 export const riverGardenPaths: Point[][] = [
   [[57.7, 30.3], [61.2, 24.6], [63.4, 18.1], [67, 12.6], [72, 9.1], [77.7, 6.7]],
-  [[66.1, 16.1], [70.2, 14.2], [74.7, 14.3], [79.4, 14.4]],
   // DSC08084: the office-bank path bends along the narrowed river, then
   // rejoins the approach of the smaller arched bridge.
   [[82.852, 7.65], [85.2, 7.57], [87.45, 7.82], [89.37, 9.12],

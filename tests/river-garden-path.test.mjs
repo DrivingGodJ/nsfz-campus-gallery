@@ -22,7 +22,7 @@ test('the marked yellow route joins the two original roads and stays completely 
     const road = campus.features.find(f => f.id === id);
     assert.ok(Math.min(...road.points.slice(1).map((b, i) => Math.hypot(...nearest(point, road.points[i], b).map((n, j) => n - point[j])))) < 1e-6, 'Both ends meet actual road centre-lines');
   }
-  assert.ok(clip.intersection(polygons, shape(passageFootprint(riverGardenPaths[1], 1.2))).length, 'The second unchanged yellow branch stays connected');
+  assert.equal(path.branches, undefined, 'The marked bridge-side spur and its short connector are removed');
   assert.deepEqual(applyCampusCorrections(campus, read('data/campus-corrections.json')), campus);
 });
 
@@ -38,11 +38,11 @@ test('only the three identified obstructing trees are removed, and remaining cro
   for (const feature of campus.features) for (const tree of feature.trees ?? []) assert.ok(distance(tree.position) >= tree.radius + path.width / 2, `${feature.id} crown overlaps the marked route`);
 });
 
-test('the actual yellow mesh follows the new route, removes the old segment, and preserves the other two paths and all bank details', () => {
+test('the actual yellow mesh removes the bridge-side spur while preserving the new route, office-bank path and bank details', () => {
   const before = JSON.stringify(campus), model = riverLandscapeGeometry(campus.features, campus.buildings);
   const legacy = riverLandscapeGeometry(campus.features.filter(f => f.id !== RIVER_GARDEN_PATH_ID), campus.buildings);
   // Suppress the first route inside a real building to obtain the unchanged
-  // second and third routes as rendered meshes, rather than hand-made copies.
+  // office-bank route as a rendered mesh, rather than a hand-made copy.
   const reference = riverLandscapeGeometry(campus.features.map(f => f.id === RIVER_GARDEN_PATH_ID ? {...f,points:[[140,50],[140.1,50]],branches:[]} : f), campus.buildings);
   const material = new THREE.MeshBasicMaterial({side:THREE.DoubleSide}), mesh = new THREE.Mesh(model.paths, material); mesh.updateMatrixWorld();
   const hits = p => new THREE.Raycaster(new THREE.Vector3(p[0],1,p[1]),new THREE.Vector3(0,-1,0),0,2).intersectObject(mesh);
@@ -50,8 +50,9 @@ test('the actual yellow mesh follows the new route, removes the old segment, and
   try {
     for (const p of path.points.filter((_,i) => i%4===0)) if (!otherRoads.some(road => pointOnStairTread(p,road.outer))) assert.ok(hits(p).length, 'Real paint follows every sampled new centre-line');
     for (const p of [[57.7,30.3],[61.2,24.6]]) assert.equal(hits(p).length,0,'Old unmarked route no longer has a yellow floor');
+    for (const p of [[70.2,14.2],[74.7,14.3],[78,14.37]]) assert.equal(hits(p).length,0,'The newly marked bridge-side spur no longer has a yellow floor');
     const remaining = reference.paths.attributes.position.array;
-    assert.deepEqual([...model.paths.attributes.position.array.slice(-remaining.length)],[...remaining], 'The other two yellow paths keep their actual original triangles');
+    assert.deepEqual([...model.paths.attributes.position.array.slice(-remaining.length)],[...remaining], 'The office-bank path keeps its actual original triangles');
     for (const kind of Object.keys(RIVER_COLORS).filter(k => k !== 'paths')) assert.deepEqual([...model[kind].attributes.position.array],[...legacy[kind].attributes.position.array], `Existing ${kind} geometry stays unchanged`);
     assert.equal(JSON.stringify(campus),before);
   } finally { [model,legacy,reference].forEach(parts => Object.values(parts).forEach(g=>g.dispose())); material.dispose(); }
