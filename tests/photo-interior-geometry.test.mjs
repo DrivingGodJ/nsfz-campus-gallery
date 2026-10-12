@@ -112,7 +112,7 @@ test('the marked laboratory art group moves across the driveway into the garage 
   const lab=buildings[2],layout=laboratoryLayout(lab),floorHeight=3.6;
   const items=photoInteriorPlacements(lab).filter(p=>p.source===PHOTO_INTERIOR_EVIDENCE[4].photoId);
   assert.deepEqual(items.map(p=>[p.id,p.floor]),[['art-wall-panel',-1],['leaning-canvas',-1],['paint-pots',-1],['art-gallery-red-pipe',-1]]);
-  for(const [i,[u,v]] of [[58,11],[60.5,10.8],[62,10.8],[57.8,10.8]].entries())assert.deepEqual(items[i].center,layout.at(u,v));
+  for(const [i,[u,v]] of [[49,11],[51.5,10.8],[53,10.8],[48.8,10.8]].entries())assert.deepEqual(items[i].center,layout.at(u,v));
   const along=layout.at(1,0).map((n,i)=>n-layout.at(0,0)[i]);
   assert.deepEqual(items[0].axis,along.map(n=>-n),'The painted front faces back toward the driveway');
   const garage=photoInteriorGeometry(lab,21.6,floorHeight,undefined,true);

@@ -80,14 +80,14 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
   }
   if (building.id === PHOTO_INTERIOR_IDS[2]) {
     const layout = laboratoryLayout(building), a = layout.at(0,0), b = layout.at(1,0), axis: Point = [b[0]-a[0],b[1]-a[1]];
-    // Keep the photographed group on the opposite side of the driveway, below
-    // ground. Reverse its facing so the painted front still faces the driveway.
+    // The retaining wall hides the narrow strip beside the ramp. Keep the group
+    // on the same opposite wall, beyond the ramp's lower end in the open garage.
     const garage = [...(building.groundFloorOpenings || []), ...(building.groundPassages || []).map(passageShape)];
     const floor = building.basement ? -1 : 1, facing: Point = floor < 0 ? [-axis[0],-axis[1]] : axis;
-    add('art-wall-panel',floor,'art-panel',layout.at(58,floor<0?11:3.8),facing,3.6,.1,2.15,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
-    add('leaning-canvas',floor,'canvas',layout.at(60.5,floor<0?10.8:4),facing,1.2,.35,1.6,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
-    add('paint-pots',floor,'paint-pots',layout.at(62,floor<0?10.8:4),facing,1.15,.5,.36,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
-    add('art-gallery-red-pipe',floor,'red-pipe',layout.at(57.8,floor<0?10.8:4),facing,8.7,.12,floor<0?building.basement!.clearHeight-.15:3.3,PHOTO_INTERIOR_EVIDENCE[4].photoId);
+    add('art-wall-panel',floor,'art-panel',layout.at(floor<0?49:58,floor<0?11:3.8),facing,3.6,.1,2.15,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
+    add('leaning-canvas',floor,'canvas',layout.at(floor<0?51.5:60.5,floor<0?10.8:4),facing,1.2,.35,1.6,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
+    add('paint-pots',floor,'paint-pots',layout.at(floor<0?53:62,floor<0?10.8:4),facing,1.15,.5,.36,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
+    add('art-gallery-red-pipe',floor,'red-pipe',layout.at(floor<0?48.8:57.8,floor<0?10.8:4),facing,8.7,.12,floor<0?building.basement!.clearHeight-.15:3.3,PHOTO_INTERIOR_EVIDENCE[4].photoId);
     add('balcony-approach-ceiling',6,'slat-ceiling',layout.at(57.8,13.2),axis,12,2.35,3.35,PHOTO_INTERIOR_EVIDENCE[2].photoId);
     add('balcony-space-frame',6,'space-frame',layout.at(layout.circleU,23),axis,12.3,5.8,3.3,PHOTO_INTERIOR_EVIDENCE[3].photoId);
   }
