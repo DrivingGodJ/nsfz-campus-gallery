@@ -83,7 +83,7 @@ test('both first-floor roads remain clear across their full usable width with or
   assert.equal(JSON.stringify(building), original, 'Geometry preserves saved building and opening data');
 });
 
-test('the first-floor classroom is enclosed by its new recessed road-side wall and window without extending that wall upstairs', () => {
+test('the first-floor classroom is enclosed by its opaque recessed road-side wall without extending that wall upstairs', () => {
   const passage = building.groundPassages.find(item => item.sourcePathId === 'way/1233313441');
   assert.equal(passage.recessClassrooms, true, 'The confirmed road has an explicit recessed classroom enclosure');
   const axis = segment(...passage.points);
@@ -101,8 +101,8 @@ test('the first-floor classroom is enclosed by its new recessed road-side wall a
       }
       for (const rise of [1.6, 3]) {
         const ray = crossing(side, .4, rise);
-        assert.equal(ray.intersectObjects(object.bodies).length, 0, 'The new recessed window has a real wall aperture');
-        assert.ok(ray.intersectObject(object.glass).length, 'The road-side classroom retains an actual pane across its new opening');
+        assert.ok(ray.intersectObjects(object.bodies).length, 'The marked recessed end is now real opaque masonry');
+        assert.equal(ray.intersectObjects([object.glass, object.frames]).length, 0, 'The marked first-floor end has no window or frame');
       }
       if (selectedFloor) continue;
       for (let floor = 2; floor <= main.floors; floor++) for (const rise of [.65, 1.6, 3]) {

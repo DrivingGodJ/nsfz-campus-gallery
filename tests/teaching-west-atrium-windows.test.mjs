@@ -59,10 +59,10 @@ test('the entire west wall of the blue main atrium has no windows on any floor, 
 });
 
 test('the single red-cross first-floor window becomes masonry while its four upper windows and every other bay remain',()=>{
-  assert.deepEqual(building.classroomWindows.groundBlindFacadeLines,[groundWest],'Canonical data retains the one first-floor blind wall after map refresh');
+  assert.deepEqual(building.classroomWindows.groundBlindFacadeLines[0],groundWest,'Canonical data retains the original first-floor blind wall after map refresh');
   const config=building.classroomWindows;
   const patched=building;
-  const baseConfig={...building.classroomWindows};delete baseConfig.groundBlindFacadeLines;
+  const baseConfig={...building.classroomWindows,groundBlindFacadeLines:building.classroomWindows.groundBlindFacadeLines.filter(line=>JSON.stringify(line)!==JSON.stringify(groundWest))};
   const before={...building,classroomWindows:baseConfig};
   const solids=building.solidCores.filter(c=>c.partId==='main'),stairs=building.stairwells.filter(c=>c.partId==='main');
   const corridors=building.floorCorridors.filter(c=>c.partId==='main'),cutouts=building.cutouts.filter(c=>c.partId==='main');
