@@ -6,22 +6,25 @@ import { buildingGeometry, buildingCoreFootprint, buildingSectionWindows } from 
 import { buildingLevels } from '../src/building-model.ts';
 import { teachingWindowGeometry } from '../src/architecture-geometry.ts';
 import { photoInteriorGeometry, photoInteriorPlacements } from '../src/photo-interior-geometry.ts';
+import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 
 const campus=JSON.parse(fs.readFileSync(new URL('../public/data/campus.json',import.meta.url)));
 const corrections=JSON.parse(fs.readFileSync(new URL('../data/campus-corrections.json',import.meta.url)));
 const theatre=campus.buildings.find(b=>b.id==='local/theatre');
-const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+// Verified original building from commit448e5e7; no Git history is required in CI.
+const baseline=JSON.parse(fs.readFileSync(new URL('./fixtures/theatre-448e5e7.json',import.meta.url)));
+const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),frontMaterial=new THREE.MeshBasicMaterial({side:THREE.FrontSide});
 const origin=[30.809226250687292,-45.18263028622997],along=[.9876333466290035,-.15678128914636014],across=[-along[1],along[0]];
 const at=(u,v)=>[origin[0]+along[0]*u+across[0]*v,origin[1]+along[1]*u+across[1]*v];
 const local=p=>[(p[0]-origin[0])*along[0]+(p[1]-origin[1])*along[1],(p[0]-origin[0])*across[0]+(p[1]-origin[1])*across[1]];
 const cast=(target,p,y,d,far)=>new THREE.Raycaster(new THREE.Vector3(p[0],y,p[1]),new THREE.Vector3(d[0],0,d[1]),0,far).intersectObject(target);
-const mesh=(g,extruded=false)=>{const m=new THREE.Mesh(g,material);if(extruded){m.rotation.x=-Math.PI/2;m.position.y=.12;}m.updateMatrixWorld();return m;};
-function model(floorHeight=3.6,cutoff) {
-  const info=buildingLevels(theatre,{floorHeight}),geometries=info.sections.map(section=>buildingGeometry(section,Math.min(section.height,cutoff??Infinity),floorHeight,
-    theatre.groundPassages,theatre.floorCorridors.filter(c=>c.partId===section.id),[],section.classroomWindows??theatre.classroomWindows,[],[],cutoff!==undefined&&cutoff<=section.height+1e-6));
-  const group=new THREE.Group();geometries.forEach(g=>group.add(mesh(g,true)));group.updateMatrixWorld();
-  const glazing=teachingWindowGeometry(theatre,info.sections,floorHeight,cutoff);
-  const furniture=photoInteriorGeometry(theatre,info.height,floorHeight,cutoff);
+const mesh=(g,extruded=false,side=THREE.DoubleSide)=>{const m=new THREE.Mesh(g,side===THREE.FrontSide?frontMaterial:material);if(extruded){m.rotation.x=-Math.PI/2;m.position.y=.12;}m.updateMatrixWorld();return m;};
+function model(floorHeight=3.6,cutoff,source=theatre,side=THREE.DoubleSide) {
+  const info=buildingLevels(source,{floorHeight}),geometries=info.sections.map(section=>buildingGeometry(section,Math.min(section.height,cutoff??Infinity),floorHeight,
+    source.groundPassages,source.floorCorridors.filter(c=>c.partId===section.id),[],section.classroomWindows??source.classroomWindows,source.solidCores?.filter(c=>c.partId===section.id),source.cutouts?.filter(c=>c.partId===section.id),cutoff!==undefined&&cutoff<=section.height+1e-6));
+  const group=new THREE.Group();geometries.forEach(g=>group.add(mesh(g,true,side)));group.updateMatrixWorld();
+  const glazing=teachingWindowGeometry(source,info.sections,floorHeight,cutoff);
+  const furniture=photoInteriorGeometry(source,info.height,floorHeight,cutoff);
   return {info,group,geometries,glass:mesh(glazing.glass),frames:mesh(glazing.frames),furniture,dispose(){geometries.forEach(g=>g.dispose());Object.values(glazing).forEach(g=>g.dispose());furniture.forEach(b=>b.geometry.dispose());}};
 }
 
@@ -42,12 +45,14 @@ test('the west-facing fifth-floor gallery has a solid art wall on the left and t
       }
       const main=built.info.sections.find(s=>s.id==='main'),core=buildingCoreFootprint(main,theatre.groundPassages,theatre.floorCorridors.filter(c=>c.partId==='main'),[]);
       const panes=buildingSectionWindows(main,core,main.classroomWindows,Math.min(main.height,selected===undefined?Infinity:selected*floorHeight),floorHeight);
-      const right=panes.filter(p=>local([(p.from[0]+p.to[0])/2,(p.from[1]+p.to[1])/2])[0]<24);
-      assert.ok(right.length>8,'Repeated actual window bays continue along the narrow corridor');
-      for(const pane of right.filter((_,i)=>i%3===0)) {
-        const [u]=local([(pane.from[0]+pane.to[0])/2,(pane.from[1]+pane.to[1])/2]),point=at(u,-1),direction=across.map(n=>-n);
-        assert.equal(cast(built.group,point,y,direction,1.5).length,0,'Each right-hand pane penetrates the actual wall rather than covering solid mass');
-        assert.ok(cast(built.glass,point,y,direction,1.5).length,'The opened right wall receives glass');
+      for(const east of [false,true]) {
+        const run=panes.filter(p=>(local([(p.from[0]+p.to[0])/2,(p.from[1]+p.to[1])/2])[0]>26)===east);
+        assert.ok(run.length>5,'Both the narrow west and long east inner glass runs remain');
+        for(const pane of run.filter((_,i)=>i%3===0)) {
+          const [u]=local([(pane.from[0]+pane.to[0])/2,(pane.from[1]+pane.to[1])/2]),point=at(u,east?-4.6:-1),direction=across.map(n=>-n),far=east?1.25:1.5;
+          assert.equal(cast(built.group,point,y,direction,far).length,0,'Every retained inner pane occupies a real wall aperture');
+          assert.ok(cast(built.glass,point,y,direction,far).length,'Both inner runs retain their actual glass');
+        }
       }
       const camera=[60.88965943416322,-50.532612910984824],heading=262.9816727347636*Math.PI/180;
       assert.equal(cast(built.group,camera,y,[Math.sin(heading),-Math.cos(heading)],25).length,0,'The retained DSC07199 camera has a clear route into the west gallery without a new end wall');
@@ -57,35 +62,41 @@ test('the west-facing fifth-floor gallery has a solid art wall on the left and t
   }
 });
 
-test('the duplicated outside band is removed and the two long inner lines retain one wall face',()=>{
-  const built=model(),connector=built.info.sections.find(s=>s.id==='laboratory-connection'),main=built.info.sections.find(s=>s.id==='main');
-  try {
-    assert.equal(main.floors,6);assert.equal(connector.floors,4);assert.equal(built.info.sections.find(s=>s.id==='curved-terrace').floors,4);
-    const removed=[...connector.outer.slice(1).map((b,i)=>[connector.outer[i],b]),[main.outer[2],main.outer[3]]];
-    for(const [a,b] of removed) {
-      const dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),normal=[-dz/length,dx/length],p=[(a[0]+b[0])/2,(a[1]+b[1])/2],start=p.map((n,i)=>n-normal[i]*.55);
-      for(let floor=0;floor<6;floor++) for(const rise of [.5,1.5,2.6,3.3]) {
-        const y=.12+floor*3.6+rise;
-        assert.equal(cast(built.group,start,y,normal,1.1).length,0,'The crossed-out outside layer is gone between slabs on every storey');
-        assert.equal(cast(built.glass,start,y,normal,1.1).length,0,'No hanging glass survives on the deleted outer layer');
-        assert.equal(cast(built.frames,start,y,normal,1.1).length,0,'No hanging frame survives on the deleted outer layer');
+test('normal lower and sixth-storey facades match the original building and the mistaken east outside wall stays absent',()=>{
+  const savedMain=baseline.parts.find(p=>p.id==='main'),main=theatre.parts.find(p=>p.id==='main');
+  assert.equal(main.openEdgesStartFloor,5);assert.equal(main.openEdgesEndFloor,5);
+  assert.deepEqual(theatre.parts.find(p=>p.id==='laboratory-connection'),baseline.parts.find(p=>p.id==='laboratory-connection'),'The complete original four-storey connector is restored');
+  assert.deepEqual(main.outer,savedMain.outer);assert.deepEqual(main.holes,savedMain.holes);assert.equal(main.floors,savedMain.floors);
+  for(const floorHeight of [2.4,3.6,4.2]) {
+    const lower=model(floorHeight,4*floorHeight),originalLower=model(floorHeight,4*floorHeight,baseline),built=model(floorHeight),original=model(floorHeight,undefined,baseline);
+    try {
+      for(let i=0;i<lower.geometries.length;i++)assert.deepEqual(lower.geometries[i].attributes.position.array,originalLower.geometries[i].attributes.position.array,'Every lower-four-storey body vertex matches the448e5e7 baseline');
+      const lines=[...baseline.outer.slice(1).map((b,i)=>[baseline.outer[i],b]),[savedMain.outer[2],savedMain.outer[3]]];
+      for(const [a,b] of lines) {
+        const dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),normal=[-dz/length,dx/length];
+        for(const t of [.13,.37,.61,.83])for(const rise of [.2,.45,.72,.92]) {
+          const p=[a[0]+dx*t,a[1]+dz*t],start=p.map((n,i)=>n-normal[i]*.6),y=.12+(5+rise)*floorHeight;
+          const distances=target=>[...new Set(cast(target,start,y,normal,1.2).map(hit=>Math.round(hit.distance*1e4)))];
+          assert.deepEqual(distances(built.group),distances(original.group),'The sixth-storey normal facade matches every original boundary sample');
+        }
       }
-    }
-    for(let floor=0;floor<6;floor++) for(const [u,v] of [[12,-2],[32,-5.4]]) {
-      // Above the glazing, the remaining lintel supplies an independent measure
-      // of the one surviving wall leaf on each long inner line.
-      const hits=cast(built.group,at(u,v+.5),.12+floor*3.6+3.3,across.map(n=>-n),15);
-      assert.equal(hits.length,2,'Only the two surfaces of one inner wall leaf remain, with no farther outside wall');
-      assert.ok(Math.abs(hits[1].distance-hits[0].distance-.28)<1e-4,'The remaining inner wall is one 0.28m leaf');
-    }
-    for(let floor=0;floor<4;floor++) {
-      const p=at(32,-10),hit=new THREE.Raycaster(new THREE.Vector3(p[0],.12+floor*3.6+.6,p[1]),new THREE.Vector3(0,-1,0),0,.7).intersectObject(built.group)[0];
-      assert.ok(hit,'Removing the exterior walls retains the existing connector floor slabs');
-    }
-  } finally {built.dispose();}
+      const a=main.outer[2],b=main.outer[3],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),normal=[-dz/length,dx/length];
+      for(const t of [.7,.85,.95])for(const rise of [.2,.45,.72,.92]) {
+        const p=[a[0]+dx*t,a[1]+dz*t],start=p.map((n,i)=>n-normal[i]*.55),y=.12+(4+rise)*floorHeight;
+        assert.equal(cast(built.group,start,y,normal,1.1).length,0,'The mistakenly identified east outside wall remains absent');
+        assert.equal(cast(built.glass,start,y,normal,1.1).length,0,'No hanging glass survives on the deleted fifth-floor outside wall');
+        assert.equal(cast(built.frames,start,y,normal,1.1).length,0,'No hanging frame survives on the deleted fifth-floor outside wall');
+      }
+      for(const [u,v] of [[32,-5.4]]) {
+        const hits=cast(built.group,at(u,v+.5),.12+4*floorHeight+floorHeight*.96,across.map(n=>-n),15);
+        assert.equal(hits.length,2,'The east inner glass run keeps its original wall leaf without the mistaken outer L wall');
+        assert.ok(Math.abs(hits[1].distance-hits[0].distance-.28)<1e-4);
+      }
+    } finally {lower.dispose();originalLower.dispose();built.dispose();original.dispose();}
+  }
 });
 
-test('the short turn between the two long glass runs is opaque masonry, and no fire case remains',()=>{
+test('the short turn between the two glass runs stays solid, and no fire case remains',()=>{
   for(const selected of [undefined,5]) {
     const built=model(3.6,selected===undefined?undefined:selected*3.6),direction=along.map(n=>-n),y=.12+4*3.6+1.5;
     try {
@@ -98,5 +109,65 @@ test('the short turn between the two long glass runs is opaque masonry, and no f
       assert.equal(photoInteriorPlacements(theatre).some(p=>p.kind==='fire-case'),false,'The fire case placement is removed entirely');
       assert.equal(built.furniture.some(batch=>batch.kind==='red'),false,'No red fire-case mesh remains');
     } finally {built.dispose();}
+  }
+});
+
+
+test('the canonical marked wall replaces stale L walls after map refresh',()=>{
+  const saved=corrections.buildings.find(b=>b.id===theatre.id),main=theatre.parts.find(p=>p.id==='main');
+  assert.equal(theatre.solidCores.length,1,'Exactly the user-marked straight wall remains');
+  assert.deepEqual(saved.solidCores,theatre.solidCores,'Refresh corrections retain the exact validated wall');
+  const [wall]=theatre.solidCores;
+  assert.equal(wall.partId,'main');assert.equal(wall.partition,true);assert.equal(wall.startFloor,5);assert.equal(wall.endFloor,5);
+  assert.equal(wall.outer.length,5);assert.deepEqual(wall.holes,[]);
+  assert.deepEqual(wall.outer[0],main.outer[2],'The left end is the original left facade corner marked by the user');
+  assert.deepEqual(wall.outer[1],theatre.floorCorridors.find(c=>c.partId==='main').footprint.outer[4],'The right end is the top of the short solid return');
+  assert.deepEqual(wall.outer.at(-1),wall.outer[0]);
+  const oldL={partId:'main',partition:true,startFloor:5,endFloor:5,outer:[[54.576096813845965,-55.305888116512506],[54.59558802124802,-55.30964138767472],[67.39423278560383,-57.77417748945069],[67.43444191661159,-57.49677627004743],[54.91460722100947,-55.08592846829334],[55.00892057060891,-54.49180776930024],[54.73238323355279,-54.44790900833926],[54.63951041112425,-55.03295520183205],[54.62904158229457,-55.03093930037771],[54.576096813845965,-55.305888116512506]],holes:[]};
+  const stale={...campus,buildings:campus.buildings.map(b=>b.id===theatre.id?{...b,solidCores:[oldL]}:b)};
+  const refreshed=applyCampusCorrections(stale,corrections).buildings.find(b=>b.id===theatre.id);
+  assert.deepEqual(refreshed.solidCores,theatre.solidCores,'Refreshing replaces the complete obsolete L-wall array');
+  assert.deepEqual(refreshed,theatre,'The refreshed theatre exactly equals the validated marked-wall model');
+});
+
+test('the entire paintings wall remains continuous and front-facing to the fifth-floor corridor',()=>{
+  for(const floorHeight of [2.4,3.6,4.2])for(const selected of [undefined,5]) {
+    const built=model(floorHeight,selected===undefined?undefined:selected*floorHeight,theatre,THREE.FrontSide),direction=new THREE.Vector3(across[0],0,across[1]);
+    try {
+      for(let u=1;u<=38;u++)for(const rise of [floorHeight*.15,floorHeight*.4,floorHeight*.8,floorHeight-.3]) {
+        const hit=cast(built.group,at(u,-.5),.12+4*floorHeight+rise,across,1.05)[0];
+        assert.ok(hit,'The real FrontSide body shows a solid wall across the entire paintings side, including its east long bay');
+        assert.ok(Math.abs(hit.distance-.5)<1e-4,'The visible paintings wall remains on its original v0 line');
+        const normal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+        assert.ok(normal.dot(direction)<-.999,'The corridor-facing triangle normal prevents backface culling from hiding this wall');
+      }
+      assert.equal(cast(built.glass,at(32,-.5),.12+4*floorHeight+1.5,across,1.05).length,0,'The paintings-side east long wall gains no guessed glass');
+    } finally {built.dispose();}
+  }
+});
+
+
+test('the marked straight wall closes its actual red line on floor five and meets the existing walls at both ends',()=>{
+  const [wall]=theatre.solidCores,a=wall.outer[0],b=wall.outer[1],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),normal=[-dz/length,dx/length];
+  assert.ok(Math.abs(length-25.79)<.01);
+  const withoutMarked={...theatre,solidCores:[]};
+  for(const floorHeight of [2.4,3.6,4.2])for(const selected of [undefined,5]) {
+    const cutoff=selected===undefined?undefined:selected*floorHeight,built=model(floorHeight,cutoff),original=model(floorHeight,cutoff,withoutMarked);
+    try {
+      for(const t of [.03,.2,.5,.8,.97])for(const rise of [.2,.5,.8]) {
+        const p=[a[0]+dx*t,a[1]+dz*t],start=p.map((n,i)=>n-normal[i]*.35),y=.12+(4+rise)*floorHeight,hits=cast(built.group,start,y,normal,.8);
+        assert.equal(hits.length,2,'The actual marked line is continuously closed by one straight wall leaf');
+        assert.ok(Math.abs(hits[0].distance-.35)<1e-4&&Math.abs(hits[1].distance-hits[0].distance-.28)<1e-4,'The wall follows the marked line with0.28m thickness toward the gallery');
+        assert.equal(cast(original.group,start,y,normal,.8).length,0,'The requested straight wall is measured at its own line, not the old outer edge');
+        assert.equal(cast(built.glass,start,y,normal,.8).length,0,'The marked wall stays opaque');
+      }
+      const main=theatre.parts.find(p=>p.id==='main'),left=main.outer[1],leftLength=Math.hypot(left[0]-a[0],left[1]-a[1]),towardLeft=[(left[0]-a[0])/leftLength,(left[1]-a[1])/leftLength],leftNormal=[towardLeft[1],-towardLeft[0]];
+      for(const offset of [.02,.08,.2]) {
+        const p=[a[0]+towardLeft[0]*offset,a[1]+towardLeft[1]*offset],start=p.map((n,i)=>n-leftNormal[i]*.35),y=.12+4*floorHeight+floorHeight*.5;
+        assert.ok(cast(built.group,start,y,leftNormal,.8).length,'The original left outer wall remains continuous immediately beside the new wall endpoint');
+        const returnPoint=b.map((n,i)=>n+across[i]*offset+along[i]*.35);
+        assert.ok(cast(built.group,returnPoint,y,along.map(n=>-n),.8).length,'The existing short return remains continuous immediately beside the new right endpoint');
+      }
+    } finally {built.dispose();original.dispose();}
   }
 });

@@ -49,7 +49,7 @@ test('the photographed sixth-floor laboratory stair window has one aperture, fou
   } finally { geometry.dispose(); target.material.dispose(); }
 });
 
-test('theatre glazing stays on the observed lower terrace face and fifth-floor inner gallery, with deleted outside walls clear', () => {
+test('theatre glazing stays on the observed lower terrace face and fifth-floor inner gallery, preserving normal connector masonry', () => {
   const b = building('local/theatre'), info = buildingLevels(b, site.buildingOverrides[b.id]);
   const ring=b.floorCorridors.find(c=>c.partId==='main').footprint.outer, galleryLines=[[ring[2],ring[3]],[ring[4],ring[5]]];
   const distance=(point,[a,b])=>{
@@ -61,7 +61,7 @@ test('theatre glazing stays on the observed lower terrace face and fifth-floor i
     try {
       const p = model.glass.attributes.position;
       assert.equal(p.count>0,['curved-terrace','main'].includes(section.id),'Only the two observed theatre facades receive glass');
-      if(section.id==='laboratory-connection')assert.equal(model.frames.attributes.position.count,0,'The removed outer connector facade leaves no hanging frames');
+      if(section.id==='laboratory-connection')assert.equal(model.frames.attributes.position.count,0,'The unobserved normal connector wall gains no guessed frames');
       for(let i=0;i<p.count;i++) {
         if(section.id==='main') {
           assert.ok(p.getY(i)>=.12+4*info.floorHeight&&p.getY(i)<.12+5*info.floorHeight,'Inner gallery glass stays on its observed fifth floor');

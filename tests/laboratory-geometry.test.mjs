@@ -44,17 +44,17 @@ test('laboratory corridors connect each floor while the round enclosure and oute
   geometry.dispose();
 });
 
-test('only floors one through four retain the connector slabs and the removed outer projection has no wall', () => {
+test('the original four-storey connector retains its normal outside walls and slabs', () => {
   for (const floorHeight of [3.6, 4.2]) {
     const { at } = laboratoryLayout(building), info = buildingLevels(theatre, { floorHeight }), geometry = laboratoryBodyGeometry(building, floorHeight * 6, floorHeight), target = new THREE.Group();
-    const bodies = info.sections.map(p => buildingGeometry(p, p.height, floorHeight, theatre.groundPassages, theatre.floorCorridors.filter(c => c.partId === p.id)));
+    const bodies = info.sections.map(p => buildingGeometry(p, p.height, floorHeight, theatre.groundPassages, theatre.floorCorridors.filter(c => c.partId === p.id),[],p.classroomWindows??theatre.classroomWindows));
     bodies.forEach(g => target.add(mesh(g, true))); target.updateMatrixWorld();
     for (let floor = 0; floor < 6; floor++) {
       const y = .12 + floor * floorHeight + 1.5;
-      assert.equal(cast(target, at(1.5, 26), at(-1.5, 26), y, 3).length, 0, 'The crossed-out exterior projection wall is removed');
+      assert.equal(cast(target, at(1.5, 26), at(-1.5, 26), y, 3).length>0,floor<4,'The original connector outside wall remains on its four storeys');
       const slab=down(target,at(-.5,26),.12+floor*floorHeight+.4)[0];
       assert.equal(!!slab&&slab.distance<.5,floor<=4,'The connector retains its four-storey slabs and roof, with no added sixth-storey slab');
-      if (floor >= 4) assert.ok(cast(target, at(-2, 18), at(-2, 16), y, 2).length, 'The single retained inside wall continues along the gallery line');
+      if (floor >= 4) assert.ok(cast(target, at(-2, 18), at(-2, 16), .12+(floor+1)*floorHeight-.3, 2).length, 'The single retained inside wall continues above the observed fifth-floor glazing');
     }
     const cut = laboratoryBodyGeometry(building, floorHeight * 3, floorHeight, true);
     cut.computeBoundingBox(); assert.ok(Math.abs(cut.boundingBox.max.z - floorHeight * 3) < 1e-4);
@@ -152,7 +152,7 @@ test('the white connection is part of the theatre outline, with the recess road 
   assert.equal(down(target, at(5.8, .4), .6).length, 0, 'No raised floor slab blocks the road at the passage');
   const theatreBodies = info.sections.map(p => buildingGeometry(p, p.height, info.floorHeight, theatre.groundPassages, theatre.floorCorridors.filter(c => c.partId === p.id)));
   const theatreGroup = new THREE.Group(); theatreBodies.forEach(g => theatreGroup.add(mesh(g, true))); theatreGroup.updateMatrixWorld();
-  for (let floor = 0; floor < 6; floor++) assert.equal(cast(theatreGroup, at(1.5, 26), at(-1.5, 26), .12 + floor * info.floorHeight + 1.5, 3).length,0,'The deleted outer projection wall is absent on every storey');
+  for (let floor = 0; floor < 6; floor++) assert.equal(cast(theatreGroup, at(1.5, 26), at(-1.5, 26), .12 + floor * info.floorHeight + 1.5, 3).length>0,floor<4,'The original lower connector outside wall remains on all four existing storeys');
   const combined = new THREE.Group(); combined.add(target, theatreGroup); combined.updateMatrixWorld();
   for (let floor = 1; floor < 6; floor++) assert.ok(down(combined, at(.1,16), .12 + floor * 3.6 + .4).length, 'The corridor slab connects the laboratory and theatre on every upper floor');
   theatreBodies.forEach(g => g.dispose()); body.dispose(); rails.dispose();
@@ -183,7 +183,8 @@ test('the white marked hall has a straight upper wall and retained lower return 
     for(const p of [[-10,15.5],[-2,11.8],[-12.48,12.6],[-12.52,12.6],[-35,12.6]]) assert.ok(down(group,at(...p),.12+floor*3.6+.4).length,'The shifted hallway keeps a continuous floor through the return');
     if(floor>=4) {
       const hit=cast(group,at(-5,19),at(-5,16.5),y,2.5)[0];
-      assert.ok(hit && hit.distance>=1.7&&hit.distance<2.1,'Only the retained inner wall remains; the former parallel outer wall is gone');
+      if(floor===4)assert.ok(hit&&hit.distance>=1.7&&hit.distance<2.1,'Only the fifth-floor corridor loses its duplicate outside wall');
+      else assert.ok(hit&&hit.distance<1.5,'The original normal sixth-storey outside wall is retained');
     }
   }
   [...bodies, lab].forEach(g=>g.dispose());
