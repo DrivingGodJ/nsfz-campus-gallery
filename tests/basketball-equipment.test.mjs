@@ -90,15 +90,14 @@ test('each painted court has two usable standard-height baskets, with inward-fac
   } finally { material.dispose(); ['metal', 'bases', 'glass', 'rims', 'nets'].forEach(name => equipment[name].dispose()); }
 });
 
-test('basket bases remain outside playable courts and keep the single fence, entrances, aircraft, flag platform and buildings clear', async () => {
+test('basket bases remain outside playable courts and keep both fences, entrances, aircraft, flag platform and buildings clear', async () => {
   const equipment = basketballEquipment(layout), courts = basketballGeometry(layout);
-  const fence = passageFootprint(feature.railEdges[0], .09);
   const obstacles = [
     ...campus.buildings,
     ...campus.features.filter(item => item.aircraft || item.flagPlatform),
     ...campus.features.filter(item => item.type === 'garageEntrance' || item.type === 'tunnelEntrance' || item.type === 'path' && item.points && !item.representedBy)
       .map(item => ({ id: item.id, ...(item.outer ? item : passageFootprint(item.points, item.width || 3)) })),
-    { id: 'basketball-fence', ...fence },
+    ...feature.railEdges.map((chain, index) => ({ id: 'basketball-fence-' + index, ...passageFootprint(chain, .09) })),
   ];
   try {
     for (const basket of equipment.baskets) {
@@ -111,33 +110,55 @@ test('basket bases remain outside playable courts and keep the single fence, ent
   } finally { ['metal', 'bases', 'glass', 'rims', 'nets'].forEach(name => equipment[name].dispose()); }
 });
 
-test('the fine mesh fence appears only along the designated outer southern baseline at the correct ground and top heights', () => {
-  assert.deepEqual(feature.railEdges, [[feature.outer[4], feature.outer[5]]]);
+test('the fine mesh fence follows only the southern baseline and marked eastern side, with the northern entrance open', () => {
+  assert.deepEqual(feature.railEdges, [[feature.outer[4], feature.outer[5]], [feature.outer[3], feature.outer[4]]]);
   assert.equal(feature.railHeight, 3.8);
   const fence = basketballFenceGeometry(feature), material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
   try {
     for (const part of Object.values(fence)) finite(part);
-    const vertices = fence.wire.getAttribute('position'), wireSides = [];
-    assert.ok(vertices.count > 500 && vertices.count % 2 === 0 && vertices.count / 2 < 1100, 'Dense diamond mesh stays one inexpensive line-segment batch');
-    for (let i = 0; i < vertices.count; i++) {
-      const [across, along] = local([vertices.getX(i), vertices.getZ(i)]);
-      assert.ok(Math.abs(along + 16) < 1e-5, 'Every wire lies on the single photographed outer side');
-      assert.ok(along < -layout.length / 2 - 1, 'The fence is beyond the playable baseline');
-      assert.ok(vertices.getY(i) > .16 && vertices.getY(i) < .16 + feature.railHeight);
-      wireSides.push(across);
-    }
+    const vertices = fence.wire.getAttribute('position'), wireSides = [], wireCoverage = [0, 0];
     const courtsSpan = layout.count * layout.width + (layout.count - 1) * layout.gap;
+    assert.ok(vertices.count > 500 && vertices.count % 2 === 0 && vertices.count / 2 < 1600, 'Both diamond nets share one inexpensive line-segment batch');
+    for (let i = 0; i < vertices.count; i++) {
+      const point = [vertices.getX(i), vertices.getZ(i)], [across, along] = local(point);
+      const distances = feature.railEdges.map(([a, b]) => distanceToSegment(point, a, b));
+      const side = distances[0] <= distances[1] ? 0 : 1;
+      assert.ok(distances[side] < 1e-5, 'Every wire stays on one of the two requested outer edges');
+      if (side === 0) {
+        assert.ok(along < -layout.length / 2 - 1, 'The southern fence is beyond the playable baseline');
+        wireSides.push(across);
+      } else assert.ok(across < -courtsSpan / 2 - .5, 'The eastern fence stays beyond the outermost playing sideline');
+      wireCoverage[side]++;
+      assert.ok(vertices.getY(i) > .16 && vertices.getY(i) < .16 + feature.railHeight);
+    }
+    assert.ok(wireCoverage.every(count => count > 300), 'Each requested side has a complete visible mesh');
     assert.ok(Math.max(...wireSides) - Math.min(...wireSides) > courtsSpan, 'The mesh spans all four courts rather than one bay');
     fence.wire.computeBoundingBox(); fence.frame.computeBoundingBox();
     assert.ok(Math.abs(fence.frame.boundingBox.min.y - .16) < .001);
     assert.ok(Math.abs(fence.frame.boundingBox.max.y - (.16 + feature.railHeight)) < .05);
     assert.ok(fence.wire.boundingBox.min.y - .16 < .15 && .16 + feature.railHeight - fence.wire.boundingBox.max.y < .15, 'Mesh reaches close to both the ground frame and the top rail');
-    const frameVertices = fence.frame.getAttribute('position');
-    for (let i = 0; i < frameVertices.count; i++) assert.ok(Math.abs(local([frameVertices.getX(i), frameVertices.getZ(i)])[1] + 16) < .06, 'No frame wraps around unrequested sides or seals the entrance');
+    const frameVertices = fence.frame.getAttribute('position'), frameCoverage = [0, 0];
+    for (let i = 0; i < frameVertices.count; i++) {
+      const point = [frameVertices.getX(i), frameVertices.getZ(i)];
+      const distances = feature.railEdges.map(([a, b]) => distanceToSegment(point, a, b));
+      const side = distances[0] <= distances[1] ? 0 : 1;
+      assert.ok(distances[side] < .06, 'No frame wraps around unrequested sides or seals the entrance');
+      frameCoverage[side]++;
+    }
+    assert.ok(frameCoverage.every(count => count > 100), 'Both requested sides have physical posts and rails');
     assert.ok(triangles(fence.frame) < 700, 'All posts and horizontal rails share one small opaque mesh');
-    const frame = mesh(fence.frame, material), [a, b] = feature.railEdges[0];
-    const middle = a.map((n, i) => (n + b[i]) / 2), eye = vector(middle, .16 + feature.railHeight).addScaledVector(vector(layout.axis), 1);
-    const hit = new THREE.Raycaster(eye, vector(layout.axis).negate(), 0, 2).intersectObject(frame)[0];
-    assert.ok(hit && Math.abs(hit.distance - 1) < .06, 'The real top rail sits on the selected outer line');
+    const frame = mesh(fence.frame, material);
+    for (const [a, b] of feature.railEdges) {
+      const middle = a.map((n, i) => (n + b[i]) / 2), normal = vector([a[1] - b[1], b[0] - a[0]]).normalize();
+      const eye = vector(middle, .16 + feature.railHeight).addScaledVector(normal, 1);
+      const hit = new THREE.Raycaster(eye, normal.clone().negate(), 0, 2).intersectObject(frame)[0];
+      assert.ok(hit && Math.abs(hit.distance - 1) < .06, 'Each real top rail sits on its selected outer line');
+    }
+    const [a, b] = feature.outer.slice(2, 4), middle = a.map((n, i) => (n + b[i]) / 2);
+    const normal = vector([a[1] - b[1], b[0] - a[0]]).normalize();
+    for (const y of [1, .16 + feature.railHeight]) {
+      const eye = vector(middle, y).addScaledVector(normal, 1);
+      assert.equal(new THREE.Raycaster(eye, normal.clone().negate(), 0, 2).intersectObject(frame).length, 0, 'The northern access beside the underground entrance remains open');
+    }
   } finally { material.dispose(); Object.values(fence).forEach(part => part.dispose()); }
 });
