@@ -53,7 +53,10 @@ test('all ordinary campus buildings open every selected storey, preserving floor
       const height = Math.min(section.height, floor * info.floorHeight), geometry = ordinary(building, section, height, info.floorHeight, true);
       assert.ok(exposedFloorSamples(geometry, height, info.floorHeight, `${building.id}/${floor}`) > 0, `${building.id}/${section.id}/${floor} retains an exposed floor`);
       geometry.computeBoundingBox();
-      assert.ok(Math.abs(geometry.boundingBox.max.z-height)<1e-4,'Walls retain the selected storey height');
+      const fullyOpen = !section.holes.length && section.outer.slice(1).every((_, edge) => section.openEdges?.includes(edge)) &&
+        floor >= (section.openEdgesStartFloor ?? 1) && floor <= (section.openEdgesEndFloor ?? Infinity);
+      const expectedTop = fullyOpen ? (floor - 1) * info.floorHeight + Math.min(.25, info.floorHeight * .1, height * .1) : height;
+      assert.ok(Math.abs(geometry.boundingBox.max.z-expectedTop)<1e-4,`${building.id}/${section.id}/${floor}: ${fullyOpen ? 'The open terrace retains its floor with no wall above it' : 'Walls retain the selected storey height'}`);
       geometry.dispose();
     }
   }
