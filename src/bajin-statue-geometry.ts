@@ -4,6 +4,7 @@ import type { BaJinStatueModel } from './types';
 
 export function bajinStatueGeometry(model: BaJinStatueModel) {
   const yuanLongping = model.variant === 'yuanLongping';
+  const officeBust = model.variant === 'officeBust';
   const steps: THREE.BufferGeometry[] = [], pedestal: THREE.BufferGeometry[] = [], bust: THREE.BufferGeometry[] = [];
   const add = (parts: THREE.BufferGeometry[], source: THREE.BufferGeometry, position: [number, number, number], color?: string) => {
     const geometry = source.index ? source.toNonIndexed() : source;
@@ -28,11 +29,13 @@ export function bajinStatueGeometry(model: BaJinStatueModel) {
     geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()));
     add(bust, geometry, a.add(b).multiplyScalar(.5).toArray(), color);
   };
-  if (yuanLongping) {
+  if (yuanLongping || officeBust) {
     // This portrait stands on a narrow stone column, without Ba Jin's broad stair podium.
     box(steps, model.width, .025 * model.totalHeight, model.depth, 0);
     box(pedestal, model.width / model.totalHeight * .84, .58, model.depth / model.totalHeight * .84, .025);
     box(pedestal, model.width / model.totalHeight * .90, .045, model.depth / model.totalHeight * .90, .605);
+    if (officeBust) add(pedestal, new THREE.BoxGeometry(model.width / model.totalHeight * .43, .16, .016),
+      [0, .425, model.depth / model.totalHeight * .42 + .008]);
     const shoulder = Math.min(.15, model.width / model.totalHeight * .48);
     const outline = new THREE.Shape();
     outline.moveTo(-shoulder * .7, .645); outline.lineTo(-shoulder, .79);
@@ -40,17 +43,25 @@ export function bajinStatueGeometry(model: BaJinStatueModel) {
     outline.lineTo(-.032, .883); outline.lineTo(.032, .883); outline.lineTo(.047, .863);
     outline.lineTo(shoulder * .80, .837); outline.lineTo(shoulder, .79); outline.lineTo(shoulder * .7, .645);
     outline.closePath();
-    add(bust, new THREE.ExtrudeGeometry(outline, { depth: .12, bevelEnabled: false }), [0, 0, -.06], '#46594b');
-    rod([0, .851, 0], [0, .909, 0], .032, '#57665a');
-    sphere([0, .933, .006], [.052, .067, .051], '#5b695d');
-    sphere([0, .892, .024], [.028, .022, .034], '#5b695d');
+    add(bust, new THREE.ExtrudeGeometry(outline, { depth: .12, bevelEnabled: false }), [0, 0, -.06], officeBust ? '#494a46' : '#46594b');
+    rod([0, .851, 0], [0, .909, 0], .032, officeBust ? '#62615a' : '#57665a');
+    sphere([0, .933, .006], [.052, .067, .051], officeBust ? '#65645f' : '#5b695d');
+    sphere([0, .892, .024], [.028, .022, .034], officeBust ? '#65645f' : '#5b695d');
     // Short hair follows the crown and sides; this portrait has no spectacles.
-    sphere([0, .938, .003], [.054, .062, .053], '#34473a', 0, Math.PI * 2, Math.PI * .47);
+    sphere([0, .938, .003], [.054, .062, .053], officeBust ? '#454640' : '#34473a', 0, Math.PI * 2, Math.PI * .47);
     for (const side of [-1, 1]) {
-      sphere([side * .053, .926, .009], [.009, .019, .013], '#57665a');
-      rod([side * .037, .854, .061], [side * .017, .77, .062], .004, '#354c3d');
+      sphere([side * .053, .926, .009], [.009, .019, .013], officeBust ? '#62615a' : '#57665a');
+      rod([side * .037, .854, .061], [side * .017, .77, .062], .004, officeBust ? '#929188' : '#354c3d');
     }
-    sphere([0, .927, .056], [.010, .018, .015], '#57665a');
+    sphere([0, .927, .056], [.010, .018, .015], officeBust ? '#62615a' : '#57665a');
+    if (officeBust) {
+      rod([0, .848, .063], [0, .764, .065], .008, '#76766e');
+      for (const side of [-1, 1]) {
+        sphere([side * .023, .939, .050], [.006, .004, .007], '#30322e');
+        rod([side * .012, .947, .053], [side * .033, .946, .048], .003, '#73736b');
+      }
+      rod([-.013, .910, .056], [.013, .910, .056], .0025, '#464842');
+    }
   } else {
     // The step footprint is independent of the modest bust and pedestal height.
     for (let i = 0; i < 3; i++) box(steps, model.width * (1 - .165 * i), .04 * model.totalHeight,

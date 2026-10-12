@@ -45,6 +45,37 @@ test('Yuan Longping uses a narrow stone column and a short-haired bronze bust wi
   } finally { [...Object.values(geometry), ...Object.values(defaultGeometry)].forEach(part => part.dispose()); }
 });
 
+test('the office bust fits its narrow stone column and leaves the photographed entrance, road and tree trunks clear', async () => {
+  const fs = await import('node:fs/promises');
+  const { default: clip } = await import('polygon-clipping');
+  const { roadFootprint } = await import('../src/road-geometry.ts');
+  const { applyCampusCorrections } = await import('../server/campus-corrections.mjs');
+  const read = async file => JSON.parse(await fs.readFile(new URL('../' + file, import.meta.url)));
+  const campus = await read('public/data/campus.json'), feature = campus.features.find(f => f.id === 'local/office-front-bust');
+  const model = feature.statue, geometry = bajinStatueGeometry(model);
+  try {
+    const bounds = new THREE.Box3();
+    for (const part of Object.values(geometry)) {
+      assert.ok([...part.getAttribute('position').array, ...part.getAttribute('normal').array].every(Number.isFinite));
+      bounds.union(part.boundingBox);
+    }
+    const size = bounds.getSize(new THREE.Vector3());
+    assert.ok(size.x <= model.width + 1e-6 && size.z <= model.depth + 1e-6);
+    assert.ok(Math.abs(bounds.min.y) < 1e-6 && Math.abs(bounds.max.y - model.totalHeight) < 1e-6);
+    assert.equal(geometry.steps.getAttribute('position').count / 3, 12, 'The photographed column does not gain a broad stair platform');
+    const occupied = [feature.outer, ...feature.holes];
+    for (const shape of [...campus.buildings, ...campus.features.filter(f => f.type === 'water'),
+      ...campus.features.filter(f => f.type === 'path' && !f.representedBy).map(roadFootprint)]) {
+      assert.equal(clip.intersection(occupied, [shape.outer, ...(shape.holes || [])]).length, 0);
+    }
+    for (const tree of campus.features.flatMap(f => f.trees || [])) {
+      assert.ok(Math.hypot(tree.position[0] - model.center[0], tree.position[1] - model.center[1]) > .55 + tree.radius * .18);
+    }
+    assert.equal(clip.difference(occupied, [campus.boundary]).length, 0);
+    assert.deepEqual(applyCampusCorrections(campus, await read('data/campus-corrections.json')), campus);
+  } finally { Object.values(geometry).forEach(part => part.dispose()); }
+});
+
 test('the photographed statue stays inside the courtyard, clears the pergola and does not add a selectable location', async () => {
   const fs = await import('node:fs/promises');
   const {default: clip} = await import('polygon-clipping');
