@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { Feature } from './types';
 import { LocationHtml, LocationName } from './LocationSelection';
 import { palmCrownGeometry, treeInstances, treeTrunkGeometry } from './tree-geometry';
+import { treePlanterGeometry } from './tree-planter-geometry';
 import { GARDEN_LAMP_COLORS, specimenGroveGeometry, specimenTrees } from './specimen-grove';
 
 function TreeBatch({ trees, columnar = false, palm = false, openCanopy = false }: { trees: Feature['trees']; columnar?: boolean; palm?: boolean; openCanopy?: boolean }) {
@@ -48,9 +49,18 @@ function TreeBatch({ trees, columnar = false, palm = false, openCanopy = false }
   </>;
 }
 
-export const Trees = memo(function Trees({ trees, openCanopy = false }: { trees: Feature['trees']; openCanopy?: boolean }) {
+function TreePlanter({ model }: { model: NonNullable<Feature['treePlanter']> }) {
+  const mapColor = useMapColor(), geometry = useMemo(() => treePlanterGeometry(model), [model]);
+  useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
+  const colors = { rim: '#b39787', soil: '#65794b', foliage: '#506a42' };
+  return <group>{(Object.keys(colors) as (keyof typeof colors)[]).map(key => <mesh key={key} geometry={geometry[key]} raycast={() => null}>
+    <meshStandardMaterial color={mapColor(colors[key])} roughness={1} side={THREE.DoubleSide} />
+  </mesh>)}</group>;
+}
+
+export const Trees = memo(function Trees({ trees, openCanopy = false, planter }: { trees: Feature['trees']; openCanopy?: boolean; planter?: Feature['treePlanter'] }) {
   const groups = useMemo(() => ({ plane: trees?.filter(tree => !tree.kind || tree.kind === 'plane'), columnar: trees?.filter(tree => tree.kind === 'columnar'), palm: trees?.filter(tree => tree.kind === 'palm') }), [trees]);
-  return <><TreeBatch trees={groups.plane} openCanopy={openCanopy} /><TreeBatch trees={groups.columnar} columnar /><TreeBatch trees={groups.palm} columnar palm /></>;
+  return <>{planter && <TreePlanter model={planter} />}<TreeBatch trees={groups.plane} openCanopy={openCanopy} /><TreeBatch trees={groups.columnar} columnar /><TreeBatch trees={groups.palm} columnar palm /></>;
 });
 
 function SpecimenDetails({ feature }: { feature: Feature }) {
