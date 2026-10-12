@@ -103,9 +103,11 @@ export function riverLandscapeGeometry(features: Feature[], buildings: Shape[] =
   }
   // Small garden paths and the seats surrounding the old tree are visible in
   // _DSC2471 / _DSC1493; only this photographed northern bank gets furniture.
-  const excluded = snapFootprint([...waters, ...buildings, ...roads.filter((_, i) => roadFeatures[i].id !== RIVER_GARDEN_PATH_ID)].map(shape => [shape.outer, ...shape.holes]));
+  const excluded = snapFootprint([...waters, ...buildings, ...roads.filter((_, i) => roadFeatures[i].representedBy !== 'river-landscape')].map(shape => [shape.outer, ...shape.holes]));
   const markedPath = features.find(feature => feature.id === RIVER_GARDEN_PATH_ID);
-  const gardenPaths = markedPath?.points ? [markedPath.points, ...(markedPath.branches ?? []), ...riverGardenPaths.slice(1)] : riverGardenPaths;
+  const gardenPaths = [...(markedPath?.points ? [markedPath.points, ...(markedPath.branches ?? []), ...riverGardenPaths.slice(1)] : riverGardenPaths),
+    ...features.filter(feature => feature.type === 'path' && feature.representedBy === 'river-landscape' && feature.id !== RIVER_GARDEN_PATH_ID && feature.points)
+      .flatMap(feature => [feature.points!, ...(feature.branches ?? [])])];
   for (const route of gardenPaths) {
     const points = new THREE.CatmullRomCurve3(route.map(([x,z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal').getSpacedPoints(route.length * 5).map(p => [p.x,p.z] as Point);
     const footprint = passageFootprint(points, 1.2);

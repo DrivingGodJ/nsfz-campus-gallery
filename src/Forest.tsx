@@ -22,7 +22,7 @@ function TreeBatch({ trees, columnar = false, palm = false, openCanopy = false }
       instances.branches.forEach((matrix, j) => branches.current?.setMatrixAt(i * 6 + j, matrix));
       instances.crowns.forEach((matrix, j) => {
         crowns.current!.setMatrixAt(i * 3 + j, matrix);
-        crowns.current!.setColorAt(i * 3 + j, color.set(mapColor(['#798e65', '#84966d', '#718b66'][(i + j) % 3])));
+        crowns.current!.setColorAt(i * 3 + j, color.set(mapColor(tree.crownColor ?? ['#798e65', '#84966d', '#718b66'][(i + j) % 3])));
       });
     });
     for (const mesh of [trunks.current, bases.current, crowns.current, branches.current]) {
