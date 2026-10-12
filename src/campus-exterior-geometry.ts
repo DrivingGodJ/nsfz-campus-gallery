@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FACADE_COLORS } from './facade-geometry.ts';
-import { architectureBar, classroomGlazingGeometry } from './architecture-geometry.ts';
+import { architectureBar, architectureBatch, classroomGlazingGeometry, teachingWindowGeometry } from './architecture-geometry.ts';
 import { officeCurvedFacade, officeCurvedWindows } from './office-windows.ts';
-import type { Building, Point } from './types';
+import { classroomWindowLayout, confirmedFacade } from './teaching-classrooms.ts';
+import type { Building, BuildingPart, Point } from './types';
 
 export const OFFICE_ID = 'way/1233313430';
 export const LIBRARY_ID = 'way/855459419';
@@ -26,6 +27,27 @@ export function libraryEntranceLayout(building: Building, floorHeight: number) {
   const width = 4, depth = 2.3, wallHeight = .12 + floorHeight + .05;
   const at = (u: number, v: number, y = wallHeight - .2 * v / depth) => new THREE.Vector3(center[0] + along[0] * u + outward[0] * v, y, center[1] + along[1] * u + outward[1] * v);
   return { center, along, outward, width, depth, wallHeight, at };
+}
+
+// Separate only the ground-level door leaves beneath the entry canopy. The
+// adjoining green curtain panes and all their existing frames keep their finish.
+export function libraryAnnexGlazingGeometry(building: Building, sections: (BuildingPart & { height: number; floors: number })[], floorHeight: number, cutawayHeight?: number) {
+  const config=libraryAnnexWindowsConfig(building,floorHeight),model=teachingWindowGeometry({...building,classroomWindows:config},sections,floorHeight,cutawayHeight);
+  const entrance=libraryEntranceLayout(building,floorHeight),panes=[] as Parameters<typeof classroomGlazingGeometry>[0],doors=[] as typeof panes;
+  const doorHalf=1.2,doorTop=Math.min(2.6,floorHeight-.35),station=(p:Point)=>(p[0]-entrance.center[0])*entrance.along[0]+(p[1]-entrance.center[1])*entrance.along[1];
+  for(const section of sections)for(const pane of config?classroomWindowLayout([[section.outer,...section.holes]],config,Math.min(section.height,cutawayHeight??Infinity),floorHeight):[]) {
+    const boundary=(p:Point):Point=>[p[0]+entrance.outward[0]*config!.wallThickness/2,p[1]+entrance.outward[1]*config!.wallThickness/2];
+    if(pane.bottom>=floorHeight||!confirmedFacade(boundary(pane.from),boundary(pane.to),[{from:building.outer[2],to:building.outer[3]}])){panes.push(pane);continue;}
+    const a=station(pane.from),b=station(pane.to),low=Math.max(Math.min(a,b),-doorHalf),high=Math.min(Math.max(a,b),doorHalf),top=Math.min(pane.top,doorTop);
+    if(high<=low||top<=pane.bottom){panes.push(pane);continue;}
+    const at=(s:number):Point=>[pane.from[0]+(pane.to[0]-pane.from[0])*(s-a)/(b-a),pane.from[1]+(pane.to[1]-pane.from[1])*(s-a)/(b-a)];
+    for(const [from,to] of [[Math.min(a,b),low],[high,Math.max(a,b)]])if(to>from)panes.push({...pane,from:at(from),to:at(to)});
+    if(top<pane.top)panes.push({...pane,from:at(low),to:at(high),bottom:top});
+    doors.push({...pane,from:at(low),to:at(high),top});
+  }
+  const ordinary=classroomGlazingGeometry(panes,config),entry=classroomGlazingGeometry(doors,config);
+  model.glass.dispose();ordinary.frames.dispose();entry.frames.dispose();
+  return {glass:ordinary.glass,frames:model.frames,doors:architectureBatch([entry.glass],false)};
 }
 
 // Observed brick panels and the deep west window reveals preserve the approved

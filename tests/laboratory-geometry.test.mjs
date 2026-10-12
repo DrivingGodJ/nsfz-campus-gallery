@@ -90,9 +90,9 @@ test('yellow edges have guards instead of solid walls or glazing, and the green 
   [rails, body, ...Object.values(stairs)].forEach(g => g.dispose());
 });
 
-test('the annotated front wall, recessed left staircase and right-hand wall returns follow the corrected plan', () => {
+test('the annotated front wall, east-shifted staircase and right-hand wall returns follow the corrected plan', () => {
   const layout = laboratoryLayout(building), { at } = layout;
-  assert.ok(Math.abs(layout.stairU + layout.roomWidth / 2 - 20.5) < .03, 'The staircase occupies the left recess next to the theatre, instead of the corridor centre');
+  assert.ok(Math.hypot(...layout.stair.opening.outer[0].map((n,i)=>n-building.outer[9][i])) < 1e-6, 'The staircase starts east of the facade return and shares the laboratory outside wall');
   const body = laboratoryBodyGeometry(building, 21.6, 3.6), target = mesh(body, true);
   for (let floor = 0; floor < 6; floor++) {
     const y = .12 + floor * 3.6 + 3.1; // Probe the concrete lintel, above the new window apertures.
@@ -222,7 +222,7 @@ test('the glass canopy stays above the concrete roof and ends on the straight th
 test('the laboratory roof is closed and the marked corridor end is walled on every storey', () => {
   const {at,circleU,stairU}=laboratoryLayout(building), info=buildingLevels(building);
   const geometry=laboratoryBodyGeometry(building,info.height,info.floorHeight), target=mesh(geometry,true);
-  const roofPoints=[[40,5],[40,12],[57.1,35],[circleU,34],[stairU,3]];
+  const roofPoints=[[40,5],[40,12],[57.1,35],[circleU,34],[stairU,4.5]];
   for (const [u,v] of roofPoints) {
     const hit=down(target,at(u,v),info.height+.5)[0];
     assert.ok(hit && Math.abs(hit.point.y-info.height-.12)<1e-4,'Concrete closes rooms, halls, round enclosure and stairwell at the top');

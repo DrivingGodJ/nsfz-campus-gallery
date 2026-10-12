@@ -12,7 +12,7 @@ import { teachingClassroomFurniture } from './teaching-classroom-furniture';
 import { theatreEntranceGeometry, theatreGlazingGeometry } from './theatre-exterior-geometry';
 import { THEATRE_ID } from './venue-geometry';
 import DormitoryEntrance from './DormitoryEntrance';
-import { OFFICE_ID, LIBRARY_ID, libraryAnnexWindowsConfig } from './campus-exterior-geometry';
+import { OFFICE_ID, LIBRARY_ID, libraryAnnexGlazingGeometry } from './campus-exterior-geometry';
 import { officeWindowLayout } from './office-windows';
 import { STAND_OFFICE_ID, standOfficeWindows } from './stand-office-geometry';
 import type { Building, BuildingPart } from './types';
@@ -51,7 +51,7 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
     }
     return teachingWindowGeometry(building, building.id === LIBRARY_ID ? sections.filter(section => section.id !== 'curved-annex') : sections, floorHeight, cutawayHeight);
   }, [building, sections, floorHeight, cutawayHeight]);
-  const annexWindows = useMemo(() => building.id === LIBRARY_ID ? teachingWindowGeometry({ ...building, classroomWindows: libraryAnnexWindowsConfig(building, floorHeight) }, sections.filter(section => section.id === 'curved-annex'), floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
+  const annexWindows = useMemo(() => building.id === LIBRARY_ID ? libraryAnnexGlazingGeometry(building, sections.filter(section => section.id === 'curved-annex'), floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
   const theatreEntry = useMemo(() => building.id === THEATRE_ID ? theatreEntranceGeometry(building, floorHeight, cutawayHeight) : undefined, [building, floorHeight, cutawayHeight]);
   useEffect(() => () => { if (theatreEntry) Object.values(theatreEntry).forEach(geometry => geometry.dispose()); }, [theatreEntry]);
   const elevator = useMemo(() => teachingElevatorGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
@@ -85,10 +85,13 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
       <mesh geometry={teaching.columns} raycast={() => null}><meshStandardMaterial color={material('trim', '#c5c9be')} roughness={.95} /></mesh>
       <mesh geometry={teaching.paving} raycast={() => null}><meshStandardMaterial color={mapColor('#bda995')} roughness={1} /></mesh>
       <mesh geometry={teaching.inlay} raycast={() => null}><meshStandardMaterial color={mapColor('#92a7a4')} roughness={1} /></mesh>
+      <mesh geometry={teaching.screenFrames} raycast={() => null}><meshStandardMaterial color={mapColor('#333632')} roughness={.7} /></mesh>
+      <mesh geometry={teaching.screens} raycast={() => null}><meshStandardMaterial color="#090b0b" roughness={.42} /></mesh>
     </>}
     <mesh geometry={windows.glass} raycast={() => null}><meshStandardMaterial color={material('glass', '#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} forceSinglePass /></mesh>
     {annexWindows && <>
       <mesh geometry={annexWindows.glass} raycast={() => null}><meshStandardMaterial color={material('annexGlass', '#183d32')} roughness={.22} metalness={.15} transparent opacity={cutawayHeight === undefined ? .88 : .55} depthWrite={cutawayHeight === undefined} side={THREE.DoubleSide} forceSinglePass /></mesh>
+      <mesh geometry={annexWindows.doors} raycast={() => null}><meshStandardMaterial color={material('annexGlass', '#183d32')} roughness={.15} metalness={.04} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} forceSinglePass /></mesh>
       <mesh geometry={annexWindows.frames} raycast={() => null}><meshStandardMaterial color={material('annexFrame', '#354b43')} roughness={.65} side={THREE.DoubleSide} /></mesh>
     </>}
     <mesh geometry={elevator.glass} raycast={() => null}><meshStandardMaterial color={material('glass', '#a4bfbd')} roughness={.35} transparent opacity={.16} depthWrite={false} side={THREE.DoubleSide} /></mesh>

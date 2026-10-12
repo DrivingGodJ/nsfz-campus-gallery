@@ -1,5 +1,5 @@
 import { buildingInfo, type Campus, type Photo, type Site } from './types';
-import { buildingFloorText } from './building-model';
+import { buildingFloorLabel, buildingFloorText } from './building-model';
 import PhotoNumberInput from './PhotoNumberInput';
 import { aerialImportText, altitudeLabel, campusLocations, isAerialPhoto, photoCameraHeightRange, photoLocationId } from './locations';
 
@@ -29,7 +29,7 @@ export default function PhotoPositionFields({ photo, campus, site, onChange }: {
         }}><option value="takeoff">相对起飞点</option><option value="seaLevel">海拔</option></select></label></div>
     </> : <>
       <label>{info ? '所在楼层' : '所在层面'}<select value={photo.floor} disabled={!info} onChange={e => onChange({ floor: Number(e.target.value), cameraHeight: undefined, position: { x: photo.position.x, z: photo.position.z } })}>
-        {!info ? <option value={0}>{location?.levelText || '室外'}</option> : Array.from({ length: Math.max(info.floors, photo.floor) }, (_, i) => <option key={i} value={i + 1}>{i + 1} 楼{i + 1 > info.baseFloors ? '（局部）' : ''}</option>)}
+        {!info ? <option value={0}>{location?.levelText || '室外'}</option> : Array.from({ length: Math.max(info.floors, photo.floor) }, (_, i) => <option key={i} value={i + 1}>{buildingFloorLabel(info,i+1)}</option>)}
       </select></label>
       <p className="field-help">{location?.feature?.type === 'tunnelEntrance' ? '点击入口的台阶标记拍摄位置，高度会随台阶自动确定，无需填写楼层。' : <>地图位置随楼层显示。{info && info.sections.length > 1 && <> 此楼分为{buildingFloorText(info)}。</>}</>}</p>
       <label>镜头离{info ? '楼面' : '地面'}高度 / m<PhotoNumberInput name="cameraHeight" min={cameraRange.min} max={cameraRange.max} step={.1} value={Math.min(cameraRange.max, Math.max(cameraRange.min, photo.cameraHeight ?? 1.6))} onValue={value => {

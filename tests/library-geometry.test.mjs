@@ -6,7 +6,7 @@ import polygonClipping from 'polygon-clipping';
 import { buildingGeometry } from '../src/building-geometry.ts';
 import { buildingLevels } from '../src/building-model.ts';
 import { teachingWindowGeometry } from '../src/architecture-geometry.ts';
-import { libraryAnnexWindowsConfig } from '../src/campus-exterior-geometry.ts';
+import { libraryAnnexWindowsConfig, libraryAnnexGlazingGeometry, libraryEntranceLayout } from '../src/campus-exterior-geometry.ts';
 import { buildingColors } from '../src/building-colors.ts';
 import { classroomWindowLayout, confirmedFacade } from '../src/teaching-classrooms.ts';
 import { applyCampusCorrections } from '../server/campus-corrections.mjs';
@@ -14,6 +14,23 @@ import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
 const corrections = JSON.parse(await fs.readFile(new URL('../data/campus-corrections.json', import.meta.url)));
 const library = campus.buildings.find(building => building.id === 'way/855459419');
+
+test('only the entrance door leaves leave the dark curtain-glass batch, with neighbouring and upper windows unchanged',()=>{
+  const info=buildingLevels(library),sections=info.sections.filter(s=>s.id==='curved-annex'),entry=libraryEntranceLayout(library,info.floorHeight);
+  const config=libraryAnnexWindowsConfig(library,info.floorHeight),original=teachingWindowGeometry({...library,classroomWindows:config},sections,info.floorHeight);
+  const split=libraryAnnexGlazingGeometry(library,sections,info.floorHeight),material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=geometry=>{const m=new THREE.Mesh(geometry,material);m.updateMatrixWorld();return m;},glass=mesh(split.glass),door=mesh(split.doors);
+  const ray=(u,y)=>new THREE.Raycaster(entry.at(u,1,y),new THREE.Vector3(-entry.outward[0],0,-entry.outward[1]),0,2);
+  try {
+    assert.equal(ray(0,1.5).intersectObject(glass).length,0,'No opaque curtain pane remains behind the transparent entrance door');
+    assert.ok(ray(0,1.5).intersectObject(door).length,'The same real entrance glass has its own material batch');
+    for(const [u,y] of [[-1.5,1.5],[1.7,1.5],[0,3],[0,info.floorHeight+1.5]]) {
+      assert.ok(ray(u,y).intersectObject(glass).length,'Adjoining, transom and upstairs windows keep their dark glass');
+      assert.equal(ray(u,y).intersectObject(door).length,0,'The transparent door batch never reaches another window');
+    }
+    assert.deepEqual(split.frames.attributes.position.array,original.frames.attributes.position.array,'Every original mullion stays exactly where it was');
+  } finally {for(const g of [...Object.values(original),...Object.values(split)])g.dispose();material.dispose();}
+});
 
 test('the green annex curtain wall opens its confirmed faces while preserving the main library windows', () => {
   const original = JSON.stringify(library), material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });

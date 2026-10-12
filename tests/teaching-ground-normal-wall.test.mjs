@@ -66,8 +66,8 @@ test('both first-floor roads remain clear across their full usable width with or
         }
       }
       for (const rise of [.65, 1.6, 3]) {
-        assert.ok(crossing(normal, .1, rise).intersectObjects(object.bodies).length,
-          'The ordinary classroom facade retains its wall jamb beyond the road');
+        assert.ok(crossing(normal, .005, rise).intersectObjects(object.bodies).length,
+          'The elongated classroom window retains its narrow nine-centimetre end jamb beyond the road');
         assert.ok(crossing(besideRoad, .1, rise).intersectObjects([...object.bodies, object.glass]).length,
           'Opening the road leaves its adjoining ordinary classroom facade enclosed by masonry or its real window');
       }

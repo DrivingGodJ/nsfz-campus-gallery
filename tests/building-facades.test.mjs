@@ -38,7 +38,7 @@ test('the observatory and doorway align with the existing projecting bay, while 
     const from = center.clone().sub(new THREE.Vector3(a[0], 0, a[1]));
     assert.ok(Math.abs(from.dot(axis) - length * .5) < 1e-6, 'Dome is centered on the original bay');
     assert.ok(inside(model.dome.center, dorm), 'Dome is supported by the existing roof');
-    const ratio = (model.dome.peak - FACADE_BASE - .06) / floorHeight;
+    const ratio = (model.dome.peak - FACADE_BASE - .25 - .06) / floorHeight;
     if (peakRatio !== undefined) assert.ok(Math.abs(ratio - peakRatio) < 1e-7);
     peakRatio = ratio;
     assert.ok(!model.geometries.some(p => ['roof', 'red', 'wall'].includes(p.kind)), 'No full-building roof, colored bands, or window rows');
@@ -57,14 +57,14 @@ test('the observatory and doorway align with the existing projecting bay, while 
 
 test('the dormitory opaque crown follows its real curved front above five window rows and leaves with a top-floor cut', () => {
   const original = JSON.stringify(dorm), info = buildingLevels(dorm, site.buildingOverrides[dorm.id]);
-  const model = facadeGeometry(dorm, info.floors, info.floorHeight), sliced = facadeGeometry(dorm, info.floors, info.floorHeight, info.height, true);
+  const model = facadeGeometry(dorm, info.floors, info.floorHeight), sliced = facadeGeometry(dorm, info.floors, info.floorHeight, info.baseHeight, true);
   const body = dormitoryBodyGeometry(dorm, info.height, info.floorHeight);
   const front = dormitoryProfile(dorm).shape.outer;
   const meshes = model.geometries.filter(p => p.kind === 'stone').map(p => { const mesh = new THREE.Mesh(p.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })); mesh.updateMatrixWorld(); return mesh; });
   try {
     assert.equal(dorm.classroomWindows.startFloor, 2);
     assert.equal(dorm.classroomWindows.endFloor, 6, 'The photographed five ordinary rows occupy floors 2–6');
-    assert.equal(model.crown.base, FACADE_BASE + info.height);
+    assert.equal(model.crown.base, FACADE_BASE + info.baseHeight);
     assert.ok(model.crown.line.length > 10, 'The crown uses the actual curved wall, rather than a flat rectangle');
     for (const point of model.crown.line) {
       const distance = Math.min(...front.slice(1).map((b, i) => {
@@ -77,7 +77,7 @@ test('the dormitory opaque crown follows its real curved front above five window
     const normal = new THREE.Vector3(dz / length, 0, -dx / length), center = new THREE.Vector3((a[0] + b[0]) / 2, model.crown.base + model.crown.height / 2, (a[1] + b[1]) / 2);
     assert.ok(new THREE.Raycaster(center.addScaledVector(normal, .5), normal.clone().negate(), 0, 1).intersectObjects(meshes).length, 'The roof crown is opaque masonry');
     body.computeBoundingBox();
-    assert.ok(Math.abs(body.boundingBox.max.z - info.height) < 1e-4, 'The six-storey roof height is unchanged');
+    assert.ok(Math.abs(body.boundingBox.max.z - info.baseHeight) < 1e-4, 'The six-storey roof height is unchanged');
     const entry = dorm.facade.entry, x = dorm.outer[entry.edge], z = dorm.outer[entry.edge + 1];
     const span = Math.hypot(z[0] - x[0], z[1] - x[1]), area = dorm.outer.slice(1).reduce((sum, p, i) => sum + dorm.outer[i][0] * p[1] - p[0] * dorm.outer[i][1], 0), sign = Math.sign(area);
     const expected = [x[0] + (z[0] - x[0]) * entry.at - 3.1 * (z[1] - x[1]) / span * sign, x[1] + (z[1] - x[1]) * entry.at + 3.1 * (z[0] - x[0]) / span * sign];
@@ -88,7 +88,7 @@ test('the dormitory opaque crown follows its real curved front above five window
         .addScaledVector(along, model.plaque.width * horizontal).addScaledVector(outward, -.5);
       assert.ok(new THREE.Raycaster(eye, outward, 0, .4).intersectObjects(meshes).length, 'Solid masonry backs both the lower and upper crest before the outward plaque plates');
     }
-    assert.equal(model.dome.base, FACADE_BASE + info.height + info.floorHeight * .4 + .01, 'The dome retains its original elevation');
+    assert.equal(model.dome.base, FACADE_BASE + info.baseHeight + .25 + info.floorHeight * .8 + .01, 'The enlarged observatory sits on its new seventh-floor slab');
     assert.equal(sliced.crown, undefined);
     assert.equal(sliced.plaque, undefined);
     assert.equal(sliced.dome, undefined);

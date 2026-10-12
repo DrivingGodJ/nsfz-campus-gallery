@@ -100,7 +100,11 @@ export function classroomWindowLayout(core: MultiPolygon, config: ClassroomWindo
     // Keep the conservative minimum for facades without explicit evidence.
     if (length < (facadeEdges ? .8 : 3.2)) continue;
     const count = Math.max(1, Math.floor(length / config.bayWidth));
-    const bay = length / count, width = Math.min(config.windowWidth, bay - (config.pierWidth ?? .9));
+    const bay = length / count;
+    const straight = run.every(edge => Math.abs(edge.normal[0] * run[0].normal[1] - edge.normal[1] * run[0].normal[0]) < 1e-4);
+    // Straight classroom strips fill each measured bay; rounded runs retain
+    // their independent photographed widths and ordinary frame calibration.
+    const width = straight && config.straightWindowGap !== undefined ? bay - config.straightWindowGap : Math.min(config.windowWidth, bay - (config.pierWidth ?? .9));
     if (width <= 1e-6) continue;
     for (let i = 0; i < count; i++) {
       const center = bay * (i + .5), start = center - width / 2, end = center + width / 2;

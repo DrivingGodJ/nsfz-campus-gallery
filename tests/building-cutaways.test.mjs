@@ -63,7 +63,7 @@ test('laboratory, cafeteria and dormitory cutaways remove first and top ceilings
   const generators = { laboratory: laboratoryBodyGeometry, cafeteria: cafeteriaBodyGeometry, dormitory: dormitoryBodyGeometry };
   for (const building of campus.buildings.filter(b => b.facade && generators[b.facade.type])) {
     const info = buildingLevels(building, site.buildingOverrides[building.id]);
-    for (const floor of [1, 2, info.floors]) {
+    for (const floor of [1, 2, info.baseFloors]) {
       const height = floor * info.floorHeight, geometry = generators[building.facade.type](building, height, info.floorHeight, true);
       assert.ok(exposedFloorSamples(geometry, height, info.floorHeight, `${building.id}/${floor}`) > 0, `${building.id}/${floor} retains an exposed floor`);
       geometry.dispose();
@@ -86,7 +86,7 @@ test('removing the selected ceiling keeps lower ceilings and the normal complete
   }
 });
 
-test('gymnasium, dormitory dome and glass pavilion roofs disappear when their top floor is selected', () => {
+test('gymnasium and pavilion roofs disappear on selection, while the dormitory globe stays only on its dedicated seventh floor', () => {
   const gym = campus.buildings.find(b => b.id === GYM_ID), levels = buildingLevels(gym, site.buildingOverrides[gym.id]);
   const bridge = campus.features.find(f => f.id === 'local/footbridge');
   const fullGym = gymArchitecture(gym, levels.height, levels.floorHeight, bridge);
@@ -96,9 +96,12 @@ test('gymnasium, dormitory dome and glass pavilion roofs disappear when their to
   for (const model of [fullGym, cutGym]) for (const geometry of Object.values(model)) geometry.dispose();
 
   const dorm = campus.buildings.find(b => b.facade?.type === 'dormitory'), dormLevels = buildingLevels(dorm, site.buildingOverrides[dorm.id]);
-  const dormCut = facadeGeometry(dorm, dormLevels.floors, dormLevels.floorHeight, dormLevels.height, true);
+  const dormCut = facadeGeometry(dorm, dormLevels.floors, dormLevels.floorHeight, dormLevels.baseHeight, true);
   assert.equal(dormCut.dome, undefined);
   for (const { geometry } of dormCut.geometries) geometry.dispose();
+  const observatory = facadeGeometry(dorm, dormLevels.floors, dormLevels.floorHeight, dormLevels.height, true);
+  assert.ok(observatory.dome,'The dedicated seventh-floor globe remains visible when selected');
+  for (const {geometry} of observatory.geometries)geometry.dispose();
 
   const hall = campus.buildings.find(b => b.appearance?.type === 'glass-pavilion'), hallLevels = buildingLevels(hall, site.buildingOverrides[hall.id]);
   const pavilion = pavilionGeometry(hall.appearance, hallLevels.height, 48, true);

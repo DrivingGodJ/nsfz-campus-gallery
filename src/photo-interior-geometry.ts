@@ -18,7 +18,7 @@ export type InteriorPlacement = { id: string; floor: number; source: string; sha
 // a photo's heading or position never moves its photographed furniture.
 export const PHOTO_INTERIOR_EVIDENCE = [
   { photoId: '719592c1-5539-42c7-b21a-7d9492d273b0', buildingId: PHOTO_INTERIOR_IDS[0], floor: 2, observed: 'green tables, wood legs, green/white/orange chairs and round columns' },
-  { photoId: 'a4661989-e16c-4399-8edb-6c5a8a2223fe', buildingId: PHOTO_INTERIOR_IDS[1], floor: 6, observed: 'tilted open-truss reflector telescope, white fork mount and side table' },
+  { photoId: 'a4661989-e16c-4399-8edb-6c5a8a2223fe', buildingId: PHOTO_INTERIOR_IDS[1], floor: 7, observed: 'tilted open-truss reflector telescope, white fork mount and side table' },
   { photoId: '88338113-b195-4d6d-a689-628603b6fc3f', buildingId: PHOTO_INTERIOR_IDS[2], floor: 6, observed: 'wood slat ceiling and zigzag strip lighting on the balcony approach' },
   { photoId: '8904ca53-186b-44ac-b32b-6603b313e39b', buildingId: PHOTO_INTERIOR_IDS[2], floor: 6, observed: 'wood balcony decking, steel space frame and folded black umbrellas' },
   { photoId: '15ce2084-cd0d-4410-8f6d-112dae3e127a', buildingId: PHOTO_INTERIOR_IDS[2], floor: 1, observed: 'art wall, leaning canvas boards, paint pots and red ceiling pipe' },
@@ -41,7 +41,10 @@ const fits = (shape: Shape, rooms: Shape[], exclusions: Shape[]) => rooms.some(r
 export function photoInteriorShapes(building: Building, floor: number): Shape[] {
   if (building.facade?.type === 'laboratory') { const layout = laboratoryLayout(building); return [...layout.rooms, ...layout.walkways]; }
   if (building.facade?.type === 'cafeteria' && floor <= 2) return [cafeteriaLowerProfile(building).shape];
-  if (building.facade?.type === 'dormitory') return [dormitoryProfile(building).shape];
+  if (building.facade?.type === 'dormitory') {
+    const observatory=dormitoryObservatory(building,building.floorHeight??3.6);
+    return floor===building.facade.observatory?.floor&&observatory?[observatory.shape]:[dormitoryProfile(building).shape];
+  }
   return [building.parts?.find(part => part.id === 'main') ?? building];
 }
 
@@ -69,8 +72,9 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
     for (const point of columns) add(`dining-column-${point}`,2,'column',point,[1,0],.8,.8,3.3,source);
   }
   if (building.id === PHOTO_INTERIOR_IDS[1]) {
-    add('observatory-reflector',6,'telescope',[-5.25,132.5],[.05,-1],1.7,2.25,4.8,PHOTO_INTERIOR_EVIDENCE[1].photoId);
-    add('observatory-side-table',6,'side-table',[-2.9,134.7],[1,0],1.15,.65,.78,PHOTO_INTERIOR_EVIDENCE[1].photoId);
+    const floor=building.facade?.observatory?.floor??7;
+    add('observatory-reflector',floor,'telescope',[-5.25,132.5],[.05,-1],1.7,2.25,4.8,PHOTO_INTERIOR_EVIDENCE[1].photoId);
+    add('observatory-side-table',floor,'side-table',[-2.9,134.7],[1,0],1.15,.65,.78,PHOTO_INTERIOR_EVIDENCE[1].photoId);
   }
   if (building.id === PHOTO_INTERIOR_IDS[2]) {
     const layout = laboratoryLayout(building), a = layout.at(0,0), b = layout.at(1,0), axis: Point = [b[0]-a[0],b[1]-a[1]];
@@ -107,11 +111,11 @@ export function photoInteriorGeometry(building: Building, height: number, floorH
     for(let i=0;i<(index?.count??p.count);i++) {const j=index?index.getX(i):i;vertices[kind].push(p.getX(j),Math.min(p.getY(j),limit),p.getZ(j));}
     geometry.dispose();
   };
-  for(const item of photoInteriorPlacements(building)) {
+  for(const item of photoInteriorPlacements({...building,floorHeight})) {
     const base=floorY(item.floor), f=frame(item.center,item.axis), floorTop=item.floor*floorHeight;
     if(base>=.12+shown || floorTop>height+.001) continue;
-    const observatory=item.kind==='telescope'&&cutawayHeight===undefined?dormitoryObservatory(building,floorHeight):undefined;
-    limit=observatory?.radius ? .12+height+observatory.drumRise+floorHeight*.73 : .12+shown;
+    const observatory=building.id===PHOTO_INTERIOR_IDS[1]&&item.floor===building.facade?.observatory?.floor?dormitoryObservatory(building,floorHeight):undefined;
+    limit=observatory?.radius ? observatory.floorY+observatory.drumRise+observatory.domeRise : .12+shown;
     const overhead=item.kind==='slat-ceiling'||item.kind==='light-track'||item.kind==='space-frame'||item.kind==='red-pipe';
     if(overhead && cutawayHeight!==undefined && cutawayHeight<=floorTop+.001) continue;
     const matrix=(point: Vector) => new THREE.Matrix4().makeBasis(new THREE.Vector3(f.along[0],0,f.along[1]),new THREE.Vector3(0,1,0),new THREE.Vector3(f.across[0],0,f.across[1])).setPosition(...point);

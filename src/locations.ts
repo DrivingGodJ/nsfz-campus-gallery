@@ -1,6 +1,7 @@
 import { bridgeHeight, bridgeSurfaceHeight, curvedStairSurfaceHeight } from './structure-geometry.ts';
 import { buildingLevels } from './building-model.ts';
 import { groundElevationAt } from './sports-ground-geometry.ts';
+import { dormitoryObservatory } from './facade-geometry.ts';
 import type { Building, Campus, Feature, Photo, Site } from './types';
 
 export type CampusLocation = { id: string; name: string; kind: 'building' | 'feature'; surfaceHeight: number; levelText: string; building?: Building; feature?: Feature };
@@ -69,6 +70,10 @@ export function photoMapHeight(photo: Photo, campus: Campus, site: Site) {
   const id = photoLocationId(photo, campus), building = campus.buildings.find(b => b.id === id);
   if (building) {
     const info = buildingLevels(building, site.buildingOverrides[id]);
+    if(photo.floor===info.observatoryFloor) {
+      const observatory=dormitoryObservatory(building,info.floorHeight);
+      if(observatory)return info.baseElevation+observatory.floorY+cameraHeight;
+    }
     return info.baseElevation + (Math.max(1, photo.floor) - 1) * info.floorHeight + cameraHeight;
   }
   const feature = campus.features.find(f => f.id === id);

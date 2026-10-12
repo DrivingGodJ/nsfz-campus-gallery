@@ -38,6 +38,15 @@ export function theatreEntranceLayout(building: Building, floorHeight: number) {
     treads: straightStairTreads(flightTop, bottom, BASE + floor, BASE) };
 }
 
+export function theatrePartDoorLayouts(building: Building, floorHeight: number) {
+  return (building.parts??[]).flatMap(part=>(part.doors??[]).map(door=>{
+    const a=part.outer[door.edge],b=part.outer[door.edge+1],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    const axis:Point=[(b[0]-a[0])/length,(b[1]-a[1])/length],center=shifted(a,axis,length*door.at);
+    const bottom=(door.floor-1)*floorHeight+.25,top=Math.min(door.floor*floorHeight-.35,bottom+door.height);
+    return {...door,partId:part.id,center,axis,from:shifted(center,axis,-door.width/2),to:shifted(center,axis,door.width/2),outward:[axis[1],-axis[0]] as Point,bottom,top};
+  }));
+}
+
 // Open the recessed entrance, vestibule exit and separate auditorium doorway only on 2F.
 // Ordinary facade glazing and the confirmed 5F art/glass walls remain separate.
 function ordinaryTheatreWindows(building: Building, section: Section, height: number, floorHeight: number): ClassroomWindow[] {
@@ -53,6 +62,7 @@ function ordinaryTheatreWindows(building: Building, section: Section, height: nu
 
 export function theatreBodyWindows(building: Building, section: Section, height: number, floorHeight: number): ClassroomWindow[] {
   const windows = ordinaryTheatreWindows(building, section, height, floorHeight);
+  for(const door of theatrePartDoorLayouts(building,floorHeight))if(door.partId===section.id&&height>door.bottom)windows.push({from:door.from,to:door.to,bottom:door.bottom,top:Math.min(height,door.top),cut:[passageFootprint([door.from,door.to],.9).outer]});
   // The imported east notch is narrower than one wall leaf. Its confirmed
   // pane straddles the adjoining main cap; clear that backing leaf as well.
   if ((section.id === 'main' || section.id === 'theatre-entry-vestibule') && building.classroomWindows) {
@@ -134,6 +144,14 @@ export function theatreEntranceGeometry(building: Building, floorHeight: number,
       pane.rotateY(-Math.atan2(layout.axis[1], layout.axis[0])); pane.translate(center[0], (doorTop + doorBottom) / 2, center[1]); glass.push(pane);
       if (doorTop - doorBottom > 1.3) vertical(shifted(shifted(layout.center, layout.axis, side * .13), layout.outward, .055), doorBottom + .85, doorBottom + 1.25, .025);
     }
+  }
+  for(const door of theatrePartDoorLayouts(building,floorHeight)) {
+    const low=BASE+door.bottom,high=Math.min(BASE+door.top,shown);if(high<=low)continue;
+    for(const p of [door.from,door.to])frames.push(architectureBar(point(p,low),point(p,high),.065));
+    frames.push(architectureBar(point(door.from,high),point(door.to,high),.065));
+    const pane=new THREE.BoxGeometry(door.width-.07,high-low-.035,.04);
+    pane.rotateY(-Math.atan2(door.axis[1],door.axis[0]));pane.translate(door.center[0],(low+high)/2,door.center[1]);glass.push(pane);
+    if(high-low>1.3){const handle=shifted(shifted(door.to,door.axis,-.18),door.outward,.06);frames.push(architectureBar(point(handle,low+.9),point(handle,low+1.2),.025));}
   }
   return { concrete: architectureBatch(concrete), glass: architectureBatch(glass, false), frames: architectureBatch(frames, false), rails: architectureBatch(rails, false) };
 }

@@ -6,6 +6,7 @@ import { snapFootprint } from './building-geometry.ts';
 import type { Feature, Point, Shape } from './types';
 
 export const RIVER_IDS = ['way/1277839749', 'way/1277839748', 'local/lake-water-link'];
+export const RIVER_GARDEN_PATH_ID = 'local/river-north-bank-path';
 export const RIVER_COLORS = { bank: '#a6a18e', rock: '#7e8274', paths: '#b3a58c', timber: '#795e46', stone: '#c4bdab', leaves: '#648064', shrubs: '#67805e' };
 const BASE = .12;
 // The seat beside the northern-bank tree was moved to the main path; the
@@ -67,7 +68,8 @@ export function riverBankSamples(features: Feature[], spacing = 1.35) {
 }
 export function riverLandscapeGeometry(features: Feature[], buildings: Shape[] = []) {
   const parts = Object.fromEntries(Object.keys(RIVER_COLORS).map(key => [key, [] as THREE.BufferGeometry[]])) as Record<keyof typeof RIVER_COLORS, THREE.BufferGeometry[]>;
-  const waters = riverWaterFootprints(features), roads = features.filter(feature => ['path', 'bridge'].includes(feature.type) && feature.points).map(feature => passageFootprint(feature.points!, feature.width ?? 2));
+  const waters = riverWaterFootprints(features), roadFeatures = features.filter(feature => ['path', 'bridge'].includes(feature.type) && feature.points);
+  const roads = roadFeatures.map(feature => passageFootprint(feature.points!, feature.width ?? 2));
   const onLand = (point: Point) => !waters.some(water => inside(point, water.outer)) && !buildings.some(building => inside(point, building.outer)) && !roads.some(road => inside(point, road.outer));
   const box = (key: keyof typeof parts, size: [number, number, number], position: [number, number, number], angle = 0) => parts[key].push(new THREE.BoxGeometry(...size).rotateY(angle).translate(...position));
   const shrub = (position: Point, seed: number) => {
@@ -102,8 +104,10 @@ export function riverLandscapeGeometry(features: Feature[], buildings: Shape[] =
   }
   // Small garden paths and the seats surrounding the old tree are visible in
   // _DSC2471 / _DSC1493; only this photographed northern bank gets furniture.
-  const excluded = snapFootprint([...waters, ...buildings, ...roads].map(shape => [shape.outer, ...shape.holes]));
-  for (const route of riverGardenPaths) {
+  const excluded = snapFootprint([...waters, ...buildings, ...roads.filter((_, i) => roadFeatures[i].id !== RIVER_GARDEN_PATH_ID)].map(shape => [shape.outer, ...shape.holes]));
+  const markedPath = features.find(feature => feature.id === RIVER_GARDEN_PATH_ID);
+  const gardenPaths = markedPath?.points ? [markedPath.points, ...(markedPath.branches ?? []), ...riverGardenPaths.slice(1)] : riverGardenPaths;
+  for (const route of gardenPaths) {
     const points = new THREE.CatmullRomCurve3(route.map(([x,z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal').getSpacedPoints(route.length * 5).map(p => [p.x,p.z] as Point);
     const footprint = passageFootprint(points, 1.2);
     // Shared path endpoints need the same precision as their road masks.

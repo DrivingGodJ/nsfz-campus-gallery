@@ -6,6 +6,7 @@ import { passageFootprint, undergroundLayout } from './underground-geometry.ts';
 import { bridgeLayout } from './bridge-geometry.ts';
 import { curvedStairPoint, curvedStairTreads } from './structure-geometry.ts';
 import { gardenFootprints, pergolaLayout } from './garden-geometry.ts';
+import { dormitoryObservatory } from './facade-geometry.ts';
 
 // Picking, highlighting and camera focus must describe the same footprint,
 // including joined underground routes and bridges with connecting stairs.
@@ -23,6 +24,11 @@ export function mapLocationTarget(campus: Campus, site: Site, id?: string, cutaw
   let points: Point[], center: Point | undefined, bottom: number, top: number;
   if (building) {
     const info = buildingLevels(building, site.buildingOverrides[building.id]);
+    const observatory=info.observatoryFloor?dormitoryObservatory(building,info.floorHeight):undefined;
+    if(observatory&&cutawayFloor===info.observatoryFloor) {
+      const bottom=info.baseElevation+observatory.floorY,top=bottom+observatory.drumRise+observatory.domeRise+.06;
+      return {target:[observatory.center[0],(bottom+top)/2,observatory.center[1]],bounds:{min:[observatory.center[0]-observatory.radius,bottom,observatory.center[1]-observatory.radius],max:[observatory.center[0]+observatory.radius,top,observatory.center[1]+observatory.radius]}};
+    }
     const height = cutawayFloor ? Math.min(info.height, cutawayFloor * info.floorHeight) : info.height;
     points = info.sections.flatMap(section => section.outer);
     center = building.center; bottom = info.baseElevation + .12; top = height + bottom;

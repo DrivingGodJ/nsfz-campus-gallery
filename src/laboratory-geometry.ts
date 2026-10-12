@@ -47,10 +47,14 @@ export function laboratoryLayout(building: Building) {
   const seam = (v: number): Point => origin.map((n, i) => n + (corner[i] - n) * v / reach) as Point;
   const classrooms: Shape = { outer: [origin, building.outer[10], building.outer[9], building.outer[8], at(68.85, corridorFront), seam(corridorFront), origin], holes: [] };
   const rooms = [circle, rectangle(corridorWest, leftFront, sideLeft, 56.6), shape([[sideRight,endReturn],[68.85,endReturn],[68.85,14 + forward],[65,14 + forward],[65,56.6],[sideRight,56.6]]), classrooms];
-  const stairU = 20.48 - roomWidth / 2;
+  // The marked east bay starts at the main facade's return. Its rear wall is
+  // the building's existing outside wall, rather than a second wall in front.
+  const stairWest = (a[0] - origin[0]) * along[0] + (a[1] - origin[1]) * along[1];
+  const stairRear = (a[0] - origin[0]) * inward[0] + (a[1] - origin[1]) * inward[1];
+  const stairU = stairWest + roomWidth / 2;
   const stair: BuildingStairwell = {
     partId: 'main', origin: at(stairU, 6.12 + forward), axis: [-inward[0], -inward[1]], width: stairWidth, run: 3.2, landingDepth: .8, stepsPerFlight: 11, firstFlight: 'left',
-    opening: rectangle(stairU - roomWidth / 2, WALL + forward, stairU + roomWidth / 2, corridorFront),
+    opening: rectangle(stairWest, stairRear, stairWest + roomWidth, corridorFront),
   };
   const branchLeft = circleU - circleRadius, branchRight = circleU + circleRadius;
   const connectionEdge = seam(17);
@@ -60,8 +64,7 @@ export function laboratoryLayout(building: Building) {
   ];
   // Keep the classroom band and full central hall on their marked sides of
   // the long straight wall. The theatre owns its outside walls and projection.
-  const walls = [...rooms.slice(0, -1).map(ring), ...polygonClipping.difference(snapFootprint([polygon(classrooms)]), snapFootprint([polygon(stair.opening)]))
-    .map(([outer, ...holes]) => ring({ outer: outer as Point[], holes: holes as Point[][] })), ring(stair.opening)];
+  const walls = [...rooms.map(ring), ring(stair.opening)];
   walls.push(rectangle(sideLeft, 56.6 - WALL, sideRight, 56.6));
   const doors: GroundPassage[] = [
     { id: 'lab-round-room', sourcePathId: '', points: [at(circleU, 25.8), at(circleU, 28)], width: 2.4 },
@@ -132,12 +135,5 @@ export function laboratoryWindows(building: Building, height: number, floorHeigh
   const stairWindows = building.classroomWindows.facadeLines
     ? classroomWindowLayout(snapFootprint([polygon(layout.stair.opening)]), building.classroomWindows, height, floorHeight)
     : [];
-  for (const window of stairWindows) {
-    // The stair enclosure meets the surrounding classroom shell back-to-back.
-    // Pierce both wall leaves without moving the observed frame or glazing.
-    const ring = window.cut[0], dx = ring[3][0] - ring[0][0], dz = ring[3][1] - ring[0][1], length = Math.hypot(dx, dz);
-    const out = (point: Point): Point => [point[0] - dx / length * WALL, point[1] - dz / length * WALL];
-    window.cut = [[out(ring[0] as Point), out(ring[1] as Point), ring[2], ring[3], out(ring[0] as Point)]];
-  }
   return [...classroomsWindows, ...stairWindows];
 }

@@ -8,6 +8,7 @@ import { photoInteriorPlacements, photoInteriorGeometry, photoInteriorShapes, PH
 import { laboratoryBodyGeometry, laboratoryLayout } from '../src/laboratory-geometry.ts';
 import { pointOnStairTread } from '../src/structure-geometry.ts';
 import { passageShape } from '../src/building-geometry.ts';
+import { buildingLevels } from '../src/building-model.ts';
 const campus=JSON.parse(fs.readFileSync(new URL('../public/data/campus.json',import.meta.url)));
 const site=JSON.parse(fs.readFileSync(new URL('../public/data/site.json',import.meta.url)));
 const buildings=PHOTO_INTERIOR_IDS.map(id=>campus.buildings.find(b=>b.id===id));
@@ -84,13 +85,15 @@ test('the crossed sixth-floor lab balcony has no decorative decking or umbrellas
 test('floor slicing removes the selected ceiling detail and every higher-floor object, while keeping furniture and zero marker occlusion',()=>{
   let total=0;
   for(const building of buildings) {
-    const full=photoInteriorGeometry(building,21.6,3.6),cut=photoInteriorGeometry(building,21.6,3.6,3.6);
+    const info=buildingLevels(building,site.buildingOverrides[building.id]);
+    const full=photoInteriorGeometry(building,info.height,3.6),cut=photoInteriorGeometry(building,info.height,3.6,3.6);
     const kinds=new Set(full.map(batch=>batch.kind));
     for(const {geometry} of full) {
       const p=geometry.attributes.position;total+=p.count/3;
       assert.equal(geometry.userData.photoOcclusionMask.length,p.count/3);
       assert.ok(geometry.userData.photoOcclusionMask.every(n=>n===0));
-      const ceiling=building.id===PHOTO_INTERIOR_IDS[1]?25.79:21.72;
+      const observatory=building.id===PHOTO_INTERIOR_IDS[1]?dormitoryObservatory(building,3.6):undefined;
+      const ceiling=observatory?observatory.floorY+observatory.drumRise+observatory.domeRise:21.72;
       for(let i=0;i<p.count;i++)assert.ok(Number.isFinite(p.getX(i))&&Number.isFinite(p.getY(i))&&Number.isFinite(p.getZ(i))&&p.getY(i)>=.36&&p.getY(i)<=ceiling+.001);
     }
     for(const {geometry} of cut){const p=geometry.attributes.position;for(let i=0;i<p.count;i++)assert.ok(p.getY(i)<=3.72+.001);}
@@ -105,8 +108,8 @@ test('floor slicing removes the selected ceiling detail and every higher-floor o
   assert.ok(total<26000,`Material-batched detail triangle budget: ${total}`);
 });
 
-test('telescope is an open optical truss on floor six and dining rows leave the central aisle and columns clear',()=>{
-  const dorm=photoInteriorPlacements(buildings[1]);assert.deepEqual(dorm.map(p=>[p.kind,p.floor]),[['telescope',6],['side-table',6]]);
+test('telescope is an open optical truss on floor seven and dining rows leave the central aisle and columns clear',()=>{
+  const dorm=photoInteriorPlacements(buildings[1]);assert.deepEqual(dorm.map(p=>[p.kind,p.floor]),[['telescope',7],['side-table',7]]);
   const cafeteria=photoInteriorPlacements(buildings[0]),tables=cafeteria.filter(p=>p.kind==='dining-set'),columns=cafeteria.filter(p=>p.kind==='column');
   assert.ok(tables.length>=25,'A populated dining hall, not one token table');
   assert.equal(columns.length,4);
@@ -121,21 +124,21 @@ test('telescope is an open optical truss on floor six and dining rows leave the 
   assert.equal(tables.filter(p=>p.id.startsWith('dining-window-bay')).length,3);
   assert.ok(tables.some(p=>{const dx=p.center[0]-reference.position.x,dz=p.center[1]-reference.position.z,front=dx*direction[0]+dz*direction[1];return front>2&&front<5&&Math.abs(dx*direction[1]-dz*direction[0])<1;}),'A table lies in the photographed near window bay, not only behind the original survey camera');
   assert.ok(tables.every(p=>!pointOnStairTread([reference.position.x,reference.position.z],p.shape.outer)),'The original surveyed shooting position stays clear');
-  const first=photoInteriorGeometry(buildings[1],21.6,3.6),repeat=photoInteriorGeometry(buildings[1],21.6,3.6);
+  const first=photoInteriorGeometry(buildings[1],25.2,3.6),repeat=photoInteriorGeometry(buildings[1],25.2,3.6);
   assert.ok(first.find(p=>p.kind==='dark').geometry.attributes.position.array.some((n,i)=>i%3===1&&n>22.5),'The tall reflector rises into the existing observatory dome, above the former generic lid');
   assert.deepEqual(first.map(x=>Array.from(x.geometry.attributes.position.array)),repeat.map(x=>Array.from(x.geometry.attributes.position.array)),'Model anchors are deterministic and independent of a live photo view');
   dispose(first);dispose(repeat);
 });
 
-test('the observatory opens through only its roof patch and has a hollow support, preserving the sixth floor beneath it',()=>{
+test('the relocated observatory has a hollow support above the closed original roof and retained sixth floor',()=>{
   const building=buildings[1],observatory=dormitoryObservatory(building,3.6),body=dormitoryBodyGeometry(building,21.6,3.6);
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),object=new THREE.Mesh(body,material);
   object.rotation.x=-Math.PI/2;object.position.y=.12;object.updateMatrixWorld();
   const [x,z]=observatory.center,up=new THREE.Vector3(0,1,0),origin=new THREE.Vector3(x,21.2,z),facade=facadeGeometry(building,6,3.6);
   const fittings=facade.geometries.map(part=>{const mesh=new THREE.Mesh(part.geometry,material);mesh.updateMatrixWorld();return mesh;});
   try {
-    assert.equal(new THREE.Raycaster(origin,up,0,.7).intersectObject(object).length,0,'The former generic roof slab no longer blocks the dome cavity');
-    assert.equal(new THREE.Raycaster(new THREE.Vector3(x,21.8,z),up,0,1.3).intersectObjects(fittings).length,0,'The observatory support is a hollow drum, never a solid plinth');
+    assert.ok(new THREE.Raycaster(origin,up,0,.7).intersectObject(object).length,'The original roof is closed beneath the new seventh-floor room');
+    assert.equal(new THREE.Raycaster(new THREE.Vector3(x,22.2,z),up,0,1.3).intersectObjects(fittings).length,0,'The observatory support is a hollow drum, never a solid plinth');
     assert.ok(new THREE.Raycaster(new THREE.Vector3(x,19,z),new THREE.Vector3(0,-1,0),0,1).intersectObject(object).length,'The actual sixth-floor slab remains');
     assert.ok(new THREE.Raycaster(new THREE.Vector3(x+6,21.2,z+5),up,0,.7).intersectObject(object).length,'The roof outside the circular observatory remains closed');
   } finally {body.dispose();facade.geometries.forEach(part=>part.geometry.dispose());material.dispose();}

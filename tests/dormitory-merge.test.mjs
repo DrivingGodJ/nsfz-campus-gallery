@@ -28,7 +28,10 @@ test('three dormitories become one continuous footprint and one selectable locat
   const expected = clip.union(...originals), actual = [merged.outer, ...merged.holes];
   assert.deepEqual(clip.difference(actual, expected), [], 'The merged building adds no footprint outside the original dormitories');
   assert.deepEqual(clip.difference(expected, actual), [], 'All original dormitory areas remain');
-  assert.equal(buildingLevels(merged, { floors: 6, floorHeight: 3.6 }).height, 6 * 3.6);
+  const levels=buildingLevels(merged,{floors:6,floorHeight:3.6});
+  assert.equal(levels.sections.find(part=>part.id==='main').height,6*3.6,'The merged ordinary dormitory remains six storeys');
+  assert.equal(levels.baseFloors,6);assert.equal(levels.floors,7);
+  assert.equal(levels.height,7*3.6,'The separate rooftop observatory is a local seventh floor');
   assert.equal(buildingLevels(merged, { floors: 7, floorHeight: 4 }).height, 28);
   const locations = campusLocations(regenerated, site);
   assert.equal(locations.filter(p => p.name === '宿舍').length, 1);

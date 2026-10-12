@@ -58,14 +58,21 @@ export function dormitoryObservatory(building: Building, floorHeight: number) {
   const entry=building.facade?.entry;
   if(!entry)return undefined;
   const edge=edgesOf(outline(building))[entry.edge];
-  return {center:shifted(shifted(edge.from,edge.axis,edge.length*entry.at),edge.normal,-3.1),radius:floorHeight*.77,drumRise:floorHeight*.4};
+  const config=building.facade?.observatory, floor=config?.floor??building.floors??6;
+  const center=shifted(shifted(edge.from,edge.axis,edge.length*entry.at),edge.normal,-3.1);
+  const radius=floorHeight*(config?.radiusScale??.77),drumRise=floorHeight*(config?.drumRiseScale??.4),domeRise=floorHeight*(config?.domeRiseScale??.73);
+  const floorY=FACADE_BASE+(floor-1)*floorHeight+.25;
+  const shape={outer:Array.from({length:49},(_,i):Point=>[center[0]+Math.cos(i*Math.PI/24)*(radius-.22),center[1]+Math.sin(i*Math.PI/24)*(radius-.22)]),holes:[]};
+  return {center,radius,drumRise,domeRise,floor,floorY,shape,doorAxis:edge.normal.map(n=>-n) as Point};
 }
 
 const dormitoryDoorArch = (floorHeight: number) => ({ half: floorHeight * .42, bottom: .04, spring: floorHeight * .57, rise: floorHeight * .42 * .66 });
 
 export function dormitoryBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
+  const separateObservatory=building.facade?.observatory;
+  if(separateObservatory)height=Math.min(height,(separateObservatory.floor-1)*floorHeight);
   const { shape, curve } = dormitoryProfile(building);
-  const observatory=!cutaway && height>=(building.floors??6)*floorHeight-.001?dormitoryObservatory(building,floorHeight):undefined;
+  const observatory=!separateObservatory && !cutaway && height>=(building.floors??6)*floorHeight-.001?dormitoryObservatory(building,floorHeight):undefined;
   const config = building.classroomWindows;
   const windows = config && classroomWindowLayout([[shape.outer, ...shape.holes]], config, height, floorHeight,
     (building.groundPassages ?? []).map(passage => { const opening = passageShape(passage); return [opening.outer, ...opening.holes]; }));
@@ -255,7 +262,8 @@ export function cafeteriaBodyGeometry(building: Building, height: number, floorH
 // Only the dormitory entry, plaque and observatory have local details. The
 // cafeteria uses its body geometry alone, with no glass or facade frames.
 export function facadeGeometry(building: Building, floors: number, floorHeight: number, visibleHeight = floors * floorHeight, cutaway = false) {
-  const model = building.facade!, height = floors * floorHeight, top = FACADE_BASE + Math.min(height, visibleHeight);
+  const model = building.facade!,height=Math.min(floors,model.observatory?(model.observatory.floor-1):floors)*floorHeight,top=FACADE_BASE+Math.min(height,visibleHeight);
+  const observatorySelected=!!model.observatory&&cutaway&&visibleHeight>=model.observatory.floor*floorHeight-1e-6;
   const complete = visibleHeight >= height - 1e-6, edges = edgesOf(outline(building));
   const vertices: Record<Material, number[]> = { glass: [], frame: [], stone: [], metal: [], emblem: [] };
   const append = (kind: Material, geometry: THREE.BufferGeometry, transform?: THREE.Matrix4) => {
@@ -296,7 +304,7 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
     const door = transform.clone(); door.setPosition(...at(edge, along, 0, .1));
     append('glass', new THREE.ShapeGeometry(new THREE.Shape(inner)), door);
     panel('frame', edge, along, FACADE_BASE + floorHeight * .34, .075, floorHeight * .65, .15, .045);
-    if (complete && !cutaway) {
+    if (complete && (!cutaway || observatorySelected)) {
       // 000013410013 shows five ordinary rows above the ground arcade. The
       // opaque crest wall is a separate roof crown, not the sixth-storey wall.
       const { curve } = dormitoryProfile(building), path = curve.length ? curve : [edge.from, shifted(edge.from, edge.axis, edge.length)];
@@ -337,12 +345,25 @@ export function facadeGeometry(building: Building, floors: number, floorHeight: 
       panel('stone', edge, along, plaqueY + plaqueHeight * .03, plaqueWidth * .38, plaqueHeight * .045, .35, .02);
       panel('stone', edge, along, plaqueY - plaqueHeight * .11, plaqueWidth * .28, plaqueHeight * .045, .35, .02);
       plaque = { center: at(edge, along, plaqueY, .3), width: plaqueWidth + .22, height: plaqueHeight + .22 };
-      if (!cutaway) {
-        const center = at(edge, along, 0, -3.1), radius = floorHeight * .77;
-        const base = top + floorHeight * .4 + .01, domeRise = floorHeight * .73;
+      if (!cutaway || observatorySelected) {
+        const observatory=dormitoryObservatory(building,floorHeight)!,{radius,drumRise,domeRise}=observatory;
+        const center=[observatory.center[0],0,observatory.center[1]];
+        const supportBase=model.observatory?observatory.floorY:top;
+        const base=supportBase+drumRise+.01;
         const drum=new THREE.Shape(Array.from({length:49},(_,i)=>new THREE.Vector2(Math.cos(i*Math.PI/24)*radius,Math.sin(i*Math.PI/24)*radius)));
         drum.holes.push(new THREE.Path(Array.from({length:49},(_,i)=>new THREE.Vector2(Math.cos(-i*Math.PI/24)*(radius-.22),Math.sin(-i*Math.PI/24)*(radius-.22)))));
-        const support=new THREE.ExtrudeGeometry(drum,{depth:floorHeight*.4+.01,bevelEnabled:false});support.rotateX(-Math.PI/2);support.translate(center[0],top,center[2]);append('stone',support);
+        if(model.observatory) {
+          const floor=new THREE.Shape(Array.from({length:49},(_,i)=>new THREE.Vector2(Math.cos(i*Math.PI/24)*radius,Math.sin(i*Math.PI/24)*radius)));
+          const plate=new THREE.ExtrudeGeometry(floor,{depth:.25,bevelEnabled:false});plate.rotateX(-Math.PI/2);plate.translate(center[0],supportBase-.25,center[2]);append('stone',plate);
+          const door=passageShape({id:'observatory-door',sourcePathId:'',width:1.3,points:[observatory.center,shifted(observatory.center,observatory.doorAxis,radius+.4)]});
+          const wall={outer:Array.from({length:49},(_,i):Point=>[center[0]+Math.cos(i*Math.PI/24)*radius,center[2]+Math.sin(i*Math.PI/24)*radius]),holes:[observatory.shape.outer]};
+          const lower=polygonClipping.difference(snapFootprint([[wall.outer,...wall.holes]]),snapFootprint([[door.outer,...door.holes]]));
+          const doorHeight=Math.min(2.2,drumRise*.85);
+          for(const [outer,...holes] of lower) append('stone',buildingGeometry({outer:outer as Point[],holes:holes as Point[][]},doorHeight,floorHeight).rotateX(-Math.PI/2).translate(0,supportBase,0));
+          const lintel=new THREE.ExtrudeGeometry(drum,{depth:drumRise+.01-doorHeight,bevelEnabled:false});lintel.rotateX(-Math.PI/2);lintel.translate(center[0],supportBase+doorHeight,center[2]);append('stone',lintel);
+        } else {
+          const support=new THREE.ExtrudeGeometry(drum,{depth:drumRise+.01,bevelEnabled:false});support.rotateX(-Math.PI/2);support.translate(center[0],top,center[2]);append('stone',support);
+        }
         const sphere = new THREE.SphereGeometry(radius, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
         sphere.scale(1, domeRise / radius, 1); sphere.translate(center[0], base, center[2]); append('stone', sphere);
         for (let i = 0; i < 20; i++) {

@@ -14,6 +14,7 @@ const BASE = .12;
 export function teachingDetailGeometry(building: Building, sections: Section[], floorHeight: number, cutawayHeight?: number) {
   const columns: THREE.BufferGeometry[] = [], rails: THREE.BufferGeometry[] = [], paving: THREE.BufferGeometry[] = [], inlay: THREE.BufferGeometry[] = [];
   const units: THREE.BufferGeometry[] = [], vents: THREE.BufferGeometry[] = [];
+  const screens: THREE.BufferGeometry[] = [], screenFrames: THREE.BufferGeometry[] = [];
   const passages = (building.groundPassages || []).map(passageShape);
   for (const section of sections) {
     const shown = Math.min(section.height, cutawayHeight ?? Infinity);
@@ -96,5 +97,18 @@ export function teachingDetailGeometry(building: Building, sections: Section[], 
       }
     }
   }
-  return { columns: batch(columns, false), rails: batch(rails, false), paving: batch(paving, false), inlay: batch(inlay, false), units: batch(units, false), vents: batch(vents, false) };
+  for (const core of building.solidCores || []) {
+    const display = core.wallDisplay;
+    if (!display || (core.startFloor ?? 1) > 1 || !sections.some(section => section.id === core.partId) || (cutawayHeight ?? Infinity) < display.bottom + display.height) continue;
+    const a = core.outer[display.edge], b = core.outer[display.edge + 1], dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz);
+    const sign = core.outer.slice(1).reduce((area, point, i) => area + core.outer[i][0] * point[1] - point[0] * core.outer[i][1], 0) > 0 ? 1 : -1;
+    const nx = dz / length * sign, nz = -dx / length * sign, y = BASE + display.bottom + display.height / 2;
+    const panel = (width: number, height: number, depth: number, offset: number) => {
+      const geometry = new THREE.BoxGeometry(width, height, depth);
+      geometry.rotateY(-Math.atan2(dz, dx)); geometry.translate((a[0] + b[0]) / 2 + nx * offset, y, (a[1] + b[1]) / 2 + nz * offset); return geometry;
+    };
+    screenFrames.push(panel(display.width + .16, display.height + .16, .1, .055));
+    screens.push(panel(display.width, display.height, .025, .12));
+  }
+  return { columns: batch(columns, false), rails: batch(rails, false), paving: batch(paving, false), inlay: batch(inlay, false), units: batch(units, false), vents: batch(vents, false), screens: batch(screens, false), screenFrames: batch(screenFrames, false) };
 }

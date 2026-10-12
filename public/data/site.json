@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 829,
+  "revision": 830,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -7691,18 +7691,18 @@
         "iso": 2500
       },
       "buildingId": "way/1233313434",
-      "floor": 6,
+      "floor": 7,
       "author": "",
       "copyright": "",
       "uploadedAt": "2026-10-09T05:48:32.439Z",
       "captureType": "ground",
       "position": {
-        "x": -5.126762947497318,
-        "z": 134.72502205943377
+        "x": -5.13856500414111,
+        "z": 130.26348559897875
       },
       "placed": true,
-      "heading": 358.46449573663244,
-      "pitch": 27.021960877048627,
+      "heading": 183.19624937721346,
+      "pitch": 30.530596676129406,
       "width": 7008,
       "height": 4672,
       "downloadBytes": 4843996,
@@ -7715,7 +7715,7 @@
       },
       "depthUpdatedAt": "4d8ac99a-44fc-4c53-b776-3b69618fb4cd",
       "locationId": "way/1233313434",
-      "cameraHeight": 3.5
+      "cameraHeight": 0.10000000000000142
     },
     {
       "id": "c5bd279e-c001-4cf3-8aeb-7c5861f65d82",

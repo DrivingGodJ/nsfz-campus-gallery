@@ -19,6 +19,7 @@ import LakeGarden from './LakeGarden';
 import MottoStone from './MottoStone';
 import FlagPlatform from './FlagPlatform';
 import BajinStatue from './BajinStatue';
+import CourtyardSculpture from './CourtyardSculpture';
 import MemorialGallery from './MemorialGallery';
 import AircraftDisplay from './AircraftDisplay';
 import Bench from './Bench';
@@ -260,6 +261,7 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
     if (feature.type === 'flagPlatform' && feature.flagPlatform) return surface(<FlagPlatform feature={feature} />);
     if (['boardwalk', 'lakePavilion', 'pergola'].includes(feature.type)) return surface(<LakeGarden feature={feature} features={features} connectedBuilding={buildings.find(building => feature.connectedTo?.includes(building.id))} labelPortal={labelPortal} />);
     if (feature.type === 'landmark' && feature.statue) return surface(<BajinStatue feature={feature} />);
+    if (feature.type === 'landmark' && feature.sculpture) return surface(<CourtyardSculpture feature={feature} />);
     if (feature.type === 'landmark' && feature.gallery) return surface(<MemorialGallery feature={feature} />);
     if (feature.type === 'landmark' && feature.aircraft) return surface(<AircraftDisplay feature={feature} />);
     if (feature.type === 'landmark' && feature.bench) return surface(<Bench feature={feature} />);
