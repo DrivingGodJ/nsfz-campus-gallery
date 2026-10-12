@@ -152,3 +152,22 @@ test('submission destination manifest exactly matches upload/filter major places
  assert.deepEqual(new Set(manifest.locationIds),new Set(campusFilterLocations(campus,{buildingOverrides:{}}).map(l=>l.id)));
  assert.throws(()=>validateAnnotation({title:'x',placed:true,captureType:'aerial',floor:0,position:{x:0,z:0},heading:0,pitch:0,capturedAt:'',locationId:''},manifest),/航拍高度/);
 });
+
+test('submission requests persist the declared laboratory garage floor and reject unsupported basements before reserving storage',async()=>{
+ const f=await fixture();try{
+  const laboratory='way/855459411';f.campus.basementBuildingIds=[laboratory];
+  const annotation={...f.annotation,buildingId:laboratory,locationId:laboratory,floor:-1,cameraHeight:.1};
+  const other=f.campus.buildingIds.find(id=>id!==laboratory&&f.campus.locationIds.includes(id));
+  for(const invalid of [{...annotation,floor:-2},{...annotation,buildingId:other,locationId:other}]){
+    const response=await f.call('start',{...f.input(),annotation:invalid});
+    assert.equal(response.status,400);
+    assert.match((await response.json()).error,/楼层/);
+  }
+  assert.equal((await f.env.DB.prepare('SELECT * FROM submission_budget').first()).reserved_bytes,0);
+  const input={...f.input(),annotation};assert.equal((await f.call('start',input)).status,201);
+  const record=await f.env.DB.prepare('SELECT annotation FROM submissions WHERE id=?').bind(input.id).first();
+  assert.equal(JSON.parse(record.annotation).floor,-1);
+  assert.equal(JSON.parse(record.annotation).cameraHeight,.1);
+  assert.equal((await f.call('start',input)).status,200,'An unchanged garage submission resumes through the same runtime');
+ }finally{await f.proxy.dispose();}
+});

@@ -3,6 +3,7 @@ import { Camera, Download, Minus, Plus, RotateCcw, X } from 'lucide-react';
 import { asset, captureTimeText, headingText, photoLocation, sizeText, type Campus, type Photo, type Site } from './types';
 import { photoFieldOfView, viewSourceText } from './photo-view';
 import { altitudeLabel, campusLocations, isAerialPhoto } from './locations';
+import { buildingFloorLabel, buildingLevels } from './building-model';
 import { PhotoPerspectiveButton } from './PhotoPerspective';
 import { photoPerspectiveIssue } from './photo-perspective';
 import { photoDisplayFile } from './photo-image';
@@ -59,7 +60,8 @@ export function PhotoMetadataView({ photo, editor = false }: { photo: Photo; edi
 }
 export function PhotoDetails({ photo, campus, site, onOpen, showImage = true, photoPerspective = false, onPhotoPerspective }: { photo: Photo; campus: Campus; site: Site; onOpen: () => void; showImage?: boolean; photoPerspective?: boolean; onPhotoPerspective?: () => void }) {
   const view = photoFieldOfView(photo);
-  const layer = campusLocations(campus, site).find(location => location.id === (photo.locationId ?? photo.buildingId))?.levelText || '室外';
+  const photoSpot = campusLocations(campus, site).find(location => location.id === (photo.locationId ?? photo.buildingId));
+  const layer = photoSpot?.building ? buildingFloorLabel(buildingLevels(photoSpot.building, site.buildingOverrides[photoSpot.id]), photo.floor) : photoSpot?.levelText || '室外';
   return <article className="photo-details">
     {showImage && <button className="detail-image" onClick={onOpen} aria-label={'查看大图：' + photo.title}><PhotoImage src={asset(photoDisplayFile(photo))} managed fallbackSrc={asset(photo.files.thumbnail)} alt={photo.title} /><span>查看大图 <Plus size={14} /></span></button>}
     <div className="detail-copy"><p className="eyebrow">{photoLocation(photo, campus, site)}</p><h2>{photo.title}</h2>
@@ -67,7 +69,7 @@ export function PhotoDetails({ photo, campus, site, onOpen, showImage = true, ph
       {onPhotoPerspective && <PhotoPerspectiveButton photo={photo} active={photoPerspective} onClick={onPhotoPerspective} />}
       {photo.description && <p className="description">{photo.description}</p>}
       <dl className="photo-credits" aria-label="作者与版权"><div><dt>作者</dt><dd>{photo.author || ''}</dd></div><div><dt>版权信息</dt><dd>{photo.copyright || ''}</dd></div></dl>
-      <dl className="photo-facts">{isAerialPhoto(photo) && photo.altitude ? <div><dt>{altitudeLabel(photo)}</dt><dd>{photo.altitude.meters.toFixed(1)} m</dd></div> : !isAerialPhoto(photo) && <div><dt>所在楼层</dt><dd>{photo.floor > 0 ? photo.floor + ' 楼' : layer}</dd></div>}<div><dt>镜头朝向</dt><dd>{headingText(photo.heading)}</dd></div><div><dt>仰俯角</dt><dd>{photo.pitch > 0 ? '仰拍 ' : photo.pitch < 0 ? '俯拍 ' : '平拍 '}{Math.abs(photo.pitch)}°</dd></div><div><dt>图片尺寸</dt><dd>{photo.width} × {photo.height}</dd></div></dl>
+      <dl className="photo-facts">{isAerialPhoto(photo) && photo.altitude ? <div><dt>{altitudeLabel(photo)}</dt><dd>{photo.altitude.meters.toFixed(1)} m</dd></div> : !isAerialPhoto(photo) && <div><dt>所在楼层</dt><dd>{layer}</dd></div>}<div><dt>镜头朝向</dt><dd>{headingText(photo.heading)}</dd></div><div><dt>仰俯角</dt><dd>{photo.pitch > 0 ? '仰拍 ' : photo.pitch < 0 ? '俯拍 ' : '平拍 '}{Math.abs(photo.pitch)}°</dd></div><div><dt>图片尺寸</dt><dd>{photo.width} × {photo.height}</dd></div></dl>
       {view && <div className="photo-view-summary"><strong>水平视角约 {view.horizontal.toFixed(1)}°</strong><span>{viewSourceText(view)}</span></div>}
       <PhotoMetadataView photo={photo} />
       <PhotoDownloadLink photo={photo} className="button secondary download-link"><Download size={16} />下载高清 JPEG<span>{sizeText(photo.downloadBytes)}</span></PhotoDownloadLink>

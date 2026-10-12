@@ -10,8 +10,8 @@ export function garageRampFootprint(feature: Feature) {
 }
 
 // The same straight opening cuts the ground and contains the sloping floor.
-// Only an entrance is modelled; the dark end stops at the basement doorway.
-export function garageRampGeometry(feature: Feature) {
+// A connected basement uses the real open end, rather than the old dark cap.
+export function garageRampGeometry(feature: Feature, openBottom = false) {
   const [from, to] = feature.points!, width = feature.width || 4.5;
   const { topHeight: top, bottomHeight: bottom } = feature.ramp!;
   const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
@@ -36,7 +36,7 @@ export function garageRampGeometry(feature: Feature) {
     geometry.computeVertexNormals();
     return geometry;
   });
-  const doorway = new THREE.PlaneGeometry(width, Math.min(2.5, top - bottom - .1));
+  const doorway = openBottom ? new THREE.BufferGeometry() : new THREE.PlaneGeometry(width, Math.min(2.5, top - bottom - .1));
   doorway.rotateY(Math.atan2(normal[1], -normal[0]));
   doorway.translate(to[0], bottom + Math.min(2.5, top - bottom - .1) / 2, to[1]);
   return { floor, leftWall: wallParts[0], rightWall: wallParts[1], doorway };

@@ -28,6 +28,7 @@ import WoodenHut from './WoodenHut';
 import StreetFence from './StreetFence';
 import { garageRampGeometry, garageRampFootprint } from './garage-ramp-geometry';
 import MapModelLayer from './MapModelLayer';
+import PhotoInteriorDetails from './PhotoInteriorDetails';
 
 function UndergroundView({ space, spaces, mode, photoPerspective = false, children }: { space: UndergroundViewSpace; spaces: UndergroundViewSpace[]; mode: UndergroundInspectionMode; photoPerspective?: boolean; children: ReactNode }) {
   const group=useRef<THREE.Group>(null), previous=useRef('');
@@ -59,9 +60,9 @@ function UndergroundView({ space, spaces, mode, photoPerspective = false, childr
   return <group ref={group}>{children}</group>;
 }
 
-function GarageEntrance({ feature, mode, photoPerspective }: { feature: Feature; mode: UndergroundInspectionMode; photoPerspective: boolean }) {
+function GarageEntrance({ feature, mode, photoPerspective, openBottom = false }: { feature: Feature; mode: UndergroundInspectionMode; photoPerspective: boolean; openBottom?: boolean }) {
   const mapColor = useMapColor();
-  const geometry = useMemo(() => garageRampGeometry(feature), [feature]);
+  const geometry = useMemo(() => garageRampGeometry(feature, openBottom), [feature, openBottom]);
   const space = useMemo(() => ({ floor: feature.ramp!.bottomHeight, height: feature.ramp!.topHeight + .3 - feature.ramp!.bottomHeight, footprints: [garageRampFootprint(feature)] }), [feature]);
   useEffect(() => () => Object.values(geometry).forEach(part => part.dispose()), [geometry]);
   const model = <group>
@@ -214,7 +215,7 @@ function UndergroundDetails({ feature, footprint, openings, connections }: { fea
       transparent opacity={kind === 'glass' || kind === 'skylights' ? .28 : kind === 'nets' ? .38 : kind === 'ceiling' ? .22 : .75} depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
   </mesh>)}</group>;
 }
-function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, openings = NO_OPENINGS, labelPortal, spaces, mode, photoPerspective }: { feature: Feature; connections?: Feature[]; footprints?: Shape[]; openings?: PassageOpening[]; labelPortal: RefObject<HTMLDivElement>; spaces: UndergroundViewSpace[]; mode: UndergroundInspectionMode; photoPerspective: boolean }) {
+function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, openings = NO_OPENINGS, labelPortal, spaces, mode, photoPerspective, building, floorHeight = 3.6 }: { feature: Feature; connections?: Feature[]; footprints?: Shape[]; openings?: PassageOpening[]; labelPortal: RefObject<HTMLDivElement>; spaces: UndergroundViewSpace[]; mode: UndergroundInspectionMode; photoPerspective: boolean; building?: Building; floorHeight?: number }) {
   const mapColor = useMapColor();
   const floor = feature.height ?? -3, wallHeight = feature.wallHeight || 2.4;
   const corridor = feature.type === 'undergroundCorridor' || feature.type === 'tunnelJunction', tunnel = feature.type === 'tunnel';
@@ -247,6 +248,7 @@ function UndergroundArea({ feature, connections = NO_CONNECTIONS, footprints, op
     })}
     <UndergroundView space={{floor,height:wallHeight,footprints:floorShapes,sections:viewSections}} spaces={spaces} mode={mode} photoPerspective={photoPerspective}>
       {floorShapes.map((footprint, n) => <UndergroundDetails key={n} feature={feature} footprint={footprint} openings={openings} connections={connections} />)}
+      {building && <PhotoInteriorDetails building={building} height={(building.floors ?? 6)*floorHeight} floorHeight={floorHeight} basement />}
     </UndergroundView>
     {(mode === 'underground' || photoPerspective) && [feature, ...connections].filter(item => !item.hideLabel && item.name?.trim()).map(item => <LocationHtml key={item.id} portal={labelPortal} position={labelPosition(item)} center zIndexRange={[5, 1]}><LocationName id={item.id} name={item.name!} underground /></LocationHtml>)}
   </group>;
@@ -270,10 +272,11 @@ export default memo(function CampusStructures({ features, buildings, overrides, 
     if (feature.type === 'landmark' && feature.landmark) return surface(<GateLandmark feature={feature} labelPortal={labelPortal} />);
     if (['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction', 'undergroundTrack'].includes(feature.type)) {
       const area = layout.areas.get(feature.id);
-      return underground && area ? <UndergroundArea key={feature.id} {...area} labelPortal={labelPortal} spaces={spaces} mode={mode} photoPerspective={photoPerspective} /> : null;
+      const building=feature.roomUse==='garage'?buildings.find(building=>building.basement?.featureId===feature.id):undefined;
+      return underground && area ? <UndergroundArea key={feature.id} {...area} labelPortal={labelPortal} spaces={spaces} mode={mode} photoPerspective={photoPerspective} building={building} floorHeight={building?overrides[building.id]?.floorHeight??building.floorHeight??3.6:undefined} /> : null;
     }
     if (!feature.points || feature.points.length < 2) return null;
-    if (feature.type === 'garageEntrance' && feature.ramp && feature.points.length === 2) return <GarageEntrance key={feature.id} feature={feature} mode={mode} photoPerspective={photoPerspective} />;
+    if (feature.type === 'garageEntrance' && feature.ramp && feature.points.length === 2) return <GarageEntrance key={feature.id} feature={feature} mode={mode} photoPerspective={photoPerspective} openBottom={features.some(room=>room.roomUse==='garage'&&room.connectedTo?.includes(feature.id))} />;
     if (feature.type === 'bridge') return surface(<Bridge feature={feature} buildings={buildings} overrides={overrides} labelPortal={labelPortal} />);
     if (feature.type === 'tunnelEntrance') return <Entrance key={feature.id} feature={feature} underground={underground} labelPortal={labelPortal} spaces={spaces} mode={mode} photoPerspective={photoPerspective} />;
     return null;

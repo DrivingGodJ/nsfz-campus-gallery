@@ -29,7 +29,7 @@ function rampSample(progress, across = 0) {
   return [from[0] + dx * progress - dz / length * across, from[1] + dz * progress + dx / length * across];
 }
 
-test('the garage ramp enters the classroom through its end facade, without occupying the neighboring corridor or adding an underground garage', () => {
+test('the garage ramp enters through its end facade without occupying the neighboring corridor or changing other underground routes', () => {
   assert.ok(entrance, 'The marked garage entrance is present in the published campus data');
   assert.equal(entrance.type, 'garageEntrance');
   assert.deepEqual(entrance, corrections.features.find(feature => feature.id === entrance.id));
@@ -50,11 +50,12 @@ test('the garage ramp enters the classroom through its end facade, without occup
   assert.ok(area(polygonClipping.intersection(footprint, polygonClipping.union(...layout.walkways.map(polygon)))) < 1e-7,
     'The neighboring three-metre open corridor remains outside the garage footprint');
   assert.deepEqual(laboratory.groundFloorOpenings, [garageRampFootprint(entrance)], 'The building cuts the same footprint as the ground and retaining walls');
-  const obstacles = [...campus.buildings.filter(building => building !== laboratory).map(polygon), ...campus.features.flatMap(feature => feature.outer ? [polygon(feature)]
+  const obstacles = [...campus.buildings.filter(building => building !== laboratory).map(polygon), ...campus.features.filter(feature => feature.roomUse !== 'garage').flatMap(feature => feature.outer ? [polygon(feature)]
     : feature.type === 'path' ? [polygon(passageFootprint(feature.points, feature.width || 3))] : [])];
   for (const obstacle of obstacles) assert.ok(area(polygonClipping.intersection(footprint, obstacle)) < 1e-7, 'The entrance leaves existing roads and buildings clear');
-  const before = undergroundLayout(campus.features.filter(feature => feature !== entrance)), after = undergroundLayout(campus.features);
-  assert.deepEqual(after, before, 'Only the entrance is added; there is no garage volume or new underground route');
+  const existing=campus.features.filter(feature=>feature.roomUse!=='garage');
+  const before = undergroundLayout(existing.filter(feature => feature !== entrance)), after = undergroundLayout(existing);
+  assert.deepEqual(after, before, 'The added garage keeps every existing underground route unchanged');
 });
 
 test('the driveway slopes below ground with continuous retaining walls and a doorway at its lower end', () => {

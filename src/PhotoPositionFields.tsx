@@ -1,5 +1,5 @@
 import { buildingInfo, type Campus, type Photo, type Site } from './types';
-import { buildingFloorLabel, buildingFloorText } from './building-model';
+import { buildingFloorLabel, buildingFloorText, buildingFloorOptions } from './building-model';
 import PhotoNumberInput from './PhotoNumberInput';
 import { aerialImportText, altitudeLabel, campusLocations, isAerialPhoto, photoCameraHeightRange, photoLocationId } from './locations';
 
@@ -15,7 +15,7 @@ export default function PhotoPositionFields({ photo, campus, site, onChange }: {
       const altitude = captureType === 'aerial' ? photo.altitude ?? (source?.relativeAltitude !== undefined
         ? { meters: source.relativeAltitude, reference: 'takeoff' as const }
         : source?.absoluteAltitude !== undefined ? { meters: source.absoluteAltitude, reference: 'seaLevel' as const } : undefined) : undefined;
-      onChange({ captureType, cameraHeight: undefined, floor: captureType === 'aerial' ? 0 : info ? Math.max(1, photo.floor) : 0,
+      onChange({ captureType, cameraHeight: undefined, floor: captureType === 'aerial' ? 0 : info ? info.basement && photo.floor === -1 ? -1 : Math.max(1, photo.floor) : 0,
         altitude, position: { x: photo.position.x, z: photo.position.z } });
     }}><option value="ground">普通照片</option><option value="aerial">航拍照片</option></select></label>
     {aerial ? <>
@@ -29,7 +29,7 @@ export default function PhotoPositionFields({ photo, campus, site, onChange }: {
         }}><option value="takeoff">相对起飞点</option><option value="seaLevel">海拔</option></select></label></div>
     </> : <>
       <label>{info ? '所在楼层' : '所在层面'}<select value={photo.floor} disabled={!info} onChange={e => onChange({ floor: Number(e.target.value), cameraHeight: undefined, position: { x: photo.position.x, z: photo.position.z } })}>
-        {!info ? <option value={0}>{location?.levelText || '室外'}</option> : Array.from({ length: Math.max(info.floors, photo.floor) }, (_, i) => <option key={i} value={i + 1}>{buildingFloorLabel(info,i+1)}</option>)}
+        {!info ? <option value={0}>{location?.levelText || '室外'}</option> : buildingFloorOptions(info, photo.floor).map(floor => <option key={floor} value={floor}>{buildingFloorLabel(info,floor)}</option>)}
       </select></label>
       <p className="field-help">{location?.feature?.type === 'tunnelEntrance' ? '点击入口的台阶标记拍摄位置，高度会随台阶自动确定，无需填写楼层。' : <>地图位置随楼层显示。{info && info.sections.length > 1 && <> 此楼分为{buildingFloorText(info)}。</>}</>}</p>
       <label>镜头离{info ? '楼面' : '地面'}高度 / m<PhotoNumberInput name="cameraHeight" min={cameraRange.min} max={cameraRange.max} step={.1} value={Math.min(cameraRange.max, Math.max(cameraRange.min, photo.cameraHeight ?? 1.6))} onValue={value => {

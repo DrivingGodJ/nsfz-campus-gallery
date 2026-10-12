@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { cafeteriaLowerProfile, dormitoryProfile, dormitoryObservatory } from './facade-geometry.ts';
 import { laboratoryLayout } from './laboratory-geometry.ts';
+import { laboratoryGarageLayout } from './laboratory-garage-geometry.ts';
 import { passageShape } from './building-geometry.ts';
 import { pointOnStairTread } from './structure-geometry.ts';
 import type { Building, Point, Shape } from './types';
@@ -21,7 +22,7 @@ export const PHOTO_INTERIOR_EVIDENCE = [
   { photoId: 'a4661989-e16c-4399-8edb-6c5a8a2223fe', buildingId: PHOTO_INTERIOR_IDS[1], floor: 7, observed: 'tilted open-truss reflector telescope, white fork mount and side table' },
   { photoId: '88338113-b195-4d6d-a689-628603b6fc3f', buildingId: PHOTO_INTERIOR_IDS[2], floor: 6, observed: 'wood slat ceiling and zigzag strip lighting on the balcony approach' },
   { photoId: '8904ca53-186b-44ac-b32b-6603b313e39b', buildingId: PHOTO_INTERIOR_IDS[2], floor: 6, observed: 'wood balcony decking, steel space frame and folded black umbrellas' },
-  { photoId: '15ce2084-cd0d-4410-8f6d-112dae3e127a', buildingId: PHOTO_INTERIOR_IDS[2], floor: 1, observed: 'art wall, leaning canvas boards, paint pots and red ceiling pipe' },
+  { photoId: '15ce2084-cd0d-4410-8f6d-112dae3e127a', buildingId: PHOTO_INTERIOR_IDS[2], floor: -1, observed: 'art wall, leaning canvas boards, paint pots and red ceiling pipe in the underground garage' },
   { photoId: 'dc98c0fb-fd4a-4158-81cd-5e4926f9d9a9', buildingId: PHOTO_INTERIOR_IDS[2], floor: 1, observed: 'four blue-backed barrel seats beside the existing gallery rail' },
   { photoId: '49036e82-ea4a-4195-a5b4-f571794f438b', buildingId: PHOTO_INTERIOR_IDS[3], floor: 5, observed: 'three shallow white window steps, orange bench and red fire case' },
   { photoId: 'f07686c3-cedb-4632-9441-80413ab4b9bf', buildingId: PHOTO_INTERIOR_IDS[3], floor: 5, observed: 'wall exhibition frames and ceiling spotlights along the window gallery' },
@@ -39,6 +40,7 @@ const samples = (shape: Shape) => shape.outer.slice(0,-1).flatMap((a,i) => [a, [
 const fits = (shape: Shape, rooms: Shape[], exclusions: Shape[]) => rooms.some(room => samples(shape).every(p => inside(p, room))) && exclusions.every(exclusion => !samples(shape).some(p => inside(p, exclusion)) && !samples(exclusion).some(p => inside(p, shape)));
 
 export function photoInteriorShapes(building: Building, floor: number): Shape[] {
+  if (floor === -1 && building.basement) return laboratoryGarageLayout(building).footprints;
   if (building.facade?.type === 'laboratory') { const layout = laboratoryLayout(building); return [...layout.rooms, ...layout.walkways]; }
   if (building.facade?.type === 'cafeteria' && floor <= 2) return [cafeteriaLowerProfile(building).shape];
   if (building.facade?.type === 'dormitory') {
@@ -78,12 +80,14 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
   }
   if (building.id === PHOTO_INTERIOR_IDS[2]) {
     const layout = laboratoryLayout(building), a = layout.at(0,0), b = layout.at(1,0), axis: Point = [b[0]-a[0],b[1]-a[1]];
-    // Thin artworks are on a classroom-side wall, clear of the garage opening.
+    // Keep the photographed group on the opposite side of the driveway, below
+    // ground. Reverse its facing so the painted front still faces the driveway.
     const garage = [...(building.groundFloorOpenings || []), ...(building.groundPassages || []).map(passageShape)];
-    add('art-wall-panel',1,'art-panel',layout.at(58,3.8),axis,3.6,.1,2.15,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
-    add('leaning-canvas',1,'canvas',layout.at(60.5,4),axis,1.2,.35,1.6,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
-    add('paint-pots',1,'paint-pots',layout.at(62,4),axis,1.15,.5,.36,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
-    add('art-gallery-red-pipe',1,'red-pipe',layout.at(57.8,4),axis,8.7,.12,3.3,PHOTO_INTERIOR_EVIDENCE[4].photoId);
+    const floor = building.basement ? -1 : 1, facing: Point = floor < 0 ? [-axis[0],-axis[1]] : axis;
+    add('art-wall-panel',floor,'art-panel',layout.at(58,floor<0?11:3.8),facing,3.6,.1,2.15,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
+    add('leaning-canvas',floor,'canvas',layout.at(60.5,floor<0?10.8:4),facing,1.2,.35,1.6,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
+    add('paint-pots',floor,'paint-pots',layout.at(62,floor<0?10.8:4),facing,1.15,.5,.36,PHOTO_INTERIOR_EVIDENCE[4].photoId,garage);
+    add('art-gallery-red-pipe',floor,'red-pipe',layout.at(57.8,floor<0?10.8:4),facing,8.7,.12,floor<0?building.basement!.clearHeight-.15:3.3,PHOTO_INTERIOR_EVIDENCE[4].photoId);
     add('balcony-approach-ceiling',6,'slat-ceiling',layout.at(57.8,13.2),axis,12,2.35,3.35,PHOTO_INTERIOR_EVIDENCE[2].photoId);
     add('balcony-space-frame',6,'space-frame',layout.at(layout.circleU,23),axis,12.3,5.8,3.3,PHOTO_INTERIOR_EVIDENCE[3].photoId);
   }
@@ -100,11 +104,11 @@ export function photoInteriorPlacements(building: Building): InteriorPlacement[]
   return items;
 }
 
-export function photoInteriorGeometry(building: Building, height: number, floorHeight: number, cutawayHeight?: number) {
+export function photoInteriorGeometry(building: Building, height: number, floorHeight: number, cutawayHeight?: number, basement = false) {
   const vertices = Object.fromEntries(Object.keys(PHOTO_INTERIOR_COLORS).map(kind => [kind, [] as number[]])) as Record<Kind,number[]>;
-  const shown = Math.min(height, cutawayHeight ?? height), floorY = (floor: number) => .12 + (floor-1)*floorHeight + .25;
+  const shown = Math.min(height, cutawayHeight ?? height), floorY = (floor: number) => floor < 0 && building.basement ? building.basement.floorElevation + .045 : .12 + (floor-1)*floorHeight + .25;
   let limit=.12+shown;
-  const ceilingY = (floor: number) => .12 + floor * floorHeight - .25;
+  const ceilingY = (floor: number) => floor < 0 && building.basement ? building.basement.floorElevation + building.basement.clearHeight : .12 + floor * floorHeight - .25;
   const append = (kind: Kind, geometry: THREE.BufferGeometry, transform?: THREE.Matrix4) => {
     if (transform) geometry.applyMatrix4(transform);
     const p=geometry.getAttribute('position'), index=geometry.index;
@@ -112,10 +116,11 @@ export function photoInteriorGeometry(building: Building, height: number, floorH
     geometry.dispose();
   };
   for(const item of photoInteriorPlacements({...building,floorHeight})) {
+    if ((item.floor < 0) !== basement) continue;
     const base=floorY(item.floor), f=frame(item.center,item.axis), floorTop=item.floor*floorHeight;
     if(base>=.12+shown || floorTop>height+.001) continue;
     const observatory=building.id===PHOTO_INTERIOR_IDS[1]&&item.floor===building.facade?.observatory?.floor?dormitoryObservatory(building,floorHeight):undefined;
-    limit=observatory?.radius ? observatory.floorY+observatory.drumRise+observatory.domeRise : .12+shown;
+    limit=item.floor<0?ceilingY(item.floor):observatory?.radius ? observatory.floorY+observatory.drumRise+observatory.domeRise : .12+shown;
     const overhead=item.kind==='slat-ceiling'||item.kind==='light-track'||item.kind==='space-frame'||item.kind==='red-pipe';
     if(overhead && cutawayHeight!==undefined && cutawayHeight<=floorTop+.001) continue;
     const matrix=(point: Vector) => new THREE.Matrix4().makeBasis(new THREE.Vector3(f.along[0],0,f.along[1]),new THREE.Vector3(0,1,0),new THREE.Vector3(f.across[0],0,f.across[1])).setPosition(...point);

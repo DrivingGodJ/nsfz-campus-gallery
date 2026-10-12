@@ -22,6 +22,7 @@ export function featureFootprints(feature: Feature, features: Feature[], height:
 export function mapLocationTarget(campus: Campus, site: Site, id?: string, cutawayFloor?: number): { target: [number, number, number]; bounds: MapObjectBounds } | null {
   const building = campus.buildings.find(building => building.id === id);
   let points: Point[], center: Point | undefined, bottom: number, top: number;
+  if (building?.basement && cutawayFloor === -1) return mapLocationTarget(campus, site, building.basement.featureId);
   if (building) {
     const info = buildingLevels(building, site.buildingOverrides[building.id]);
     const observatory=info.observatoryFloor?dormitoryObservatory(building,info.floorHeight):undefined;
@@ -29,7 +30,7 @@ export function mapLocationTarget(campus: Campus, site: Site, id?: string, cutaw
       const bottom=info.baseElevation+observatory.floorY,top=bottom+observatory.drumRise+observatory.domeRise+.06;
       return {target:[observatory.center[0],(bottom+top)/2,observatory.center[1]],bounds:{min:[observatory.center[0]-observatory.radius,bottom,observatory.center[1]-observatory.radius],max:[observatory.center[0]+observatory.radius,top,observatory.center[1]+observatory.radius]}};
     }
-    const height = cutawayFloor ? Math.min(info.height, cutawayFloor * info.floorHeight) : info.height;
+    const height = cutawayFloor && cutawayFloor > 0 ? Math.min(info.height, cutawayFloor * info.floorHeight) : info.height;
     points = info.sections.flatMap(section => section.outer);
     center = building.center; bottom = info.baseElevation + .12; top = height + bottom;
   } else {

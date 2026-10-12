@@ -5,11 +5,11 @@ import { useMapColor } from './MapTheme';
 import { PHOTO_INTERIOR_COLORS, photoInteriorGeometry } from './photo-interior-geometry';
 import type { Building } from './types';
 
-export default function PhotoInteriorDetails({ building, height, floorHeight, cutawayHeight }: {
-  building: Building; height: number; floorHeight: number; cutawayHeight?: number;
+export default function PhotoInteriorDetails({ building, height, floorHeight, cutawayHeight, basement = false }: {
+  building: Building; height: number; floorHeight: number; cutawayHeight?: number; basement?: boolean;
 }) {
   const mapColor=useMapColor(), detail=useRef<THREE.Group>(null);
-  const batches=useMemo(()=>photoInteriorGeometry(building,height,floorHeight,cutawayHeight),[building,height,floorHeight,cutawayHeight]);
+  const batches=useMemo(()=>photoInteriorGeometry(building,height,floorHeight,cutawayHeight,basement),[building,height,floorHeight,cutawayHeight,basement]);
   useEffect(()=>()=>batches.forEach(batch=>batch.geometry.dispose()),[batches]);
   useFrame(({camera})=>{
     if(detail.current) detail.current.visible=Math.hypot(camera.position.x-building.center[0],camera.position.y-(building.baseElevation??0),camera.position.z-building.center[1])<280;

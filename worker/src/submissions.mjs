@@ -15,7 +15,7 @@ function text(value, max, label) {
   if (typeof value !== 'string' || value.length > max) throw new SubmissionError(label + '格式不正确。');
   return value.trim();
 }
-/** @param {unknown} input @param {{locationIds:string[],buildingIds:string[],bounds:number[]}} campus */
+/** @param {unknown} input @param {{locationIds:string[],buildingIds:string[],basementBuildingIds?:string[],bounds:number[]}} campus */
 export function validateAnnotation(input, campus) {
   if (!input || typeof input !== 'object') throw new SubmissionError('请填写照片资料。');
   const p = /** @type {Record<string, any>} */ (input);
@@ -26,7 +26,7 @@ export function validateAnnotation(input, campus) {
   const buildingId = campus.buildingIds.includes(locationId) ? locationId : '';
   const captureType = p.captureType;
   if (!['ground','aerial'].includes(captureType)) throw new SubmissionError('拍摄方式无效。');
-  if (!Number.isInteger(p.floor) || (captureType === 'ground' && buildingId ? p.floor < 1 || p.floor > 50 : p.floor !== 0)) throw new SubmissionError('楼层无效。');
+  if (!Number.isInteger(p.floor) || (captureType === 'ground' && buildingId ? p.floor > 50 || p.floor < 1 && !(p.floor === -1 && campus.basementBuildingIds?.includes(buildingId)) : p.floor !== 0)) throw new SubmissionError('楼层无效。');
   if (p.cameraHeight !== undefined && (!Number.isFinite(p.cameraHeight) || p.cameraHeight < .1 || p.cameraHeight > 11.9)) throw new SubmissionError('拍摄高度需在 0.1 到 11.9 米之间。');
   const x = p.position?.x, z = p.position?.z;
   const [xmin,xmax,zmin,zmax] = campus.bounds;
@@ -73,7 +73,7 @@ async function readJSON(request) {
   catch { throw new SubmissionError('请求内容格式不正确。'); }
 }
 /** @typedef {Env & {SUBMISSIONS_OWNER_TOKEN?:string,TURNSTILE_SECRET?:string,R2_ACCESS_KEY_ID?:string,R2_SECRET_ACCESS_KEY?:string}} SubmissionEnv */
-/** @typedef {{locationIds:string[],buildingIds:string[],bounds:number[]}} SubmissionCampus */
+/** @typedef {{locationIds:string[],buildingIds:string[],basementBuildingIds?:string[],bounds:number[]}} SubmissionCampus */
 /** @typedef {{ now?:()=>number, verify?:(token:string,request:Request)=>Promise<boolean>, sign?:(row:any,receipt:string)=>Promise<string> }} Dependencies */
 
 /** @param {SubmissionEnv} env @param {string} token @param {Request} request */

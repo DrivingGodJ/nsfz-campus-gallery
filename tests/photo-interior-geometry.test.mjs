@@ -103,9 +103,22 @@ test('floor slicing removes the selected ceiling detail and every higher-floor o
   }
   const lab=buildings[2],ceilingRemoved=photoInteriorGeometry(lab,21.6,3.6,21.6);
   assert.ok(!ceilingRemoved.some(batch=>batch.kind==='lights'),'Sixth-floor slats and light strips vanish with its ceiling');
-  assert.ok(ceilingRemoved.some(batch=>batch.kind==='wood'),'The first-floor art display remains after removal of the sixth-floor finish');
+  assert.equal(ceilingRemoved.some(batch=>batch.kind==='wood'),false,'The relocated art group no longer remains on an above-ground floor');
   dispose(ceilingRemoved);
   assert.ok(total<26000,`Material-batched detail triangle budget: ${total}`);
+});
+
+test('the marked laboratory art group moves across the driveway into the garage with every vertex underground',()=>{
+  const lab=buildings[2],layout=laboratoryLayout(lab),floorHeight=3.6;
+  const items=photoInteriorPlacements(lab).filter(p=>p.source===PHOTO_INTERIOR_EVIDENCE[4].photoId);
+  assert.deepEqual(items.map(p=>[p.id,p.floor]),[['art-wall-panel',-1],['leaning-canvas',-1],['paint-pots',-1],['art-gallery-red-pipe',-1]]);
+  for(const [i,[u,v]] of [[58,11],[60.5,10.8],[62,10.8],[57.8,10.8]].entries())assert.deepEqual(items[i].center,layout.at(u,v));
+  const along=layout.at(1,0).map((n,i)=>n-layout.at(0,0)[i]);
+  assert.deepEqual(items[0].axis,along.map(n=>-n),'The painted front faces back toward the driveway');
+  const garage=photoInteriorGeometry(lab,21.6,floorHeight,undefined,true);
+  assert.ok(garage.some(batch=>batch.kind==='purple')&&garage.some(batch=>batch.kind==='red'));
+  for(const {geometry} of garage){const p=geometry.attributes.position;for(let i=0;i<p.count;i++)assert.ok(p.getY(i)>=-3&&p.getY(i)<0,'No migrated geometry leaks onto floor one');}
+  dispose(garage);
 });
 
 test('telescope is an open optical truss on floor seven and dining rows leave the central aisle and columns clear',()=>{
