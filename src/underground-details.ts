@@ -50,10 +50,10 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     const ordered = [...new Set(cuts)].sort((a,b) => a-b), at = (t: number): Point => [from[0] + (to[0]-from[0])*t, from[1] + (to[1]-from[1])*t];
     return ordered.slice(1).map((end,i) => ({from:at(ordered[i]),to:at(end),height:floorAt(at((ordered[i]+end)/2))}));
   };
-  const heightAt = (p: Point) => sections.find(section => section.footprints.some(shape => pointOnStairTread(p, shape.outer)
-    && !shape.holes.some(hole => pointOnStairTread(p, hole))))?.height ?? clear;
+  const sectionAt = (p: Point) => sections.find(section => section.footprints.some(shape => pointOnStairTread(p, shape.outer)
+    && !shape.holes.some(hole => pointOnStairTread(p, hole))));
+  const heightAt = (p: Point) => sectionAt(p)?.height ?? clear;
   const roofSegments = (from: Point, to: Point) => {
-    if (!feature.ceilingSegments?.length) return [{ from, to, height: clear }];
     const dx = to[0] - from[0], dz = to[1] - from[1], cuts = [0, 1];
     for (const section of sections) for (const shape of section.footprints) for (const ring of [shape.outer, ...shape.holes]) for (let i = 1; i < ring.length; i++) {
       const a = ring[i - 1], b = ring[i], ex = b[0] - a[0], ez = b[1] - a[1], cross = dx * ez - dz * ex;
@@ -63,7 +63,13 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     }
     const ordered = [...new Set(cuts.map(t => Math.round(t * 1e9) / 1e9))].sort((a, b) => a - b);
     const at = (t: number): Point => [from[0] + dx * t, from[1] + dz * t];
-    return ordered.slice(1).map((end, i) => ({ from: at(ordered[i]), to: at(end), height: heightAt(at((ordered[i] + end) / 2)) }));
+    // A straight fitting can cross the diagonal end of a mitered passage.
+    // Keep only the pieces under this passage's actual roof, never a fallback
+    // low beam or pipe hanging in the adjoining raised landing.
+    return ordered.slice(1).flatMap((end, i) => {
+      const section = sectionAt(at((ordered[i] + end) / 2));
+      return section ? [{ from: at(ordered[i]), to: at(end), height: section.height }] : [];
+    });
   };
   const point = ([x, z]: Point, height: number): Vector => [x, height, z];
   const box = (p: Point, bottom: number, height: number, length: number, width: number, angle: number, kind: Kind) => {
@@ -118,12 +124,15 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
         segment(panel.from, panel.to, floor + panel.bottom, panel.top - panel.bottom, .2, entranceFace ? 'podium' : 'walls');
       }
       const trimHeight = feature.type === 'undergroundTrack' ? 1.55 : feature.type === 'undergroundCorridor' ? 1.1 : clear - 1;
-      for (let y = .55; y < trimHeight; y += .55) if (y > panel.bottom) segment(panel.from, panel.to, floor + y, .018, .215, 'tiles');
+      // Trim belongs to the solid panel, including the low wall buried beneath
+      // a raised landing; it must never span the opening above that panel.
+      for (let y = .55; y < trimHeight; y += .55) if (y > panel.bottom && y + .018 <= panel.top) segment(panel.from, panel.to, floor + y, .018, .215, 'tiles');
       if (panel.bottom < 1.1) {
+        const bottom = Math.max(.08, panel.bottom), top = Math.min(trimHeight, panel.top);
         const count = Math.ceil(length / (feature.type === 'undergroundTrack' ? .55 : 2.4));
-        for (let i = 1; i < count; i++) {
+        for (let i = 1; top > bottom && i < count; i++) {
           const p = panel.from.map((n, j) => n + (panel.to[j] - n) * i / count) as Point;
-          bar(point(p, floor + Math.max(.08, panel.bottom)), point(p, floor + trimHeight), .008, 'tiles', 4);
+          bar(point(p, floor + bottom), point(p, floor + top), .008, 'tiles', 4);
         }
       }
     }

@@ -30,6 +30,7 @@ const fixture = areas => {
   const models = areas.map(area => undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections));
   const meshes = models.map(model => Object.fromEntries(Object.entries(model).map(([kind, geometry]) => {
     const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    mesh.name = kind;
     mesh.updateMatrixWorld(); return [kind, mesh];
   })));
   const ray = (point, height, direction, distance, objects) => new THREE.Raycaster(new THREE.Vector3(point[0], height, point[1]), direction, 0, distance).intersectObjects(objects);
@@ -98,26 +99,59 @@ test('real flat treads rise continuously and join the real exit floor with no fl
 
 test('the complete approach, every tread, upper landing and turn have at least 2.2 metres clear under real ceilings and fittings', () => {
   const model = fixture([tunnelArea, corridorArea]);
-  const obstructions = model.meshes.flatMap(parts => Object.entries(parts).filter(([kind]) => !['floor', 'green', 'tiles', 'paint', 'wood'].includes(kind)).map(([, mesh]) => mesh));
+  const obstructions = model.meshes.flatMap(parts => Object.values(parts));
   try {
     const points = [at(14), at(11.3), at(10.5), at(9),
       ...Array.from({ length: stair.steps }, (_, index) => stepPoint(index)), at(3.8), at(3),
       exit.points[0].map((n, i) => n + (exit.points[1][i] - n) * .25)];
-    for (const center of points) for (const offset of [-1.68, -.8, 0, .7, 1.68]) {
-      const point = [center[0] - axis[1] * offset, center[1] + axis[0] * offset];
+    const samples = points.flatMap(center => [-1.68, -.8, 0, .7, 1.68].map(offset => [center[0] - axis[1] * offset, center[1] + axis[0] * offset]));
+    const seam = tunnelArea.openings[0], normal = new THREE.Vector3(seam[1][1] - seam[0][1], 0, seam[0][0] - seam[1][0]).normalize();
+    // The mitered upper platform includes space beyond the straight tunnel
+    // end. Check that actual walking area for remnants of lower roof fittings.
+    for (const fraction of [.25, .4, .5, .75]) {
+      const point = seam[0].map((n, i) => n + (seam[1][i] - n) * fraction);
+      samples.push([point[0] - normal.x * .24, point[1] - normal.z * .24]);
+    }
+    for (const point of samples) {
       const floor = undergroundFloorElevation(tunnel, point);
       const inTunnel = tunnelArea.footprints.some(shape => pointOnStairTread(point, shape.outer));
       const actualFloor = inTunnel ? floor : exit.height;
-      const hits = model.ray(point, actualFloor + .055, up, 8, obstructions);
+      // Retain every material batch, including wall tile trims. Only the
+      // lowest ten centimetres of real floor decoration lie below this ray.
+      const hits = model.ray(point, actualFloor + .145, up, 8, obstructions);
       assert.ok(hits.length, 'The walking route remains enclosed by a physical ceiling');
       assert.ok(hits[0].point.y - actualFloor - .045 >= 2.2 - 2e-5, `Headroom at ${point}: ${hits[0].point.y - actualFloor - .045}`);
     }
-    const seam = tunnelArea.openings[0], normal = new THREE.Vector3(seam[1][1] - seam[0][1], 0, seam[0][0] - seam[1][0]).normalize();
     for (const fraction of [.1, .25, .5, .75, .9]) for (const height of [.2, 1.1, 2]) {
       const point = seam[0].map((n, i) => n + (seam[1][i] - n) * fraction);
       const origin = new THREE.Vector3(point[0], exit.height + .045 + height, point[1]).addScaledVector(normal, -.3);
       assert.equal(new THREE.Raycaster(origin, normal, 0, .6).intersectObjects(obstructions).length, 0, 'The turn contains no internal wall, beam or guard barrier');
     }
+  } finally { model.dispose(); }
+});
+
+test('all real material batches leave the raised landing seam open from ankle to full standing height across its usable width', () => {
+  const model = fixture([tunnelArea, corridorArea]);
+  const objects = model.meshes.flatMap(parts => Object.values(parts));
+  const seam = tunnelArea.openings[0], normal = new THREE.Vector3(seam[1][1] - seam[0][1], 0, seam[0][0] - seam[1][0]).normalize();
+  let blockedCount = 0, firstBlock;
+  try {
+    // A one-centimetre vertical sweep catches the actual 18 mm tile courses
+    // that otherwise disappear between the handful of eye-height samples.
+    for (let widthIndex = 1; widthIndex < 20; widthIndex++) for (let heightIndex = 10; heightIndex <= 220; heightIndex++) {
+      const fraction = widthIndex / 20, height = heightIndex / 100;
+      const point = seam[0].map((n, i) => n + (seam[1][i] - n) * fraction);
+      // Cross the real opening in the 20 cm shell. At the two edge columns,
+      // a longer diagonal ray would hit a legitimate thick outer-corner jamb.
+      const halfSpan = widthIndex === 1 || widthIndex === 19 ? .1 : .15;
+      const origin = new THREE.Vector3(point[0], stair.topHeight + .045 + height, point[1]).addScaledVector(normal, -halfSpan);
+      const hit = new THREE.Raycaster(origin, normal, 0, halfSpan * 2).intersectObjects(objects)[0];
+      if (hit) {
+        blockedCount++;
+        firstBlock ??= { fraction, height, material: hit.object.name, point: hit.point.toArray() };
+      }
+    }
+    assert.equal(blockedCount, 0, `The actual landing opening is obstructed at ${blockedCount} samples; first hit ${JSON.stringify(firstBlock)}`);
   } finally { model.dispose(); }
 });
 
