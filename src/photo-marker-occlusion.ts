@@ -4,7 +4,17 @@ import { photoPhysicalRaycast, photoRayIntersectsOccluder, preparePhotoOccluder,
 type Layer = { point: THREE.Vector3; normal: THREE.Vector3; parts: Set<string> };
 const components = new WeakMap<THREE.BufferGeometry, Uint32Array>();
 const cameraLayers = new WeakMap<THREE.Object3D[], { world: THREE.Matrix4; projection: THREE.Matrix4; hits: Map<string, Layer[]> }>();
+type SegmentQueries = {
+  count: number;
+  meshes: { mesh: THREE.Mesh; geometry: THREE.BufferGeometry; positionVersion?: number; instanceVersion?: number; world: THREE.Matrix4; physical: boolean; mask: number; faces: boolean[] }[];
+  hits: Map<string, boolean>;
+};
+const segmentQueries = new WeakMap<THREE.Object3D[], SegmentQueries>();
 const epsilon = 1e-5;
+const positionVersion = (mesh: THREE.Mesh) => {
+  const position = mesh.geometry.attributes.position;
+  return position instanceof THREE.InterleavedBufferAttribute ? position.data.version : position?.version;
+};
 
 // Disjoint walls can share one render mesh. Weld positions across face normals
 // once, so equal-height coplanar walls are still separate physical barriers.
@@ -123,12 +133,42 @@ export function markerOcclusionLayers(anchor: THREE.Vector3, camera: THREE.Camer
   return layersTo(anchor, camera, occluders).length;
 }
 
-export function markerMergeAllowed(a: THREE.Vector3, b: THREE.Vector3, camera: THREE.Camera, occluders: THREE.Object3D[]): boolean {
+// Validate one scene snapshot per marker scan, rather than once for every pair.
+// Standalone pair callers retain the same geometry/transform invalidation.
+export function prepareMarkerQueries(occluders: THREE.Object3D[]) {
+  const faces = (mesh: THREE.Mesh) => (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map(material => physicalMaterial(material, forcedMesh(mesh)));
+  let segments = segmentQueries.get(occluders);
+  if (!segments || segments.count !== occluders.length || segments.meshes.some(({ mesh, geometry, positionVersion: version, instanceVersion, world, physical, mask, faces: before }) =>
+    mesh.geometry !== geometry || positionVersion(mesh) !== version || !world.equals(mesh.matrixWorld)
+    || (mesh instanceof THREE.InstancedMesh ? mesh.instanceMatrix.version : undefined) !== instanceVersion || physicalMesh(mesh) !== physical || mesh.layers.mask !== mask
+    || faces(mesh).some((visible, index) => visible !== before[index]))) {
+    segments = { count: occluders.length, meshes: occluders.filter((object): object is THREE.Mesh => object instanceof THREE.Mesh).map(mesh => ({
+      mesh, geometry: mesh.geometry, positionVersion: positionVersion(mesh),
+      instanceVersion: mesh instanceof THREE.InstancedMesh ? mesh.instanceMatrix.version : undefined,
+      world: mesh.matrixWorld.clone(), physical: physicalMesh(mesh), mask: mesh.layers.mask, faces: faces(mesh),
+    })), hits: new Map() };
+    segmentQueries.set(occluders, segments); cameraLayers.delete(occluders);
+    for (const { mesh } of segments.meshes) { preparePhotoOccluder(mesh); prepareComponents(mesh.geometry); }
+  }
+  return segments;
+}
+
+export function markerMergeAllowed(a: THREE.Vector3, b: THREE.Vector3, camera: THREE.Camera, occluders: THREE.Object3D[], segments = prepareMarkerQueries(occluders)): boolean {
   const before = layersTo(a, camera, occluders), after = layersTo(b, camera, occluders);
   if (before.length !== after.length || before.some((layer, i) => !layerMatches(layer, after[i]) || ![...layer.parts].some(part => after[i].parts.has(part)))) return false;
   const distance = a.distanceTo(b);
   if (distance <= .03) return true;
+  // Physical separation stays unchanged while only the camera moves. The scene
+  // snapshot's validated geometry/visibility owns this camera-independent cache.
+  const first = a.toArray().join(','), second = b.toArray().join(',');
+  const key = camera.layers.mask + ':' + (first < second ? first + ';' + second : second + ';' + first);
+  const cached = segments.hits.get(key);
+  if (cached !== undefined) return cached;
   const ray = new THREE.Raycaster(a, b.clone().sub(a).divideScalar(distance), .015, distance - .015);
   ray.layers.mask = camera.layers.mask;
-  return hitsBetween(ray, occluders).length === 0;
+  const allowed = hitsBetween(ray, occluders).length === 0;
+  // ponytail: bound old coordinate pairs retained during continuous editor drags.
+  if (segments.hits.size >= 8192) segments.hits.clear();
+  segments.hits.set(key, allowed);
+  return allowed;
 }

@@ -8,7 +8,7 @@ import { buildingLevels } from './building-model.ts';
 import { dormitoryObservatory } from './facade-geometry.ts';
 import { featureFootprints } from './location-geometry.ts';
 import { insideShape } from './terrain-height.ts';
-import { markerMergeAllowed, markerOcclusionLayers } from './photo-marker-occlusion.ts';
+import { markerMergeAllowed, markerOcclusionLayers, prepareMarkerQueries } from './photo-marker-occlusion.ts';
 import type { Campus, Shape, Site } from './types';
 
 export const PHOTO_MERGE_METERS = 2;
@@ -251,6 +251,7 @@ function photoRegionAssignment(photo: MapPhoto, campus: Campus, site: Site, regi
 export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], options: { campus: Campus; site: Site; selectedId?: string }): PhotoCluster[] {
   camera.updateMatrixWorld();
   const regions = photoRegions(options.campus, options.site), known = new Map(regions.map(region => [region.id, region]));
+  const markerQueries = prepareMarkerQueries(occluders);
   const hardOccluders = occluders.filter((object): object is THREE.Mesh => {
     if (!(object instanceof THREE.Mesh) || !isPhotoOccluder(object) || isPhotoOpacityOnlyOccluder(object)) return false;
     for (let parent: THREE.Object3D | null = object; parent; parent = parent.parent) {
@@ -309,7 +310,7 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
         const pa = projections.get(a.id)!, pb = projections.get(b.id)!;
         return Math.abs(pa.x - pb.x) < (pa.markerWidth + pb.markerWidth) / 2 + 6
           && Math.abs(pa.y - pb.y) < (pa.markerHeight + pb.markerHeight) / 2 + 6
-          && markerMergeAllowed(a.position, b.position, camera, occluders);
+          && markerMergeAllowed(a.position, b.position, camera, occluders, markerQueries);
       };
       for (const spot of visible) {
         const cluster = clusters.find(items => items.every(other => compatible(spot, other)));

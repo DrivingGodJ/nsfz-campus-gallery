@@ -108,3 +108,24 @@ test('back faces and instanced opaque entities remain physical without altering 
   assert.equal(markerOcclusionLayers(new THREE.Vector3(0, 1.6, 0), camera, occluders), 2, 'Moving the camera invalidates its layer cache');
   disposeScene(scene);
 });
+
+test('camera motion reuses point-to-point barriers and moved or replaced geometry invalidates them', () => {
+  const scene = new THREE.Scene(), camera = cameraAt(), a = new THREE.Vector3(-2, 1.6, -5), b = new THREE.Vector3(2, 1.6, -5);
+  const partition = new THREE.Mesh(new THREE.BoxGeometry(.3, 6, 6), new THREE.MeshBasicMaterial());
+  partition.position.set(0, 1.6, -5); scene.add(partition);
+  const occluders = markerOccluders(scene), tree = partition.geometry.boundsTree, cast = tree.raycast;
+  let casts = 0; tree.raycast = function (...args) { casts++; return cast.apply(this, args); };
+  assert.equal(markerMergeAllowed(a, b, camera, occluders), false);
+  const first = casts;
+  camera.position.y += .2; camera.updateMatrixWorld();
+  assert.equal(markerMergeAllowed(b, a, camera, occluders), false);
+  assert.equal(casts, first, 'The unchanged physical segment needs no second BVH query when the camera moves');
+  partition.position.z = -15; scene.updateMatrixWorld();
+  assert.equal(markerMergeAllowed(a, b, camera, occluders), true, 'Moving an existing scene mesh invalidates its barrier result');
+  const previous = partition.geometry;
+  partition.geometry = new THREE.BoxGeometry(.3, 6, 30); scene.updateMatrixWorld();
+  assert.equal(markerMergeAllowed(a, b, camera, occluders), false, 'Replacing geometry in the same mesh cannot reuse the clear-segment result');
+  partition.visible = false;
+  assert.equal(markerMergeAllowed(a, b, camera, occluders), true, 'Physical visibility changes invalidate the cache');
+  previous.dispose(); disposeScene(scene);
+});

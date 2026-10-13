@@ -91,3 +91,20 @@ test('buildings with unknown or only one floor never use the model default as a 
   const wing = { ...unknown, parts: [{ id: 'wing', name: '副楼', floors: 2, ...shape(0, 0, 10, 10) }] };
   assert.equal(expandedPhotoBuildings(photos, { ...data, buildings: [wing, one] }, site, camera, size)[0].id, 'unknown');
 });
+
+test('cached building ownership follows edited photo coordinates, location and replaced building overrides', () => {
+  const photo = shot('editable', 0, 30, 5, 5, '');
+  const ids = () => buildingPhotosThroughFloor([photo], campus, site, 'teaching', 3).map(item => item.id);
+  assert.deepEqual(ids(), []);
+  photo.position.x = 110;
+  assert.deepEqual(ids(), ['editable'], 'Moving to another footprint must clear inferred ownership');
+  photo.buildingId = 'teaching';
+  assert.deepEqual(ids(), [], 'An explicit location change takes effect immediately');
+  const camera = new THREE.PerspectiveCamera(100, 1.5, .08, 2000);
+  camera.position.set(10, 12, 40); camera.lookAt(10, 12, 0); camera.updateMatrixWorld();
+  const data = { buildings: [{ id: 'editable-building', name: '可编辑楼', floors: 1, ...shape(0, 0, 10, 10) }], features: [] };
+  const localSite = { buildingOverrides: {} }, shots = [shot('local', 1, 2, 5, 5, 'editable-building')];
+  assert.deepEqual(expandedPhotoBuildings(shots, data, localSite, camera, { width: 900, height: 600 }), []);
+  localSite.buildingOverrides = { 'editable-building': { floors: 3 } };
+  assert.equal(expandedPhotoBuildings(shots, data, localSite, camera, { width: 900, height: 600 })[0].id, 'editable-building');
+});

@@ -209,8 +209,10 @@ button.comparison-image{cursor:zoom-in}
 .photo-cluster-picker.is-visible{opacity:1;transform:translateY(0);pointer-events:auto}
 .map-photo,.location-name,.building-label,.structure-label{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .map-photo{transition:width .18s,height .18s,border-color .18s,opacity .22s ease}
-.map-photo.spatial-photo{min-width:44px;min-height:44px;border-width:2px}
+/* Distance sizes follow the camera; tweening them would restart layout each frame. */
+.map-photo.spatial-photo{min-width:44px;min-height:44px;border-width:2px;transition:border-color .18s,box-shadow .18s,opacity .22s ease}
 .map-photo-layer{position:absolute;inset:0;z-index:10;isolation:isolate;pointer-events:none}
+.map-photo-anchor{z-index:var(--photo-rank,0)!important}
 .overflow-collection-label{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 2px 2px;background:var(--floating,#faf9f4ee);color:var(--ink);font-size:10px;line-height:16px;pointer-events:none}
 .map-photo.overflow-collection{border-style:dashed}
 .map-photo.spatial-photo::before{inset:0}
@@ -225,7 +227,7 @@ button.comparison-image{cursor:zoom-in}
   .cluster-picker-heading{padding:10px 12px}
   .cluster-picker-grid{padding:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-@media(prefers-reduced-motion:reduce){.map-photo,.photo-cluster-picker{transition:none}}
+@media(prefers-reduced-motion:reduce){.map-photo,.map-photo.spatial-photo,.photo-cluster-picker{transition:none}}
 
 /* Public submission and the private owner's review queue. */
 .submission-main{display:grid;grid-template-columns:minmax(0,1fr) 380px;flex:1;min-height:0}
