@@ -48,7 +48,7 @@ async function fixture(t, options = {}) {
         if (args[0] === 'branch') return 'main\n';
         if (args[0] === 'remote') return 'https://github.com/DrivingGodJ/nsfz-campus-media.git\n';
         if (args[0] === 'rev-list') return (options.mediaAhead || 0) + '\t0\n';
-        if (args[0] === 'rev-parse') return 'b'.repeat(40) + '\n';
+        if (args[0] === 'rev-parse') return (options.mediaHead?.() || 'b'.repeat(40)) + '\n';
         return '';
       }
       if (args[0] === 'status') return options.dirty ?? ' M public/data/site.json\0';
@@ -59,7 +59,7 @@ async function fixture(t, options = {}) {
       if (args[0] === 'rev-parse') return 'a'.repeat(40) + '\n';
     }
     if (tool === 'gh' && args[0] === 'api') {
-      if (args[1].endsWith('/actions/variables/MEDIA_BASE_URL')) return JSON.stringify({ value: 'https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/' });
+      if (args[1].endsWith('/actions/variables/MEDIA_BASE_URL')) return JSON.stringify({ value: options.mediaBaseURL || 'https://photos.drivinggodj.dpdns.org/' });
       return JSON.stringify({ workflow_runs: [{ head_sha: 'a'.repeat(40), created_at: new Date().toISOString(), status: 'completed', conclusion: options.conclusion || 'success', html_url: 'https://github.com/DrivingGodJ/nsfz-campus-gallery/actions/runs/1' }] });
     }
     return '';
@@ -67,7 +67,15 @@ async function fixture(t, options = {}) {
   const fetcher = async (url, settings) => {
     requests.push([url, settings?.method || 'GET']);
     if (options.onRequest) await options.onRequest(url, settings);
-    if (settings?.method === 'HEAD') return new Response(null, { status: options.assetStatus || 200 });
+    if (settings?.method === 'HEAD') {
+      const key = new URL(url).pathname.replace(/^\//, '');
+      const headers = {
+        'access-control-allow-origin': '*', 'content-type': key.endsWith('.webp') ? 'image/webp' : 'image/jpeg',
+        'content-length': String(Buffer.byteLength(key)), ...options.assetHeaders
+      };
+      for (const [name, value] of Object.entries(headers)) if (value === null) delete headers[name];
+      return new Response(null, { status: options.assetStatus || 200, headers });
+    }
     if (url.startsWith(LIKES_API)) {
       const { photoIds } = JSON.parse(settings.body);
       return Response.json({ likes: Object.fromEntries(photoIds.map(id => [id, { count: 0, liked: false, ...(options.unsynced ? { available: false } : {}) }])) }, { status: options.likesStatus || 200 });
@@ -137,9 +145,12 @@ test('separate media publication copies referenced assets and pushes them before
   const mainAdd = commands.find((row, index) => row[0] === 'git' && row[1] === 'add' && commandOptions[index].cwd === root);
   assert.deepEqual(mainAdd, ['git', 'add', '--', 'public/data/site.json']);
   const buildIndex = commands.findIndex(row => row[2] === 'run' && row[3] === 'build');
-  assert.equal(commandOptions[buildIndex].env.VITE_MEDIA_BASE_URL, 'https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/');
-  assert.equal(requests.filter(([, method]) => method === 'HEAD').length, 3);
-  assert.ok(requests.filter(([, method]) => method === 'HEAD').every(([url]) => url.startsWith('https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/media/')));
+  assert.equal(commandOptions[buildIndex].env.VITE_MEDIA_BASE_URL, 'https://photos.drivinggodj.dpdns.org/');
+  assert.equal(requests.filter(([, method]) => method === 'HEAD').length, 6);
+  assert.ok(requests.filter(([, method]) => method === 'HEAD').every(([url]) => url.startsWith('https://photos.drivinggodj.dpdns.org/media/')));
+  const mediaDeploy = commands.findIndex(row => row[2] === 'run' && row[3] === 'media:deploy');
+  assert.ok(mediaDeploy > mediaPush && mainPush > mediaDeploy);
+  assert.deepEqual((await service.status()).plan.media.assets, Object.values(separateMediaPhoto.files).sort());
   for (const file of Object.values(separateMediaPhoto.files)) assert.equal(await fs.readFile(path.join(mediaRoot, file), 'utf8'), file);
   assert.equal(await fs.readFile(path.join(mediaRoot, orphan), 'utf8'), 'orphan-photo');
   assert.equal(await fs.readFile(path.join(root, '.local/original.jpg'), 'utf8'), 'private-original');
@@ -166,7 +177,7 @@ test('failed media pushes stop the main publication and matching committed media
   assert.equal((await finished(retry.service)).status, 'completed');
   assert.ok(retry.commands.some((row, index) => row[0] === 'git' && row[1] === 'push' && retry.commandOptions[index].cwd === retry.mediaRoot));
   assert.ok(!retry.commands.some((row, index) => row[0] === 'git' && row[1] === 'commit' && retry.commandOptions[index].cwd === retry.mediaRoot));
-  assert.equal(retry.requests.filter(([, method]) => method === 'HEAD').length, 3);
+  assert.equal(retry.requests.filter(([, method]) => method === 'HEAD').length, 6);
 });
 
 test('conflicting media checkout edits are preserved while matching dirty copies can publish', async t => {
@@ -201,14 +212,100 @@ test('external media requires every local asset and rejects downloads over five 
   assert.ok(!oversized.commands.some(row => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1])));
 });
 
-test('a successful Pages run does not hide a missing image in the separate media repository', async t => {
+test('missing hosted images stop the site publication even when the media backup has succeeded', async t => {
   const { service, commands, requests } = await fixture(t, { media: true, mediaStored: true, mediaAhead: 1, current: separateMediaLibrary, assetStatus: 404 });
   await service.start();
   const result = await finished(service);
   assert.equal(result.status, 'failed');
   assert.match(result.message, /照片文件尚未加载成功/);
-  assert.ok(requests.some(([url, method]) => method === 'HEAD' && url.startsWith('https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/')));
+  assert.ok(requests.some(([url, method]) => method === 'HEAD' && url.startsWith('https://photos.drivinggodj.dpdns.org/')));
+  assert.ok(!commands.some(row => row[0] === 'gh' && row[1] === 'workflow'));
   assert.ok(!commands.flat().includes('likes:deploy:only'));
+});
+
+test('failed photo hosting retains the GitHub backup and stops the main commit and push', async t => {
+  const { service, root, mediaRoot, commands, commandOptions } = await fixture(t, { media: true, current: separateMediaLibrary,
+    onCommand: async (_tool, args) => { if (args[1] === 'run' && args[2] === 'media:deploy') throw new Error('hosting unavailable'); }
+  });
+  await service.start();
+  const result = await finished(service);
+  assert.equal(result.status, 'failed');
+  assert.match(result.message, /照片托管上传失败.*尚未提交/);
+  assert.ok(commands.some((row, index) => row[0] === 'git' && row[1] === 'push' && commandOptions[index].cwd === mediaRoot));
+  assert.ok(!commands.some((row, index) => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1]) && commandOptions[index].cwd === root));
+  for (const file of Object.values(separateMediaPhoto.files)) assert.equal(await fs.readFile(path.join(mediaRoot, file), 'utf8'), file);
+});
+
+test('hosting is verified from the Pages origin before the site push, including CORS, image type and byte length', async t => {
+  for (const assetHeaders of [
+    { 'access-control-allow-origin': 'https://example.com' },
+    { 'content-type': 'text/html' },
+    { 'content-length': '1' }
+  ]) {
+    const { service, root, commands, commandOptions, requests } = await fixture(t, { media: true, mediaStored: true, current: separateMediaLibrary, assetHeaders });
+    await service.start();
+    assert.match((await finished(service)).message, /跨域、图片类型或文件大小/);
+    assert.ok(!commands.some((row, index) => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1]) && commandOptions[index].cwd === root));
+    assert.ok(requests.some(([, method]) => method === 'HEAD'));
+  }
+  const valid = await fixture(t, { media: true, mediaStored: true, current: separateMediaLibrary, assetHeaders: { 'access-control-allow-origin': 'https://drivinggodj.github.io' },
+    onRequest: async (_url, settings) => { if (settings?.method === 'HEAD') assert.equal(settings.headers.Origin, 'https://drivinggodj.github.io'); }
+  });
+  await valid.service.start();
+  assert.equal((await finished(valid.service)).status, 'completed');
+});
+
+test('native asset HEAD responses without Content-Length require an ETag', async t => {
+  const valid = await fixture(t, { media: true, mediaStored: true, current: separateMediaLibrary,
+    assetHeaders: { 'content-length': null, etag: '"native-asset-hash"' }
+  });
+  await valid.service.start();
+  assert.equal((await finished(valid.service)).status, 'completed');
+  for (const etag of [null, '   ']) {
+    const invalid = await fixture(t, { media: true, mediaStored: true, current: separateMediaLibrary,
+      assetHeaders: { 'content-length': null, etag }
+    });
+    await invalid.service.start();
+    assert.match((await finished(invalid.service)).message, /跨域、图片类型或文件大小/);
+    assert.ok(!invalid.commands.some((row, index) => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1]) && invalid.commandOptions[index].cwd === invalid.root));
+  }
+});
+
+test('changes made during photo hosting upload stop main publication without discarding the edit', async t => {
+  for (const editPhoto of [false, true]) {
+    const { service, root, commands, commandOptions } = await fixture(t, { media: true, current: separateMediaLibrary,
+      onCommand: async (_tool, args, root) => {
+        if (args[1] !== 'run' || args[2] !== 'media:deploy') return;
+        if (editPhoto) await fs.writeFile(path.join(root, 'public', separateMediaPhoto.files.depth), 'changed-during-upload');
+        else await fs.writeFile(path.join(root, 'public/data/site.json'), JSON.stringify({ ...separateMediaLibrary, photos: [{ ...separateMediaPhoto, title: 'changed-during-upload' }] }));
+      }
+    });
+    await service.start();
+    assert.match((await finished(service)).message, /上传过程中内容库发生变化/);
+    assert.ok(!commands.some((row, index) => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1]) && commandOptions[index].cwd === root));
+    const edited = editPhoto ? path.join(root, 'public', separateMediaPhoto.files.depth) : path.join(root, 'public/data/site.json');
+    assert.match(await fs.readFile(edited, 'utf8'), /changed-during-upload/);
+  }
+});
+
+test('the upload guard accepts the backup commit while protecting the original local source', async t => {
+  let mediaHead = 'b'.repeat(40);
+  const { service } = await fixture(t, { media: true, current: separateMediaLibrary, mediaHead: () => mediaHead,
+    onCommand: async (tool, args, _root, settings) => {
+      if (tool === 'git' && args[0] === 'commit' && settings.cwd.endsWith('/media-repo')) mediaHead = 'c'.repeat(40);
+    }
+  });
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.equal(mediaHead, 'c'.repeat(40));
+});
+
+test('a stale GitHub media base setting stops hosting and publication before any write', async t => {
+  const { service, commands } = await fixture(t, { media: true, current: separateMediaLibrary, mediaBaseURL: 'https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/' });
+  await service.start();
+  assert.match((await finished(service)).message, /图片库地址尚未配置正确/);
+  assert.ok(!commands.flat().includes('media:deploy'));
+  assert.ok(!commands.some(row => row[0] === 'git' && ['add', 'commit', 'push'].includes(row[1])));
 });
 
 test('all matching referenced assets are verified with at most six simultaneous requests', async t => {
@@ -225,7 +322,7 @@ test('all matching referenced assets are verified with at most six simultaneous 
   } });
   await service.start();
   assert.equal((await finished(service)).status, 'completed');
-  assert.equal(requests.filter(([, method]) => method === 'HEAD').length, 12);
+  assert.equal(requests.filter(([, method]) => method === 'HEAD').length, 24);
   assert.ok(maximum > 1 && maximum <= 6);
 });
 

@@ -1,0 +1,22 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "nsfz-campus-media",
+  "account_id": "0c0d8a2db6edf18b71de397116d1a5ae",
+  "compatibility_date": "2026-10-13",
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "photos.drivinggodj.dpdns.org", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "../.local/deployment/media-assets",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": false
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  }
+}

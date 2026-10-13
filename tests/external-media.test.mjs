@@ -7,8 +7,8 @@ import { assetURL } from '../src/asset-url.ts';
 import { downloadPhotoFile, externalPhotoDownload } from '../src/photo-download.ts';
 import { exportStaticContent } from '../server/storage.mjs';
 
-const mediaBaseURL = 'https://raw.githubusercontent.com/DrivingGodJ/nsfz-campus-media/main/';
-test('only production photo assets use the separate repository and preserve asset versions', () => {
+const mediaBaseURL = 'https://photos.drivinggodj.dpdns.org/';
+test('only production photo assets use the external image host and preserve asset versions', () => {
   const file = 'media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.webp?v=depth-version';
   assert.equal(assetURL(file, '/nsfz-campus-gallery/', mediaBaseURL), mediaBaseURL + file);
   assert.equal(assetURL(file, '/nsfz-campus-gallery/', mediaBaseURL.slice(0, -1)), mediaBaseURL + file);

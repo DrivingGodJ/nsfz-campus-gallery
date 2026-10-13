@@ -75,7 +75,7 @@
 
 可下载原图统一控制在 **5 MB 以内**，本地审核导入时会自动压缩；导入的源文件保存在本地。
 
-公开图片存放在独立的 [图片仓库](https://github.com/DrivingGodJ/nsfz-campus-media)，主站直接读取该仓库的图片地址。图片仓库不开启 Pages，主站发布包只包含程序、模型和照片资料。
+网站入口保留在 GitHub Pages，缩略图、次高清图、深度图和可下载原图由 Cloudflare 静态托管提供。独立的 [图片仓库](https://github.com/DrivingGodJ/nsfz-campus-media) 保留备份，主站发布包只包含程序、模型和照片资料。
 
 ## 看见四季与晨昏
 

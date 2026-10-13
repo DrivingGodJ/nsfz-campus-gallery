@@ -6,12 +6,11 @@ import { spawn } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
 import { ASSET_PATTERN, UserError, writeJSON } from './storage.mjs';
 import { PHOTO_DOWNLOAD_MAX_BYTES } from './photo-preview.mjs';
+import { MEDIA_BASE_URL } from './media-publication.mjs';
 
 export const PUBLIC_SITE = 'https://drivinggodj.github.io/nsfz-campus-gallery/';
 export const LIKES_API = 'https://likes.drivinggodj.dpdns.org/api/likes';
 const REPOSITORY = 'DrivingGodJ/nsfz-campus-gallery';
-const MEDIA_REPOSITORY = 'DrivingGodJ/nsfz-campus-media';
-const MEDIA_BASE_URL = 'https://raw.githubusercontent.com/' + MEDIA_REPOSITORY + '/main/';
 const CONTENT = /^(public\/data\/site\.json|public\/media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg|depth\.webp))$/;
 export const contentPath = value => CONTENT.test(value);
 export function changedPaths(porcelain) {
@@ -86,7 +85,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     const cached = hashes.get(file);
     if (!fresh && cached?.key === key) return cached.value;
     const value = await fileHash(file);
-    hashes.set(file, { key, value });
+    hashes.set(file, { key, value, bytes: stat.size });
     return value;
   }
   const npm = async (script, args = [], env = {}) => {
@@ -129,6 +128,9 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       try { fingerprint.update(await fs.readFile(path.join(root, file))); }
       catch (error) { if (error.code !== 'ENOENT') throw error; fingerprint.update('deleted'); }
     }
+    // The backup repository changes during a normal publish; this fingerprint
+    // covers only the source that must stay unchanged while images upload.
+    const sourceFingerprint = fingerprint.copy().update(JSON.stringify(current));
     let media;
     const useExternalMedia = await externalMedia();
     if (!useExternalMedia) {
@@ -150,14 +152,15 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       const mediaPaths = changedPaths(mediaStatus);
       const unrelated = mediaPaths.filter(file => !ASSET_PATTERN.test(file) && file !== 'README.md');
       if (unrelated.length) throw new UserError('图片内容库还有其他修改，请先处理：' + unrelated.slice(0, 5).join('、'));
-      const files = [];
+      const files = [], manifest = [];
       fingerprint.update(mediaHead).update(mediaStatus);
       for (const file of assets) {
-        let localHash;
+        let localHash, bytes;
         try {
           const localFile = path.join(root, 'public', file);
-          if (file.endsWith('/download.jpg') && (await fs.stat(localFile)).size > PHOTO_DOWNLOAD_MAX_BYTES) throw new UserError('下载图片超过 5 MB，请先压缩后发布。');
           localHash = await hash(localFile, fresh);
+          bytes = hashes.get(localFile).bytes;
+          if (file.endsWith('/download.jpg') && bytes > PHOTO_DOWNLOAD_MAX_BYTES) throw new UserError('下载图片超过 5 MB，请先压缩后发布。');
         }
         catch (error) { if (error.code !== 'ENOENT') throw error; throw new UserError('缺少已审核的照片文件：' + file); }
         let storedHash = 'missing';
@@ -166,15 +169,17 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
         if (mediaPaths.includes(file) && localHash !== storedHash) throw new UserError('图片库中的照片文件有未同步的修改，未覆盖。请先核对：' + file);
         // Ignored public/media files must still participate in the publication check.
         fingerprint.update(file).update(localHash).update(storedHash);
+        sourceFingerprint.update(file).update(localHash);
+        manifest.push({ key: file, bytes, sha256: localHash });
         if (localHash !== storedHash || mediaPaths.includes(file)) files.push(file);
       }
       if (mediaPaths.includes('README.md')) {
         try { fingerprint.update(await hash(path.join(mediaRoot, 'README.md'), fresh)); files.push('README.md'); }
         catch (error) { if (error.code !== 'ENOENT') throw error; throw new UserError('图片内容库的说明文件已删除，请先恢复后再上线。'); }
       }
-      media = { assets, files, ahead: mediaAhead, baseURL: MEDIA_BASE_URL };
+      media = { assets, manifest, files, ahead: mediaAhead, baseURL: MEDIA_BASE_URL };
     }
-    latestPlan = { ...photoChanges(JSON.parse(previousText), current), files: media ? paths.filter(file => !file.startsWith('public/media/')) : paths, media, fingerprint: fingerprint.digest('hex'), saved: current.photos.length, drafts: drafts.length, ahead, siteURL: PUBLIC_SITE };
+    latestPlan = { ...photoChanges(JSON.parse(previousText), current), files: media ? paths.filter(file => !file.startsWith('public/media/')) : paths, media, fingerprint: fingerprint.digest('hex'), sourceFingerprint: sourceFingerprint.digest('hex'), saved: current.photos.length, drafts: drafts.length, ahead, siteURL: PUBLIC_SITE };
     return latestPlan;
   }
   async function status() {
@@ -201,6 +206,27 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       catch (error) { if (error.code === 'EEXIST') throw new UserError('另一窗口正在上线，请等待完成。', 409); throw error; }
     }
   }
+  async function verifyAssets(expected, prepared) {
+    const assets = prepared.media ? prepared.media.assets : prepared.files.filter(file => file.startsWith('public/media/')).map(file => file.slice(7));
+    const manifest = new Map(prepared.media?.manifest.map(asset => [asset.key, asset]) || []);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(6, assets.length) }, async () => {
+      while (next < assets.length) {
+        const file = assets[next++], origin = new URL(PUBLIC_SITE).origin;
+        const asset = await fetcher((prepared.media?.baseURL || PUBLIC_SITE) + file + '?review=' + expected, { method: 'HEAD', cache: 'no-store', headers: { Origin: origin }, signal: AbortSignal.timeout(25000) });
+        if (!asset.ok) throw new UserError('照片托管未通过检查，有照片文件尚未加载成功。照片和上线记录已保留，可以稍后重试。');
+        if (prepared.media) {
+          const cors = asset.headers.get('access-control-allow-origin');
+          const mime = file.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+          const length = asset.headers.get('content-length');
+          // Native Static Assets can return only its content-hash ETag on HEAD.
+          const validMetadata = length === null ? Boolean(asset.headers.get('etag')?.trim()) : Number(length) === manifest.get(file).bytes;
+          if (![origin, '*'].includes(cors) || asset.headers.get('content-type')?.split(';')[0].trim() !== mime
+            || !validMetadata) throw new UserError('照片托管的跨域、图片类型或文件大小检查未通过。照片和备份已保留，请检查托管配置后重试。');
+        }
+      }
+    }));
+  }
   async function verifyWebsite(expected, prepared) {
     const local = JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'), 'utf8'));
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -208,15 +234,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       // Static validation may reorder fields (for example aerial altitude).
       // Compare the entire library while ignoring JSON object key order.
       if (response.ok && isDeepStrictEqual(await response.json().catch(() => null), local)) {
-        const assets = prepared.media ? prepared.media.assets : prepared.files.filter(file => file.startsWith('public/media/')).map(file => file.slice(7));
-        let next = 0;
-        await Promise.all(Array.from({ length: Math.min(6, assets.length) }, async () => {
-          while (next < assets.length) {
-            const file = assets[next++];
-            const asset = await fetcher((prepared.media?.baseURL || PUBLIC_SITE) + file + '?review=' + expected, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(25000) });
-            if (!asset.ok) throw new UserError('网站已发布，但有照片文件尚未加载成功。请稍后重新上线。');
-          }
-        }));
+        await verifyAssets(expected, prepared);
         return;
       }
       await wait(pollMs);
@@ -276,6 +294,11 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
         }
         // A previous failed push may have already committed the matching files.
         if (prepared.media.files.length || prepared.media.ahead) await mediaGit('push', 'origin', 'main');
+        await update({ step: 2, message: '图片已备份，正在上传照片托管并检查公开图片…' });
+        try { await npm('media:deploy'); }
+        catch (error) { throw new UserError('照片托管上传失败，尚未提交本次网站更新。照片与 GitHub 图片备份已保留，可以重试。\n' + publicationError(error.message)); }
+        await verifyAssets(active.id, prepared);
+        if ((await plan(true)).sourceFingerprint !== prepared.sourceFingerprint) throw new UserError('上传过程中内容库发生变化，尚未提交本次网站更新。请重新核对后上线。');
       }
       if (prepared.files.length) {
         await git('add', '--', ...prepared.files);
