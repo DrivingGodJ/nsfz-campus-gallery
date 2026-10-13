@@ -7,6 +7,7 @@ import { applyCampusCorrections } from '../server/campus-corrections.mjs';
 import { basketballEquipment, basketballGeometry } from '../src/basketball-geometry.ts';
 import { basketballFenceGeometry } from '../src/basketball-fence-geometry.ts';
 import { passageFootprint } from '../src/underground-geometry.ts';
+import { curvedStairTreads } from '../src/structure-geometry.ts';
 
 const read = async file => JSON.parse(await fs.readFile(new URL('../' + file, import.meta.url)));
 const campus = await read('public/data/campus.json');
@@ -110,8 +111,26 @@ test('basket bases remain outside playable courts and keep both fences, entrance
   } finally { ['metal', 'bases', 'glass', 'rims', 'nets'].forEach(name => equipment[name].dispose()); }
 });
 
-test('the fine mesh fence follows only the southern baseline and marked eastern side, with the northern entrance open', () => {
-  assert.deepEqual(feature.railEdges, [[feature.outer[4], feature.outer[5]], [feature.outer[3], feature.outer[4]]]);
+test('the side mesh fence follows the marked grass margin, leaving the southern fence and northern entrance separate', () => {
+  assert.deepEqual(feature.railEdges[0], [feature.outer[4], feature.outer[5]], 'The original southern fence stays in place');
+  assert.equal(feature.railEdges.length, 2, 'Only the two requested sides have fences');
+  const originalSide = feature.outer.slice(3, 5), [a, b] = originalSide;
+  const direction = b.map((n, i) => n - a[i]), length = Math.hypot(...direction);
+  const outward = [direction[1] / length, -direction[0] / length];
+  const side = feature.railEdges[1];
+  for (const [point, along] of [[side[0], 0], [side[1], length - 9]]) {
+    const offset = point.map((n, i) => n - a[i]);
+    assert.ok(Math.abs(offset[0] * outward[0] + offset[1] * outward[1] - 5.5) < 1e-8, 'The side fence moves outward to the red grass-margin line');
+    assert.ok(Math.abs(offset[0] * direction[0] / length + offset[1] * direction[1] / length - along) < 1e-8, 'The north end stays aligned and the south end stops before the old corner');
+  }
+  assert.ok(distanceToSegment(side[1], ...feature.railEdges[0]) > 10, 'An open passage separates the two fences');
+  const footprint = passageFootprint(side, .1);
+  for (const road of campus.features.filter(item => item.type === 'path' && item.points && !item.representedBy)) {
+    assert.equal(clip.intersection(polygon(footprint), polygon(passageFootprint(road.points, road.width || 3))).length, 0, 'The moved fence leaves existing roads clear');
+  }
+  const entrance = campus.features.find(item => item.id === 'local/underpass-entrance');
+  const stairOpening = curvedStairTreads({ ...entrance.curvedStair, steps: 1 })[0].ring;
+  assert.equal(clip.intersection(polygon(footprint), [stairOpening]).length, 0, 'The northern post leaves the curved entrance stairs clear');
   assert.equal(feature.railHeight, 3.8);
   const fence = basketballFenceGeometry(feature), material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
   try {
@@ -154,11 +173,18 @@ test('the fine mesh fence follows only the southern baseline and marked eastern 
       const hit = new THREE.Raycaster(eye, normal.clone().negate(), 0, 2).intersectObject(frame)[0];
       assert.ok(hit && Math.abs(hit.distance - 1) < .06, 'Each real top rail sits on its selected outer line');
     }
-    const [a, b] = feature.outer.slice(2, 4), middle = a.map((n, i) => (n + b[i]) / 2);
-    const normal = vector([a[1] - b[1], b[0] - a[0]]).normalize();
-    for (const y of [1, .16 + feature.railHeight]) {
-      const eye = vector(middle, y).addScaledVector(normal, 1);
-      assert.equal(new THREE.Raycaster(eye, normal.clone().negate(), 0, 2).intersectObject(frame).length, 0, 'The northern access beside the underground entrance remains open');
+    const extendedSouth = b.map((n, i) => n + 5.5 * outward[i]);
+    for (const [edge, description] of [
+      [originalSide, 'The old side-fence location is vacated'],
+      [[side[1], extendedSouth], 'The south gap has no continuation or joining rail'],
+      [feature.outer.slice(2, 4), 'The northern access beside the underground entrance remains open'],
+    ]) {
+      const [from, to] = edge, middle = from.map((n, i) => (n + to[i]) / 2);
+      const normal = vector([from[1] - to[1], to[0] - from[0]]).normalize();
+      for (const y of [1, .16 + feature.railHeight]) {
+        const eye = vector(middle, y).addScaledVector(normal, 1);
+        assert.equal(new THREE.Raycaster(eye, normal.clone().negate(), 0, 2).intersectObject(frame).length, 0, description);
+      }
     }
   } finally { material.dispose(); Object.values(fence).forEach(part => part.dispose()); }
 });
