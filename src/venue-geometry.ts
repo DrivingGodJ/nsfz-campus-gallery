@@ -111,7 +111,7 @@ export function standsArchitecture(building: Building, height: number, floorHeig
   const inner = [at(.35, .35), at(length - .35, .35), at(length - .35, width - .35), at(.35, width - .35)];
   const shell: Shape = { outer: building.outer, holes: [[...inner, inner[0]]] };
   const opening = (u: number, span: number): GroundPassage => ({ id: `stand-${u}`, sourcePathId: '', width: span, points: [at(u, -1), at(u, 1)] });
-  const doors = [length * .18, length * .5, length * .82].map(u => opening(u, 2.3));
+  const doors = [length * .18, length * .5].map(u => opening(u, 2.3));
   // _DSC1046: the office-side end is an open passage, with a rear parapet
   // and a right turn beneath the seats, rather than another glazed room.
   const entrance = opening(length - 3.85, 6.3), entranceLeft = length - 7;
@@ -119,10 +119,12 @@ export function standsArchitecture(building: Building, height: number, floorHeig
   const rearCenter = length - 3.85;
   const rearEntrance = { ...entrance, points: [at(rearCenter, width - 1), at(rearCenter, width + 1)] };
   const windows = Array.from({ length: 9 }, (_, i) => opening(length * (.065 + i * .105), 3.7))
-    .filter(window => doors.every(door => Math.abs(Number(window.id.slice(6)) - Number(door.id.slice(6))) > (window.width + door.width) / 2 + .2));
+    // The office-side front bay is solid; the broad end passage stays open.
+    .filter(window => Number(window.id.slice(6)) < length * .78 && doors.every(door => Math.abs(Number(window.id.slice(6)) - Number(door.id.slice(6))) > (window.width + door.width) / 2 + .2));
   const housingTop = Math.min(floorHeight, shown), bands = [0, .65, .75, 2.55, 2.8, housingTop].filter(y => y >= 0 && y <= housingTop).sort((a, b) => a - b);
   const rearWindowEnd = rearCenter - 3.15;
-  const stairWindow: GroundPassage = { ...opening((stair.u0 + rearWindowEnd) / 2, rearWindowEnd - stair.u0), points: [at((stair.u0 + rearWindowEnd) / 2, width - 1), at((stair.u0 + rearWindowEnd) / 2, width + 1)] };
+  // Keep the wide rear window cut away from the newly solid front wall.
+  const stairWindow: GroundPassage = { ...opening((stair.u0 + rearWindowEnd) / 2, rearWindowEnd - stair.u0), points: [at((stair.u0 + rearWindowEnd) / 2, width + 1), at((stair.u0 + rearWindowEnd) / 2, width + 3)] };
   for (let i = 1; i < bands.length; i++) {
     const bottom = bands[i - 1], top = bands[i];
     if (top <= bottom) continue;

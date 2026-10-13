@@ -99,7 +99,17 @@ test('the office-side stand passage opens to the outside and turns right beneath
       const corridor = standsStairLayout(stands).v0 - .6;
       assert.equal(ray(entrance, corridor, 1.6, frame.along.map(value => -value), 15).length, 0, 'The room-side walkway reaches the stair head when turning right');
       assert.ok(ray(entrance, frame.width - 1, .5, frame.across, 2).length, 'The rear opening retains its low parapet');
-      assert.ok(ray(frame.length * .905, -1, 1.6, frame.across, 2).length, 'The adjoining room window remains beside the entrance');
+      for (const u of [frame.length * .82, frame.length * .905]) for (const y of [1.2, 2.3]) {
+        const p = frame.at(u, -1), sight = new THREE.Raycaster(new THREE.Vector3(p[0], y, p[1]), new THREE.Vector3(frame.across[0], 0, frame.across[1]), 0, 2);
+        assert.ok(sight.intersectObject(body).length, 'The marked door and window bay are closed with a real wall');
+        assert.equal(sight.intersectObjects([objects[1], objects[2]]).length, 0, 'The solid bay has no leftover glass or window frame');
+      }
+      const adjacent = frame.at(frame.length * .695, -1), windowRay = new THREE.Raycaster(new THREE.Vector3(adjacent[0], 1.6, adjacent[1]), new THREE.Vector3(frame.across[0], 0, frame.across[1]), 0, 2);
+      assert.equal(windowRay.intersectObject(body).length, 0, 'The next unmarked window stays open through the masonry');
+      assert.ok(windowRay.intersectObject(objects[1]).length, 'The next unmarked window keeps its glazing');
+      const rear = frame.at(frame.length * .905, frame.width + 1), rearRay = new THREE.Raycaster(new THREE.Vector3(rear[0], 1.6, rear[1]), new THREE.Vector3(-frame.across[0], 0, -frame.across[1]), 0, 2);
+      assert.equal(rearRay.intersectObject(body).length, 0, 'Closing the front bay keeps the rear stair window open');
+      assert.ok(rearRay.intersectObject(objects[1]).length, 'The rear stair window retains its glazing');
       const returnWall = ray(entrance, 2, 1.6, frame.along.map(value => -value), 6);
       assert.ok(returnWall.length, 'A side wall separates the adjoining room from the open passage');
       for (const [u, v] of [[entrance, 1], [entrance, corridor], [entrance - 10, corridor]]) {
