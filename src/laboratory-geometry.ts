@@ -67,6 +67,8 @@ export function laboratoryLayout(building: Building) {
   // the long straight wall. The theatre owns its outside walls and projection.
   const walls = [...rooms.map(ring), ring(stair.opening)];
   walls.push(rectangle(sideLeft, 56.6 - WALL, sideRight, 56.6));
+  // Close the marked east hall end above ground, flush with both adjoining walls.
+  const upperEndWall = rectangle(68.85 - WALL, corridorFront - WALL, 68.85, endReturn + WALL);
   // Open the other two marked ground-floor boundaries as well. These cuts
   // affect walls only; the floor and stair's rear outside wall stay intact.
   const groundWallOpenings = [
@@ -84,7 +86,7 @@ export function laboratoryLayout(building: Building) {
   // The marked L-shaped ground-floor guard is open; the opposite guard and
   // both upper-storey guards keep their original edges.
   const corridors: FloorCorridor[] = railEdges.map((edge, i) => ({ partId: 'main', depth: corridorWidth, startFloor: i === 0 ? 2 : 1, points: [seam(12 + forward), at(57.1,12 + forward)], railEdges: [edge] }));
-  return { at, seam, rooms, walls, groundWallOpenings, walkways, stair, stairU, doors, corridors, circleU, circleRadius, corridorWest, roomWidth };
+  return { at, seam, rooms, walls, upperEndWall, groundWallOpenings, walkways, stair, stairU, doors, corridors, circleU, circleRadius, corridorWest, roomWidth };
 }
 
 export function laboratoryBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
@@ -93,6 +95,7 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
   const wallPolygons = snapFootprint(layout.walls.map(polygon));
   const walls = polygonClipping.union(wallPolygons[0], ...wallPolygons.slice(1));
   const groundWalls = polygonClipping.difference(walls, ...snapFootprint(layout.groundWallOpenings.map(polygon)));
+  const upperWalls = polygonClipping.union(walls, ...snapFootprint([polygon(layout.upperEndWall)]));
   const platePolygons = snapFootprint([...layout.rooms, ...layout.walkways, layout.stair.opening].map(polygon));
   const floorPlate = polygonClipping.union(platePolygons[0], ...platePolygons.slice(1));
   const glazing = laboratoryWindows(building, height, floorHeight);
@@ -111,7 +114,7 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
     const levels = [...new Set([bottom + SLAB, top, Math.min(bottom + 2.65, top), ...glazing.filter(window => window.bottom >= bottom && window.bottom < top).flatMap(window => [window.bottom, window.top]), ...laboratoryRearOpeningLevels(rearGlazing).filter(y => y > bottom + SLAB && y < top)])].sort((a, b) => a - b);
     for (let i = 0; i < levels.length - 1; i++) {
       const low = levels[i], high = levels[i + 1], middle = (low + high) / 2;
-      let layer = floor === 0 ? groundWalls : walls;
+      let layer = floor === 0 ? groundWalls : upperWalls;
       if (openings.length && middle < bottom + 2.65) layer = polygonClipping.difference(layer, openings);
       const cuts = [...glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut), ...laboratoryRearCutsAt(building, rearGlazing, middle)];
       if (cuts.length) layer = polygonClipping.difference(layer, ...snapFootprint(cuts));

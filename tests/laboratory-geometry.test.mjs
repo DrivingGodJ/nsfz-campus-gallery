@@ -123,6 +123,33 @@ test('all red-marked ground boundaries are open while upper walls, the rear faca
   body.dispose();
 });
 
+test('the marked east hall end is solid on floors two through six while floor one stays open', () => {
+  const { at } = laboratoryLayout(building);
+  for (const [floorHeight, shown, cutaway] of [[3.6, 6, false], [3.6, 1, true], [3.6, 3, true], [4.2, 6, false]]) {
+    const geometry = laboratoryBodyGeometry(building, shown * floorHeight, floorHeight, cutaway), target = mesh(geometry, true);
+    target.material.side = THREE.DoubleSide;
+    for (let floor = 0; floor < shown; floor++) for (const rise of [.5, 1.5, 2.5, 3.1]) {
+      const y = .12 + floor * floorHeight + rise;
+      for (const v of [11.601, 11.9, 13.1, 14.3, 14.599]) {
+        const inside = cast(target, at(68, v), at(69.4, v), y, 1.4)[0];
+        assert.equal(!!inside, floor > 0, 'Only floors above ground seal the marked three-metre exit');
+        if (inside) {
+          assert.ok(Math.abs(inside.distance - .57) < 1e-4, 'The wall has the same inside face and thickness as the adjacent wall');
+          const outside = cast(target, at(69.4, v), at(68, v), y, 1.4)[0];
+          assert.ok(outside && Math.abs(outside.distance - .55) < 1e-4, 'The outside face stays on the original building outline');
+          assert.equal(geometry.userData.photoOcclusionMask[inside.faceIndex], 1, 'The closure is opaque masonry');
+        }
+      }
+      if (floor) {
+        for (const v of [11.599, 11.6, 14.6, 14.601]) assert.ok(cast(target, at(68, v), at(69.4, v), y, 1.4).length, 'Both ends join the existing masonry without a crack');
+        assert.equal(cast(target, at(68.7, 11.4), at(68.7, 14.8), y, 3.4).length, 0, 'The joined wall has no internal cap between its sections');
+      }
+      assert.equal(cast(target, at(66, 13.1), at(68.1, 13.1), y, 2.1).length, 0, 'The hall itself remains clear');
+    }
+    geometry.dispose(); target.material.dispose();
+  }
+});
+
 test('the white connection is part of the theatre outline, with the recess road open only on the ground floor', () => {
   const wall = building.facade.connectionWall;
   assert.deepEqual(wall.at(-1), building.outer[11]);
