@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useMapColor } from './MapTheme';
@@ -17,6 +17,7 @@ import { OFFICE_ID, LIBRARY_ID, libraryAnnexGlazingGeometry } from './campus-ext
 import { officeWindowLayout } from './office-windows';
 import { STAND_OFFICE_ID, standOfficeWindows } from './stand-office-geometry';
 import type { Building, BuildingPart } from './types';
+import { useFloorGeometry } from './useFloorGeometry';
 
 type Section = BuildingPart & { height: number; floors: number };
 export default function BuildingArchitecture({ building, sections, floorHeight, cutawayHeight, gym }: {
@@ -30,9 +31,9 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
     const layout = laboratoryLayout(building);
     return { ...building, floorCorridors: layout.corridors, stairwells: [layout.stair] };
   }, [building]);
-  const rails = useMemo(() => teachingRailGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
-  const stairs = useMemo(() => teachingStairGeometry(structure, sections, floorHeight, cutawayHeight), [structure, sections, floorHeight, cutawayHeight]);
-  const windows = useMemo(() => {
+  const rails = useFloorGeometry(cutawayHeight, [structure, sections, floorHeight], () => teachingRailGeometry(structure, sections, floorHeight, cutawayHeight));
+  const stairs = useFloorGeometry(cutawayHeight, [structure, sections, floorHeight], () => teachingStairGeometry(structure, sections, floorHeight, cutawayHeight));
+  const windows = useFloorGeometry(cutawayHeight, [building, sections, floorHeight], () => {
     const visibleHeight = Math.min(Math.max(...sections.map(section => section.height)), cutawayHeight ?? Infinity);
     if (building.id === THEATRE_ID) return theatreGlazingGeometry(building, sections, floorHeight, cutawayHeight);
     if (building.id === STAND_OFFICE_ID) return classroomGlazingGeometry(standOfficeWindows(building, visibleHeight, floorHeight), building.classroomWindows);
@@ -51,20 +52,12 @@ export default function BuildingArchitecture({ building, sections, floorHeight, 
       return { glass: architectureBatch([lower.glass, upper.glass], false), frames: architectureBatch([lower.frames, upper.frames], false) };
     }
     return teachingWindowGeometry(building, building.id === LIBRARY_ID ? sections.filter(section => section.id !== 'curved-annex') : sections, floorHeight, cutawayHeight);
-  }, [building, sections, floorHeight, cutawayHeight]);
-  const annexWindows = useMemo(() => building.id === LIBRARY_ID ? libraryAnnexGlazingGeometry(building, sections.filter(section => section.id === 'curved-annex'), floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
-  const theatreEntry = useMemo(() => building.id === THEATRE_ID ? theatreEntranceGeometry(building, floorHeight, cutawayHeight) : undefined, [building, floorHeight, cutawayHeight]);
-  useEffect(() => () => { if (theatreEntry) Object.values(theatreEntry).forEach(geometry => geometry.dispose()); }, [theatreEntry]);
-  const elevator = useMemo(() => teachingElevatorGeometry(building, sections, floorHeight, cutawayHeight), [building, sections, floorHeight, cutawayHeight]);
-  const teaching = useMemo(() => building.id === TEACHING_ID ? teachingDetailGeometry(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
-  const furniture = useMemo(() => building.id === TEACHING_ID ? teachingClassroomFurniture(building, sections, floorHeight, cutawayHeight) : undefined, [building, sections, floorHeight, cutawayHeight]);
-  useEffect(() => () => rails.dispose(), [rails]);
-  useEffect(() => () => Object.values(stairs).forEach(geometry => geometry.dispose()), [stairs]);
-  useEffect(() => () => Object.values(windows).forEach(geometry => geometry.dispose()), [windows]);
-  useEffect(() => () => { if (annexWindows) Object.values(annexWindows).forEach(geometry => geometry.dispose()); }, [annexWindows]);
-  useEffect(() => () => Object.values(elevator).forEach(geometry => geometry.dispose()), [elevator]);
-  useEffect(() => () => { if (teaching) Object.values(teaching).forEach(geometry => geometry.dispose()); }, [teaching]);
-  useEffect(() => () => { if (furniture) Object.values(furniture).forEach(geometry => geometry.dispose()); }, [furniture]);
+  });
+  const annexWindows = useFloorGeometry(cutawayHeight, [building, sections, floorHeight], () => building.id === LIBRARY_ID ? libraryAnnexGlazingGeometry(building, sections.filter(section => section.id === 'curved-annex'), floorHeight, cutawayHeight) : undefined);
+  const theatreEntry = useFloorGeometry(cutawayHeight, [building, floorHeight], () => building.id === THEATRE_ID ? theatreEntranceGeometry(building, floorHeight, cutawayHeight) : undefined);
+  const elevator = useFloorGeometry(cutawayHeight, [building, sections, floorHeight], () => teachingElevatorGeometry(building, sections, floorHeight, cutawayHeight));
+  const teaching = useFloorGeometry(cutawayHeight, [building, sections, floorHeight], () => building.id === TEACHING_ID ? teachingDetailGeometry(building, sections, floorHeight, cutawayHeight) : undefined);
+  const furniture = useFloorGeometry(cutawayHeight, [building, sections, floorHeight], () => building.id === TEACHING_ID ? teachingClassroomFurniture(building, sections, floorHeight, cutawayHeight) : undefined);
   const detail = useRef<THREE.Group>(null), railMaterial = useRef<THREE.MeshStandardMaterial>(null), frameMaterial = useRef<THREE.MeshStandardMaterial>(null);
   useFrame(({ camera }) => {
     const distance = Math.hypot(camera.position.x - building.center[0], camera.position.y, camera.position.z - building.center[1]);

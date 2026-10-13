@@ -32,17 +32,26 @@ export function usePhotoPreloading(photos: Photo[] | undefined, selected: Photo 
   }, [galleryOpen, catalogPhotos]);
   useEffect(() => {
     const connection = (navigator as Navigator & { connection?: EventTarget & { saveData?: boolean; effectiveType?: string } }).connection;
+    const rankedIds = ranked.map(photo => photo.id);
+    const resources = new Map(ranked.map(photo => [photo.id, photoLoadFiles(photo).map(asset)]));
+    const popular = likesReady ? ranked.slice(0, PHOTO_PRELOAD_POPULAR_COUNT).flatMap(photo => resources.get(photo.id)!) : [];
+    let timer: number | undefined;
     const update = () => {
-      photoImageCache.setAllowed(backgroundPhotoLoadingAllowed({ hidden: document.hidden, online: navigator.onLine, saveData: connection?.saveData, effectiveType: connection?.effectiveType }));
-      const popular = likesReady ? ranked.slice(0, PHOTO_PRELOAD_POPULAR_COUNT) : [];
-      const visible = new Set(visibility.current.candidates(ranked.map(photo => photo.id), performance.now()));
-      photoImageCache.setBackground(selected ? [] : [...popular, ...ranked.filter(photo => visible.has(photo.id))].flatMap(photo => photoLoadFiles(photo).map(asset)));
+      const allowed = backgroundPhotoLoadingAllowed({ hidden: document.hidden, online: navigator.onLine, saveData: connection?.saveData, effectiveType: connection?.effectiveType });
+      photoImageCache.setAllowed(allowed);
+      if (selected || !allowed) {
+        if (timer !== undefined) { window.clearInterval(timer); timer = undefined; }
+        photoImageCache.setBackground([]); return;
+      }
+      if (timer === undefined) timer = window.setInterval(update, 250);
+      const visible = visibility.current.candidates(rankedIds, performance.now());
+      photoImageCache.setBackground([...popular, ...visible.flatMap(id => resources.get(id)!)]);
     };
     update();
-    const timer = window.setInterval(update, 250);
     document.addEventListener('visibilitychange', update); window.addEventListener('online', update); window.addEventListener('offline', update); connection?.addEventListener('change', update);
     return () => {
-      window.clearInterval(timer); document.removeEventListener('visibilitychange', update); window.removeEventListener('online', update); window.removeEventListener('offline', update); connection?.removeEventListener('change', update);
+      if (timer !== undefined) window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', update); window.removeEventListener('online', update); window.removeEventListener('offline', update); connection?.removeEventListener('change', update);
     };
   }, [ranked, likesReady, selected]);
   useEffect(() => () => { photoImageCache.select([]); photoImageCache.setBackground([]); }, []);

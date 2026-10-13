@@ -44,6 +44,30 @@ function makeShape(data: Shape) {
   return shape;
 }
 
+// Corridor caps are built separately. Emit only the polygon's side walls,
+// avoiding a complete extrusion (and discarded cap triangulation) per layer.
+export function buildingWallTriangles(shape: Shape, depth: number) {
+  const points = makeShape(shape).extractPoints(12);
+  const positions: number[] = [], top = Math.fround(depth);
+  for (const ring of [points.shape, ...points.holes]) {
+    // Match ExtrudeGeometry's adjacent-point tolerance and winding, including
+    // its removal of the repeated closing vertex before emitting side faces.
+    let previous = ring[0];
+    for (let i = 1; i <= ring.length; i++) {
+      const index = i % ring.length, point = ring[index];
+      const scale = Math.max(Math.abs(point.x), Math.abs(point.y), Math.abs(previous.x), Math.abs(previous.y));
+      if (point.distanceToSquared(previous) <= 1e-20 * scale * scale) { ring.splice(index, 1); i--; }
+      else previous = point;
+    }
+    for (let i = ring.length - 1; i >= 0; i--) {
+      const a = ring[i], b = ring[(i + ring.length - 1) % ring.length];
+      const ax = Math.fround(a.x), ay = Math.fround(a.y), bx = Math.fround(b.x), by = Math.fround(b.y);
+      positions.push(ax, ay, 0, bx, by, 0, ax, ay, top, bx, by, 0, bx, by, top, ax, ay, top);
+    }
+  }
+  return positions;
+}
+
 export function passageShape(passage: GroundPassage) {
   const points = passage.points.map(point => [...point] as Point);
   // Extend past the facade so a road endpoint on a wall cannot leave a thin cap.
@@ -62,9 +86,15 @@ function splitFacade(section: Shape, corners: Point[]): Shape {
     for (let i = 0; i < vertices.length; i++) {
       const from = vertices[i], to = vertices[(i + 1) % vertices.length];
       const dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
-      const cuts = corners.map(point => ({ point, t: ((point[0] - from[0]) * dx + (point[1] - from[1]) * dz) / length ** 2 }))
-        .filter(({ point, t }) => t > 1e-8 && t < 1 - 1e-8 && Math.abs((point[0] - from[0]) * dz - (point[1] - from[1]) * dx) / length < 1e-7)
-        .sort((a, b) => a.t - b.t);
+      const minX = Math.min(from[0], to[0]) - 1e-7, maxX = Math.max(from[0], to[0]) + 1e-7;
+      const minZ = Math.min(from[1], to[1]) - 1e-7, maxZ = Math.max(from[1], to[1]) + 1e-7;
+      const cuts: { point: Point; t: number }[] = [];
+      for (const point of corners) {
+        if (point[0] < minX || point[0] > maxX || point[1] < minZ || point[1] > maxZ) continue;
+        const t = ((point[0] - from[0]) * dx + (point[1] - from[1]) * dz) / length ** 2;
+        if (t > 1e-8 && t < 1 - 1e-8 && Math.abs((point[0] - from[0]) * dz - (point[1] - from[1]) * dx) / length < 1e-7) cuts.push({ point, t });
+      }
+      cuts.sort((a, b) => a.t - b.t);
       result.push(from);
       for (const { point } of cuts) if (Math.hypot(point[0] - result.at(-1)![0], point[1] - result.at(-1)![1]) > 1e-7) result.push(point);
     }
@@ -211,6 +241,9 @@ function corridorGeometry(section: Section, height: number, floorHeight: number,
   const doorTops = solidCores.flatMap((core, index) => Array.from({ length: Math.ceil(solidEnds[index] / floorHeight) }, (_, floor) =>
     (core.doors || []).map(door => floor * floorHeight + door.height)).flat().filter(top => top > solidStarts[index] && top < solidEnds[index]));
   const levels = [...new Set([0, height, Math.min(floorHeight, height), openBottom, openTop, ...solidStarts, ...solidEnds, ...doorTops, ...slabs.flat(), ...glazing.flatMap(window => [window.bottom, window.top])])].filter(level => level >= 0 && level <= height).sort((a, b) => a - b);
+  // Repeated storeys share identical XY wall/window cuts. Keep this cache local
+  // to one build, so editor geometry changes never reuse an old footprint.
+  const footprints = new Map<string, polygonClipping.MultiPolygon>();
   const layers = levels.slice(0, -1).map((bottom, i) => {
     const top = levels[i + 1], middle = (bottom + top) / 2;
     const slab = slabs.some(([a, b]) => middle >= a && middle <= b);
@@ -220,18 +253,26 @@ function corridorGeometry(section: Section, height: number, floorHeight: number,
       solidCores[index].classroomWindows || cutaway && middle >= cutawayBottom ? coreShells[index] : [solid]);
     const opened = middle >= openBottom && middle < openTop;
     const storeyWalls = middle < floorHeight && groundWalls ? opened ? groundWalls : closedGroundWalls! : cutawayWalls && middle >= cutawayBottom ? opened ? cutawayWalls : closedCutawayWalls! : opened ? walls : closedWalls;
-    let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(storeyWalls, activeSolids[0], ...activeSolids.slice(1)) : storeyWalls;
     const openWindows = !slab && snapFootprint(glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut));
+    const stairOpening = slab && middle > slabThickness && middle < height - slabThickness && shafts.length > 0;
+    const roofOpening = slab && middle >= height - slabThickness && roofShafts.length > 0;
+    const groundOpening = middle < floorHeight && groundCuts.length > 0;
+    const key = JSON.stringify([slab, storeyWalls, activeSolids, openWindows, stairOpening, roofOpening, groundOpening]);
+    const cached = footprints.get(key);
+    if (cached) return { bottom, top, footprint: cached, slab };
+    let footprint = slab ? slabFootprint : activeSolids.length ? polygonClipping.union(storeyWalls, activeSolids[0], ...activeSolids.slice(1)) : storeyWalls;
     if (openWindows && openWindows.length) footprint = polygonClipping.difference(footprint, openWindows[0], ...openWindows.slice(1));
     // Retain the base and roof; stairs and glass elevator shafts remain open
     // through intermediate slabs so they can connect the floors.
-    if (slab && middle > slabThickness && middle < height - slabThickness && shafts.length) footprint = polygonClipping.difference(footprint, shafts[0], ...shafts.slice(1));
-    if (slab && middle >= height - slabThickness && roofShafts.length) footprint = polygonClipping.difference(footprint, roofShafts[0], ...roofShafts.slice(1));
+    if (stairOpening) footprint = polygonClipping.difference(footprint, shafts[0], ...shafts.slice(1));
+    if (roofOpening) footprint = polygonClipping.difference(footprint, roofShafts[0], ...roofShafts.slice(1));
     // Ground roads and removed balcony strips stay clear, including base slabs.
-    if (middle < floorHeight && groundCuts.length) footprint = polygonClipping.difference(footprint, groundCuts[0], ...groundCuts.slice(1));
+    if (groundOpening) footprint = polygonClipping.difference(footprint, groundCuts[0], ...groundCuts.slice(1));
     // Window jambs and wall shells share the same boundary. Weld microscopic
     // clipping differences before subtracting adjacent layers for their caps.
-    return { bottom, top, footprint: hasShell || cutaway ? snapFootprint(footprint) : footprint, slab };
+    footprint = hasShell || cutaway ? snapFootprint(footprint) : footprint;
+    footprints.set(key, footprint);
+    return { bottom, top, footprint, slab };
   });
   // A separately calibrated top room may reach the building edge while its
   // ordinary storeys and the last flight retain their original stair opening.
@@ -252,6 +293,16 @@ function corridorGeometry(section: Section, height: number, floorHeight: number,
   }
   const positions: number[] = [], occlusionMask: number[] = [];
   const corners = [...new Map(layers.flatMap(layer => layer.footprint.flat(2)).map(point => [point.join(','), point])).values()];
+  const contours = new WeakMap<polygonClipping.MultiPolygon, Shape[]>();
+  const caps = new WeakMap<polygonClipping.MultiPolygon, Map<polygonClipping.MultiPolygon, polygonClipping.MultiPolygon>>();
+  const exposedCap = (footprint: polygonClipping.MultiPolygon, neighbor?: polygonClipping.MultiPolygon) => {
+    if (!neighbor) return footprint;
+    let differences = caps.get(footprint);
+    if (!differences) { differences = new Map(); caps.set(footprint, differences); }
+    let difference = differences.get(neighbor);
+    if (!difference) { difference = polygonClipping.difference(footprint, neighbor); differences.set(neighbor, difference); }
+    return difference;
+  };
   const insideRing = (point: Point, ring: Point[]) => {
     let inside = false;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -275,44 +326,58 @@ function corridorGeometry(section: Section, height: number, floorHeight: number,
       geometry.dispose();
     }
   };
+  const corridorCaps = new WeakMap<polygonClipping.MultiPolygon, [polygonClipping.MultiPolygon, polygonClipping.MultiPolygon]>();
   const addCap = (footprint: polygonClipping.MultiPolygon, y: number, upward: boolean) => {
     // Keep classroom roofs and passage ceilings blocking; only the recessed
     // corridor's slab surfaces are transparent to photo-marker visibility rays.
-    addHorizontal(polygonClipping.difference(footprint, corridorArea), y, upward, true);
-    addHorizontal(polygonClipping.intersection(footprint, corridorArea), y, upward, false);
+    if (!footprint.length) return;
+    let split = corridorCaps.get(footprint);
+    if (!split) {
+      split = [polygonClipping.difference(footprint, corridorArea), polygonClipping.intersection(footprint, corridorArea)];
+      corridorCaps.set(footprint, split);
+    }
+    addHorizontal(split[0], y, upward, true);
+    addHorizontal(split[1], y, upward, false);
   };
   for (const [i, layer] of layers.entries()) {
-    for (const [outer, ...holes] of layer.footprint) {
+    let walls = contours.get(layer.footprint);
+    if (!walls) { walls = layer.footprint.map(([outer, ...holes]) => splitFacade({ outer, holes }, corners)); contours.set(layer.footprint, walls); }
+    for (const wall of walls) {
       // Identical subdivisions keep intact walls free of false seams at slab levels.
-      const geometry = new THREE.ExtrudeGeometry(makeShape(splitFacade({ outer, holes }, corners)), { depth: layer.top - layer.bottom, bevelEnabled: false });
-      const vertices = geometry.getAttribute('position');
-      for (let j = 0; j < vertices.count; j += 3) {
-        if (vertices.getZ(j) === vertices.getZ(j + 1) && vertices.getZ(j) === vertices.getZ(j + 2)) continue;
-        for (let k = 0; k < 3; k++) positions.push(vertices.getX(j + k), vertices.getY(j + k), vertices.getZ(j + k) + layer.bottom);
-        const middle: Point = [0, 1, 2].reduce((sum, k) => [sum[0] + vertices.getX(j + k) / 3, sum[1] - vertices.getY(j + k) / 3] as Point, [0, 0] as Point);
+      const vertices = buildingWallTriangles(wall, layer.top - layer.bottom);
+      for (let j = 0; j < vertices.length; j += 9) {
+        for (let k = 0; k < 3; k++) positions.push(vertices[j + k * 3], vertices[j + k * 3 + 1], vertices[j + k * 3 + 2] + layer.bottom);
+        const middle: Point = [0, 1, 2].reduce((sum, k) => [sum[0] + vertices[j + k * 3] / 3, sum[1] - vertices[j + k * 3 + 1] / 3] as Point, [0, 0] as Point);
         occlusionMask.push(layer.slab && insideCorridor(middle) ? 0 : 1);
       }
-      geometry.dispose();
     }
     // Only exposed floors/ceilings get caps. Shared slab/core interfaces are
     // removed instead of overlapping, so the open corridors do not flicker.
     const previous = layers[i - 1]?.footprint, next = layers[i + 1]?.footprint;
-    addCap(previous ? polygonClipping.difference(layer.footprint, previous) : layer.footprint, layer.bottom, false);
-    addCap(next ? polygonClipping.difference(layer.footprint, next) : layer.footprint, layer.top, true);
+    if (previous !== layer.footprint) addCap(exposedCap(layer.footprint, previous), layer.bottom, false);
+    if (next !== layer.footprint) addCap(exposedCap(layer.footprint, next), layer.top, true);
   }
   const geometry = new THREE.BufferGeometry();
   // Clipped jamb corners may produce slivers narrower than the snapping grid.
   // Drop them before rendering or raycasting, keeping the face mask aligned.
   const clean: number[] = [], masks: number[] = [], faces = new Set<string>(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const coordinates = new Map<number, string>();
+  const coordinateKey = (value: number) => {
+    const rounded = Math.fround(value);
+    let key = coordinates.get(rounded);
+    if (key === undefined) { key = rounded.toFixed(5); coordinates.set(rounded, key); }
+    return key;
+  };
   for (let i = 0; i < positions.length; i += 9) {
     a.fromArray(positions, i); b.fromArray(positions, i + 3); c.fromArray(positions, i + 6);
     b.sub(a); c.sub(a);
     const longestEdge = Math.max(b.lengthSq(), c.lengthSq(), b.distanceToSquared(c));
     if (b.cross(c).lengthSq() < longestEdge * 1e-10) continue;
-    const face = [0, 3, 6].map(offset => positions.slice(i + offset, i + offset + 3).map(value => Math.fround(value).toFixed(5)).join(',')).sort().join(';');
+    const face = [0, 3, 6].map(offset => coordinateKey(positions[i + offset]) + ',' + coordinateKey(positions[i + offset + 1]) + ',' + coordinateKey(positions[i + offset + 2])).sort().join(';');
     if (faces.has(face)) continue;
     faces.add(face);
-    clean.push(...positions.slice(i, i + 9)); masks.push(occlusionMask[i / 9]);
+    for (let k = 0; k < 9; k++) clean.push(positions[i + k]);
+    masks.push(occlusionMask[i / 9]);
   }
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(clean, 3));
   geometry.userData.photoOcclusionMask = new Uint8Array(masks);

@@ -33,11 +33,14 @@ function photoAnchorUnblocked(anchor: THREE.Vector3, camera: THREE.Camera, occlu
   ray.setFromCamera(new THREE.Vector2(projected.x, projected.y), camera);
   ray.layers.mask = camera.layers.mask;
   ray.far = Math.max(0, ray.ray.origin.distanceTo(anchor) - .12);
-  return !ray.intersectObjects(occluders.filter(mesh => photoRayIntersectsOccluder(mesh, ray)), false).some(hit => {
-    const mesh = hit.object as THREE.Mesh;
-    const blockingFace = mesh.geometry?.userData.photoOcclusionMask?.[hit.faceIndex ?? -1] !== 0;
-    return blockingFace && mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite));
-  });
+  const hits: THREE.Intersection[] = [];
+  for (const mesh of occluders) {
+    if (!photoRayIntersectsOccluder(mesh, ray)) continue;
+    hits.length = 0; ray.intersectObject(mesh, false, hits);
+    if (hits.some(hit => mesh.geometry?.userData.photoOcclusionMask?.[hit.faceIndex ?? -1] !== 0
+      && mesh.visible && mesh.parent && (!mesh.material || (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).some(material => !material.transparent && material.depthWrite)))) return false;
+  }
+  return true;
 }
 
 function photoAnchorVisible(anchor: THREE.Vector3, camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Mesh[], ray: THREE.Raycaster, halfSize: [number, number]) {
@@ -190,9 +193,11 @@ export function photoMarkerSize(distance: number) {
 
 type PhotoRegion = { id: string; name: string; footprints: Shape[]; bounds: THREE.Box3; landscape: boolean; building: boolean; interiors: { shape: Shape; bottom: number; top: number }[] };
 const regionGeometry = new WeakMap<Campus, { site: Site; regions: PhotoRegion[] }>();
+type PhotoRegionAssignment = { campus: Campus; site: Site; x: number; y: number; z: number; locationId: string | undefined; aerial: boolean; region?: PhotoRegion; id: string; name: string; spot: PhotoSpot; inside: boolean };
+const photoRegionAssignments = new WeakMap<MapPhoto, PhotoRegionAssignment>();
 function photoRegions(campus: Campus, site: Site) {
   const cached = regionGeometry.get(campus);
-  if (cached?.site === site) return cached.regions;
+  if (cached?.site.buildingOverrides === site.buildingOverrides) return cached.regions;
   const regions = campusLocations(campus, site).map(location => {
     const info = location.building ? buildingLevels(location.building, site.buildingOverrides[location.id]) : undefined;
     const footprints: Shape[] = info ? info.sections.map(part => ({ outer: part.outer, holes: part.holes || [] }))
@@ -215,6 +220,32 @@ function photoRegions(campus: Campus, site: Site) {
   return regions;
 }
 
+function photoRegionAssignment(photo: MapPhoto, campus: Campus, site: Site, regions: PhotoRegion[], known: Map<string, PhotoRegion>, origin: number[]) {
+  const { x, height: y, z } = photo.position, locationId = photoLocationId(photo, campus), aerial = isAerialPhoto(photo);
+  const cached = photoRegionAssignments.get(photo);
+  if (cached?.campus === campus && cached.site.buildingOverrides === site.buildingOverrides && cached.x === x && cached.y === y && cached.z === z
+    && cached.locationId === locationId && cached.aerial === aerial) return cached;
+  const position = shootingPoint(photo), point: [number, number] = [x, z];
+  const inferred = locationId ? undefined : regions.filter(region => y >= region.bounds.min.y - .5 && y <= region.bounds.max.y + .5
+    && region.footprints.some(shape => insideShape(point, shape))).sort((a, b) => {
+    const spanA = a.bounds.getSize(new THREE.Vector3()), spanB = b.bounds.getSize(new THREE.Vector3());
+    return spanA.x * spanA.z - spanB.x * spanB.z;
+  })[0];
+  const nearby = locationId || inferred ? undefined : regions.filter(region => region.landscape && y >= region.bounds.min.y - .5
+    && y <= region.bounds.max.y + .5 && region.bounds.distanceToPoint(position) <= 30)
+    .sort((a, b) => a.bounds.distanceToPoint(position) - b.bounds.distanceToPoint(position))[0];
+  // ponytail: 96 m outdoor tiles bound unspecified areas; use mapped polygons
+  // when the archive gains explicit destinations for those spaces.
+  const tileX = Math.floor(x / 96), tileZ = Math.floor(z / 96);
+  const id = locationId || inferred?.id || nearby?.id || `outdoor/${tileX}/${tileZ}`;
+  const region = known.get(id) || inferred || nearby, dx = (tileX + .5) * 96 - origin[0], dz = (tileZ + .5) * 96 - origin[1];
+  const direction = Math.abs(dx) > Math.abs(dz) ? dx < 0 ? '西' : '东' : dz < 0 ? '北' : '南';
+  const inside = !aerial && !!region?.interiors.some(section => y >= section.bottom && y < section.top && insideShape(point, section.shape));
+  const assignment = { campus, site, x, y, z, locationId, aerial, region, id, name: region?.name || '校园' + direction + '侧', spot: { id: photo.id, photos: [photo], position }, inside };
+  photoRegionAssignments.set(photo, assignment);
+  return assignment;
+}
+
 // Public map markers aggregate by a real destination first, and only compare
 // neighbouring screen cards after that destination is close enough to explore.
 export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], options: { campus: Campus; site: Site; selectedId?: string }): PhotoCluster[] {
@@ -229,30 +260,15 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
   });
   const boundary = options.campus.boundary || [], boundaryX = boundary.map(point => point[0]), boundaryZ = boundary.map(point => point[1]);
   const origin = boundary.length ? [(Math.min(...boundaryX) + Math.max(...boundaryX)) / 2, (Math.min(...boundaryZ) + Math.max(...boundaryZ)) / 2] : [0, 0];
-  const groups = new Map<string, { region?: PhotoRegion; name: string; spots: PhotoSpot[] }>();
+  const groups = new Map<string, { region?: PhotoRegion; name: string; spots: PhotoSpot[]; inside: Set<string> }>();
   for (const photo of [...photos].sort((a, b) => a.id.localeCompare(b.id))) {
     if (![photo.position.x, photo.position.z, photo.position.height].every(Number.isFinite)) continue;
-    const position = shootingPoint(photo), point: [number, number] = [position.x, position.z];
-    const explicit = photoLocationId(photo, options.campus);
-    const inferred = explicit ? undefined : regions.filter(region => position.y >= region.bounds.min.y - .5 && position.y <= region.bounds.max.y + .5
-      && region.footprints.some(shape => insideShape(point, shape))).sort((a, b) => {
-      const spanA = a.bounds.getSize(new THREE.Vector3()), spanB = b.bounds.getSize(new THREE.Vector3());
-      return spanA.x * spanA.z - spanB.x * spanB.z;
-    })[0];
-    const nearby = explicit || inferred ? undefined : regions.filter(region => region.landscape && position.y >= region.bounds.min.y - .5
-      && position.y <= region.bounds.max.y + .5 && region.bounds.distanceToPoint(position) <= 30)
-      .sort((a, b) => a.bounds.distanceToPoint(position) - b.bounds.distanceToPoint(position))[0];
-    // ponytail: 96 m outdoor tiles bound unspecified areas; use mapped polygons
-    // when the archive gains explicit destinations for those spaces.
-    const tileX = Math.floor(position.x / 96), tileZ = Math.floor(position.z / 96);
-    const id = explicit || inferred?.id || nearby?.id || `outdoor/${tileX}/${tileZ}`;
+    const { id, name, region, spot, inside } = photoRegionAssignment(photo, options.campus, options.site, regions, known, origin);
     let group = groups.get(id);
     if (!group) {
-      const region = known.get(id) || inferred || nearby, dx = (tileX + .5) * 96 - origin[0], dz = (tileZ + .5) * 96 - origin[1];
-      const direction = Math.abs(dx) > Math.abs(dz) ? dx < 0 ? '西' : '东' : dz < 0 ? '北' : '南';
-      group = { region, name: region?.name || '校园' + direction + '侧', spots: [] }; groups.set(id, group);
+      group = { region, name, spots: [], inside: new Set() }; groups.set(id, group);
     }
-    group.spots.push({ id: photo.id, photos: [photo], position });
+    group.spots.push(spot); if (inside) group.inside.add(spot.id);
   }
   const result: PhotoCluster[] = [], ray = new THREE.Raycaster();
   for (const [regionId, group] of groups) {
@@ -261,11 +277,7 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
       : new THREE.Box3().setFromPoints(group.spots.map(spot => spot.position));
     const distance = Math.min(bounds.distanceToPoint(camera.position), ...group.spots.map(spot => spot.position.distanceTo(camera.position)));
     const collapsed = !group.spots.some(spot => spot.id === options.selectedId) && distance > PHOTO_REGION_EXPAND_DISTANCE;
-    const inside = new Set(group.spots.filter(spot => !isAerialPhoto(spot.photos[0]) && group.region?.interiors.some(section =>
-      spot.position.y >= section.bottom && spot.position.y < section.top
-      && insideShape([spot.position.x, spot.position.z], section.shape))).map(spot => spot.id));
-    const otherBuildings = hardOccluders.filter(mesh => !isOwnBuildingOccluder(mesh, regionId));
-    const eligible = group.spots.filter(spot => photoAnchorUnblocked(spot.position, camera, inside.has(spot.id) ? otherBuildings : hardOccluders, ray));
+    const inside = group.inside;
     const appearance = (spot: PhotoSpot) => {
       const occlusionLayers = !collapsed && inside.has(spot.id) ? markerOcclusionLayers(spot.position, camera, occluders) : 0;
       return { opacity: Math.max(.18, .68 ** occlusionLayers), occlusionLayers, cameraDistance: spot.position.distanceTo(camera.position) };
@@ -275,9 +287,14 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
       const { markerWidth, markerHeight } = dimensions(spot), count = grouped ? 6 : 0;
       return [collapsed ? Math.max(markerWidth / 2 + count, 55) : markerWidth / 2 + count, markerHeight / 2 + (collapsed ? 21 : count)];
     };
-    const visible = eligible.filter(spot => {
-      return photoAnchorVisible(spot.position, camera, size, [], ray, halfSize(spot, true));
-    });
+    // Project first: fully offscreen destinations need no physical rays. A far
+    // collection still keeps all unblocked members, including offscreen shots.
+    const inView = group.spots.filter(spot => photoAnchorVisible(spot.position, camera, size, [], ray, halfSize(spot, true)));
+    if (!inView.length) continue;
+    const otherBuildings = hardOccluders.filter(mesh => !isOwnBuildingOccluder(mesh, regionId));
+    const eligible = (collapsed ? group.spots : inView).filter(spot => photoAnchorUnblocked(spot.position, camera, inside.has(spot.id) ? otherBuildings : hardOccluders, ray));
+    const eligibleIds = new Set(eligible.map(spot => spot.id));
+    const visible = collapsed ? inView.filter(spot => eligibleIds.has(spot.id)) : eligible;
     if (!visible.length) continue;
     const clusters: PhotoSpot[][] = [];
     if (collapsed) clusters.push(eligible);
@@ -306,7 +323,7 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
       const representative = candidates.find(spot => spot.id === options.selectedId)
         || candidates.reduce((nearest, spot) => spot.position.distanceToSquared(middle) < nearest.position.distanceToSquared(middle) ? spot : nearest);
       regional.push({ id: collapsed ? 'region/' + regionId + '/' + representative.id : representative.id, photos: spots.flatMap(spot => spot.photos), spots,
-        position: representative.position.clone(), ...dimensions(representative), ...appearance(representative),
+        position: representative.position.clone(), ...dimensions(representative), cameraDistance: representative.position.distanceTo(camera.position),
         regionId, regionName, collapsed, overflow: false });
     }
     if (group.region?.building && !collapsed) {
@@ -317,11 +334,14 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
         const cameraDistance = nearest.position.distanceTo(camera.position);
         regional.push({ ...remainder[0], id: 'overflow/' + regionId + '/' + nearest.id,
           photos: remainder.flatMap(cluster => cluster.photos), spots, position: nearest.position.clone(),
-          ...photoMarkerSize(cameraDistance), ...appearance(nearest),
+          ...photoMarkerSize(cameraDistance), cameraDistance,
           collapsed: false, overflow: true });
       }
     }
-    result.push(...regional);
+    for (const cluster of regional) {
+      const representative = cluster.spots.find(spot => spot.position.equals(cluster.position))!;
+      result.push({ ...cluster, ...appearance(representative) });
+    }
   }
   return result;
 }

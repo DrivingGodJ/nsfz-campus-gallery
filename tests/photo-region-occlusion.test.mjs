@@ -103,3 +103,23 @@ test('overlapping inside and outside photographs in one destination retain separ
     assert.deepEqual(cluster.position.toArray(), [photo.position.x, photo.position.height, photo.position.z]);
   }
 });
+
+test('offscreen cards avoid hard rays while distant collections keep their members and edited points invalidate membership', () => {
+  const scene = new THREE.Scene(), mesh = wall(scene, 'other', 5, 0, 6, 2200), config = options();
+  let rays = 0; mesh.raycast = () => { rays++; };
+  const indoor = shot('inside', 0, 0, 1.6, 'teaching'), offscreen = shot('offscreen', 1000, 0, 1.6, 'teaching');
+  const photos = [indoor, offscreen], blockers = markerOccluders(scene);
+  let clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, config);
+  assert.deepEqual(ids(clusters), ['inside']); assert.equal(rays, 1, 'A fully offscreen card needs no hard visibility query');
+  rays = 0;
+  clusters = regionPhotoClusters(photos, cameraAt(200), size, blockers, config);
+  assert.equal(clusters[0].collapsed, true); assert.deepEqual(ids(clusters), ['inside', 'offscreen']);
+  assert.equal(rays, 2, 'Collapsed collection membership still checks offscreen members for exterior blockers');
+  indoor.position.x = 20;
+  clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, config);
+  assert.equal(clusters[0].opacity, 1, 'Editing the same photo object from indoor to outdoor invalidates the cached membership');
+  indoor.position.x = 0; indoor.captureType = 'aerial';
+  clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, config);
+  assert.equal(clusters[0].opacity, 1, 'A capture-type edit cannot reuse the indoor exemption');
+  dispose(scene);
+});

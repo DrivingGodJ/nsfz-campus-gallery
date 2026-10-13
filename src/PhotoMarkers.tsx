@@ -40,7 +40,10 @@ export default function PhotoMarkers({ campus, site, photos, expansionPhotos, on
   const occluders = useRef<Object3D[] | null>(null);
   const lastView = useRef({ checked: false, world: new Matrix4(), projection: new Matrix4() });
   useEffect(() => {
-    occluders.current = null; signature.current = null; expandedSignature.current = null; lastView.current.checked = false; invalidate();
+    occluders.current = null; lastView.current.checked = false; invalidate();
+  }, [campus, site.buildingOverrides, scene, occlusionRevision, invalidate]);
+  useEffect(() => {
+    signature.current = null; expandedSignature.current = null; lastView.current.checked = false; invalidate();
   }, [photos, expansionPhotos, onExpandedBuildings, campus, site, scene, size.width, size.height, selected?.id, occlusionRevision, visibleViewport, onVisiblePhotos, invalidate]);
   useFrame(() => {
     camera.updateMatrixWorld();
