@@ -5,7 +5,8 @@ import { Matrix4, type Object3D } from 'three';
 import { asset, type Campus, type Site } from './types';
 import { useMapColor } from './MapTheme';
 import type { MapPhoto } from './MapCameraRig';
-import { collagePhotos, regionPhotoClusters, type PhotoCluster } from './photo-clusters';
+import { collagePhotos, expandedPhotoRegions, regionPhotoClusters, type PhotoCluster } from './photo-clusters';
+import type { MapObjectBounds } from './map-orbit';
 import { markerOccluders } from './photo-marker-occlusion';
 import { MAP_PHOTO_FOCUS_DISTANCE, FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 import { useAnimatedPresence } from './useAnimatedPresence';
@@ -34,7 +35,7 @@ export default function PhotoMarkers({ campus, site, photos, expansionPhotos, on
   minimal?: boolean;
   expansionPhotos?: MapPhoto[]; onExpandedBuildings?: (ids: string[]) => void;
   onSelect: (photo: MapPhoto) => void; onPick: (cluster: PhotoCluster, trigger: HTMLButtonElement) => void;
-  onExpand: (focus: { target: [number, number, number]; distance: number }) => void;
+  onExpand: (focus: { target: [number, number, number]; distance: number; bounds?: MapObjectBounds }) => void;
   onVisiblePhotos?: (ids: string[]) => void; visibleViewport?: MapViewport;
   occlusionRevision?: string; photoLikes?: PhotoLikes;
 }) {
@@ -58,13 +59,15 @@ export default function PhotoMarkers({ campus, site, photos, expansionPhotos, on
     camera.updateMatrixWorld();
     const previous = lastView.current;
     if (previous.checked && previous.world.equals(camera.matrixWorld) && previous.projection.equals(camera.projectionMatrix)) return;
+    const expandedRegions = expandedPhotoRegions(expansionPhotos || photos, campus, site, camera, visibleViewport, selected?.id);
+    const expandedRegionId = expandedRegions[0]?.id || '';
     if (onExpandedBuildings) {
-      const ids = expandedPhotoBuildings(expansionPhotos || photos, campus, site, camera, size, visibleViewport, selected?.id).map(building => building.id);
+      const ids = expandedPhotoBuildings(expansionPhotos || photos, campus, site, camera, size, visibleViewport, selected?.id, expandedRegions).map(building => building.id);
       const key = ids.join(',');
       if (key !== expandedSignature.current) { expandedSignature.current = key; onExpandedBuildings(ids); }
     }
     const blockers = occluders.current ?? (occluders.current = markerOccluders(scene));
-    const clusters = orderPhotoMarkers(regionPhotoClusters(photos, camera, size, blockers, { campus, site, selectedId: selected?.id }), camera);
+    const clusters = orderPhotoMarkers(regionPhotoClusters(photos, camera, size, blockers, { campus, site, selectedId: selected?.id, viewport: visibleViewport, expandedRegionId }), camera);
     liveMarkers.current = new Map(clusters.map(cluster => [cluster.id, cluster]));
     liveRanks.current = new Map(clusters.map((cluster, index) => [cluster.id, cluster.overflow ? 0 : index + 1]));
     clusters.forEach((cluster, index) => {
@@ -118,6 +121,7 @@ export default function PhotoMarkers({ campus, site, photos, expansionPhotos, on
           event.stopPropagation();
           const current = liveMarkers.current.get(cluster.id) || cluster;
           if (active) { onSelect(photo); return; }
+          if (current.collapsed) { onExpand({ target: current.position.toArray() as [number, number, number], distance: MAP_PHOTO_FOCUS_DISTANCE, bounds: current.focusBounds }); return; }
           // Keep separate physical layers on the map, while making every card
           // under a finger reachable. Keyboard activation addresses only this card.
           if (event.detail > 0 && labelPortal.current) {
@@ -131,7 +135,6 @@ export default function PhotoMarkers({ campus, site, photos, expansionPhotos, on
               onPick({ ...current, photos, spots: overlapping.flatMap(marker => marker.spots) }, event.currentTarget); return;
             }
           }
-          if (current.collapsed) { onExpand({ target: current.position.toArray() as [number, number, number], distance: MAP_PHOTO_FOCUS_DISTANCE }); return; }
           if (!grouped) onSelect(photo); else onPick(current, event.currentTarget);
         }}>
         {grouped ? <span className={'photo-collage' + (cluster.photos.length < 4 ? ' two-up' : '')}>{collagePhotos(cluster.photos).map(photo => <img key={photo.id} src={asset(photo.files.thumbnail)} alt="" draggable={false} />)}</span> : <img src={asset(photo.files.thumbnail)} alt="" draggable={false} />}

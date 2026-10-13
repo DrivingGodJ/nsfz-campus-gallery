@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { cameraPhotoClusters, clusterFocus, clusterReadyToPick, collagePhotos, permanentPhotoSpots, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, photoPointVisible, visiblePhotoPoints, regionPhotoClusters, photoMarkerSize } from '../src/photo-clusters.ts';
 import { photoSeason, photosInSeason } from '../src/photo-season.ts';
+import { FULL_MAP_VIEWPORT, mapObjectApproach, mapObjectFocusPose } from '../src/map-card-viewport.ts';
+import { mapLocationTarget } from '../src/location-geometry.ts';
 
 const photo = (id, x, z = 0, height = 1.6) => ({ id, position: { x, z, height }, capturedAt: '2025-04-18' });
 const cameraAt = distance => {
@@ -188,17 +190,63 @@ test('the distant map keeps one collection per destination, anchored to a real u
   assert.equal(JSON.stringify(photos), before);
 });
 
-test('approaching any end of a long building expands its photos; selecting a far photo expands only its destination', () => {
+test('approaching a large building expands its photos; selecting a far photo expands only its destination', () => {
   const options = regionOptions([regionBuilding('long', -100, -10, 200, 20), regionBuilding('other', -10, -10)]);
   const photos = [photo('a', -75), photo('b', 75)].map(shot => ({ ...shot, buildingId: 'long', floor: 1 }));
   const camera = cameraAt(40); camera.position.set(-105, 30, 25); camera.lookAt(-75, 1.6, 0); camera.updateMatrixWorld();
   const approached = regionPhotoClusters(photos, camera, size, [], options);
   assert.ok(approached.length > 0 && approached.every(cluster => !cluster.collapsed));
-  const far = cameraAt(200), selected = { ...options, selectedId: 'a' };
+  const far = cameraAt(600), selected = { ...options, selectedId: 'a' };
+  assert.ok(regionPhotoClusters(photos, far, size, [], options).every(cluster => cluster.collapsed), 'The far destination starts outside its fitted approach range');
   const expanded = regionPhotoClusters([...photos, { ...photo('other', 0), buildingId: 'other', floor: 1 }], far, size, [], selected);
   assert.equal(expanded.find(cluster => cluster.regionId === 'other').collapsed, true);
   assert.ok(expanded.filter(cluster => cluster.regionId === 'long').every(cluster => !cluster.collapsed));
   assert.ok(expanded.filter(cluster => cluster.regionId === 'long').length >= 2);
+});
+
+test('a farther facing building expands before a close side neighbour and turning the gaze changes the expanded cards', () => {
+  const options = regionOptions([regionBuilding('front', -45, -10, 90, 20), regionBuilding('side', 14, 50)]);
+  const shots = [{ ...photo('front-left', -20), buildingId: 'front', floor: 1 },
+    { ...photo('front-right', 40), buildingId: 'front', floor: 1 },
+    { ...photo('side', 14.1, 50.1), buildingId: 'side', floor: 1 }];
+  const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000);
+  camera.position.set(0, 12, 80); camera.lookAt(0, 7.32, 0); camera.updateMatrixWorld();
+  const bounds = id => mapLocationTarget(options.campus, options.site, id).bounds;
+  const facing = mapObjectApproach(camera, bounds('front')), nearer = mapObjectApproach(camera, bounds('side'));
+  assert.ok(facing.expanded && nearer.expanded, 'Both destinations have reached their own size-based approach range');
+  assert.ok(facing.distance > nearer.distance && facing.alignment < nearer.alignment);
+  let clusters = regionPhotoClusters(shots, camera, size, [], options);
+  assert.equal(clusters.filter(cluster => cluster.regionId === 'front').length, 2);
+  assert.ok(clusters.filter(cluster => cluster.regionId === 'front').every(cluster => !cluster.collapsed));
+  assert.equal(clusters.find(cluster => cluster.regionId === 'side').collapsed, true);
+  camera.lookAt(24, 7.32, 60); camera.updateMatrixWorld();
+  clusters = regionPhotoClusters(shots, camera, size, [], options);
+  assert.equal(clusters.find(cluster => cluster.regionId === 'side').collapsed, false);
+  assert.equal(clusters.find(cluster => cluster.regionId === 'front').collapsed, true);
+});
+
+test('destination collections carry real bounds and their fitted click view expands in desktop and phone map space', () => {
+  const options = regionOptions([regionBuilding('wide', -70, -10, 140, 20)], [
+    { id: 'forest', name: '标本林', type: 'forest', ...rectangle(150, -40, 90, 80) }]);
+  const shots = [{ ...photo('wide-left', -60), buildingId: 'wide', floor: 1 },
+    { ...photo('wide-right', 60), buildingId: 'wide', floor: 2 },
+    { ...photo('forest-left', 160), locationId: 'forest' }, { ...photo('forest-right', 230), locationId: 'forest' }];
+  for (const [viewportSize, viewport] of [[size, { left: .36, top: .04, width: .64, height: .92 }],
+    [{ width: 390, height: 844 }, { left: 0, top: .07, width: 1, height: .38 }]]) {
+    const aspect = viewportSize.width / viewportSize.height, camera = new THREE.PerspectiveCamera(43, aspect, .08, 4000);
+    camera.position.set(90, 700, 700); camera.lookAt(90, 0, 0); camera.updateMatrixWorld();
+    const collections = regionPhotoClusters(shots, camera, viewportSize, [], { ...options, viewport: FULL_MAP_VIEWPORT });
+    for (const id of ['wide', 'forest']) {
+      const cluster = collections.find(cluster => cluster.regionId === id), destination = mapLocationTarget(options.campus, options.site, id);
+      assert.equal(cluster.collapsed, true); assert.deepEqual(cluster.focusBounds, destination.bounds);
+      const pose = mapObjectFocusPose({ position: camera.position.clone(), quaternion: camera.quaternion.clone(),
+        target: new THREE.Vector3(), fov: camera.fov, near: camera.near }, new THREE.Vector3(...destination.target), cluster.focusBounds, aspect, viewport);
+      camera.position.copy(pose.position); camera.quaternion.copy(pose.quaternion); camera.updateMatrixWorld();
+      assert.equal(mapObjectApproach(camera, destination.bounds, viewport).expanded, true);
+      const expanded = regionPhotoClusters(shots, camera, viewportSize, [], { ...options, viewport });
+      assert.ok(expanded.some(cluster => cluster.regionId === id && !cluster.collapsed), `${id} expands in the fitted ${viewportSize.width}px map`);
+    }
+  }
 });
 
 test('unassigned photos infer a mapped destination while unrelated outdoor areas remain separate', () => {
@@ -230,7 +278,7 @@ test('a far collection changes its fade identity when an offscreen representativ
 });
 
 test('close overlap merging keeps different storeys distinct rather than permanently fusing nearby heights', () => {
-  const options = regionOptions([regionBuilding('teaching', -10, -10)]);
+  const options = { ...regionOptions([regionBuilding('teaching', -10, -10)]), expandedRegionId: 'teaching' };
   const same = [photo('one', 0), photo('same-storey', .2)].map(shot => ({ ...shot, buildingId: 'teaching', floor: 1 }));
   assert.equal(regionPhotoClusters(same, cameraAt(40), size, [], options).length, 1);
   const different = { ...photo('two', .2, 0, 2.1), buildingId: 'teaching', floor: 2 };
@@ -245,7 +293,7 @@ test('approaching an aerial collection expands it at the actual shooting altitud
 });
 
 test('an actual wall keeps overlapping near cards separate and dims the card behind it instead of removing it', () => {
-  const options = regionOptions([regionBuilding('teaching', -10, -10)]);
+  const options = { ...regionOptions([regionBuilding('teaching', -10, -10)]), expandedRegionId: 'teaching' };
   const shots = [photo('front', 0, 1), photo('back', 0, -1)].map(shot => ({ ...shot, buildingId: 'teaching', floor: 1 }));
   const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000);
   camera.position.set(0, 1.6, 40); camera.lookAt(0, 1.6, 0); camera.updateMatrixWorld();

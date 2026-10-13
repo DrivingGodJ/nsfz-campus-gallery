@@ -280,10 +280,7 @@ export default function MapView(props: Props) {
   const [levelMode, setLevelMode] = useState<MapLevelMode>('surface');
   const [expandedBuildingId, setExpandedBuildingId] = useState('');
   const [mapFloorLimit, setMapFloorLimit] = useState<{ buildingId: string; floor: number } | null>(null);
-  const updateExpandedBuildings = useCallback((ids: string[]) => setExpandedBuildingId(previous => {
-    if (selectedLocation && ids.includes(selectedLocation)) return selectedLocation;
-    return previous && ids.includes(previous) ? previous : ids[0] || '';
-  }), [selectedLocation]);
+  const updateExpandedBuildings = useCallback((ids: string[]) => setExpandedBuildingId(ids[0] || ''), []);
   useEffect(() => setMapFloorLimit(null), [expandedBuildingId]);
   const undergroundFloor = Math.min(-3.8, ...campus.features.filter(isUndergroundFeature).map(feature => feature.height ?? -3.8));
   const entranceSelected = campus.features.some(feature => feature.id === props.selectedLocation && feature.type === 'tunnelEntrance');
@@ -298,7 +295,7 @@ export default function MapView(props: Props) {
   const pickerTrigger = useRef<HTMLButtonElement | null>(null);
   const closePicker = useCallback(() => { setPicker(null); if (pickerTrigger.current?.isConnected) pickerTrigger.current.focus({ preventScroll: true }); }, []);
   const pickCluster = (cluster: PhotoCluster, trigger: HTMLButtonElement) => { pickerTrigger.current = trigger; setPicker(cluster); };
-  const expandCluster = (focus: { target: [number, number, number]; distance: number }) => { setPicker(null); setCommand(c => ({ type: 'cluster', ...focus, sequence: c.sequence + 1 })); };
+  const expandCluster = (focus: Pick<MapCommand, 'target' | 'distance' | 'bounds'>) => { setPicker(null); setCommand(c => ({ type: 'cluster', ...focus, sequence: c.sequence + 1 })); };
   const photoIds = props.photos.map(photo => photo.id).join(',');
   useEffect(() => setPicker(null), [photoIds, props.selectedPhoto?.id, props.editPhoto?.id, props.photoPerspective]);
   const candidate = editPhoto || selectedPhoto;

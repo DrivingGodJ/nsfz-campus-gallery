@@ -9,10 +9,10 @@ import { bindPhotoLookControls, type PhotoOrientation, type PhotoViewAdjustment 
 import { bindMapTravelControls, mapGroundViewDistance, mapTravelStep, panMapView, retargetMapPan, travelAlongView } from './map-travel-controls';
 import { mapGroundOrbitTarget, mapObjectInView, orbitMapObject, turnMapView, type MapObjectBounds } from './map-orbit';
 import { aboveGroundMovement, keepMapCameraAboveGround, shiftMapCameraGround, MAP_CAMERA_GROUND_HEIGHT } from './map-camera-ground';
-import { FULL_MAP_VIEWPORT, frameMapTarget, photoMapFocusPose, type MapViewport } from './map-card-viewport';
+import { FULL_MAP_VIEWPORT, frameMapTarget, photoMapFocusPose, mapObjectFocusPose, type MapViewport } from './map-card-viewport';
 
 export type MapPhoto = Photo & { position: { x: number; z: number; height: number }; pointHeight?: number; pointOpacity?: number };
-export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number };
+export type MapCommand = { type: string; sequence: number; target?: [number, number, number]; distance?: number; bounds?: MapObjectBounds };
 // View into campus from the gate: dormitory and cafeteria fronts face the camera.
 export const OVERVIEW_POSITION: [number, number, number] = [-240, 340, -380];
 const OVERVIEW_DISTANCE = 560;
@@ -95,8 +95,9 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
     if (!control || !current.objectTarget || current.preview || motion.current.photoTransition || !(camera instanceof THREE.PerspectiveCamera)) return;
     stopOrbitMomentum(camera, control);
     const target = new THREE.Vector3(...current.objectTarget);
-    // Photos, buildings and areas share the same fixed approach and exposed centre.
-    const pose = photoMapFocusPose(readCameraPose(camera, control.target), target, camera.aspect, current.visibleViewport, current.groundHeight);
+    const currentPose = readCameraPose(camera, control.target);
+    const pose = current.objectBounds ? mapObjectFocusPose(currentPose, target, current.objectBounds, camera.aspect, current.visibleViewport, current.groundHeight)
+      : photoMapFocusPose(currentPose, target, camera.aspect, current.visibleViewport, current.groundHeight);
     pendingFocus.current = false;
     control.enabled = false;
     motion.current.focus(camera, control.target, pose, window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -248,7 +249,9 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
       invalidate(); return;
     }
     if (command.type === 'cluster' && command.target) {
-      pose = photoMapFocusPose(pose, new THREE.Vector3(...command.target), camera.aspect, live.current.visibleViewport, surface);
+      const target = new THREE.Vector3(...command.target);
+      pose = command.bounds ? mapObjectFocusPose(pose, target, command.bounds, camera.aspect, live.current.visibleViewport, surface)
+        : photoMapFocusPose(pose, target, camera.aspect, live.current.visibleViewport, surface);
     } else {
       pose.position.y = Math.max(surface + MAP_CAMERA_GROUND_HEIGHT, pose.position.y);
       const oriented = camera.clone(); oriented.position.copy(pose.position); oriented.lookAt(pose.target);

@@ -29,6 +29,26 @@ const cameraAtPose = (pose, aspect = 1.5) => {
   camera.position.copy(pose.position); camera.quaternion.copy(pose.quaternion); camera.updateMatrixWorld();
   return camera;
 };
+const boundsCenter = bounds => new THREE.Vector3(...bounds.min).add(new THREE.Vector3(...bounds.max)).multiplyScalar(.5);
+const boundsInViewport = (camera, bounds, viewport = FULL_MAP_VIEWPORT) => {
+  camera.updateMatrixWorld();
+  const points = [];
+  for (const x of [bounds.min[0], bounds.max[0]]) for (const y of [bounds.min[1], bounds.max[1]]) for (const z of [bounds.min[2], bounds.max[2]]) {
+    const projected = new THREE.Vector3(x, y, z).project(camera);
+    const point = { x: (projected.x + 1) / 2, y: (1 - projected.y) / 2 };
+    assert.ok(projected.z > -1 && projected.z < 1, 'Every building corner stays in front of the camera');
+    assert.ok(point.x >= viewport.left - 1e-7 && point.x <= viewport.left + viewport.width + 1e-7, 'The whole building fits beside the card');
+    assert.ok(point.y >= viewport.top - 1e-7 && point.y <= viewport.top + viewport.height + 1e-7, 'The whole building fits above the card');
+    points.push(point);
+  }
+  const margin = Math.min(...points.flatMap(point => [(point.x - viewport.left) / viewport.width,
+    (viewport.left + viewport.width - point.x) / viewport.width, (point.y - viewport.top) / viewport.height,
+    (viewport.top + viewport.height - point.y) / viewport.height]));
+  assert.ok(margin > .04 && margin < .12, 'The nearest corner has a small clear margin instead of wasting the map on a distant overview');
+  const center = boundsCenter(bounds).project(camera);
+  close(center.x, 2 * (viewport.left + viewport.width / 2) - 1, 1e-7);
+  close(center.y, 1 - 2 * (viewport.top + viewport.height / 2), 1e-7);
+};
 const overview = () => {
   const camera = new THREE.PerspectiveCamera(43, 1.5, .5, 2000), target = new THREE.Vector3(15, 0, 30);
   camera.position.set(-240, 340, -380); camera.lookAt(target); camera.updateMatrixWorld();
@@ -173,14 +193,14 @@ test('real map gestures anchor all ground, turn in place toward the sky, prefer 
       await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds });
       vectorClose(camera.position, position); // Selection starts a journey rather than teleporting.
       await advance();
-      vectorClose(control.target, new THREE.Vector3(...focus.target));
-      close(camera.position.distanceTo(control.target), 40);
+      vectorClose(control.target, boundsCenter(focus.bounds));
+      boundsInViewport(camera, focus.bounds);
       close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
       close(camera.rotation.clone().reorder('YXZ').y, yaw);
-      const projected = new THREE.Vector3(...focus.target).project(camera);
-      close(projected.x, 0); close(projected.y, 0); assert.equal(camera.fov, fov);
+      assert.equal(camera.fov, fov);
+      const selectedPivot = new THREE.Vector3(...focus.target), selectedRadius = camera.position.distanceTo(selectedPivot);
       down(); move(); up(); await advance();
-      close(camera.position.distanceTo(new THREE.Vector3(...focus.target)), 40);
+      close(camera.position.distanceTo(selectedPivot), selectedRadius);
     }
   } finally {
     await act(async () => { root?.unmount(); });
@@ -983,7 +1003,7 @@ test('photo, building and area approaches and card resizes stay continuous at bo
       frame(object, viewport); close(camera.position.distanceTo(object), 40, 1e-7);
       close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
     }
-    // Real building and area selections use the same fixed approach from
+    // Real building and area selections fit every corner from
     // either camera pole, including when a card covers part of the canvas.
     const campus = JSON.parse(await fs.readFile(new URL('../public/data/campus.json', import.meta.url)));
     const site = JSON.parse(await fs.readFile(new URL('../public/data/site.json', import.meta.url)));
@@ -995,25 +1015,40 @@ test('photo, building and area approaches and card resizes stay continuous at bo
       camera.quaternion.setFromEuler(new THREE.Euler(pitch * Math.PI / 180, .8, 0, 'YXZ'));
       control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 100);
       control.update();
-      const focus = mapLocationTarget(campus, site, id), point = new THREE.Vector3(...focus.target), start = readCameraPose(camera, control.target);
+      const focus = mapLocationTarget(campus, site, id), start = readCameraPose(camera, control.target);
       await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds, visibleViewport: viewport });
       vectorClose(camera.position, start.position);
-      await advance(`focusing ${id} at ${pitch} degrees`); frame(point, viewport);
+      await advance(`focusing ${id} at ${pitch} degrees`); boundsInViewport(camera, focus.bounds, viewport);
       close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
       close(camera.rotation.clone().reorder('YXZ').y, .8);
-      close(camera.position.distanceTo(point), 40, 1e-7);
       // A card resize keeps the same framing policy and animates the movement.
       const nextViewport = viewport.height === 1 ? { left: 0, top: 0, width: 1, height: .35 } : FULL_MAP_VIEWPORT;
       const beforeResize = camera.position.clone();
       await render({ selectedObjectTarget: focus.target, selectedObjectBounds: focus.bounds, visibleViewport: nextViewport });
       vectorClose(camera.position, beforeResize);
-      await advance(`resizing a card around ${id}`); frame(point, nextViewport);
-      close(camera.position.distanceTo(point), 40, 1e-7);
+      await advance(`resizing a card around ${id}`); boundsInViewport(camera, focus.bounds, nextViewport);
       close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
     }
-    // Switching between desktop and mobile keeps the fixed approach and
+    // Collection thumbnails may sit at one end of a building. Their command
+    // must frame the destination bounds rather than that representative photo.
+    const collection = mapLocationTarget(campus, site, 'way/855459420');
+    const representative = [collection.bounds.min[0], collection.bounds.min[1], collection.bounds.min[2]];
+    for (const pitch of [-89.4, 89.4]) for (const viewport of [FULL_MAP_VIEWPORT, { left: .4, top: 0, width: .6, height: 1 }, { left: 0, top: 0, width: 1, height: .35 }]) {
+      await render({ visibleViewport: viewport });
+      camera.position.set(0, 100, 0);
+      camera.quaternion.setFromEuler(new THREE.Euler(pitch * Math.PI / 180, .8, 0, 'YXZ'));
+      control.target.copy(camera.position).addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 100); control.update();
+      const start = readCameraPose(camera, control.target);
+      await render({ command: { type: 'cluster', sequence: ++sequence, target: representative, bounds: collection.bounds, distance: 40 }, visibleViewport: viewport });
+      vectorClose(camera.position, start.position);
+      await advance(`opening a collection at ${pitch} degrees`); boundsInViewport(camera, collection.bounds, viewport);
+      assert.ok(camera.position.distanceTo(boundsCenter(collection.bounds)) > 40, 'A large building needs a wider view than a single photograph');
+      close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
+      close(camera.rotation.clone().reorder('YXZ').y, .8);
+    }
+    // Switching between desktop and mobile keeps whole-building framing and
     // recentres smoothly instead of briefly scaling back to the overview.
-    const resizeFocus = mapLocationTarget(campus, site, 'way/855459418'), resizePoint = new THREE.Vector3(...resizeFocus.target);
+    const resizeFocus = mapLocationTarget(campus, site, 'way/855459418');
     const resizeViewport = { left: .4, top: 0, width: .6, height: 1 };
     await render({ selectedObjectTarget: resizeFocus.target, selectedObjectBounds: resizeFocus.bounds, visibleViewport: resizeViewport });
     await advance('selecting an area before viewport resizing');
@@ -1021,8 +1056,7 @@ test('photo, building and area approaches and card resizes stay continuous at bo
       const beforeResize = readCameraPose(camera, control.target);
       await act(async () => state.setSize(width, height));
       vectorClose(camera.position, beforeResize.position);
-      await advance('resizing the screen with an area selected'); frame(resizePoint, resizeViewport);
-      close(camera.position.distanceTo(resizePoint), 40, 1e-7);
+      await advance('resizing the screen with an area selected'); boundsInViewport(camera, resizeFocus.bounds, resizeViewport);
       close(camera.rotation.clone().reorder('YXZ').x, -Math.PI / 4);
     }
     // Card movement preserves the selected photo's fixed tilt and distance.

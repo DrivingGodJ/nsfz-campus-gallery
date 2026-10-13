@@ -7,6 +7,8 @@ import { bridgeLayout } from './bridge-geometry.ts';
 import { curvedStairPoint, curvedStairTreads } from './structure-geometry.ts';
 import { gardenFootprints, pergolaLayout } from './garden-geometry.ts';
 import { dormitoryObservatory } from './facade-geometry.ts';
+import { GYM_ID, gymRoofHeight } from './architecture-geometry.ts';
+import { gymFrame } from './gym-interior.ts';
 
 // Picking, highlighting and camera focus must describe the same footprint,
 // including joined underground routes and bridges with connecting stairs.
@@ -33,6 +35,26 @@ export function mapLocationTarget(campus: Campus, site: Site, id?: string, cutaw
     const height = cutawayFloor && cutawayFloor > 0 ? Math.min(info.height, cutawayFloor * info.floorHeight) : info.height;
     points = info.sections.flatMap(section => section.outer);
     center = building.center; bottom = info.baseElevation + .12; top = height + bottom;
+    // Complete views include the existing roof geometry above nominal storeys;
+    // a selected floor retains its exact cut and the dedicated observatory view.
+    if (!cutawayFloor || cutawayFloor < 0) {
+      if (building.id === GYM_ID) {
+        const frame = gymFrame(building);
+        points.push(frame.at(0, -.65), frame.at(0, frame.width + .65), frame.at(frame.length, -.65), frame.at(frame.length, frame.width + .65));
+        top = Math.max(top, bottom + gymRoofHeight(info.height, .5));
+      }
+      if (observatory) {
+        const [x, z] = observatory.center, radius = observatory.radius + .05;
+        points.push([x - radius, z - radius], [x + radius, z + radius]);
+        top = Math.max(top, info.baseElevation + observatory.floorY + observatory.drumRise + observatory.domeRise + .06);
+      }
+      for (const stair of building.stairwells || []) if (stair.roofAccess) {
+        const section = info.sections.find(section => section.id === stair.partId);
+        if (!section) continue;
+        points.push(...(stair.roofAccess.footprint ?? stair.opening).outer);
+        top = Math.max(top, bottom + section.height + stair.roofAccess.height);
+      }
+    }
   } else {
     const feature = campus.features.find(feature => feature.id === id);
     if (!feature) return null;

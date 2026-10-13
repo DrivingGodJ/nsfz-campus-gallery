@@ -2,9 +2,8 @@ import { buildingLevels } from './building-model.ts';
 import { isAerialPhoto, photoLocationId, resolveLocationId } from './locations.ts';
 import { insideShape } from './terrain-height.ts';
 import { Box3, Vector3, type Camera } from 'three';
-import { mapObjectInView } from './map-orbit.ts';
 import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport.ts';
-import { PHOTO_REGION_EXPAND_DISTANCE } from './photo-clusters.ts';
+import { expandedPhotoRegions } from './photo-clusters.ts';
 import type { MapPhoto } from './MapCameraRig';
 import type { Campus, Site } from './types';
 
@@ -61,26 +60,10 @@ export function buildingPhotosThroughFloor(photos: MapPhoto[], campus: Campus, s
 
 // Use the full source list here, so a low cut with no remaining photos does not
 // remove the very control the visitor needs to restore the upper floors.
-export function expandedPhotoBuildings(photos: MapPhoto[], campus: Campus, site: Site, camera: Camera, size: { width: number; height: number }, viewport: MapViewport = FULL_MAP_VIEWPORT, selectedId?: string): { id: string; distance: number }[] {
+export function expandedPhotoBuildings(photos: MapPhoto[], campus: Campus, site: Site, camera: Camera, size: { width: number; height: number }, viewport: MapViewport = FULL_MAP_VIEWPORT, selectedId?: string, candidates?: ReturnType<typeof expandedPhotoRegions>): { id: string; distance: number }[] {
   if (size.width <= 0 || size.height <= 0 || viewport.width <= 0 || viewport.height <= 0) return [];
-  camera.updateMatrixWorld();
-  const regions = buildingRegions(campus, site), assigned = new Map<string, MapPhoto[]>();
-  for (const photo of photos) {
-    if (![photo.position.x, photo.position.height, photo.position.z].every(Number.isFinite)) continue;
-    const owner = photoBuildingOwner(photo, campus, regions);
-    if (!owner) continue;
-    let entries = assigned.get(owner);
-    if (!entries) { entries = []; assigned.set(owner, entries); }
-    entries.push(photo);
-  }
-  return regions.flatMap(region => {
-    const shots = assigned.get(region.id);
-    if (!region.hasFloors || !shots?.length || region.bounds.isEmpty()) return [];
-    const points = shots.map(photo => new Vector3(photo.position.x, photo.position.height, photo.position.z));
-    const distance = Math.min(region.bounds.distanceToPoint(camera.position), ...points.map(point => point.distanceTo(camera.position)));
-    if (distance > PHOTO_REGION_EXPAND_DISTANCE && !shots.some(photo => photo.id === selectedId)) return [];
-    const visible = mapObjectInView(camera, region.bounds.getCenter(new Vector3()), { min: region.bounds.min.toArray(), max: region.bounds.max.toArray() }, viewport)
-      || points.some(point => mapObjectInView(camera, point, undefined, viewport));
-    return visible ? [{ id: region.id, distance }] : [];
-  }).sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
+  const regions = buildingRegions(campus, site);
+  return (candidates || expandedPhotoRegions(photos, campus, site, camera, viewport, selectedId))
+    .filter(candidate => regions.some(region => region.id === candidate.id && region.hasFloors))
+    .map(({ id, distance }) => ({ id, distance }));
 }

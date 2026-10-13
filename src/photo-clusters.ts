@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import type { MapPhoto } from './MapCameraRig';
-import { MAP_PHOTO_FOCUS_DISTANCE } from './map-card-viewport.ts';
+import { MAP_PHOTO_FOCUS_DISTANCE, FULL_MAP_VIEWPORT, mapObjectApproach, type MapViewport } from './map-card-viewport.ts';
+import { mapObjectInView, type MapObjectBounds } from './map-orbit.ts';
 import { acceleratePhotoOccluder, isOwnBuildingOccluder, isPhotoOccluder, isPhotoOpacityOnlyOccluder, photoOpacityRaycast, photoRayIntersectsOccluder } from './photo-occlusion.ts';
 import { isAerialPhoto, photoLocationId } from './locations.ts';
 import { campusLocations } from './locations.ts';
 import { buildingLevels } from './building-model.ts';
 import { dormitoryObservatory } from './facade-geometry.ts';
-import { featureFootprints } from './location-geometry.ts';
+import { featureFootprints, mapLocationTarget } from './location-geometry.ts';
 import { insideShape } from './terrain-height.ts';
 import { markerMergeAllowed, markerOcclusionLayers, prepareMarkerQueries } from './photo-marker-occlusion.ts';
 import type { Campus, Shape, Site } from './types';
@@ -15,7 +16,7 @@ export const PHOTO_MERGE_METERS = 2;
 export const PHOTO_MARKER_LIFT = 1.8;
 export const PHOTO_POINT_LIFT = .4;
 export type PhotoSpot = { id: string; photos: MapPhoto[]; position: THREE.Vector3 };
-export type PhotoCluster = PhotoSpot & { spots: PhotoSpot[]; markerWidth?: number; markerHeight?: number; opacity?: number; regionId?: string; regionName?: string; collapsed?: boolean; overflow?: boolean; occlusionLayers?: number; cameraDistance?: number };
+export type PhotoCluster = PhotoSpot & { spots: PhotoSpot[]; markerWidth?: number; markerHeight?: number; opacity?: number; regionId?: string; regionName?: string; collapsed?: boolean; overflow?: boolean; occlusionLayers?: number; cameraDistance?: number; focusBounds?: MapObjectBounds };
 const shootingPoint = (photo: MapPhoto) => new THREE.Vector3(photo.position.x, photo.position.height, photo.position.z);
 export const photoPointPosition = (photo: MapPhoto) => new THREE.Vector3(photo.position.x, photo.pointHeight ?? photo.position.height + PHOTO_POINT_LIFT, photo.position.z);
 const center = (points: THREE.Vector3[]) => points.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(points.length);
@@ -191,13 +192,13 @@ export function photoMarkerSize(distance: number) {
   return { markerWidth, markerHeight: Math.round(Math.max(44, markerWidth * .75)) };
 }
 
-type PhotoRegion = { id: string; name: string; footprints: Shape[]; bounds: THREE.Box3; landscape: boolean; building: boolean; interiors: { shape: Shape; bottom: number; top: number }[] };
-const regionGeometry = new WeakMap<Campus, { site: Site; regions: PhotoRegion[] }>();
-type PhotoRegionAssignment = { campus: Campus; site: Site; x: number; y: number; z: number; locationId: string | undefined; aerial: boolean; region?: PhotoRegion; id: string; name: string; spot: PhotoSpot; inside: boolean };
+type PhotoRegion = { id: string; name: string; footprints: Shape[]; bounds: THREE.Box3; focusBounds: MapObjectBounds; landscape: boolean; building: boolean; interiors: { shape: Shape; bottom: number; top: number }[] };
+const regionGeometry = new WeakMap<Campus, { overrides: Site['buildingOverrides']; regions: PhotoRegion[] }>();
+type PhotoRegionAssignment = { campus: Campus; overrides: Site['buildingOverrides']; x: number; y: number; z: number; locationId: string | undefined; aerial: boolean; region?: PhotoRegion; id: string; name: string; spot: PhotoSpot; inside: boolean };
 const photoRegionAssignments = new WeakMap<MapPhoto, PhotoRegionAssignment>();
 function photoRegions(campus: Campus, site: Site) {
   const cached = regionGeometry.get(campus);
-  if (cached?.site.buildingOverrides === site.buildingOverrides) return cached.regions;
+  if (cached?.overrides === site.buildingOverrides) return cached.regions;
   const regions = campusLocations(campus, site).map(location => {
     const info = location.building ? buildingLevels(location.building, site.buildingOverrides[location.id]) : undefined;
     const footprints: Shape[] = info ? info.sections.map(part => ({ outer: part.outer, holes: part.holes || [] }))
@@ -213,17 +214,17 @@ function photoRegions(campus: Campus, site: Site) {
       footprints.push(observatory.shape);
       for (const [x, z] of observatory.shape.outer) bounds.expandByPoint(new THREE.Vector3(x, roomTop, z));
     }
-    return { id: location.id, name: location.name, footprints, bounds, building: !!location.building, interiors,
+    return { id: location.id, name: location.name, footprints, bounds, focusBounds: mapLocationTarget(campus, site, location.id)?.bounds || objectBounds(bounds), building: !!location.building, interiors,
       landscape: !!location.feature && ['water', 'forest', 'plaza', 'runningTrack', 'basketballCourts', 'sport', 'green'].includes(location.feature.type) };
   });
-  regionGeometry.set(campus, { site, regions });
+  regionGeometry.set(campus, { overrides: site.buildingOverrides, regions });
   return regions;
 }
 
 function photoRegionAssignment(photo: MapPhoto, campus: Campus, site: Site, regions: PhotoRegion[], known: Map<string, PhotoRegion>, origin: number[]) {
   const { x, height: y, z } = photo.position, locationId = photoLocationId(photo, campus), aerial = isAerialPhoto(photo);
   const cached = photoRegionAssignments.get(photo);
-  if (cached?.campus === campus && cached.site.buildingOverrides === site.buildingOverrides && cached.x === x && cached.y === y && cached.z === z
+  if (cached?.campus === campus && cached.overrides === site.buildingOverrides && cached.x === x && cached.y === y && cached.z === z
     && cached.locationId === locationId && cached.aerial === aerial) return cached;
   const position = shootingPoint(photo), point: [number, number] = [x, z];
   const inferred = locationId ? undefined : regions.filter(region => y >= region.bounds.min.y - .5 && y <= region.bounds.max.y + .5
@@ -241,16 +242,49 @@ function photoRegionAssignment(photo: MapPhoto, campus: Campus, site: Site, regi
   const region = known.get(id) || inferred || nearby, dx = (tileX + .5) * 96 - origin[0], dz = (tileZ + .5) * 96 - origin[1];
   const direction = Math.abs(dx) > Math.abs(dz) ? dx < 0 ? '西' : '东' : dz < 0 ? '北' : '南';
   const inside = !aerial && !!region?.interiors.some(section => y >= section.bottom && y < section.top && insideShape(point, section.shape));
-  const assignment = { campus, site, x, y, z, locationId, aerial, region, id, name: region?.name || '校园' + direction + '侧', spot: { id: photo.id, photos: [photo], position }, inside };
+  const assignment = { campus, overrides: site.buildingOverrides, x, y, z, locationId, aerial, region, id, name: region?.name || '校园' + direction + '侧', spot: { id: photo.id, photos: [photo], position }, inside };
   photoRegionAssignments.set(photo, assignment);
   return assignment;
 }
 
-// Public map markers aggregate by a real destination first, and only compare
-// neighbouring screen cards after that destination is close enough to explore.
-export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], options: { campus: Campus; site: Site; selectedId?: string }): PhotoCluster[] {
+function groupPhotoRegions(photos: MapPhoto[], campus: Campus, site: Site) {
+  const regions = photoRegions(campus, site), known = new Map(regions.map(region => [region.id, region]));
+  const boundary = campus.boundary || [], boundaryX = boundary.map(point => point[0]), boundaryZ = boundary.map(point => point[1]);
+  const origin = boundary.length ? [(Math.min(...boundaryX) + Math.max(...boundaryX)) / 2, (Math.min(...boundaryZ) + Math.max(...boundaryZ)) / 2] : [0, 0];
+  const groups = new Map<string, { region?: PhotoRegion; name: string; spots: PhotoSpot[]; inside: Set<string> }>();
+  for (const photo of [...photos].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (![photo.position.x, photo.position.z, photo.position.height].every(Number.isFinite)) continue;
+    const { id, name, region, spot, inside } = photoRegionAssignment(photo, campus, site, regions, known, origin);
+    let group = groups.get(id);
+    if (!group) {
+      group = { region, name, spots: [], inside: new Set() }; groups.set(id, group);
+    }
+    group.spots.push(spot); if (inside) group.inside.add(spot.id);
+  }
+  return groups;
+}
+
+const objectBounds = (bounds: THREE.Box3): MapObjectBounds => ({ min: bounds.min.toArray(), max: bounds.max.toArray() });
+function browsePhotoRegions(groups: ReturnType<typeof groupPhotoRegions>, camera: THREE.Camera, viewport: MapViewport, selectedId?: string) {
+  return [...groups].flatMap(([id, group]) => {
+    if (!group.region || group.region.bounds.isEmpty() || group.spots.every(spot => isAerialPhoto(spot.photos[0]))) return [];
+    const bounds = group.region.focusBounds, approach = mapObjectApproach(camera, bounds, viewport);
+    const selected = group.spots.some(spot => spot.id === selectedId);
+    if ((!approach.expanded && !selected) || !mapObjectInView(camera, new THREE.Vector3(...bounds.min).add(new THREE.Vector3(...bounds.max)).multiplyScalar(.5), bounds, viewport)) return [];
+    return [{ id, ...approach, selected }];
+  }).sort((a, b) => Number(b.selected) - Number(a.selected) || a.alignment - b.alignment || a.distance - b.distance || a.id.localeCompare(b.id)).slice(0, 1);
+}
+
+export function expandedPhotoRegions(photos: MapPhoto[], campus: Campus, site: Site, camera: THREE.Camera, viewport: MapViewport = FULL_MAP_VIEWPORT, selectedId?: string) {
   camera.updateMatrixWorld();
-  const regions = photoRegions(options.campus, options.site), known = new Map(regions.map(region => [region.id, region]));
+  return browsePhotoRegions(groupPhotoRegions(photos, campus, site), camera, viewport, selectedId);
+}
+
+// Expand the destination being faced once it fills the available map area.
+export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, size: { width: number; height: number }, occluders: THREE.Object3D[], options: { campus: Campus; site: Site; selectedId?: string; viewport?: MapViewport; expandedRegionId?: string }): PhotoCluster[] {
+  camera.updateMatrixWorld();
+  const groups = groupPhotoRegions(photos, options.campus, options.site);
+  const expandedRegionId = options.expandedRegionId ?? browsePhotoRegions(groups, camera, options.viewport || FULL_MAP_VIEWPORT, options.selectedId)[0]?.id;
   const markerQueries = prepareMarkerQueries(occluders);
   const hardOccluders = occluders.filter((object): object is THREE.Mesh => {
     if (!(object instanceof THREE.Mesh) || !isPhotoOccluder(object) || isPhotoOpacityOnlyOccluder(object)) return false;
@@ -259,25 +293,14 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
     }
     return false;
   });
-  const boundary = options.campus.boundary || [], boundaryX = boundary.map(point => point[0]), boundaryZ = boundary.map(point => point[1]);
-  const origin = boundary.length ? [(Math.min(...boundaryX) + Math.max(...boundaryX)) / 2, (Math.min(...boundaryZ) + Math.max(...boundaryZ)) / 2] : [0, 0];
-  const groups = new Map<string, { region?: PhotoRegion; name: string; spots: PhotoSpot[]; inside: Set<string> }>();
-  for (const photo of [...photos].sort((a, b) => a.id.localeCompare(b.id))) {
-    if (![photo.position.x, photo.position.z, photo.position.height].every(Number.isFinite)) continue;
-    const { id, name, region, spot, inside } = photoRegionAssignment(photo, options.campus, options.site, regions, known, origin);
-    let group = groups.get(id);
-    if (!group) {
-      group = { region, name, spots: [], inside: new Set() }; groups.set(id, group);
-    }
-    group.spots.push(spot); if (inside) group.inside.add(spot.id);
-  }
   const result: PhotoCluster[] = [], ray = new THREE.Raycaster();
   for (const [regionId, group] of groups) {
     const regionName = group.spots.every(spot => isAerialPhoto(spot.photos[0])) ? '航拍' : group.name;
     const bounds = group.region && !group.region.bounds.isEmpty() ? group.region.bounds
       : new THREE.Box3().setFromPoints(group.spots.map(spot => spot.position));
     const distance = Math.min(bounds.distanceToPoint(camera.position), ...group.spots.map(spot => spot.position.distanceTo(camera.position)));
-    const collapsed = !group.spots.some(spot => spot.id === options.selectedId) && distance > PHOTO_REGION_EXPAND_DISTANCE;
+    const collapsed = !group.spots.some(spot => spot.id === options.selectedId) && (group.region && !group.spots.every(spot => isAerialPhoto(spot.photos[0]))
+      ? regionId !== expandedRegionId : distance > PHOTO_REGION_EXPAND_DISTANCE);
     const inside = group.inside;
     const appearance = (spot: PhotoSpot) => {
       const occlusionLayers = !collapsed && inside.has(spot.id) ? markerOcclusionLayers(spot.position, camera, occluders) : 0;
@@ -325,7 +348,7 @@ export function regionPhotoClusters(photos: MapPhoto[], camera: THREE.Camera, si
         || candidates.reduce((nearest, spot) => spot.position.distanceToSquared(middle) < nearest.position.distanceToSquared(middle) ? spot : nearest);
       regional.push({ id: collapsed ? 'region/' + regionId + '/' + representative.id : representative.id, photos: spots.flatMap(spot => spot.photos), spots,
         position: representative.position.clone(), ...dimensions(representative), cameraDistance: representative.position.distanceTo(camera.position),
-        regionId, regionName, collapsed, overflow: false });
+        regionId, regionName, collapsed, overflow: false, focusBounds: group.region?.focusBounds });
     }
     if (group.region?.building && !collapsed) {
       regional.sort((a, b) => a.cameraDistance! - b.cameraDistance! || a.id.localeCompare(b.id));

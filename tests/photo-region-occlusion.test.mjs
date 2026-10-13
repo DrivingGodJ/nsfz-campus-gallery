@@ -46,7 +46,7 @@ test('a location label cannot exempt an exterior, courtyard-hole or aerial point
   const photos = [shot('outside', 0, -15, 1.6, 'teaching'), shot('courtyard', 0, 0, 1.6, 'teaching'),
     { ...shot('aerial', 0, -5, 1.6, 'teaching'), captureType: 'aerial' }, shot('indoor', 5, 0, 1.6, 'teaching')];
   for (const selectedId of [undefined, 'outside', 'courtyard', 'aerial']) {
-    const clusters = regionPhotoClusters(photos, cameraAt(), size, markerOccluders(scene), { ...config, selectedId });
+    const clusters = regionPhotoClusters(photos, cameraAt(), size, markerOccluders(scene), { ...config, selectedId, expandedRegionId: 'teaching' });
     assert.deepEqual(ids(clusters), ['indoor']);
     assert.ok(clusters[0].opacity > 0 && clusters[0].opacity < 1);
   }
@@ -57,7 +57,7 @@ test('an expanded indoor point fades through its own building while its distant 
   const scene = new THREE.Scene(); wall(scene);
   const photos = [shot('indoor-a', -2, 0, 1.6, 'teaching'), shot('indoor-b', 2, 0, 1.6, 'teaching')], config = options();
   const blockers = markerOccluders(scene);
-  const close = regionPhotoClusters(photos, cameraAt(), size, blockers, config);
+  const close = regionPhotoClusters(photos, cameraAt(), size, blockers, { ...config, expandedRegionId: 'teaching' });
   assert.deepEqual(ids(close), ['indoor-a', 'indoor-b']);
   assert.ok(close.every(cluster => !cluster.collapsed && cluster.occlusionLayers === 1 && cluster.opacity > 0 && cluster.opacity < 1));
   const far = regionPhotoClusters(photos, cameraAt(200), size, blockers, config);
@@ -85,7 +85,7 @@ test('aliases and raised bases use each wing height instead of the tallest build
   config.site.buildingOverrides.teaching = { floorHeight: 4 };
   const photos = [shot('main', -5, 0, 13.6, 'oldTeaching'), shot('annex', 5, 0, 13.6, 'oldTeaching'),
     shot('below-base', -5, 0, 10, 'oldTeaching'), shot('above-annex-roof', 5, 0, 17.2, 'oldTeaching')];
-  const clusters = regionPhotoClusters(photos, cameraAt(40, -20, 20, [0, 16, 0]), size, markerOccluders(scene), config);
+  const clusters = regionPhotoClusters(photos, cameraAt(40, -20, 20, [0, 16, 0]), size, markerOccluders(scene), { ...config, expandedRegionId: 'teaching' });
   assert.deepEqual(ids(clusters), ['annex', 'main']);
   assert.ok(clusters.every(cluster => cluster.regionId === 'teaching' && cluster.opacity > 0 && cluster.opacity < 1));
   dispose(scene);
@@ -94,7 +94,7 @@ test('aliases and raised bases use each wing height instead of the tallest build
 test('overlapping inside and outside photographs in one destination retain separate appearance policies', () => {
   const teaching = { ...building(), ...rectangle(0, -10, 20, 20) }, config = options([teaching]);
   const photos = [shot('inside', .05, 0, 1.6, 'teaching'), shot('outside', -.05, 0, 1.6, 'teaching')];
-  const clusters = regionPhotoClusters(photos, cameraAt(), size, [], config);
+  const clusters = regionPhotoClusters(photos, cameraAt(), size, [], { ...config, expandedRegionId: 'teaching' });
   assert.equal(clusters.length, 2);
   assert.ok(clusters.every(cluster => cluster.photos.length === 1 && !cluster.collapsed && cluster.opacity === 1));
   assert.deepEqual(ids(clusters), ['inside', 'outside']);
@@ -109,17 +109,17 @@ test('offscreen cards avoid hard rays while distant collections keep their membe
   let rays = 0; mesh.raycast = () => { rays++; };
   const indoor = shot('inside', 0, 0, 1.6, 'teaching'), offscreen = shot('offscreen', 1000, 0, 1.6, 'teaching');
   const photos = [indoor, offscreen], blockers = markerOccluders(scene);
-  let clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, config);
+  let clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, { ...config, expandedRegionId: 'teaching' });
   assert.deepEqual(ids(clusters), ['inside']); assert.equal(rays, 1, 'A fully offscreen card needs no hard visibility query');
   rays = 0;
   clusters = regionPhotoClusters(photos, cameraAt(200), size, blockers, config);
   assert.equal(clusters[0].collapsed, true); assert.deepEqual(ids(clusters), ['inside', 'offscreen']);
   assert.equal(rays, 2, 'Collapsed collection membership still checks offscreen members for exterior blockers');
   indoor.position.x = 20;
-  clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, config);
+  clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, { ...config, expandedRegionId: 'teaching' });
   assert.equal(clusters[0].opacity, 1, 'Editing the same photo object from indoor to outdoor invalidates the cached membership');
   indoor.position.x = 0; indoor.captureType = 'aerial';
-  clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, config);
+  clusters = regionPhotoClusters(photos, cameraAt(), size, blockers, { ...config, expandedRegionId: 'teaching' });
   assert.equal(clusters[0].opacity, 1, 'A capture-type edit cannot reuse the indoor exemption');
   dispose(scene);
 });
