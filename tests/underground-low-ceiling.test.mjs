@@ -21,7 +21,7 @@ const ray = (point, y, direction, length, objects) => new THREE.Raycaster(new TH
 
 test('only the marked right corridor leg has a door-height roof, with the original full-height floor plan retained', () => {
   assert.deepEqual(area.feature.ceilingSegments, [{ edge: 1, height: 2.82 }]);
-  assert.deepEqual(sections.map(section => section.height).sort(), [2.82, 3.2, 6.4]);
+  assert.deepEqual(sections.map(section => section.height).sort(), [2.82, 3.2, 3.84, 6.4]);
   assert.deepEqual(polygonClipping.union(...sections.flatMap((a,i)=>sections.slice(i+1).map(b=>polygonClipping.intersection(polygons(a.footprints),polygons(b.footprints))))), []);
   assert.deepEqual(polygonClipping.xor(polygons(area.footprints), polygonClipping.union(...sections.map(section => polygons(section.footprints)))), []);
   const low = sections.find(section => section.height === 2.82);

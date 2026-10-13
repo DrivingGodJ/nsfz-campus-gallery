@@ -203,7 +203,7 @@ test('underground layout is orthogonal to the stand and shares its right edge', 
   assert.notDeepEqual(corridor.points[0], corridor.points.at(-1));
   assert.equal(corridor.holes.length, 0);
   const area = ring => Math.abs(ring.slice(1).reduce((sum, p, i) => sum + ring[i][0] * p[1] - p[0] * ring[i][1], 0) / 2);
-  assert.ok(Math.abs(area(corridor.outer) - 914.5480794312368) < 1e-8, 'The shifted road-side corridor retains three connected sides');
+  assert.ok(Math.abs(area(corridor.outer) - 1024.5480794312368) < 1e-8, 'The shifted road-side corridor retains three connected sides');
   const point = (along, across) => [origin[0] + axis[0] * along + axis[1] * across, origin[1] + axis[1] * along - axis[0] * across];
   const inside = ([x, z]) => {
     let contained = false;

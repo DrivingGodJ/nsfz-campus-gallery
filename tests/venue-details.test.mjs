@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as THREE from 'three';
+import polygonClipping from 'polygon-clipping';
 import { buildingLevels } from '../src/building-model.ts';
 import { buildingGeometry } from '../src/building-geometry.ts';
 import { gymArchitecture } from '../src/architecture-geometry.ts';
 import { gymFrame, gymStairLayout } from '../src/gym-interior.ts';
 import { sportsGroundPlatformLayers } from '../src/sports-ground-geometry.ts';
-import { undergroundLayout } from '../src/underground-geometry.ts';
+import { undergroundLayout, undergroundCeilingSections } from '../src/underground-geometry.ts';
 import { undergroundDetailGeometry } from '../src/underground-details.ts';
 import { gymDetailGeometry, STANDS_ID, standsArchitecture, standsFrame, standsStairLayout, THEATRE_ID, theatreInteriorGeometry, theatreInteriorLayout } from '../src/venue-geometry.ts';
 
@@ -134,22 +135,27 @@ test('the glazed stand stair hall descends to a real open low-ground exit', () =
 
 test('the built stand stair shaft clears the actual podium and underground sports roof', () => {
   const layout = standsStairLayout(stands), track = campus.features.find(feature => feature.type === 'runningTrack');
-  const room = undergroundLayout(campus.features).areas.get('local/underground-badminton');
-  assert.deepEqual(room.feature.ceilingCutouts[0].footprint, layout.footprint, 'The building floor and sports roof share the same calibrated shaft');
-  const roof = undergroundDetailGeometry(room.feature, room.footprints, room.openings, room.connections);
+  const areas = undergroundLayout(campus.features).areas;
+  const room = areas.get('local/underground-badminton'), corridor = areas.get('local/underground-corridor');
+  assert.deepEqual(corridor.feature.ceilingCutouts[0].footprint, layout.footprint, 'The extended passage roof leaves the fixed stand shaft open');
+  const sideHall = [layout.at(layout.u0 - .2, layout.v0 - .2), layout.at(layout.end + .2, layout.v0 - .2),
+    layout.at(layout.end + .2, layout.width + .02), layout.at(layout.u0 - .2, layout.width + .02)];
+  assert.deepEqual(polygonClipping.intersection([room.feature.outer], [[...sideHall, sideHall[0]]]), [], 'The stair and its sidewalls do not invade the moved badminton hall');
+  assert.ok(undergroundCeilingSections(room.feature, room.footprints, room.openings).every(section => section.height === room.feature.wallHeight), 'The entire badminton hall keeps its full ceiling clearance');
+  const roofs = [room, corridor].map(area => undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections));
   const podium = sportsGroundPlatformLayers(track, campus.features).map(layer => {
     const geometry = buildingGeometry(layer.shape, layer.top - layer.bottom, 3.6);
     const object = mesh(geometry, true); object.position.y = layer.bottom; object.updateMatrixWorld(); return object;
   });
   try {
-    const above = Object.entries(roof).filter(([key]) => key !== 'floor' && key !== 'green' && key !== 'paint').map(([, geometry]) => mesh(geometry));
+    const above = roofs.flatMap(roof => Object.entries(roof).filter(([key]) => key !== 'floor' && key !== 'green' && key !== 'paint').map(([, geometry]) => mesh(geometry)));
     const p = layout.at((layout.u0 + layout.u1) / 2, layout.center);
     const hits = down([...above, ...podium], p, 4.2, 4.2);
     assert.ok(hits.every(hit => hit.point.y < .12), 'No podium slab, sports roof, beam or pipe obstructs the flight above its low-ground floor');
     const doorway = layout.at((layout.u1 + layout.end) / 2, layout.width - .5);
     const exit = new THREE.Raycaster(new THREE.Vector3(doorway[0], 1.6, doorway[1]), new THREE.Vector3(layout.across[0], 0, layout.across[1]), 0, 2).intersectObjects([...above, ...podium]);
     assert.equal(exit.length, 0, 'The lower rear exit also clears the underlying sports enclosure');
-  } finally { dispose(roof); podium.forEach(object => object.geometry.dispose()); }
+  } finally { roofs.forEach(dispose); podium.forEach(object => object.geometry.dispose()); }
 });
 
 test('venue details disappear above selected floors and never add photo-marker obstruction', () => {

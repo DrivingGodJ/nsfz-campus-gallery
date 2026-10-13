@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as THREE from 'three';
-import { undergroundEntranceStair, undergroundLayout } from '../src/underground-geometry.ts';
+import { undergroundEntranceStair, undergroundLayout, undergroundCeilingSections } from '../src/underground-geometry.ts';
 import { undergroundDetailGeometry } from '../src/underground-details.ts';
 import { sportsGroundPlatform, sportsGroundPlatformLayers, groundElevationAt } from '../src/sports-ground-geometry.ts';
 import { campusLocations, photoMapHeight } from '../src/locations.ts';
 import { bridgeHeight } from '../src/structure-geometry.ts';
+import { pointOnStairTread } from '../src/structure-geometry.ts';
 
 const campus = JSON.parse(fs.readFileSync(new URL('../public/data/campus.json', import.meta.url)));
 const site = JSON.parse(fs.readFileSync(new URL('../public/data/site.json', import.meta.url)));
@@ -82,6 +83,7 @@ test('entrance treads descend continuously to the existing floor and retain usab
 test('corridor roof glazing receives daylight without the field podium or gym covering it', () => {
   close(area.feature.height + area.feature.wallHeight, field.height, 'The glazing meets the raised athletics ground');
   const geometry = undergroundDetailGeometry(area.feature, area.footprints, area.openings, area.connections);
+  const sections = undergroundCeilingSections(area.feature, area.footprints, area.openings, area.connections);
   const skylights = object(geometry.skylights), ceiling = object(geometry.ceiling);
   const blockers = [...sportsGroundPlatformLayers(field, campus.features).map(layer => prism(layer.shape, layer.bottom, layer.top)),
     prism(gym, gym.baseElevation, gym.baseElevation + 20)];
@@ -91,9 +93,13 @@ test('corridor roof glazing receives daylight without the field podium or gym co
       const [from, to] = route, dx = to[0] - from[0], dz = to[1] - from[1], length = Math.hypot(dx, dz);
       for (const t of [.01, .1, .25, .5, .75, .9, .99]) for (const side of [.2, 1.25, 2.3]) {
         const point = [from[0] + dx * t - dz / length * side, from[1] + dz * t + dx / length * side];
-        assert.ok(ray(point, top - .06, up, .1, [skylights]).length, 'The photographed glazed strip is present');
-        assert.equal(ray(point, top - .2, up, .3, [ceiling]).length, 0, 'Opaque roof never fills the glazing');
-        assert.equal(ray(point, top - .01, up, 25, blockers).length, 0, 'The gym and podium cannot block light above the glazing');
+        const section = sections.find(section => section.footprints.some(shape => pointOnStairTread(point, shape.outer)
+          && !shape.holes.some(hole => pointOnStairTread(point, hole))));
+        assert.ok(section, 'The extended passage has a roof at each sampled point');
+        const localTop = area.feature.height + section.height;
+        assert.ok(ray(point, localTop - .06, up, .1, [skylights]).length, 'The glazed strip follows the local roof, including the fixed stair shaft');
+        assert.equal(ray(point, localTop - .2, up, .3, [ceiling]).length, 0, 'Opaque roof never fills the glazing');
+        assert.equal(ray(point, localTop + .01, up, 25, blockers).length, 0, 'The gym and podium cannot block light above the glazing');
       }
     }
   } finally {

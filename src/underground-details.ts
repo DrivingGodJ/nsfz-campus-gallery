@@ -5,6 +5,7 @@ import { passageFootprint, undergroundFootprints, undergroundEntranceStair, unde
 import { undergroundWallPanels } from './underground-mesh.ts';
 import { undergroundRailGeometry } from './underground-rail-geometry.ts';
 import { pointOnStairTread } from './structure-geometry.ts';
+import { confirmedFacade } from './teaching-classrooms.ts';
 import type { Feature, Point, Shape } from './types';
 
 type Kind = 'floor' | 'walls' | 'podium' | 'tiles' | 'metal' | 'rails' | 'lights' | 'pipes' | 'glass' | 'skylights' | 'green' | 'wood' | 'paint' | 'nets' | 'ceiling' | 'fittings';
@@ -33,6 +34,8 @@ export function undergroundBadmintonLayout({ width, length }: ReturnType<typeof 
 export function undergroundDetailGeometry(feature: Feature, footprints = undergroundFootprints(feature), openings: PassageOpening[] = [], connections: Feature[] = []) {
   const parts = Object.fromEntries(Object.keys(UNDERGROUND_COLORS).map(kind => [kind, [] as THREE.BufferGeometry[]])) as Record<Kind, THREE.BufferGeometry[]>;
   const floor = feature.height ?? -3, clear = feature.wallHeight || 2.4, top = floor + clear;
+  const hallWindowEdges = feature.id === 'local/underground-badminton' && feature.outer
+    ? feature.outer.slice(1).map((to, i) => ({ from: feature.outer![i], to })) : null;
   const sections = undergroundCeilingSections(feature, footprints, openings, connections);
   const stair = undergroundEntranceStair(feature);
   const rise = undergroundRiseStair(feature);
@@ -108,15 +111,27 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     const panels = undergroundWallPanels(shape, clear, section.openings);
     for (const panel of panels) {
       const length = Math.hypot(panel.to[0] - panel.from[0], panel.to[1] - panel.from[1]);
-      const highWindows = feature.type === 'undergroundRoom' && length > 16 && clear > 5;
+      // Doors and the stair roof split a photographed exterior wall into short
+      // panels; they must not erase its high windows or glaze internal seams.
+      const highWindows = feature.type === 'undergroundRoom' && feature.roomUse !== 'garage' && clear > 5
+        && (hallWindowEdges ? confirmedFacade(panel.from, panel.to, hallWindowEdges) : length > 16);
       if (highWindows) {
-        segment(panel.from, panel.to, floor + panel.bottom, clear - .95 - panel.bottom, .2, 'walls');
-        segment(panel.from, panel.to, top - .2, .2, .2, 'walls');
-        segment(panel.from, panel.to, top - .95, .75, .055, 'glass');
-        const bays = Math.ceil(length / 3.4);
-        for (let i = 0; i <= bays; i++) {
-          const p: Point = panel.from.map((n, j) => n + (panel.to[j] - n) * i / bays) as Point;
-          bar(point(p, top - .95), point(p, top), .035, 'metal');
+        const bottom = Math.max(panel.bottom, clear - .95), windowTop = Math.min(panel.top, clear - .2);
+        segment(panel.from, panel.to, floor + panel.bottom, Math.min(panel.top, clear - .95) - panel.bottom, .2, 'walls');
+        segment(panel.from, panel.to, floor + Math.max(panel.bottom, clear - .2), panel.top - Math.max(panel.bottom, clear - .2), .2, 'walls');
+        if (windowTop > bottom) {
+          segment(panel.from, panel.to, floor + bottom, windowTop - bottom, .055, 'glass');
+          const angle = -Math.atan2(panel.to[1] - panel.from[1], panel.to[0] - panel.from[0]);
+          // Thin sash profiles use double-sided strips instead of hundreds of
+          // closed boxes; the glass and structural walls retain their depth.
+          for (const y of [bottom, windowTop]) parts.metal.push(new THREE.PlaneGeometry(length, .05).rotateY(angle)
+            .translate((panel.from[0] + panel.to[0]) / 2, floor + y, (panel.from[1] + panel.to[1]) / 2));
+          const bays = Math.ceil(length / (hallWindowEdges ? 1.25 : 3.4));
+          for (let i = 0; i <= bays; i++) {
+            const p: Point = panel.from.map((n, j) => n + (panel.to[j] - n) * i / bays) as Point;
+            parts.metal.push(new THREE.PlaneGeometry(.035, windowTop - bottom).rotateY(angle)
+              .translate(p[0], floor + (bottom + windowTop) / 2, p[1]));
+          }
         }
       } else {
         const entranceFace = stair && [panel.from, panel.to].every(p => Math.abs(

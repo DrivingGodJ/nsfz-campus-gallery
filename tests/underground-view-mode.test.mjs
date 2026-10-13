@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { undergroundMaterialView, undergroundPartVisible, undergroundViewMode } from '../src/underground-mesh.ts';
 import { undergroundDetailGeometry } from '../src/underground-details.ts';
-import { undergroundLayout } from '../src/underground-geometry.ts';
+import { undergroundLayout, undergroundCeilingSections } from '../src/underground-geometry.ts';
 
 const room = { floor: -3.8, height: 6.2, footprints: [{ outer: [[0, 0], [10, 0], [10, 8], [0, 8], [0, 0]], holes: [] }] };
 const other = { floor: -3.8, height: 6.2, footprints: [{ outer: [[20, 0], [30, 0], [30, 8], [20, 8], [20, 0]], holes: [] }] };
@@ -84,8 +84,10 @@ test('opening the underground lightwell roof preserves its photographed vertical
     assert.ok(geometry.skylights.getAttribute('position').count > 0, 'Roof glazing is independently removable');
     assert.ok(geometry.glass.getAttribute('position').count > 0, 'The vertical window bays remain in the detailed model');
     const top = corridor.feature.height + corridor.feature.wallHeight;
+    const roofHeights = undergroundCeilingSections(corridor.feature, corridor.footprints, corridor.openings, corridor.connections)
+      .map(section => corridor.feature.height + section.height);
     const positions = geometry.skylights.getAttribute('position');
-    for (let i = 0; i < positions.count; i++) assert.ok(Math.abs(positions.getY(i) - top) < .06, 'Only the roof glazing enters the hidden batch');
+    for (let i = 0; i < positions.count; i++) assert.ok(roofHeights.some(height => Math.abs(positions.getY(i) - height) < .06), 'Only glazing at the local roof heights enters the hidden batch');
     assert.equal(undergroundPartVisible('ceiling', 'overview', top + 20, top), false);
     assert.equal(undergroundPartVisible('ceiling', 'inside', corridor.feature.height + 1.6, top), true);
   } finally { Object.values(geometry).forEach(part => part.dispose()); }
