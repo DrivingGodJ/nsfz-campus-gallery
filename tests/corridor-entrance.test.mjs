@@ -8,6 +8,7 @@ import { sportsGroundPlatform, sportsGroundPlatformLayers, groundElevationAt } f
 import { campusLocations, photoMapHeight } from '../src/locations.ts';
 import { bridgeHeight } from '../src/structure-geometry.ts';
 import { pointOnStairTread } from '../src/structure-geometry.ts';
+import { insideShape } from '../src/terrain-height.ts';
 
 const campus = JSON.parse(fs.readFileSync(new URL('../public/data/campus.json', import.meta.url)));
 const site = JSON.parse(fs.readFileSync(new URL('../public/data/site.json', import.meta.url)));
@@ -97,7 +98,10 @@ test('corridor roof glazing receives daylight without the field podium or gym co
           && !shape.holes.some(hole => pointOnStairTread(point, hole))));
         assert.ok(section, 'The extended passage has a roof at each sampled point');
         const localTop = area.feature.height + section.height;
-        assert.ok(ray(point, localTop - .06, up, .1, [skylights]).length, 'The glazed strip follows the local roof, including the fixed stair shaft');
+        const openStairwell = area.feature.ceilingOpenings?.some(shape => insideShape(point, shape));
+        const glazing = ray(point, localTop - .06, up, .1, [skylights]);
+        if (openStairwell) assert.equal(glazing.length, 0, 'The returning stairwell has an actual opening through the glass roof');
+        else assert.ok(glazing.length, 'The glazed strip follows the local roof outside the open stairwell');
         assert.equal(ray(point, localTop - .2, up, .3, [ceiling]).length, 0, 'Opaque roof never fills the glazing');
         assert.equal(ray(point, localTop + .01, up, 25, blockers).length, 0, 'The gym and podium cannot block light above the glazing');
       }

@@ -238,7 +238,9 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     }
   }
   for (const opening of roofOpenings) for (const section of sections)
-    for (const [outer, ...holes] of polygonClipping.intersection(section.footprints.map(shape => [shape.outer, ...shape.holes]), [opening.outer, ...opening.holes]))
+    for (const [outer, ...holes] of polygonClipping.difference(
+      polygonClipping.intersection(section.footprints.map(shape => [shape.outer, ...shape.holes]), [opening.outer, ...opening.holes]),
+      ...ceilingOpenings.map(shape => [shape.outer, ...shape.holes])))
       flat({ outer, holes }, floor + section.height - .05, 'skylights', .045);
   if (feature.type !== 'undergroundRoom' || feature.roomUse === 'garage') {
     // The full enclosure includes merged return passages and corner seams;
