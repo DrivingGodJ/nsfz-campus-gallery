@@ -56,6 +56,8 @@ test('the southwest upper room opens into the expanded joining classroom while t
   assert.deepEqual(room.openEdges, [3], 'The shared end opens toward the newly moved classroom partition');
   assert.equal(room.door, undefined, 'The unsupported new doorway is removed');
   const upperConfig={...building.classroomWindows};delete upperConfig.groundBlindFacadeLines;
+  // The east stair end is a main-building exception, outside this southwest room.
+  upperConfig.blindFacadeLines=[[[102.29300987733589,59.14085991112591],[100.0476098773359,45.40715991112591]]];
   assert.deepEqual(room.classroomWindows, upperConfig, 'The upper room retains its ordinary calibration without the separate first-floor exception');
   const original = JSON.stringify(building), meshes = bodies();
   const windows = solidCoreWindowLayout([room], main.height, info.floorHeight);

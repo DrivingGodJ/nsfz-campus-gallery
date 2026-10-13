@@ -67,6 +67,12 @@ export function laboratoryLayout(building: Building) {
   // the long straight wall. The theatre owns its outside walls and projection.
   const walls = [...rooms.map(ring), ring(stair.opening)];
   walls.push(rectangle(sideLeft, 56.6 - WALL, sideRight, 56.6));
+  // Open the other two marked ground-floor boundaries as well. These cuts
+  // affect walls only; the floor and stair's rear outside wall stay intact.
+  const groundWallOpenings = [
+    passageFootprint([seam(corridorFront), at(stairWest, corridorFront)], WALL * 2 + .02),
+    rectangle(stairWest - .01, stairRear + WALL, stairWest + WALL + .01, corridorFront + .01),
+  ];
   const doors: GroundPassage[] = [
     { id: 'lab-round-room', sourcePathId: '', points: [at(circleU, 25.8), at(circleU, 28)], width: 2.4 },
     { id: 'lab-stairwell', sourcePathId: '', points: [at(stairU, corridorFront - .3), at(stairU, corridorFront + 1)], width: 3.5 },
@@ -75,8 +81,10 @@ export function laboratoryLayout(building: Building) {
     [connectionEdge, at(branchLeft, 17), at(branchLeft, 34)],
     [at(branchRight, 34), at(branchRight, leftFront), at(corridorWest, leftFront)],
   ];
-  const corridors: FloorCorridor[] = [{ partId: 'main', depth: corridorWidth, startFloor: 1, points: [seam(12 + forward), at(57.1,12 + forward)], railEdges }];
-  return { at, seam, rooms, walls, walkways, stair, stairU, doors, corridors, circleU, circleRadius, corridorWest, roomWidth };
+  // The marked L-shaped ground-floor guard is open; the opposite guard and
+  // both upper-storey guards keep their original edges.
+  const corridors: FloorCorridor[] = railEdges.map((edge, i) => ({ partId: 'main', depth: corridorWidth, startFloor: i === 0 ? 2 : 1, points: [seam(12 + forward), at(57.1,12 + forward)], railEdges: [edge] }));
+  return { at, seam, rooms, walls, groundWallOpenings, walkways, stair, stairU, doors, corridors, circleU, circleRadius, corridorWest, roomWidth };
 }
 
 export function laboratoryBodyGeometry(building: Building, height: number, floorHeight: number, cutaway = false) {
@@ -84,6 +92,7 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
   const layout = laboratoryLayout(building);
   const wallPolygons = snapFootprint(layout.walls.map(polygon));
   const walls = polygonClipping.union(wallPolygons[0], ...wallPolygons.slice(1));
+  const groundWalls = polygonClipping.difference(walls, ...snapFootprint(layout.groundWallOpenings.map(polygon)));
   const platePolygons = snapFootprint([...layout.rooms, ...layout.walkways, layout.stair.opening].map(polygon));
   const floorPlate = polygonClipping.union(platePolygons[0], ...platePolygons.slice(1));
   const glazing = laboratoryWindows(building, height, floorHeight);
@@ -102,7 +111,8 @@ export function laboratoryBodyGeometry(building: Building, height: number, floor
     const levels = [...new Set([bottom + SLAB, top, Math.min(bottom + 2.65, top), ...glazing.filter(window => window.bottom >= bottom && window.bottom < top).flatMap(window => [window.bottom, window.top]), ...laboratoryRearOpeningLevels(rearGlazing).filter(y => y > bottom + SLAB && y < top)])].sort((a, b) => a - b);
     for (let i = 0; i < levels.length - 1; i++) {
       const low = levels[i], high = levels[i + 1], middle = (low + high) / 2;
-      let layer = openings.length && middle < bottom + 2.65 ? polygonClipping.difference(walls, openings) : walls;
+      let layer = floor === 0 ? groundWalls : walls;
+      if (openings.length && middle < bottom + 2.65) layer = polygonClipping.difference(layer, openings);
       const cuts = [...glazing.filter(window => middle > window.bottom && middle < window.top).map(window => window.cut), ...laboratoryRearCutsAt(building, rearGlazing, middle)];
       if (cuts.length) layer = polygonClipping.difference(layer, ...snapFootprint(cuts));
       for (const [outer, ...holes] of layer) add({ outer: outer as Point[], holes: holes as Point[][] }, low, high, true, middle < bottom + 2.65 ? [...layout.doors, ...groundPassages] : groundPassages);

@@ -33,7 +33,7 @@ test('the entire west wall of the blue main atrium has no windows on any floor, 
     assert.ok(Math.abs(fullWest[i][axis]-p[axis]-3*normal[axis])<1e-9,'The whole 13.916m line lies exactly three metres west of the blue atrium edge');
   }
   assert.equal(main.floors,5);
-  assert.deepEqual(building.classroomWindows.blindFacadeLines,[fullWest]);
+  assert.deepEqual(building.classroomWindows.blindFacadeLines,[fullWest,main.outer.slice(18,20)],'The west atrium and separately enclosed east stair end both keep their blind facades');
   assert.deepEqual(room.classroomWindows.blindFacadeLines,[fullWest],'Independent upper room glazing uses the same complete blind facade');
   const saved=corrections.buildings.find(b=>b.id===building.id);
   assert.deepEqual(saved.classroomWindows,building.classroomWindows,'Map refresh retains the correct west facade');

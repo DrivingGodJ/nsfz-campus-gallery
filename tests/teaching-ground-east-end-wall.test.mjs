@@ -74,7 +74,7 @@ test('the ground road beside the new wall keeps its full clear route and the pre
       const start=new THREE.Vector3(a[0]+dx*.1,.12+rise,a[1]+dz*.1).addScaledVector(normal,side);
       assert.equal(new THREE.Raycaster(start,axis,0,len*.75).intersectObjects(bodies).length,0,'The requested wall does not seal or narrow the existing first-floor passage');
     }
-    assert.deepEqual(building.classroomWindows.blindFacadeLines,[[[102.29300987733589,59.14085991112591],[100.0476098773359,45.40715991112591]]]);
+    assert.deepEqual(building.classroomWindows.blindFacadeLines,[[[102.29300987733589,59.14085991112591],[100.0476098773359,45.40715991112591]],info.sections.find(s=>s.id==='main').outer.slice(18,20)],'The original west blind wall and newly enclosed east stair end remain opaque');
     assert.deepEqual(building.classroomWindows.groundBlindFacadeLines[0],[[101.39296197109496,42.147361263237464],[100.08174852515707,34.365594507997365]]);
     assert.equal(building.classroomWindows.straightWindowGap,.18);
     assert.equal(building.stairwells[2].roofAccess.height,3.6);assert.equal(building.stairwells[3].roofAccess,undefined);

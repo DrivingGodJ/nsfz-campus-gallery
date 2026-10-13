@@ -68,7 +68,7 @@ test('yellow edges have guards instead of solid walls or glazing, and the green 
   const rails = teachingRailGeometry(configured, info.sections, info.floorHeight), body = laboratoryBodyGeometry(building, info.height, info.floorHeight);
   for (let floor = 0; floor < 6; floor++) {
     const y = .12 + floor * info.floorHeight + .25 + 1.05;
-    assert.ok(cast(mesh(rails), layout.at(22, 18), layout.at(22, 15), y, 3).length, 'The open side has a guard on every floor');
+    assert.equal(cast(mesh(rails), layout.at(22, 18), layout.at(22, 15), y, 3).length > 0, floor > 0, 'The marked ground-floor guard is removed; upper floors stay guarded');
     assert.equal(cast(mesh(body, true), layout.at(22, 18), layout.at(22, 15), y, 3).length, 0, 'No wall blocks the view outside');
     assert.equal(cast(mesh(body, true), layout.at(layout.stairU, 11.5), layout.at(layout.stairU, 10.1), y, 2).length, 0, 'The staircase entrance is open');
   }
@@ -84,7 +84,7 @@ test('yellow edges have guards instead of solid walls or glazing, and the green 
     for (const side of [-1, 1]) for (const v of [26.5, 28, 31, 33.5]) {
       const u = layout.circleU + side * (layout.circleRadius - .15);
       assert.ok(down(mesh(body,true),layout.at(u,v),level+.4).length, 'The full corridor width has a continuous floor where it meets the round building');
-      assert.ok(cast(mesh(rails),layout.at(u,v),layout.at(u+side,v),level+.25+1.05,1).length, 'Both guards reach the round outside wall without an exposed gap');
+      assert.equal(cast(mesh(rails),layout.at(u,v),layout.at(u+side,v),level+.25+1.05,1).length > 0, floor > 0 || side > 0, 'Only the marked ground-floor side is open; retained guards reach the round wall');
     }
   }
   [rails, body, ...Object.values(stairs)].forEach(g => g.dispose());
@@ -101,6 +101,25 @@ test('the annotated front wall, east-shifted staircase and right-hand wall retur
     assert.ok(cast(target, at(52, 18), at(52, 22), y, 4).length, 'The inside end of the left wall band turns back at the corridor');
     assert.ok(cast(target, at(60, 15.5), at(57, 15.5), y, 3).length, 'The right wall band has the annotated end return');
   }
+  body.dispose();
+});
+
+test('all red-marked ground boundaries are open while upper walls, the rear facade and floors remain intact', () => {
+  const layout = laboratoryLayout(building), { at } = layout, info = buildingLevels(building);
+  const body = laboratoryBodyGeometry(building, info.height, info.floorHeight), target = mesh(body, true);
+  const origin = at(0, 0), unit = at(1, 0).map((n, i) => n - origin[i]);
+  const west = layout.stair.opening.outer[0].reduce((sum, n, i) => sum + (n - origin[i]) * unit[i], 0);
+  for (const height of [.5, 1.5, 2.5, 3.1]) {
+    for (const u of [2, 10, 16, west - 1]) assert.equal(cast(target, at(u, 10.9), at(u, 12.3), .12 + height, 1.4).length, 0, 'Both marked classroom-front portions are open on floor one');
+    for (const v of [4, 7, 10]) assert.equal(cast(target, at(west - .5, v), at(west + .6, v), .12 + height, 1.1).length, 0, 'The marked stair-side wall is open on floor one');
+  }
+  for (let floor = 1; floor < 6; floor++) {
+    const y = .12 + floor * info.floorHeight + 3.1;
+    assert.ok(cast(target, at(16, 10.9), at(16, 12.3), y, 1.4).length, 'Upper classroom-front walls remain');
+    assert.ok(cast(target, at(west - .5, 7), at(west + .6, 7), y, 1.1).length, 'Upper stair-side walls remain');
+  }
+  assert.ok(cast(target, at(west - .5, 3.4), at(west + .6, 3.4), .12 + 3.1, 1.1).length, 'The adjoining rear exterior wall remains connected');
+  for (const u of [2, 16]) for (const v of [10.9, 11.6, 12.3]) assert.ok(down(target, at(u, v), .12 + .4).length, 'Removing the boundary does not cut the ground floor');
   body.dispose();
 });
 
@@ -297,7 +316,7 @@ test('the marked walls and left guards move forward together while classrooms an
     for(const u of [branchRight-.02,branchRight+.02]) for(const v of [17.1,19,20.9]) assert.ok(down(target,at(u,v),level+.4).length,'The shifted left side and fixed right side meet without a floor crack');
     assert.equal(cast(guard,at(45,18),at(45,16),level+.25+1.05,2).length,0,'The former left guard does not remain across the expanded hall');
     assert.ok(cast(guard,at(45,22),at(45,20),level+.25+1.05,2).length,'The left guard follows the shifted front edge');
-    assert.ok(cast(guard,at(22,18),at(22,16),level+.25+1.05,2).length,'The right guard stays on the fixed front edge');
+    assert.equal(cast(guard,at(22,18),at(22,16),level+.25+1.05,2).length > 0, floor > 0,'The fixed front edge retains its upper guards while its marked ground guard is removed');
   }
   body.dispose(); rails.dispose();
 });
