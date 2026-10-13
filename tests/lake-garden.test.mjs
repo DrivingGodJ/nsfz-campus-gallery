@@ -214,7 +214,7 @@ test('wisteria walkway stays open and its long library-side annex has a straight
   }
 });
 
-test('wisteria terminal has two staggered half-circle roofs with a continuous uncovered central passage', () => {
+test('wisteria terminal has two staggered half-circle roofs with a continuous uncovered central passage', async () => {
   const layout = pergolaLayout(pergola), { axis, normal, halves } = layout.terminal;
   const model = wisteriaArchitecture(pergola, campus.buildings.find(b => b.id === 'way/855459419'));
   const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
@@ -226,6 +226,9 @@ test('wisteria terminal has two staggered half-circle roofs with a continuous un
   const stagger = Math.abs(centerDelta[0] * axis[0] + centerDelta[1] * axis[1]);
   const gap = Math.abs(centerDelta[0] * normal[0] + centerDelta[1] * normal[1]);
   try {
+    assert.ok(centerDelta[0] * axis[0] + centerDelta[1] * axis[1] > 2, 'The marked half-circle is forward along the diameter, rather than the reversed arrangement');
+    const saved = (await read('data/campus-corrections.json')).features.find(f => f.id === pergola.id);
+    assert.deepEqual(saved.pergola, pergola.pergola, 'Map refresh preserves the corrected front/back arrangement');
     assert.ok(stagger > 2 && stagger < 3, 'The two half-circle centers are offset along their parallel straight edges');
     assert.ok(gap > .8 && gap < 1.2, 'The open central passage has a walkable width');
     assert.equal(clip.intersection(...halves.map(half => polygon(half.shape))).length, 0, 'The roof halves do not overlap');
