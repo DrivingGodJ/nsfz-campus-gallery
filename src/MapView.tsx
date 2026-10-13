@@ -10,7 +10,7 @@ import { buildingInfo, type Campus, type Feature, type Photo, type Point, type S
 import CampusStructures from './CampusStructures';
 import MapModelLayer from './MapModelLayer';
 import MapLevelSwitch, { type MapLevelMode } from './MapLevelSwitch';
-import { isUndergroundFeature, isUndergroundLocation, isUndergroundPhoto } from './map-level-mode';
+import { isUndergroundFeature, isUndergroundLocation, photoMapLevel } from './map-level-mode';
 import SportsGround from './SportsGround';
 import WestCampusTerrain from './WestCampusTerrain';
 import WestColonnade from './WestColonnade';
@@ -56,7 +56,7 @@ import { photoPlacementPoint } from './photo-placement';
 import PhotoMarkers from './PhotoMarkers';
 import { photoMarkerColors } from './photo-marker-colors';
 import PhotoClusterPicker from './PhotoClusterPicker';
-import { photoPointPosition, type PhotoCluster } from './photo-clusters';
+import { type PhotoCluster } from './photo-clusters';
 import MapCameraRig, { OVERVIEW_POSITION, type MapCommand, type MapPhoto } from './MapCameraRig';
 import { photoPerspectiveIssue } from './photo-perspective';
 import PhotoOverlay from './PhotoOverlay';
@@ -68,10 +68,13 @@ import { photoSkyTime, skyTime } from './sky-environment';
 import { mapInteractionHelp, useInputMode } from './input-mode';
 import { FULL_MAP_VIEWPORT, type MapViewport } from './map-card-viewport';
 import type { PhotoLikes } from './photo-sort';
+import MapFloorSlider from './MapFloorSlider';
+import { buildingPhotosThroughFloor } from './map-floor-filter';
 
 type Props = {
-  campus: Campus; site: Site; photos: Photo[]; selectedPhoto?: Photo | null; onSelectPhoto?: (photo: Photo) => void;
+  campus: Campus; site: Site; photos: Photo[]; selectedPhoto?: Photo | null; onSelectPhoto?: (photo: Photo, group?: Photo[]) => void;
   onVisiblePhotos?: (ids: string[]) => void;
+  compactPhotoMarkers?: boolean; visibleLocationLabelIds?: string[]; photoLevel?: MapLevelMode; floorBrowsing?: boolean;
   photoLikes?: PhotoLikes;
   selectedLocation?: string; floor?: number; onLocation?: (id: string) => void; onClearLocation?: () => void; featuresSelectable?: boolean; selectableLocationIds?: string[];
   season?: PhotoSeason | '';
@@ -92,14 +95,16 @@ function Surface({ data, color, height = .06, stableDepth = false, unlit = false
   const shape = useMemo(() => makeShape(data), [data]);
   return <mesh userData={{ photoOpacityOccluder: true }} rotation={[-Math.PI / 2, 0, 0]} position={[0, height, 0]} renderOrder={stableDepth ? 1 : 0}><shapeGeometry args={[shape]} />{unlit ? <meshBasicMaterial color={mapColor(color)} toneMapped={false} /> : <meshStandardMaterial color={mapColor(color)} side={THREE.DoubleSide} roughness={1} polygonOffset={stableDepth} polygonOffsetFactor={-1} polygonOffsetUnits={-1} />}</mesh>;
 }
-const BuildingMesh = memo(function BuildingMesh({ building, site, index, selected, floor, onClick, placing, labelPortal, bridge }: { building: Campus['buildings'][number]; site: Site; index: number; selected: boolean; floor?: number; onClick?: (id: string) => void; placing?: boolean; labelPortal: RefObject<HTMLDivElement>; bridge?: Campus['features'][number] }) {
+const BuildingMesh = memo(function BuildingMesh({ building, site, index, selected, floor, cutFloor, onClick, placing, labelPortal, bridge }: { building: Campus['buildings'][number]; site: Site; index: number; selected: boolean; floor?: number; cutFloor?: number | null; onClick?: (id: string) => void; placing?: boolean; labelPortal: RefObject<HTMLDivElement>; bridge?: Campus['features'][number] }) {
   const mapColor = useMapColor();
   const colors = buildingColors(building);
   const drumTexture = useMemo(() => building.id === THEATRE_ID && colors?.drum ? theatreDrumTexture(colors.body, colors.drum) : undefined, [building.id, colors]);
   useEffect(() => () => drumTexture?.dispose(), [drumTexture]);
   const [hover, setHover] = useState(false);
   const info = useMemo(() => buildingInfo(building, site, index), [building, site.buildingOverrides[building.id], index]);
-  const cutawayHeight = selected && floor && floor > 0 ? floor * info.floorHeight : undefined;
+  const shownFloor = cutFloor !== undefined ? cutFloor : selected ? floor : undefined;
+  const cutawayHeight = shownFloor && shownFloor > 0 ? shownFloor * info.floorHeight : undefined;
+  const translucent = cutFloor !== undefined ? cutawayHeight !== undefined : !!(selected && floor);
   const gym = useMemo(() => building.id === GYM_ID ? gymArchitecture(building, info.height, info.floorHeight, bridge, cutawayHeight) : undefined, [building, info.height, info.floorHeight, bridge, cutawayHeight]);
   useEffect(() => () => { if (gym) for (const geometry of Object.values(gym)) geometry.dispose(); }, [gym]);
   const stands = useMemo(() => building.id === STANDS_ID ? standsArchitecture(building, info.height, info.floorHeight, cutawayHeight) : undefined, [building, info.height, info.floorHeight, cutawayHeight]);
@@ -123,10 +128,10 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     return drumTexture ? theatreDrumMaterials(geometry, info.sections[i], info.floorHeight, building) : geometry;
   }), [building, info, cutawayHeight, gym, stands, colors, drumTexture]);
   useEffect(() => () => { if (!gym && !stands) geometries.forEach(geometry => geometry.dispose()); }, [geometries, gym, stands]);
-  const height = selected && floor && floor > 0 ? Math.min(info.height, floor * info.floorHeight) : info.height;
+  const height = Math.min(info.height, cutawayHeight ?? info.height);
   const color = colors ? '#d7d2c3' : selected ? '#93aa98' : hover ? '#c2c4af' : '#d7d2c3';
   const splitMaterials = !!colors && (cutawayHeight === undefined || !!drumTexture);
-  const floorLines = useMemo(() => buildingFloorLineGeometry(building, info.sections, info.floorHeight, selected && floor && floor > 0 ? floor : undefined), [building, info, selected, floor]);
+  const floorLines = useMemo(() => buildingFloorLineGeometry(building, info.sections, info.floorHeight, shownFloor && shownFloor > 0 ? shownFloor : undefined), [building, info, shownFloor]);
   useEffect(() => () => floorLines.dispose(), [floorLines]);
   const floorLineMaterial = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ camera }) => {
@@ -134,28 +139,28 @@ const BuildingMesh = memo(function BuildingMesh({ building, site, index, selecte
     const distance = Math.hypot(camera.position.x - info.center[0], camera.position.y - info.baseElevation - height / 2, camera.position.z - info.center[1]);
     if (floorLineMaterial.current) floorLineMaterial.current.opacity = THREE.MathUtils.clamp((800 - distance) / 500, 0, 1);
   });
-  return <group position={[0, info.baseElevation, 0]} userData={{ photoOccluder: true, buildingId: building.id }}>
+  return <group position={[0, info.baseElevation, 0]} userData={{ photoOccluder: true, buildingId: building.id, cutawayHeight, fullHeight: info.height }}>
     {building.appearance?.type === 'glass-pavilion' ? <group onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }} onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
       <HistoryPavilion building={building} height={height} color={color} selected={selected} cutaway={cutawayHeight !== undefined && cutawayHeight <= info.height + 1e-6} />
     </group> : <group
       onClick={e => { if (!placing && e.delta < 5) { e.stopPropagation(); onClick?.(building.id); } }}
       onPointerOver={() => setHover(true)} onPointerOut={() => setHover(false)}>
     {building.id === WEST_COLONNADE_ID ? <WestColonnade building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} /> : building.facade?.type === 'boundary-house' ? <BoundaryHouse building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'print-room' ? <PrintRoom building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'campus-shop' ? <CampusShop building={building} height={height} cutaway={cutawayHeight !== undefined} /> : building.facade?.type === 'luxun-memorial' ? <LuxunMemorial building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} /> : info.sections.map((section, i) => <group key={section.id}><mesh geometry={geometries[i]} rotation={[-Math.PI / 2, 0, 0]} position={[0, .12, 0]}>
-      <meshStandardMaterial key={splitMaterials ? 'split-body' : 'single-body'} attach={splitMaterials ? 'material-0' : 'material'} color={buildingMaterialColor(building, building.id === LIBRARY_ID && section.id === 'curved-annex' ? 'base' : 'body', color, mapColor)} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />
+      <meshStandardMaterial key={splitMaterials ? 'split-body' : 'single-body'} attach={splitMaterials ? 'material-0' : 'material'} color={buildingMaterialColor(building, building.id === LIBRARY_ID && section.id === 'curved-annex' ? 'base' : 'body', color, mapColor)} roughness={.95} transparent={translucent} opacity={translucent ? .62 : 1} />
       {splitMaterials && <meshStandardMaterial attach="material-1" color={buildingMaterialColor(building, 'roof', color, mapColor)} roughness={.95} />}
-      {drumTexture && <meshStandardMaterial attach="material-2" map={drumTexture} roughness={.95} transparent={!!(selected && floor)} opacity={selected && floor ? .62 : 1} />}
+      {drumTexture && <meshStandardMaterial attach="material-2" map={drumTexture} roughness={.95} transparent={translucent} opacity={translucent ? .62 : 1} />}
       {building.facade?.type !== 'cafeteria' && <Edges color={mapColor(selected || hover ? '#567760' : '#aaa895')} threshold={25} />}
     </mesh>
     </group>)}
     {building.id !== WEST_COLONNADE_ID && <lineSegments geometry={floorLines} renderOrder={2} raycast={() => null}><lineBasicMaterial ref={floorLineMaterial} color={mapColor(selected ? '#698673' : '#b3b1a4')} transparent depthWrite={false} toneMapped={false} /></lineSegments>}
-    {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={selected && floor && floor > 0 ? floor * info.floorHeight : undefined} />}
+    {!!building.skylights?.length && <BuildingSkylights building={building} sections={info.sections} cutawayHeight={cutawayHeight} />}
     {(building.facade?.type === 'laboratory' || building.floorCorridors?.length || building.stairwells?.length || building.classroomWindows || gym) && <BuildingArchitecture building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} gym={gym} />}
     {(stands || gym || building.id === THEATRE_ID) && <VenueDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} stands={stands} />}
     {building.id === STAND_OFFICE_ID && <StandOfficeDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
     {(building.id === OFFICE_ID || building.id === LIBRARY_ID) && <CampusExteriorDetails building={building} floors={info.floors} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} annexFloors={info.sections.find(section => section.id === 'curved-annex')?.floors} />}
     {(building.classroomWindows || building.id === 'way/855459420') && <PhotoFacadeDetails building={building} sections={info.sections} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
     {PHOTO_INTERIOR_IDS.includes(building.id) && <PhotoInteriorDetails building={building} height={info.height} floorHeight={info.floorHeight} cutawayHeight={cutawayHeight} />}
-    {building.facade?.type === 'dormitory' && <BuildingFacade building={building} floors={info.floors} floorHeight={info.floorHeight} height={height} selected={selected} cutaway={!!(selected && floor)} />}
+    {building.facade?.type === 'dormitory' && <BuildingFacade building={building} floors={info.floors} floorHeight={info.floorHeight} height={height} selected={selected} cutaway={translucent} />}
     </group>}
     {(selected || !!building.name || !!site.buildingOverrides[building.id]?.name) && <LocationHtml portal={labelPortal} key={info.name} position={[info.center[0], height + 3, info.center[1]]} center zIndexRange={[5, 1]}><LocationName id={building.id} name={info.name} building /></LocationHtml>}
   </group>;
@@ -207,7 +212,7 @@ function Direction({ photo, editing = false, compact = false, onHeading, labelPo
     document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
   };
   const origin: [number, number, number] = [photo.position.x, photo.position.height + .4, photo.position.z];
-  return <group><primitive object={arrow} />{editing && <Html portal={labelPortal} position={photoPointPosition(photo)} center zIndexRange={[19, 19]} style={{ pointerEvents: 'none' }}><span aria-hidden="true" className="map-photo-point selected" style={{ backgroundColor: mapColor(colors.point) }} /></Html>}
+  return <group userData={{ markerOccluder: false }}><primitive object={arrow} />
     {rays.length > 0 && <><mesh geometry={sector} position={origin} renderOrder={28} raycast={() => null}><meshBasicMaterial color={mapColor(color)} transparent opacity={.17} side={THREE.DoubleSide} depthTest={false} depthWrite={false} /></mesh><Line points={[origin, ...rays.map(p => p.map((n, i) => n + origin[i]) as [number, number, number]), origin]} color={mapColor(color)} lineWidth={1.5} depthTest={false} depthWrite={false} renderOrder={29} raycast={() => null} /></>}
     {editing && onHeading && <Html portal={labelPortal} center position={[photo.position.x + Math.sin(yaw) * 22, photo.position.height + 2, photo.position.z - Math.cos(yaw) * 22]} zIndexRange={[20, 19]}><button className="direction-handle" aria-label="拖动调整拍摄方向" title="拖动调整拍摄方向" onPointerDown={beginDrag} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); onHeading((photo.heading + (e.key === 'ArrowRight' ? 5 : 355)) % 360); } }}>↔</button></Html>}
   </group>;
@@ -259,20 +264,25 @@ export default function MapView(props: Props) {
     props.onPhotoOrientation?.(update);
   };
   // Display heights are derived; callbacks always return the original persisted record.
-  const selectPhoto = (photo: Photo) => props.onSelectPhoto?.(props.photos.find(item => item.id === photo.id) || photo);
+  const selectPhoto = (photo: Photo, group?: Photo[]) => props.onSelectPhoto?.(props.photos.find(item => item.id === photo.id) || photo, group?.map(item => props.photos.find(original => original.id === item.id) || item));
   const [command, setCommand] = useState<MapCommand>({ type: 'initial', sequence: 0 });
-  const [compact, setCompact] = useState(false);
   const [azimuth, setAzimuth] = useState(0);
   const [levelMode, setLevelMode] = useState<MapLevelMode>('surface');
+  const [expandedBuildingId, setExpandedBuildingId] = useState('');
+  const [mapFloorLimit, setMapFloorLimit] = useState<{ buildingId: string; floor: number } | null>(null);
+  const updateExpandedBuildings = useCallback((ids: string[]) => setExpandedBuildingId(previous => {
+    if (selectedLocation && ids.includes(selectedLocation)) return selectedLocation;
+    return previous && ids.includes(previous) ? previous : ids[0] || '';
+  }), [selectedLocation]);
+  useEffect(() => setMapFloorLimit(null), [expandedBuildingId]);
   const undergroundFloor = Math.min(-3.8, ...campus.features.filter(isUndergroundFeature).map(feature => feature.height ?? -3.8));
   const entranceSelected = campus.features.some(feature => feature.id === props.selectedLocation && feature.type === 'tunnelEntrance');
+  const modePhoto = props.editPhoto || props.selectedPhoto;
+  const selectionLevel = modePhoto ? photoMapLevel(modePhoto, campus, site) : props.selectedLocation
+    ? isUndergroundLocation(campus, props.selectedLocation, props.floor) ? 'underground' : 'surface' : props.photoLevel;
   useEffect(() => {
-    const photo = props.editPhoto || props.selectedPhoto;
-    const id = photo ? photoLocationId(photo, campus) : props.selectedLocation;
-    if (!id) return;
-    if (photo ? isUndergroundPhoto(photo, campus, site) : isUndergroundLocation(campus, id, props.floor)) setLevelMode('underground');
-    else if (photo || props.selectedLocation) setLevelMode('surface');
-  }, [props.editPhoto?.id, props.editPhoto?.floor, props.selectedPhoto?.id, props.selectedPhoto?.floor, props.selectedLocation, props.floor, campus, site]);
+    if (selectionLevel) setLevelMode(selectionLevel);
+  }, [selectionLevel, props.editPhoto?.id, props.selectedPhoto?.id, props.selectedLocation, props.floor]);
   const [moving, setMoving] = useState(false);
   const [picker, setPicker] = useState<PhotoCluster | null>(null);
   const pickerTrigger = useRef<HTMLButtonElement | null>(null);
@@ -292,15 +302,23 @@ export default function MapView(props: Props) {
   const viewingPhoto = !!preview || moving;
   const undergroundView = levelMode === 'underground' && !viewingPhoto && !props.photoPreview;
   const sceneMode: MapLevelMode = undergroundView ? 'underground' : 'surface';
-  const mapPhotos = useMemo(() => photos.filter(photo => isUndergroundPhoto(photo, campus, site) === undergroundView), [photos, campus, site, undergroundView]);
-  const focusPhoto = selectedPhoto && (viewingPhoto || !!props.photoPreview || isUndergroundPhoto(selectedPhoto, campus, site) === undergroundView) ? selectedPhoto : null;
-  const locationSelection = useMemo(() => ({ selectedId: selectedLocation, onSelect: viewingPhoto ? undefined : onLocation, placing, featuresSelectable: props.featuresSelectable, selectableIds }), [selectedLocation, viewingPhoto, onLocation, placing, props.featuresSelectable, selectableIds]);
+  const levelPhotos = useMemo(() => photos.filter(photo => photoMapLevel(photo, campus, site) === levelMode), [photos, campus, site, levelMode]);
+  const browsingBuilding = useMemo(() => campus.buildings.find(building => building.id === expandedBuildingId), [campus, expandedBuildingId]);
+  const browsingInfo = useMemo(() => browsingBuilding ? buildingInfo(browsingBuilding, site) : null, [browsingBuilding, site]);
+  const browsingFloor = browsingInfo ? Math.min(browsingInfo.floors, Math.max(1, mapFloorLimit?.buildingId === expandedBuildingId ? mapFloorLimit.floor : selectedLocation === expandedBuildingId && floor && floor > 0 ? floor : browsingInfo.floors)) : 1;
+  const showFloorSlider = !!(props.floorBrowsing && browsingInfo && browsingInfo.floors > 1 && levelMode === 'surface' && !viewingPhoto && !props.photoPreview && !placing && !editPhoto);
+  const floorCut = showFloorSlider && browsingFloor < browsingInfo!.floors ? { buildingId: expandedBuildingId, floor: browsingFloor } : null;
+  const mapPhotos = useMemo(() => floorCut ? buildingPhotosThroughFloor(levelPhotos, campus, site, floorCut.buildingId, floorCut.floor) : levelPhotos, [levelPhotos, campus, site, floorCut?.buildingId, floorCut?.floor]);
+  const focusPhoto = selectedPhoto && (viewingPhoto || !!props.photoPreview || photoMapLevel(selectedPhoto, campus, site) === levelMode) ? selectedPhoto : null;
+  const labelIds = useMemo(() => props.visibleLocationLabelIds ? new Set(props.visibleLocationLabelIds) : undefined, [props.visibleLocationLabelIds]);
+  const locationSelection = useMemo(() => ({ selectedId: selectedLocation, onSelect: viewingPhoto ? undefined : onLocation, placing, featuresSelectable: props.featuresSelectable, selectableIds, labelIds }), [selectedLocation, viewingPhoto, onLocation, placing, props.featuresSelectable, selectableIds, labelIds]);
   // Selection cuts above its floor; preview restores the building throughout the camera transition.
   const cutawayFloor = props.photoPreview || viewingPhoto ? undefined : floor;
   const selectedObject = useMemo(() => mapLocationTarget(campus, site, selectedLocation, cutawayFloor), [campus, site, selectedLocation, cutawayFloor]);
   const selectedUnderground = isUndergroundLocation(campus, selectedLocation, floor);
   const focusObject = viewingPhoto || props.photoPreview || selectedUnderground === undergroundView ? selectedObject : null;
   const labelPortal = useRef<HTMLDivElement>(null!);
+  const photoPortal = useRef<HTMLDivElement>(null!);
   useEffect(() => {
     if (!props.photoPerspective) return;
     if (!preview) { props.onExitPhotoPerspective?.(); return; }
@@ -309,7 +327,7 @@ export default function MapView(props: Props) {
     return () => window.removeEventListener('keydown', escape);
   }, [props.photoPerspective, !!preview, props.onExitPhotoPerspective]);
   const ground = useMemo(() => groundSurfaces(campus), [campus]);
-  const run = (type: string) => { setPicker(null); setCommand(c => ({ type, sequence: c.sequence + 1 })); };
+  const run = (type: string) => { setPicker(null); if (type === 'reset') setMapFloorLimit(null); setCommand(c => ({ type, sequence: c.sequence + 1 })); };
   const clearLocation = () => {
     if (placing || viewingPhoto || (!selectedLocation && !selectedPhoto)) return;
     // Dismissing the map highlight must not erase an editor photo's association or a building draft.
@@ -324,7 +342,7 @@ export default function MapView(props: Props) {
     const point = photoPlacementPoint(e.ray, props.editPhoto || null, campus, site);
     if (point) onPlace(point);
   };
-  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-level-mode={sceneMode} data-season={environmentSeason || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
+  return <div ref={labelPortal} className={'map-stage' + (placing ? ' placing' : '') + (viewingPhoto ? ' photo-perspective' : '')} data-level-mode={sceneMode} data-photo-level={levelMode} data-season={environmentSeason || 'all'} data-time={environmentTime || 'all'} data-sky-time={skyTime(theme, environmentTime)} data-input={inputMode} style={{ background: mapColor('#eeeee5'), '--map-free-left': viewport.left * 100 + '%', '--map-free-right': (1 - viewport.left - viewport.width) * 100 + '%', '--map-free-top': viewport.top * 100 + '%', '--map-free-bottom': (1 - viewport.top - viewport.height) * 100 + '%' } as CSSProperties} aria-label="察哈尔路校区三维地图">
     <MapTheme.Provider value={theme}><MapSeason.Provider value={environmentSeason}><MapTime.Provider value={environmentTime}><CanvasBoundary><Canvas camera={{ position: OVERVIEW_POSITION, fov: 43, near: .5, far: 4000 }} dpr={[1, 1.75]} frameloop="demand" gl={{ antialias: true, logarithmicDepthBuffer: true }} onPointerMissed={event => { if (event.type === 'click' && event.button === 0) clearLocation(); }} fallback={<div className="map-fallback">3D 地图不可用，请使用照片目录浏览。</div>}>
       <color attach="background" args={[mapColor('#eeeee5')]} />
       <SkyEnvironment underground={undergroundView} theme={theme} season={environmentSeason} time={environmentTime} />
@@ -334,7 +352,7 @@ export default function MapView(props: Props) {
         {ground.campus.map((shape, i) => <Surface key={'campus/' + i} data={shape} color="#cfd5bd" height={.02} />)}
         {campus.features.map(feature => feature.waterfall ? <BoundaryWaterGarden key={feature.id} feature={feature} /> : feature.type === 'basketballCourts' && feature.courts ? <BasketballCourts key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'forest' && feature.outer ? <Forest key={feature.id} feature={feature} labelPortal={labelPortal} /> : feature.type === 'trees' ? <Trees key={feature.id} trees={feature.trees} planter={feature.treePlanter} /> : feature.type === 'runningTrack' && feature.track ? <SportsGround key={feature.id} feature={feature} features={campus.features} labelPortal={labelPortal} /> : feature.type === 'path' && (feature.outer || feature.points) && !feature.representedBy ? <Roads key={feature.id} feature={feature} features={campus.features} /> : ground.features.has(feature.id) ? ground.features.get(feature.id)!.map((shape, i) => <Surface key={feature.id + '/' + i} data={shape} color={feature.type === 'water' ? '#b5cbc7' : feature.type === 'sport' ? '#b2c29f' : feature.type === 'plaza' ? '#ddd8c9' : '#bdc9ac'} stableDepth={feature.type === 'water'} />) : null)}
         <Line points={campus.boundary.map(([x, z]) => [x, .2, z])} color={mapColor('#97a188')} lineWidth={1.5} />
-        {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
+        {campus.buildings.map((b, i) => <BuildingMesh key={b.id} building={b} site={site} index={i} selected={b.id === selectedLocation} floor={b.id === selectedLocation ? cutawayFloor : undefined} cutFloor={showFloorSlider && b.id === expandedBuildingId ? floorCut?.floor ?? null : undefined} placing={placing} onClick={viewingPhoto ? undefined : onLocation} labelPortal={labelPortal} bridge={b.id === GYM_ID ? campus.features.find(feature => feature.id === 'local/footbridge') : undefined} />)}
         <WestCampusTerrain features={campus.features} buildings={campus.buildings} />
         <RiverLandscape features={campus.features} buildings={campus.buildings} />
         <AvenueGarden features={campus.features} buildings={campus.buildings} />
@@ -342,17 +360,19 @@ export default function MapView(props: Props) {
         <CampusStructures features={campus.features} buildings={campus.buildings} overrides={site.buildingOverrides} underground mode={sceneMode} photoPerspective={viewingPhoto || !!props.photoPreview} labelPortal={labelPortal} />
         <MapModelLayer underground={undergroundView}><FeatureTargets campus={campus} site={site} underground={false} labelPortal={labelPortal} /></MapModelLayer>
         {undergroundView && <FeatureTargets campus={{ ...campus, features: campus.features.filter(isUndergroundFeature) }} site={site} underground labelPortal={labelPortal} />}
-        {!viewingPhoto && <PhotoMarkers occlusionRevision={[selectedLocation, cutawayFloor, sceneMode].join(':')} photos={mapPhotos} photoLikes={props.photoLikes} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} compact={compact} labelPortal={labelPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} direction={photo => <Direction photo={photo} compact labelPortal={labelPortal} />} />}
-        {!viewingPhoto && focusPhoto && !editPhoto && <Direction photo={focusPhoto} labelPortal={labelPortal} />}
+        {!viewingPhoto && <PhotoMarkers campus={campus} site={site} occlusionRevision={[selectedLocation, cutawayFloor, sceneMode, floorCut?.buildingId, floorCut?.floor].join(':')} photos={mapPhotos} expansionPhotos={levelPhotos} onExpandedBuildings={props.floorBrowsing && levelMode === 'surface' ? updateExpandedBuildings : undefined} photoLikes={props.photoLikes} selected={selectedPhoto} onSelect={selectPhoto} onPick={pickCluster} onExpand={expandCluster} minimal={props.compactPhotoMarkers} labelPortal={photoPortal} onVisiblePhotos={props.onVisiblePhotos} visibleViewport={viewport} />}
+        {!viewingPhoto && focusPhoto && !editPhoto && mapPhotos.some(photo => photo.id === focusPhoto.id) && <Direction photo={focusPhoto} labelPortal={labelPortal} />}
         {!viewingPhoto && editPhoto?.placed && <Direction photo={editPhoto} editing onHeading={props.onHeading} labelPortal={labelPortal} />}
-      </group><MapCameraRig groundHeight={levelMode === 'underground' ? undergroundFloor : 0} command={command} selectedObjectTarget={focusObject?.target} selectedObjectBounds={focusObject?.bounds} selected={focusPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto && !props.photoViewDisabled} photoHeightRange={photoHeightRange} smoothPhotoFraming={props.smoothPhotoFraming} onMoving={setMoving} onCompact={setCompact} onAzimuth={setAzimuth} onPhotoOrientation={adjustPhotoView} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>
+      </group><MapCameraRig groundHeight={levelMode === 'underground' ? undergroundFloor : 0} command={command} selectedObjectTarget={focusObject?.target} selectedObjectBounds={focusObject?.bounds} selected={focusPhoto} preview={preview} visibleViewport={props.visibleViewport} canAdjustPhotoView={!!editPhoto && !props.photoViewDisabled} photoHeightRange={photoHeightRange} smoothPhotoFraming={props.smoothPhotoFraming} onMoving={setMoving} onAzimuth={setAzimuth} onPhotoOrientation={adjustPhotoView} onSelectionOutOfView={!placing && !editPhoto && !viewingPhoto && props.onClearLocation ? clearLocation : undefined} /></Suspense></LocationSelection.Provider>
     </Canvas></CanvasBoundary></MapTime.Provider></MapSeason.Provider></MapTheme.Provider>
+    <div ref={photoPortal} className="map-photo-layer" />
+    <MapFloorSlider visible={showFloorSlider} buildingName={browsingInfo?.name || ''} floors={browsingInfo?.floors || 1} floor={browsingFloor} onChange={value => { setPicker(null); setMapFloorLimit({ buildingId: expandedBuildingId, floor: value }); }} />
     {!viewingPhoto && <div className="map-tools"><button className="icon-button" onClick={() => run('in')} aria-label="沿视线前进" title="沿视线前进"><ArrowUp size={18} /></button><button className="icon-button" onClick={() => run('out')} aria-label="沿视线后退" title="沿视线后退"><ArrowDown size={18} /></button><span /><button className="icon-button" onClick={() => run('reset')} aria-label="回到校园全景" title="校园全景"><Crosshair size={18} /></button></div>}
-    {!viewingPhoto && !props.photoPreview && <MapLevelSwitch mode={levelMode} onChange={mode => { setPicker(null); setLevelMode(mode); }} />}
+    {!viewingPhoto && !props.photoPreview && <MapLevelSwitch mode={levelMode} onChange={mode => { setPicker(null); setMapFloorLimit(null); setExpandedBuildingId(''); setLevelMode(mode); }} />}
     {!viewingPhoto && <div className="map-caption"><span className="north-mark"><svg viewBox="0 0 20 24" width="16" height="19" aria-hidden="true" style={{ transform: 'rotate(' + azimuth + 'deg)' }}><path d="M10 2 17 20 10 16 3 20Z" fill="currentColor" /></svg><b>N</b></span><span>察哈尔路校区<small>建筑高度为示意</small></span></div>}
     {/* The map is isolated below viewer cards; place the chooser alongside them so the catalog cannot cover it. */}
-    {labelPortal.current && createPortal(<PhotoClusterPicker photos={!viewingPhoto && picker ? picker.photos : null} photoLikes={props.photoLikes} campus={campus} site={site} onSelect={photo => { setPicker(null); selectPhoto(photo); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
+    {labelPortal.current && createPortal(<PhotoClusterPicker photos={!viewingPhoto && picker ? picker.photos : null} filterable={props.compactPhotoMarkers} photoLikes={props.photoLikes} campus={campus} site={site} onSelect={(photo, group) => { setPicker(null); selectPhoto(photo, group || picker?.photos); }} onClose={closePicker} />, labelPortal.current.closest('.viewer-main') || labelPortal.current)}
     {preview && <PhotoOverlay key={preview.id + ':' + (props.photoDepthSource || preview.depthUpdatedAt || '')} photo={preview} viewport={viewport} imageSource={props.photoImageSource} depthSource={props.photoDepthSource} theme={theme} mode={props.photoOverlayMode || 'off'} cameraReady={!moving} onEntered={props.onPhotoOverlayEntered} onExited={props.onPhotoOverlayExited} />}
-    {!viewingPhoto && <div className="map-bottom"><span className="map-help">{placing && entranceSelected && editPhoto && !isAerialPhoto(editPhoto) ? '点击入口台阶，标记楼梯上的拍摄位置' : mapInteractionHelp(inputMode, placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>}
+    {!viewingPhoto && <div className="map-bottom"><span className="map-help">{placing && entranceSelected && editPhoto && !isAerialPhoto(editPhoto) ? '点击入口台阶，标记楼梯上的拍摄位置' : (props.compactPhotoMarkers ? '靠近展开 · 点照片查看 · ' : '') + mapInteractionHelp(inputMode, placing ? 'placing' : 'map')}</span><a href={campus.source.licenseUrl} target="_blank" rel="noreferrer">© OpenStreetMap contributors</a></div>}
   </div>;
 }

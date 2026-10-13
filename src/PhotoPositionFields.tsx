@@ -37,6 +37,6 @@ export default function PhotoPositionFields({ photo, campus, site, onChange }: {
       }} /></label>
       <p className="field-help">↑/↓ 微调高度，范围 {cameraRange.min}–{Number(cameraRange.max.toFixed(2))} 米；不会跨越当前楼层。</p>
     </>}
-    <p className="field-help">可从列表选择地点，也可点击地图上的名称。</p>
+    {!aerial && <p className="field-help">可从列表选择地点，也可点击地图上的名称。</p>}
   </>;
 }

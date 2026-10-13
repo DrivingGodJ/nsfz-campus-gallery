@@ -78,6 +78,7 @@ export function bindMapTravelControls(canvas: HTMLCanvasElement, options: {
   };
   const surface = canvas.closest?.('.map-stage') || canvas;
   const wheel = (event: WheelEvent) => {
+    if ((event.target as Element)?.closest?.('.map-floor-slider')) return;
     // Keep normal scrolling inside the photo menu; trackpad pinch anywhere
     // over the map belongs to the map, even in a fixed photo perspective.
     if (event.ctrlKey) event.preventDefault();

@@ -8,6 +8,9 @@ const declaredMaterialProps = (material: THREE.Material) => (material as THREE.M
 // Fade the complete model, including windows, rails and floor outlines. Keep
 // each renderer's live opacity so returning to the surface restores its view.
 export function ghostSurfaceModel(root: THREE.Object3D) {
+  const originalOccluder = root.userData.markerOccluder;
+  const hadOccluder = Object.hasOwn(root.userData, 'markerOccluder');
+  root.userData.markerOccluder = false;
   const materials = new Map<THREE.Material, { transparent: boolean; depthWrite: boolean; props?: MaterialProps }>();
   const restores: (() => void)[] = [];
   root.traverse(object => {
@@ -33,6 +36,8 @@ export function ghostSurfaceModel(root: THREE.Object3D) {
     restores.push(() => { object.onBeforeRender = before; object.onAfterRender = after; object.raycast = raycast; });
   });
   return () => {
+    if (hadOccluder) root.userData.markerOccluder = originalOccluder;
+    else delete root.userData.markerOccluder;
     restores.forEach(restore => restore());
     for (const [material, original] of materials) {
       // Child props commit before this parent's layout cleanup. Restore their

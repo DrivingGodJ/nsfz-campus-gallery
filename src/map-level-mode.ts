@@ -1,6 +1,12 @@
 import type { Campus, Feature, Photo, Site } from './types';
 import { isAerialPhoto, photoLocationId, photoMapHeight } from './locations.ts';
 
+export type MapLevelMode = 'aerial' | 'surface' | 'underground';
+
+export function photoMapLevel(photo: Photo, campus: Campus, site: Site): MapLevelMode {
+  return isAerialPhoto(photo) ? 'aerial' : isUndergroundPhoto(photo, campus, site) ? 'underground' : 'surface';
+}
+
 export function isUndergroundFeature(feature?: Feature) {
   return !!feature && ['undergroundRoom', 'undergroundCorridor', 'tunnel', 'tunnelJunction', 'undergroundTrack'].includes(feature.type);
 }

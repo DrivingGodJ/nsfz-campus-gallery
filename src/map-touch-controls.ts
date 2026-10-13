@@ -13,7 +13,8 @@ export function bindMapTouchControls(canvas: HTMLCanvasElement, options: {
   let multi = false, locked = false, suppressClick = false;
   let labelDrag: { id: number; x: number; y: number; dragged: boolean } | null = null;
   let previous: { distance: number; x: number; y: number } | null = null;
-  const onMap = (target: EventTarget | null) => target === canvas || !!(target && surface.contains?.(target as Node));
+  const onSlider = (target: EventTarget | null) => !!(target as Element)?.closest?.('.map-floor-slider');
+  const onMap = (target: EventTarget | null) => !onSlider(target) && (target === canvas || !!(target && surface.contains?.(target as Node)));
   const mapContact = () => [...touches.values()].some(touch => touch.onMap);
   const pair = () => {
     if (touches.size !== 2) return null;
@@ -27,7 +28,7 @@ export function bindMapTouchControls(canvas: HTMLCanvasElement, options: {
   const consume = (event: Event) => { event.preventDefault(); event.stopPropagation(); };
   const down = (event: PointerEvent) => {
     if (!touches.size) suppressClick = false;
-    if (event.pointerType !== 'touch') return;
+    if (event.pointerType !== 'touch' || onSlider(event.target)) return;
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY, onMap: onMap(event.target) });
     if (touches.size >= 2 && mapContact()) {
       if (!multi) { multi = true; suppressClick = true; labelDrag = null; options.single.finish(); }
@@ -91,7 +92,8 @@ export function bindMapTouchControls(canvas: HTMLCanvasElement, options: {
   };
   const click = (event: MouseEvent) => { if (suppressClick && event.detail > 0) { consume(event); event.stopImmediatePropagation(); } };
   const nativeTouch = (event: TouchEvent) => {
-    if (multi || event.touches.length >= 2 && [...event.touches].some(touch => onMap(touch.target))) event.preventDefault();
+    const contacts = [...event.touches].filter(touch => !onSlider(touch.target));
+    if (multi || contacts.length >= 2 && contacts.some(touch => onMap(touch.target))) event.preventDefault();
   };
   const nativeGesture = (event: Event) => { if (multi || mapContact() || onMap(event.target)) event.preventDefault(); };
   const capture = { capture: true, passive: false };

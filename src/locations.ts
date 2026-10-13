@@ -4,6 +4,8 @@ import { groundElevationAt } from './sports-ground-geometry.ts';
 import { dormitoryObservatory } from './facade-geometry.ts';
 import { undergroundFloorElevation, undergroundCeilingSections } from './underground-geometry.ts';
 import type { Building, Campus, Feature, Photo, Site } from './types';
+import { isAerialPhoto, withoutAerialLocation } from '../server/photo-capture.mjs';
+export { isAerialPhoto, withoutAerialLocation } from '../server/photo-capture.mjs';
 
 export type CampusLocation = { id: string; name: string; kind: 'building' | 'feature'; surfaceHeight: number; levelText: string; building?: Building; feature?: Feature };
 
@@ -46,9 +48,7 @@ export function resolveLocationId(id: string, campus?: Campus) {
 }
 
 // Resolve legacy building aliases without changing the horizontal shooting position.
-export const photoLocationId = (photo: Pick<Photo, 'locationId' | 'buildingId'>, campus?: Campus) => resolveLocationId(photo.locationId ?? photo.buildingId ?? '', campus);
-
-export const isAerialPhoto = (photo: Photo) => photo.captureType === 'aerial' || (photo.captureType === undefined && !!photo.metadata?.aerial);
+export const photoLocationId = (photo: Pick<Photo, 'locationId' | 'buildingId' | 'captureType' | 'metadata'>, campus?: Campus) => isAerialPhoto(photo) ? '' : resolveLocationId(photo.locationId ?? photo.buildingId ?? '', campus);
 // A directory filter, never a destination offered during photo annotation.
 export const AERIAL_LOCATION_FILTER = 'capture/aerial';
 export const altitudeLabel = (photo: Photo) => photo.altitude?.reference === 'seaLevel' ? '拍摄海拔' : '航拍高度（相对起飞点）';
@@ -113,6 +113,7 @@ export function aerialImportText(photo: Photo) {
 }
 
 export function assignPhotoLocation(photo: Photo, id: string, campus: Campus, site: Site): Photo {
+  if (isAerialPhoto(photo)) return withoutAerialLocation(photo);
   id = resolveLocationId(id, campus);
   const location = campusLocations(campus, site).find(item => item.id === id);
   if (id && !location) throw new Error('找不到所选拍摄地点，请重新选择。');
@@ -128,7 +129,7 @@ export function photosAtLocation(photos: Photo[], id: string, floor = 0, campus?
 
 export function photoLocationText(photo: Photo, campus: Campus, site: Site) {
   const location = campusLocations(campus, site).find(item => item.id === photoLocationId(photo, campus));
-  if (isAerialPhoto(photo)) return (location?.name || '校园') + ' · 航拍';
+  if (isAerialPhoto(photo)) return '校园 · 航拍';
   if (location?.building) return location.name + ' · ' + buildingFloorLabel(buildingLevels(location.building, site.buildingOverrides[location.id]), photo.floor);
   if (location) return location.name;
   return '校园室外';

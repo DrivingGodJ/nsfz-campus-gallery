@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowUpRight, Building2, Check, Columns2, Crosshair, ImagePl
 import { Brand, EmptyPhotos, Notice, PhotoMetadataView } from './components';
 import { asset, buildingInfo, type BuildingOverride, type EditorState, type Photo } from './types';
 import { buildingFloorText } from './building-model';
-import { assignPhotoLocation, campusFilterLocations, photoLocationId, isAerialPhoto } from './locations';
+import { assignPhotoLocation, campusFilterLocations, photoLocationId, isAerialPhoto, withoutAerialLocation } from './locations';
 import PhotoCalibrationFields from './PhotoCalibrationFields';
 import { PhotoHalfOverlayButton, PhotoPerspectiveButton } from './PhotoPerspective';
 import PhotoComparison from './PhotoComparison';
@@ -81,7 +81,7 @@ function Editor() {
     setPreviewing(false); setComparing(false);
     let cached: Photo | null = null;
     try { cached = JSON.parse(localStorage.getItem('nsfz:edit:' + p.id) || 'null'); } catch {}
-    setPhoto(cached ? { ...p, ...cached, id: p.id, files: p.files, depthUpdatedAt: p.depthUpdatedAt } : p); setDirty(!!cached); setPlacing(!p.placed); setReviewID(''); setMode('photos'); setError(''); setMessage('');
+    setPhoto(withoutAerialLocation(cached ? { ...p, ...cached, id: p.id, files: p.files, depthUpdatedAt: p.depthUpdatedAt } : p)); setDirty(!!cached); setPlacing(!p.placed); setReviewID(''); setMode('photos'); setError(''); setMessage('');
   }, []);
   useEffect(() => { if (initial.current) return; initial.current = true; refresh().then(next => { const first = next.drafts[0] || next.site.photos[0]; if (first) selectPhoto(first); if (location.hash === '#review') setMode('reviews'); }).catch(e => setError(e.message)); }, [selectPhoto]);
   useEffect(() => {
@@ -91,7 +91,7 @@ function Editor() {
   }, [dirty]);
   const change = (update: Partial<Photo>) => {
     if (!photo || busy) return;
-    const next = { ...photo, ...update };
+    const next = withoutAerialLocation({ ...photo, ...update });
     setPhoto(next); setDirty(true);
     try { localStorage.setItem('nsfz:edit:' + next.id, JSON.stringify(next)); }
     catch { setError('浏览器暂存空间不足，请及时保存到内容库。当前编辑内容仍在页面中。'); }
@@ -181,7 +181,7 @@ function Editor() {
     catch (e) { setError((e as Error).message); } finally { setBusy(''); }
   };
   const selectAssociation = (id: string) => {
-    if (!photo || !state || busy || (id && !selectableLocationIds.includes(id)) || photoLocationId(photo, state.map) === id) return;
+    if (!photo || isAerialPhoto(photo) || !state || busy || (id && !selectableLocationIds.includes(id)) || photoLocationId(photo, state.map) === id) return;
     change(assignPhotoLocation(photo, id, state.map, state.site));
   };
   const importReview = async (row: Submission) => {

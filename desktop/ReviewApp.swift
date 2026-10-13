@@ -207,7 +207,27 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     @objc func openPublication() { webView.evaluateJavaScript("window.dispatchEvent(new Event('review-app-publish'))") }
     @objc func revealRoot() { NSWorkspace.shared.open(URL(fileURLWithPath: root)) }
     @objc func openWebsite() { NSWorkspace.shared.open(URL(string: "https://drivinggodj.github.io/nsfz-campus-gallery/")!) }
-    @objc func reload() { if service?.isRunning == true { webView.reload() } else { startService() } }
+    @objc func reload() {
+        guard !quitting else { return }
+        guard service?.isRunning == true, let url = serviceURL else { startService(); return }
+        // A blank or terminated page cannot recover by reloading that same view.
+        // The default data store retains locally cached photo edits across views.
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(self, name: "reviewApp")
+        webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = self
+        webView.uiDelegate = self
+        window.contentView = webView
+        webView.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+    }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        guard webView === self.webView else { return }
+        reload()
+    }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        guard webView === self.webView, !quitting, (error as NSError).code != NSURLErrorCancelled else { return }
+        showStartup("页面未能打开", detail: error.localizedDescription + "\n\n点击重试重新连接本地编辑器。", failed: true)
+    }
     @objc func about() { let alert = NSAlert(); alert.messageText = "附中影像审核"; alert.informativeText = "导入照片和投稿包，核对位置与视角，再发布到附中影像网站。\n原片和待审核草稿保留在本地内容库。"; alert.runModal() }
     @objc func chooseRoot() {
         guard !publishing else { return }
@@ -224,7 +244,7 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         if type == "publishing" { publishing = value["value"] as? Bool ?? false }
         else if type == "unsaved" { unsaved = value["value"] as? Bool ?? false }
         else if type == "chooseRoot" { chooseRoot() }
-        else if type == "retry" { startService() }
+        else if type == "retry" { reload() }
     }
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
         let panel = NSOpenPanel(); panel.title = "导入自己的照片或投稿审核包"; panel.prompt = "导入"; panel.canChooseDirectories = false; panel.allowsMultipleSelection = parameters.allowsMultipleSelection

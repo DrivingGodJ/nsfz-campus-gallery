@@ -1,5 +1,6 @@
 import { readServiceResponse } from '../server/service-response.mjs';
 import type { Photo } from './types';
+import { isAerialPhoto, withoutAerialLocation } from '../server/photo-capture.mjs';
 export type UploadSession={id:string;receipt:string;expiresAt?:number;uploaded?:boolean;signature?:string;filename?:string};
 export function newSubmissionSession():UploadSession {
   const bytes=crypto.getRandomValues(new Uint8Array(32));
@@ -7,7 +8,7 @@ export function newSubmissionSession():UploadSession {
 }
 export function photoAnnotation(p:Photo) {
   const {title,description,capturedAt,locationId,buildingId,floor,captureType,altitude,cameraHeight,position,heading,pitch,placed,author,copyright,view}=p;
-  return {title,description,capturedAt,locationId,buildingId,floor,captureType,altitude,cameraHeight,position:{x:position.x,z:position.z},heading,pitch,placed,author,copyright,view};
+  return withoutAerialLocation({title,description,capturedAt,locationId,buildingId,floor,captureType:isAerialPhoto(p)?'aerial':captureType,altitude,cameraHeight,position:{x:position.x,z:position.z},heading,pitch,placed,author,copyright,view});
 }
 export function createSubmissionsClient(baseURL:string,transport:typeof fetch=fetch) {
   const base=baseURL.replace(/\/+$/,'');

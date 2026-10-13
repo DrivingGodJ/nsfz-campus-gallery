@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { AwsClient } from 'aws4fetch';
 import { validCaptureTime } from '../../server/capture-time.mjs';
 import { serviceFailure } from './service-errors.mjs';
+import { withoutAerialLocation } from '../../server/photo-capture.mjs';
 
 export const MAX_PHOTO_BYTES = 40 * 1024 * 1024;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -21,11 +22,11 @@ export function validateAnnotation(input, campus) {
   const p = /** @type {Record<string, any>} */ (input);
   const title = text(p.title, 160, '标题');
   if (!title || p.placed !== true) throw new SubmissionError('请填写标题并标记拍摄位置。');
-  const locationId = text(p.locationId ?? p.buildingId ?? '', 80, '地点');
-  if (locationId && !campus.locationIds.includes(locationId)) throw new SubmissionError('请选择主要建筑、校园区域或通道。');
-  const buildingId = campus.buildingIds.includes(locationId) ? locationId : '';
   const captureType = p.captureType;
   if (!['ground','aerial'].includes(captureType)) throw new SubmissionError('拍摄方式无效。');
+  const locationId = captureType === 'aerial' ? '' : text(p.locationId ?? p.buildingId ?? '', 80, '地点');
+  if (locationId && !campus.locationIds.includes(locationId)) throw new SubmissionError('请选择主要建筑、校园区域或通道。');
+  const buildingId = campus.buildingIds.includes(locationId) ? locationId : '';
   if (!Number.isInteger(p.floor) || (captureType === 'ground' && buildingId ? p.floor > 50 || p.floor < 1 && !(p.floor === -1 && campus.basementBuildingIds?.includes(buildingId)) : p.floor !== 0)) throw new SubmissionError('楼层无效。');
   if (p.cameraHeight !== undefined && (!Number.isFinite(p.cameraHeight) || p.cameraHeight < .1 || p.cameraHeight > 11.9)) throw new SubmissionError('拍摄高度需在 0.1 到 11.9 米之间。');
   const x = p.position?.x, z = p.position?.z;
@@ -49,9 +50,9 @@ export function validateAnnotation(input, campus) {
     if (!Number.isFinite(p.view.cropFactor) || p.view.cropFactor < .5 || p.view.cropFactor > 5) throw new SubmissionError('画幅无效。');
     view.cropFactor = p.view.cropFactor;
   }
-  return { title, description: text(p.description || '', 10000, '描述'), capturedAt, locationId, buildingId, floor: p.floor,
+  return withoutAerialLocation({ title, description: text(p.description || '', 10000, '描述'), capturedAt, locationId, buildingId, floor: p.floor,
     captureType, ...(altitude ? { altitude } : {}), ...(p.cameraHeight !== undefined ? { cameraHeight: p.cameraHeight } : {}), position: { x, z }, heading: p.heading % 360, pitch: p.pitch, placed: true,
-    author: text(p.author || '', 200, '作者'), copyright: text(p.copyright || '', 3000, '版权'), view };
+    author: text(p.author || '', 200, '作者'), copyright: text(p.copyright || '', 3000, '版权'), view });
 }
 /** @param {string} value */
 export async function hashReceipt(value) {

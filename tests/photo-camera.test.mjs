@@ -507,10 +507,33 @@ test('photo details, lightbox and draft preview expose enter/return actions, exp
     assert.ok(comparison.indexOf('comparison-overlay-actions') > comparison.indexOf('comparison-image'), 'controls follow the photo rather than covering it');
     assert.match(comparison, /沉浸式看照片中可下载原图/);
     assert.doesNotMatch(comparison, /全屏照片/);
+    const information = React.createElement('p', null, '照片资料');
+    const defaultLayout = render(PhotoComparison, { photo, information, children: 'model' });
+    assert.ok(defaultLayout.indexOf('comparison-information') < defaultLayout.indexOf('comparison-image'), 'Editor and submission keep information before the image');
+    const viewerLayout = render(PhotoComparison, { photo, heading: React.createElement('strong', null, '主教学楼 · 2026.10.13'), information, informationAfterImage: true, actions: '浏览操作', children: 'model' });
+    assert.match(viewerLayout, /主教学楼 · 2026\.10\.13/);
+    assert.ok(viewerLayout.indexOf('comparison-information') > viewerLayout.indexOf('comparison-actions'), 'Viewer information follows the photo and its main actions');
     const withCanvas = render(PhotoPerspectiveOverlay, { photo: renditions, children: React.createElement('canvas', { className: 'depth-transition-layer' }) });
     assert.match(withCanvas, /photo-perspective-frame/); assert.match(withCanvas, /depth-transition-layer/);
     assert.doesNotMatch(render(PhotoPerspectiveButton, { photo, active: false, onClick() {} }), /拖动|环顾/);
   } finally { await environment.close(); }
+});
+
+test('viewer card layout identifies the real screen width before content mounts', async () => {
+  const environment = await testServer(), previousWindow = globalThis.window;
+  try {
+    const { useViewerCards } = await environment.server.ssrLoadModule('/src/useViewerCards.ts');
+    for (const width of [320, 760, 761, 1440]) {
+      globalThis.window = { innerWidth: width };
+      let cards;
+      const Harness = () => { cards = useViewerCards(false, false, false); return null; };
+      renderToStaticMarkup(React.createElement(Harness));
+      assert.equal(cards.mobile, width <= 760);
+      assert.equal(cards.gallery.sizing.initial, width <= 760 ? 72 : 100);
+      assert.equal(cards.photo.sizing.initial, width <= 760 ? 62 : 100);
+      assert.equal(cards.photo.style.bottom, width <= 760 ? 68 : 12);
+    }
+  } finally { globalThis.window = previousWindow; await environment.close(); }
 });
 
 test('real camera rig suspends orbit controls during photo transitions, responds to unsaved settings and restores map controls', async () => {

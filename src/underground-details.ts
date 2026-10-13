@@ -6,6 +6,7 @@ import { undergroundWallPanels } from './underground-mesh.ts';
 import { undergroundRailGeometry } from './underground-rail-geometry.ts';
 import { pointOnStairTread } from './structure-geometry.ts';
 import { confirmedFacade } from './teaching-classrooms.ts';
+import { insideShape } from './terrain-height.ts';
 import type { Feature, Point, Shape } from './types';
 
 type Kind = 'floor' | 'walls' | 'podium' | 'tiles' | 'metal' | 'rails' | 'lights' | 'pipes' | 'glass' | 'skylights' | 'green' | 'wood' | 'paint' | 'nets' | 'ceiling' | 'fittings';
@@ -38,6 +39,8 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     ? feature.outer.slice(1).map((to, i) => ({ from: feature.outer![i], to })) : null;
   const sections = undergroundCeilingSections(feature, footprints, openings, connections);
   const stairs = undergroundEntranceStairs(feature);
+  const ceilingOpenings = feature.ceilingOpenings || [];
+  const openRoofAt = (point: Point) => ceilingOpenings.some(shape => insideShape(point, shape));
   const rise = undergroundRiseStair(feature);
   const floorAt = (p: Point) => undergroundFloorElevation(feature, p);
   const walkingSegments = (from: Point, to: Point) => {
@@ -58,7 +61,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
   const heightAt = (p: Point) => sectionAt(p)?.height ?? clear;
   const roofSegments = (from: Point, to: Point) => {
     const dx = to[0] - from[0], dz = to[1] - from[1], cuts = [0, 1];
-    for (const section of sections) for (const shape of section.footprints) for (const ring of [shape.outer, ...shape.holes]) for (let i = 1; i < ring.length; i++) {
+    for (const shape of [...sections.flatMap(section => section.footprints), ...ceilingOpenings]) for (const ring of [shape.outer, ...shape.holes]) for (let i = 1; i < ring.length; i++) {
       const a = ring[i - 1], b = ring[i], ex = b[0] - a[0], ez = b[1] - a[1], cross = dx * ez - dz * ex;
       if (Math.abs(cross) < 1e-8) continue;
       const x = a[0] - from[0], z = a[1] - from[1], t = (x * ez - z * ex) / cross, u = (x * dz - z * dx) / cross;
@@ -70,8 +73,8 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     // Keep only the pieces under this passage's actual roof, never a fallback
     // low beam or pipe hanging in the adjoining raised landing.
     return ordered.slice(1).flatMap((end, i) => {
-      const section = sectionAt(at((ordered[i] + end) / 2));
-      return section ? [{ from: at(ordered[i]), to: at(end), height: section.height }] : [];
+      const middle = at((ordered[i] + end) / 2), section = sectionAt(middle);
+      return section && !openRoofAt(middle) ? [{ from: at(ordered[i]), to: at(end), height: section.height }] : [];
     });
   };
   const point = ([x, z]: Point, height: number): Vector => [x, height, z];
@@ -98,7 +101,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
   };
   for (const shape of footprints) {
     const platform = rise ? passageFootprint([rise.to, rise.at(rise.length + 20)], feature.width || rise.width) : null;
-    const cuts = [...stairs.map(stair => [stair.footprint.outer]), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
+    const cuts = [...stairs.map(stair => [stair.footprint.outer]), ...stairs.flatMap(stair => stair.landing ? [[stair.landing.footprint.outer]] : []), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
     const floors = cuts.length ? polygonClipping.difference([shape.outer, ...shape.holes], ...cuts) : [[shape.outer, ...shape.holes]];
     for (const [outer, ...holes] of floors) flat({ outer, holes }, floor + .045, feature.type === 'undergroundRoom' && feature.roomUse !== 'garage' ? 'green' : 'floor');
     if (platform) for (const [outer, ...holes] of polygonClipping.intersection([shape.outer, ...shape.holes], [platform.outer]))
@@ -154,6 +157,10 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
   }
   for (const stair of stairs) {
     for (const tread of stair.treads) segment(tread.from, tread.to, floor, tread.height - floor, stair.width, 'floor');
+    if (stair.landing) {
+      flat(stair.landing.footprint, stair.bottomHeight - .12, 'floor', .12);
+      parts.rails.push(undergroundRailGeometry(stair.landing.railEdges.map(edge => edge.map(p => point(p, stair.bottomHeight))), 1.045));
+    }
     for (const side of [-1, 1]) {
       const offset = side * (stair.width / 2 - .09);
       parts.rails.push(undergroundRailGeometry([[0, stair.length].map(distance => point(stair.at(distance, offset),
@@ -184,7 +191,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       for (const piece of roofSegments(at(distance, -width / 2 + .12), at(distance, width / 2 - .12)))
         segment(piece.from, piece.to, floor + piece.height - .34, .28, .18, 'metal');
       const light = at(distance, lightwell ? width / 4 : 0);
-      box(light, floor + heightAt(light) - .45, .06, lightwell ? 1.2 : .95, .32, -Math.atan2(dz, dx), 'lights');
+      if (!openRoofAt(light)) box(light, floor + heightAt(light) - .45, .06, lightwell ? 1.2 : .95, .32, -Math.atan2(dz, dx), 'lights');
       for (const side of [-1, 1]) {
         const wallLight = at(distance, side * (width / 2 - .17));
         box(wallLight, floorAt(wallLight) + 1.85, .22, .22, .08, -Math.atan2(dz, dx), 'lights');
@@ -235,10 +242,11 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       flat({ outer, holes }, floor + section.height - .05, 'skylights', .045);
   if (feature.type !== 'undergroundRoom' || feature.roomUse === 'garage') {
     // The full enclosure includes merged return passages and corner seams;
-    // only the photographed skylight footprint cuts through its opaque roof.
+    // Skylights and the real folded stairwell cut through the opaque roof.
     for (const section of sections) {
       const polygons = section.footprints.map(shape => [shape.outer, ...shape.holes]);
-      const roofs = roofOpenings.length ? polygonClipping.difference(polygons, ...roofOpenings.map(shape => [shape.outer])) : polygons;
+      const cuts = [...roofOpenings, ...ceilingOpenings];
+      const roofs = cuts.length ? polygonClipping.difference(polygons, ...cuts.map(shape => [shape.outer, ...shape.holes])) : polygons;
       for (const [outer, ...holes] of roofs) flat({ outer, holes }, floor + section.height - .12, 'ceiling', .08);
     }
   }

@@ -77,17 +77,26 @@ export function standsStairLayout(building: Building) {
     footprint: { outer: [...ring, ring[0]], holes: [] } as Shape };
 }
 
-// The lower stand landing turns into a return flight beside the first stair.
-// It lands on the existing badminton approach corridor, not inside a court.
+// Descend half a level, turn on a landing, then return beside the first run.
+// Both runs remain inside the existing badminton approach corridor.
 export function standsBasementStairLayout(building: Building, floor = -3.8) {
-  const upper = standsStairLayout(building), head = upper.u1 + .2, lowerEnd = head - 6.2;
+  const upper = standsStairLayout(building), head = upper.u1 + .2, middle = head - 3.1, turnEnd = middle - 1.6;
   const width = 1.5, center = upper.width - 4, v0 = center - width / 2;
   const ring = [upper.at(head, v0), upper.at(upper.end - .2, v0), upper.at(upper.end - .2, upper.v0 + .02), upper.at(head, upper.v0 + .02)];
   const landing = { outer: [...ring, ring[0]], holes: [] } as Shape;
   const [outer, ...holes] = polygonClipping.union([upper.footprint.outer], [landing.outer])[0];
-  const stair: PassageStair = { from: upper.at(head, center), to: upper.at(lowerEnd, center), width, steps: 22,
-    topHeight: BASE, bottomHeight: floor + .045, doorHeight: 2.35 };
-  return { stair, head, lowerEnd, v0, landing, roofFootprint: { outer, holes } as Shape,
+  const returnCenter = center + width + .2, midHeight = (BASE + floor + .045) / 2;
+  const turnRing = [upper.at(middle, v0), upper.at(turnEnd, v0), upper.at(turnEnd, returnCenter + width / 2), upper.at(middle, returnCenter + width / 2)];
+  const turn: Shape = { outer: [...turnRing, turnRing[0]], holes: [] };
+  const stairs: PassageStair[] = [{ from: upper.at(head, center), to: upper.at(middle, center), width, steps: 11,
+    topHeight: BASE, bottomHeight: midHeight, doorHeight: 2.35,
+    landing: { footprint: turn, railEdges: [[turnRing[0], turnRing[1], turnRing[2], turnRing[3]]] } },
+    { from: upper.at(middle, returnCenter), to: upper.at(head, returnCenter), width, steps: 11,
+      topHeight: midHeight, bottomHeight: floor + .045, doorHeight: 2.35 }];
+  const returnRing = [upper.at(middle, returnCenter - width / 2), upper.at(head, returnCenter - width / 2), upper.at(head, returnCenter + width / 2), upper.at(middle, returnCenter + width / 2)];
+  const [voidOuter, ...voidHoles] = polygonClipping.union([turn.outer], [[...returnRing, returnRing[0]]])[0];
+  return { stairs, head, middle, turnEnd, v0, center, returnCenter, midHeight, landing, turn,
+    ceilingOpening: { outer: voidOuter, holes: voidHoles } as Shape, roofFootprint: { outer, holes } as Shape,
     landingRoofHeight: BASE - .08 - floor };
 }
 
@@ -152,7 +161,9 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     geometry.translate(0, 0, bottom); bodyParts.push(geometry);
   };
   const doorStart = stair.u1 + .2, doorEnd = stair.end - .2;
-  prism(stair.u0, doorStart, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
+  prism(stair.u0, basement.turnEnd, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
+  prism(basement.turnEnd, basement.middle, stair.v0 - .2, stair.v0, .4 - (building.baseElevation ?? 2.6), .2);
+  prism(basement.middle, doorStart, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
   prism(doorEnd, stair.end, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
   prism(doorStart, doorEnd, stair.v0 - .2, stair.v0, stair.bottom - .12, stair.bottom);
   prism(doorStart, doorEnd, stair.v0 - .2, stair.v0, stair.bottom + 2.35, .2);

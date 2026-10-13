@@ -153,6 +153,22 @@ test('submission destination manifest exactly matches upload/filter major places
  assert.throws(()=>validateAnnotation({title:'x',placed:true,captureType:'aerial',floor:0,position:{x:0,z:0},heading:0,pitch:0,capturedAt:'',locationId:''},manifest),/航拍高度/);
 });
 
+test('aerial submission annotations discard legacy place fields at both client and server boundaries',()=>{
+ const campus={locationIds:['building'],buildingIds:['building'],bounds:[-100,100,-100,100]};
+ const photo={title:'航拍',placed:true,captureType:'aerial',floor:0,position:{x:12,z:23},heading:132,pitch:-44,capturedAt:'',
+  altitude:{meters:80,reference:'takeoff'},locationId:'old-place',buildingId:'other-place'};
+ const before=structuredClone(photo);
+ for(const annotation of [photoAnnotation(photo),validateAnnotation(photo,campus)]) {
+  assert.equal(Object.hasOwn(annotation,'locationId'),false);assert.equal(Object.hasOwn(annotation,'buildingId'),false);
+  assert.deepEqual(annotation.position,photo.position);assert.deepEqual(annotation.altitude,photo.altitude);
+  assert.equal(annotation.heading,photo.heading);assert.equal(annotation.pitch,photo.pitch);
+ }
+ assert.deepEqual(photo,before);
+ assert.throws(()=>validateAnnotation({...photo,captureType:'ground'},campus),/主要建筑/);
+ const ordinary=validateAnnotation({...photo,captureType:'ground',locationId:'building',buildingId:'building',floor:2},campus);
+ assert.equal(ordinary.locationId,'building');assert.equal(ordinary.buildingId,'building');
+});
+
 test('submission requests persist the declared laboratory garage floor and reject unsupported basements before reserving storage',async()=>{
  const f=await fixture();try{
   const laboratory='way/855459411';f.campus.basementBuildingIds=[laboratory];

@@ -1,5 +1,5 @@
 import { headingText, type Campus, type Photo, type Site } from './types';
-import { campusFilterLocations, photoLocationId } from './locations';
+import { campusFilterLocations, photoLocationId, isAerialPhoto } from './locations';
 import { photoFieldOfView, viewSourceText } from './photo-view';
 import LocationOptions from './LocationOptions';
 import PhotoPositionFields from './PhotoPositionFields';
@@ -15,11 +15,11 @@ export default function PhotoCalibrationFields({ photo, campus, site, previewing
   return <section className="photo-calibration-fields" aria-label="照片视角参数">
     <div className="form-divider">拍摄位置与镜头</div>
     {previewing && <p className="field-help">参数修改会立即更新当前视角，也可以直接拖动模型调整朝向和仰俯角。</p>}
-    <label>拍摄地点<select aria-label="拍摄地点" value={locationAllowed ? locationId : 'legacy-location'} onChange={e => onLocation(e.target.value)}>
+    {!isAerialPhoto(photo) && <><label>拍摄地点<select aria-label="拍摄地点" value={locationAllowed ? locationId : 'legacy-location'} onChange={e => onLocation(e.target.value)}>
       {!locationAllowed && <option value="legacy-location" disabled>请重新选择地点</option>}
       <option value="">校园室外（未指定地点）</option><LocationOptions campus={campus} site={site} />
     </select></label>
-    {!locationAllowed && <p className="field-help" role="status">原来标注的小地点已停止使用，请选择主要建筑、校园区域或通道后保存。</p>}
+    {!locationAllowed && <p className="field-help" role="status">原来标注的小地点已停止使用，请选择主要建筑、校园区域或通道后保存。</p>}</>}
     <PhotoPositionFields photo={photo} campus={campus} site={site} onChange={onChange} />
     <div className="field-pair">
       <label>东西位置 / m<PhotoNumberInput name="positionX" step={.1} value={photo.position.x} onValue={value => {

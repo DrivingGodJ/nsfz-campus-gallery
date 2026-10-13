@@ -8,6 +8,7 @@ import { resolveLocationId } from './campus-corrections.mjs';
 import { automaticPhotoPlacement } from './photo-geolocation.mjs';
 import { createPhotoPreview, createPhotoDisplay, createPhotoDownload, PHOTO_DOWNLOAD_MAX_BYTES } from './photo-preview.mjs';
 import { PHOTO_DEPTH_FILE, normalizePhotoDepth } from './photo-depth.mjs';
+import { withoutAerialLocation } from './photo-capture.mjs';
 
 export const ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export const ASSET_PATTERN = /^media\/[a-f0-9-]{36}\/(thumbnail\.webp|preview\.webp|depth\.webp|display\.webp|download\.jpg)$/;
@@ -38,14 +39,14 @@ export function validatePhoto(input, existing, map, requirePlacement = true) {
   if (!existing || input.id !== existing.id) throw new UserError('照片编号不匹配。');
   const title = text(input.title, 160, '标题').trim();
   if (!title) throw new UserError('请填写照片标题。');
-  const locationId = resolveLocationId(text(input.locationId ?? input.buildingId ?? '', 80, '拍摄地点'), map);
+  const captureType = input.captureType ?? existing.captureType ?? (existing.metadata?.aerial ? 'aerial' : 'ground');
+  if (!['ground', 'aerial'].includes(captureType)) throw new UserError('请选择普通照片或航拍照片。');
+  const locationId = captureType === 'aerial' ? '' : resolveLocationId(text(input.locationId ?? input.buildingId ?? '', 80, '拍摄地点'), map);
   const building = map.buildings.find(b => b.id === locationId);
   const feature = map.features.find(f => f.id === locationId && f.name?.trim());
   if (locationId && !building && !feature) throw new UserError('找不到所选拍摄地点，请重新选择。');
   const buildingId = building?.id || '';
-  if (input.locationId !== undefined && input.buildingId !== undefined && resolveLocationId(input.buildingId, map) !== buildingId) throw new UserError('拍摄地点与建筑不一致，请重新选择地点。');
-  const captureType = input.captureType ?? existing.captureType ?? (existing.metadata?.aerial ? 'aerial' : 'ground');
-  if (!['ground', 'aerial'].includes(captureType)) throw new UserError('请选择普通照片或航拍照片。');
+  if (captureType !== 'aerial' && input.locationId !== undefined && input.buildingId !== undefined && resolveLocationId(input.buildingId, map) !== buildingId) throw new UserError('拍摄地点与建筑不一致，请重新选择地点。');
   const floor = number(input.floor, -1, 50, '楼层');
   if (!Number.isInteger(floor) || (captureType === 'aerial' ? floor !== 0 : (!building && floor !== 0) || (building && floor < 1 && !(floor === -1 && building.basement)))) throw new UserError('请检查拍摄地点和楼层。');
   const cameraHeight = input.cameraHeight === undefined ? undefined : number(input.cameraHeight, .1, 11.9, '拍摄高度');
@@ -73,11 +74,11 @@ export function validatePhoto(input, existing, map, requirePlacement = true) {
     if (input.view.cropFactor !== undefined) view.cropFactor = number(input.view.cropFactor, .5, 5, '相机画幅倍率');
   }
   const { altitude: _oldAltitude, cameraHeight: _oldCameraHeight, ...record } = existing;
-  return { ...record, title, description: text(input.description || '', 10000, '描述'),
+  return withoutAerialLocation({ ...record, title, description: text(input.description || '', 10000, '描述'),
     author: text(input.author ?? existing.author ?? '', 200, '作者').trim(),
     copyright: text(input.copyright ?? existing.copyright ?? '', 3000, '版权信息').trim(),
     capturedAt, locationId, buildingId, floor, position, captureType, ...(altitude ? { altitude } : {}), ...(cameraHeight !== undefined ? { cameraHeight } : {}),
-    heading: number(input.heading, 0, 360, '拍摄方向') % 360, pitch: number(input.pitch, -90, 90, '仰俯角'), placed: input.placed === true, ...(view !== undefined ? { view } : {}) };
+    heading: number(input.heading, 0, 360, '拍摄方向') % 360, pitch: number(input.pitch, -90, 90, '仰俯角'), placed: input.placed === true, ...(view !== undefined ? { view } : {}) });
 }
 export function validateOverrides(input, map) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new UserError('建筑资料格式不正确。');
@@ -149,10 +150,10 @@ export function createStore(root, { generateDepth } = {}) {
         await fs.writeFile(path.join(localRoot, 'originals', id, 'source.' + metadata.format), bytes);
         const photoMetadata = await extractPhotoMetadata(bytes);
         const { map } = await state();
-        const draft = { id, title: '未命名照片', description: '', capturedAt: photoMetadata.recordedAt || '', metadata: photoMetadata, buildingId: '', floor: 0,
+        const draft = withoutAerialLocation({ id, title: '未命名照片', description: '', capturedAt: photoMetadata.recordedAt || '', metadata: photoMetadata, buildingId: '', floor: 0,
           author: photoMetadata.author || '', copyright: photoMetadata.copyright || '', uploadedAt: new Date().toISOString(),
           ...automaticPhotoPlacement(photoMetadata, map), heading: 0, pitch: 0, width: download.width, height: download.height,
-          downloadBytes: stats.size, files: { thumbnail: 'media/' + id + '/thumbnail.webp', preview: 'media/' + id + '/preview.webp', display: 'media/' + id + '/display.webp', download: 'media/' + id + '/download.jpg' } };
+          downloadBytes: stats.size, files: { thumbnail: 'media/' + id + '/thumbnail.webp', preview: 'media/' + id + '/preview.webp', display: 'media/' + id + '/display.webp', download: 'media/' + id + '/download.jpg' } });
         let normalized;
         if (depth) {
           try { normalized = await normalizePhotoDepth(depth, draft); }

@@ -1,5 +1,5 @@
 import polygonClipping from 'polygon-clipping';
-import { stairSurfaceHeight } from './terrain-height.ts';
+import { insideShape, stairSurfaceHeight } from './terrain-height.ts';
 import type { Feature, Point, Shape } from './types';
 
 // Offset both sides of a route so adjacent segments share one mitered corner.
@@ -90,6 +90,7 @@ export function undergroundRiseStair(feature: Feature) {
 
 export function undergroundFloorElevation(feature: Feature, point: Point) {
   for (const stair of feature.entranceStairs || []) {
+    if (stair.landing && insideShape(point, stair.landing.footprint)) return stair.bottomHeight - .045;
     const height = stairSurfaceHeight({ ...feature, riseStair: stair }, point);
     if (height !== undefined) return height - .045;
   }
@@ -230,7 +231,11 @@ export function undergroundCeilingSections(feature: Feature, footprints = underg
     sections = sections.flatMap(section => {
       if (cutout.height >= section.height) return [section];
       const polygons = section.footprints.map(shape => [shape.outer, ...shape.holes]);
-      const zone = [cutout.footprint.outer, ...cutout.footprint.holes];
+      const footprint = [cutout.footprint.outer, ...cutout.footprint.holes];
+      // A folded stairwell is open to the existing stair above, rather than
+      // capped by the old flat basement roof halfway through the landing.
+      const zone = feature.ceilingOpenings?.length ? polygonClipping.difference([footprint],
+        ...feature.ceilingOpenings.map(shape => [shape.outer, ...shape.holes])) : [footprint];
       const shapes = (value: polygonClipping.MultiPolygon): Shape[] => value.map(([outer, ...holes]) => ({ outer, holes }));
       const low = shapes(polygonClipping.intersection(polygons, zone)), high = shapes(polygonClipping.difference(polygons, zone));
       if (!low.length) return [section];

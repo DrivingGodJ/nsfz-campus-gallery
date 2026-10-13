@@ -11,7 +11,7 @@ import { archedBridgeGeometry } from './bridge-mesh';
 import { pergolaLayout } from './garden-geometry';
 import { curvedStairTreads } from './structure-geometry';
 
-export const LocationSelection = createContext<{ selectedId?: string; onSelect?: (id: string) => void; placing?: boolean; featuresSelectable?: boolean; selectableIds?: ReadonlySet<string> }>({});
+export const LocationSelection = createContext<{ selectedId?: string; onSelect?: (id: string) => void; placing?: boolean; featuresSelectable?: boolean; selectableIds?: ReadonlySet<string>; labelIds?: ReadonlySet<string> }>({});
 
 export function LocationHtml({ children, ...props }: ComponentProps<typeof Html>) {
   const selection = useContext(LocationSelection);
@@ -20,9 +20,10 @@ export function LocationHtml({ children, ...props }: ComponentProps<typeof Html>
 }
 
 export function LocationName({ id, name, underground = false, building = false }: { id: string; name: string; underground?: boolean; building?: boolean }) {
-  const { selectedId, onSelect, placing, featuresSelectable, selectableIds } = useContext(LocationSelection);
+  const { selectedId, onSelect, placing, featuresSelectable, selectableIds, labelIds } = useContext(LocationSelection);
   if (selectableIds && !selectableIds.has(id)) return null;
   const selected = id === selectedId;
+  if (labelIds && !labelIds.has(id) && !selected) return null;
   const className = (building ? 'building-label' : 'structure-label') + (underground ? ' underground' : '') + (selected ? ' active' : '');
   return onSelect && !placing && (!selectableIds || selectableIds.has(id)) && (building || featuresSelectable !== false)
     ? <button type="button" className={className + ' location-name'} aria-label={'选择地点：' + name} aria-pressed={selected} onClick={e => { e.stopPropagation(); onSelect(id); }}>{name}</button>

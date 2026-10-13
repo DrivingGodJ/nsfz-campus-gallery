@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 1014,
+  "revision": 1019,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -869,12 +869,12 @@
       "floor": 0,
       "captureType": "ground",
       "position": {
-        "x": -21,
-        "z": 41.4
+        "x": -10.664285078421521,
+        "z": 45.74579444159205
       },
       "placed": true,
-      "heading": 302.57531285265463,
-      "pitch": 1.4943041154395467,
+      "heading": 301.16099294905985,
+      "pitch": 2.0394779467895385,
       "width": 4672,
       "height": 7008,
       "downloadBytes": 4738233,
@@ -2704,7 +2704,6 @@
       "description": "西操场强五飞机航拍",
       "capturedAt": "",
       "metadata": {},
-      "buildingId": "",
       "floor": 0,
       "author": "略",
       "copyright": "略",
@@ -2727,7 +2726,6 @@
         "download": "media/ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11/download.jpg",
         "depth": "media/ab3673bb-2bc8-46b1-b07b-6bb3c82f3b11/depth.webp"
       },
-      "locationId": "way/855459417",
       "view": {
         "focalLength35Mm": 26
       },
@@ -2743,7 +2741,6 @@
       "description": "夏日天桥",
       "capturedAt": "",
       "metadata": {},
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -2766,7 +2763,6 @@
         "download": "media/5d9c9500-f866-4cd3-8440-58c7eaa6b6a4/download.jpg",
         "depth": "media/5d9c9500-f866-4cd3-8440-58c7eaa6b6a4/depth.webp"
       },
-      "locationId": "",
       "depthUpdatedAt": "faafa130-d963-47e2-b126-3400b4eaee70",
       "altitude": {
         "meters": 35,
@@ -3097,7 +3093,6 @@
       "description": "校史馆",
       "capturedAt": "",
       "metadata": {},
-      "buildingId": "way/1233313451",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -3120,7 +3115,6 @@
         "download": "media/525b0ee9-3c28-4aba-a858-a252576ed315/download.jpg",
         "depth": "media/525b0ee9-3c28-4aba-a858-a252576ed315/depth.webp"
       },
-      "locationId": "way/1233313451",
       "view": {
         "focalLength35Mm": 28
       },
@@ -8141,7 +8135,6 @@
           "absoluteAltitude": 114.28
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -8165,7 +8158,6 @@
         "depth": "media/6a345fb7-795e-4bdb-9b8f-0cecf02c7b7d/depth.webp"
       },
       "depthUpdatedAt": "2f33b644-cf95-4c05-bf03-202540ecdaee",
-      "locationId": "",
       "altitude": {
         "meters": 85.80000000000115,
         "reference": "takeoff"
@@ -8193,7 +8185,6 @@
           "absoluteAltitude": 91.08
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -8217,7 +8208,6 @@
         "depth": "media/9122e39b-4eba-40c6-917b-ed7fd5c5218f/depth.webp"
       },
       "depthUpdatedAt": "350b86df-bf1c-4f61-95b8-04c9109fc315",
-      "locationId": "",
       "altitude": {
         "meters": 63.9,
         "reference": "takeoff"
@@ -8245,7 +8235,6 @@
           "absoluteAltitude": 80.08
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -8269,7 +8258,6 @@
         "depth": "media/58b59f21-440a-4d22-a6bb-14e38ee17fc6/depth.webp"
       },
       "depthUpdatedAt": "fad2d704-8a88-4276-8c7e-504ed7490013",
-      "locationId": "",
       "altitude": {
         "meters": 43,
         "reference": "takeoff"
@@ -8382,12 +8370,12 @@
       "uploadedAt": "2026-10-09T06:25:11.011Z",
       "captureType": "ground",
       "position": {
-        "x": 41.475789094344314,
-        "z": 80.92468441633251
+        "x": 44.100121116891664,
+        "z": 80.85080414428083
       },
       "placed": true,
-      "heading": 211.3235013145155,
-      "pitch": 10.030952030190118,
+      "heading": 221.08734018071505,
+      "pitch": 9.076227307922574,
       "width": 4672,
       "height": 6229,
       "downloadBytes": 4032712,
@@ -9716,7 +9704,6 @@
           "absoluteAltitude": -113.69
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -9740,7 +9727,6 @@
         "depth": "media/f955f6cd-d8b3-413e-8d54-ba8656f744d5/depth.webp"
       },
       "depthUpdatedAt": "2f8a84fc-884a-493d-84c3-e012d036702d",
-      "locationId": "",
       "altitude": {
         "meters": 68.8,
         "reference": "takeoff"
@@ -9768,7 +9754,6 @@
           "absoluteAltitude": -113.59
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -9792,7 +9777,6 @@
         "depth": "media/2fd556c9-9281-475e-ac98-18775ad99aba/depth.webp"
       },
       "depthUpdatedAt": "f6c0234f-3f87-4c24-b019-81a4c2daeb25",
-      "locationId": "",
       "altitude": {
         "meters": 68.9,
         "reference": "takeoff"
@@ -9820,7 +9804,6 @@
           "absoluteAltitude": -113.69
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -9844,7 +9827,6 @@
         "depth": "media/5989d88d-4a23-4e23-8264-f64db0379252/depth.webp"
       },
       "depthUpdatedAt": "8278b237-feb6-4c03-9ba6-6c2da59c9a1d",
-      "locationId": "",
       "altitude": {
         "meters": 68.8,
         "reference": "takeoff"
@@ -9872,7 +9854,6 @@
           "absoluteAltitude": -77.69
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -9896,7 +9877,6 @@
         "depth": "media/b0a54218-1865-4594-9066-cb119f228b7b/depth.webp"
       },
       "depthUpdatedAt": "5268784a-e639-458a-ba4e-15e80b6f8ad8",
-      "locationId": "",
       "view": {
         "focalLength35Mm": 13.4
       },
@@ -10340,94 +10320,6 @@
       },
       "depthUpdatedAt": "9827702e-2dcd-4cfc-9301-8d2eb3c8dfd8",
       "locationId": "way/855459420"
-    },
-    {
-      "id": "86977725-5251-4201-8fb3-e26af1ccfb51",
-      "title": "20240620-_DSC1004",
-      "description": "",
-      "capturedAt": "2024-06-20T09:56:04",
-      "metadata": {
-        "recordedAt": "2024-06-20T09:56:04",
-        "utcOffset": "+08:00",
-        "cameraMake": "SONY",
-        "cameraModel": "ILCE-7CM2",
-        "lensModel": "FE 24-105mm F4 G OSS",
-        "focalLengthMm": 39,
-        "focalLength35Mm": 39,
-        "aperture": 5.6,
-        "exposureSeconds": 0.004,
-        "iso": 100,
-        "author": "DrivingGodJ",
-        "copyright": "DGJ"
-      },
-      "buildingId": "way/855459420",
-      "floor": 6,
-      "author": "DrivingGodJ",
-      "copyright": "DGJ",
-      "uploadedAt": "2026-10-09T05:22:42.444Z",
-      "captureType": "ground",
-      "position": {
-        "x": 87.9820703147525,
-        "z": 67.8641256175962
-      },
-      "placed": true,
-      "heading": 75.54494344253033,
-      "pitch": -15.537661350776174,
-      "width": 4672,
-      "height": 7008,
-      "downloadBytes": 4987301,
-      "files": {
-        "thumbnail": "media/86977725-5251-4201-8fb3-e26af1ccfb51/thumbnail.webp",
-        "preview": "media/86977725-5251-4201-8fb3-e26af1ccfb51/preview.webp",
-        "display": "media/86977725-5251-4201-8fb3-e26af1ccfb51/display.webp",
-        "download": "media/86977725-5251-4201-8fb3-e26af1ccfb51/download.jpg",
-        "depth": "media/86977725-5251-4201-8fb3-e26af1ccfb51/depth.webp"
-      },
-      "depthUpdatedAt": "96454909-0c2d-4eec-bf0e-ea85922f1faf",
-      "locationId": "way/855459420"
-    },
-    {
-      "id": "eb0f1f79-f690-467e-8153-aa729009e276",
-      "title": "_DSC8616",
-      "description": "",
-      "capturedAt": "2024-04-03T16:20:21",
-      "metadata": {
-        "recordedAt": "2024-04-03T16:20:21",
-        "utcOffset": "+08:00",
-        "cameraMake": "SONY",
-        "cameraModel": "ILCE-7CM2",
-        "lensModel": "----",
-        "exposureSeconds": 0.008,
-        "iso": 100
-      },
-      "buildingId": "way/855459420",
-      "floor": 5,
-      "author": "",
-      "copyright": "",
-      "uploadedAt": "2026-10-09T06:35:45.407Z",
-      "captureType": "ground",
-      "position": {
-        "x": 114.8218674607044,
-        "z": 32.177705395708855
-      },
-      "placed": true,
-      "heading": 10.07610381143445,
-      "pitch": -22.17407814360389,
-      "width": 4672,
-      "height": 7008,
-      "downloadBytes": 4921472,
-      "files": {
-        "thumbnail": "media/eb0f1f79-f690-467e-8153-aa729009e276/thumbnail.webp",
-        "preview": "media/eb0f1f79-f690-467e-8153-aa729009e276/preview.webp",
-        "display": "media/eb0f1f79-f690-467e-8153-aa729009e276/display.webp",
-        "download": "media/eb0f1f79-f690-467e-8153-aa729009e276/download.jpg",
-        "depth": "media/eb0f1f79-f690-467e-8153-aa729009e276/depth.webp"
-      },
-      "depthUpdatedAt": "8927239b-38dd-4ef1-b89c-51b5dfdc1d7b",
-      "locationId": "way/855459420",
-      "view": {
-        "focalLength35Mm": 50
-      }
     },
     {
       "id": "ecb80c4d-32d5-4bb2-954d-9b486cbeb718",
@@ -11509,8 +11401,7 @@
         "depth": "media/e4ee9ba4-cf43-40b6-9a95-1d4c1711e349/depth.webp"
       },
       "depthUpdatedAt": "4c3b4781-c424-4582-9670-30fefcb38026",
-      "locationId": "",
-      "cameraHeight": 1.1000000000000019
+      "locationId": "way/855459407"
     },
     {
       "id": "17de08ef-1b43-4fd6-a426-867a3d69406a",
@@ -12197,8 +12088,8 @@
         "z": -87.64395489822886
       },
       "placed": true,
-      "heading": 261.2013583738701,
-      "pitch": -1.185995578389316,
+      "heading": 261.5440346689859,
+      "pitch": -0.19939198350062493,
       "width": 7008,
       "height": 4672,
       "downloadBytes": 4753283,
@@ -13188,7 +13079,6 @@
           "absoluteAltitude": -134.86
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -13212,7 +13102,6 @@
         "depth": "media/69774c0e-73b0-47e6-ad38-b6bac69d6f5f/depth.webp"
       },
       "depthUpdatedAt": "4cf6bc6c-51ed-482e-8a59-98bc71a2b14b",
-      "locationId": "",
       "altitude": {
         "meters": 10.2,
         "reference": "takeoff"
@@ -13429,7 +13318,6 @@
           "absoluteAltitude": 19.56
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -13453,7 +13341,6 @@
         "depth": "media/1917f9a2-34c8-4b30-839a-3d3b67cfc5b6/depth.webp"
       },
       "depthUpdatedAt": "1d9ab67b-93b5-4eea-8676-708c86075aad",
-      "locationId": "",
       "altitude": {
         "meters": 47.6,
         "reference": "takeoff"
@@ -13480,7 +13367,6 @@
           "absoluteAltitude": 19.76
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -13504,7 +13390,6 @@
         "depth": "media/1a3520a5-cfb1-4efe-8e35-e781954d8823/depth.webp"
       },
       "depthUpdatedAt": "80082ec4-1635-416d-8585-b087002ef385",
-      "locationId": "",
       "altitude": {
         "meters": 47.8,
         "reference": "takeoff"
@@ -13531,7 +13416,6 @@
           "absoluteAltitude": 19.16
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -13542,8 +13426,8 @@
         "z": 66.4329393691839
       },
       "placed": true,
-      "heading": 211.32870736992425,
-      "pitch": -30.80206339020939,
+      "heading": 210.06908480551408,
+      "pitch": -32.855485834833104,
       "width": 3328,
       "height": 7168,
       "downloadBytes": 4901216,
@@ -13555,7 +13439,6 @@
         "depth": "media/3a2cf2e5-dad3-4c21-8ad7-7979e5ffd7ba/depth.webp"
       },
       "depthUpdatedAt": "a3e1f8bf-98b5-4658-a53f-a55c36cabc03",
-      "locationId": "",
       "altitude": {
         "meters": 47.2,
         "reference": "takeoff"
@@ -13583,7 +13466,6 @@
           "absoluteAltitude": 19.16
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -13607,7 +13489,6 @@
         "depth": "media/b07d1fcd-23cd-4d87-81f8-39c1bc7f955d/depth.webp"
       },
       "depthUpdatedAt": "08891c6b-8220-4f7c-8481-9822d83b48a0",
-      "locationId": "",
       "altitude": {
         "meters": 47.2,
         "reference": "takeoff"
@@ -13635,18 +13516,17 @@
           "absoluteAltitude": -8.6
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
       "uploadedAt": "2026-10-09T08:38:17.673Z",
       "captureType": "aerial",
       "position": {
-        "x": 29.520746698559947,
-        "z": -79.36054510806622
+        "x": 29.27033530496734,
+        "z": -79.19533574404888
       },
       "placed": true,
-      "heading": 58.2424812116094,
+      "heading": 56.5850963610078,
       "pitch": -90,
       "width": 5464,
       "height": 3640,
@@ -13659,7 +13539,6 @@
         "depth": "media/9140905b-b8bd-4578-9ca3-e095cfce9e4e/depth.webp"
       },
       "depthUpdatedAt": "ad3eb24f-647d-46dc-bdb9-c483e89e8b40",
-      "locationId": "",
       "altitude": {
         "meters": 22.20000000000002,
         "reference": "takeoff"
@@ -13694,12 +13573,12 @@
       "uploadedAt": "2026-10-09T08:38:20.230Z",
       "captureType": "ground",
       "position": {
-        "x": -89.02146863003686,
-        "z": -89.76524923641155
+        "x": -88.40609231272418,
+        "z": -90.27630604130314
       },
       "placed": true,
-      "heading": 141.3568989951982,
-      "pitch": -18,
+      "heading": 143.0226922416182,
+      "pitch": -1.395495878078561,
       "width": 2906,
       "height": 3874,
       "downloadBytes": 1742987,
@@ -13712,7 +13591,7 @@
       },
       "depthUpdatedAt": "039f4af4-bf04-44e8-899d-6fa896b74111",
       "locationId": "way/855459409",
-      "cameraHeight": 1.6
+      "cameraHeight": 1.1000000000000005
     },
     {
       "id": "0ec460c7-55b5-4283-99ce-dcdcde63ac71",
@@ -13840,12 +13719,12 @@
       "uploadedAt": "2026-10-09T08:38:30.128Z",
       "captureType": "ground",
       "position": {
-        "x": -38.948639571529704,
-        "z": -50.571980105953784
+        "x": -39.08825768526466,
+        "z": -50.71518199950654
       },
       "placed": true,
-      "heading": 44.20506449363012,
-      "pitch": 8.22115345621966,
+      "heading": 45.57009138729677,
+      "pitch": 9.521771574206428,
       "width": 2923,
       "height": 3897,
       "downloadBytes": 2422739,
@@ -13858,7 +13737,7 @@
       },
       "depthUpdatedAt": "18b38c12-6d03-406c-89c6-1e213f8fee54",
       "locationId": "local/underground-corridor",
-      "cameraHeight": 1.6
+      "cameraHeight": 1
     },
     {
       "id": "07fa62be-e579-426a-a286-02b3a741dfe5",
@@ -13889,12 +13768,12 @@
       "uploadedAt": "2026-10-09T08:38:32.401Z",
       "captureType": "ground",
       "position": {
-        "x": -39.38014596462197,
-        "z": -50.36347182166733
+        "x": -39.43755740668601,
+        "z": -50.445349329690764
       },
       "placed": true,
-      "heading": 55.54321027303058,
-      "pitch": 13.91048862388642,
+      "heading": 54.742469308937814,
+      "pitch": 13.015152354191038,
       "width": 4000,
       "height": 3000,
       "downloadBytes": 1728334,
@@ -13907,7 +13786,7 @@
       },
       "depthUpdatedAt": "14f3965e-ec75-4a7a-a76b-a26885f840b7",
       "locationId": "local/underground-corridor",
-      "cameraHeight": 1.6
+      "cameraHeight": 1
     },
     {
       "id": "22d53c9d-2ea8-420f-b661-aae48cebb10c",
@@ -13933,12 +13812,12 @@
       "uploadedAt": "2026-10-09T08:38:55.189Z",
       "captureType": "ground",
       "position": {
-        "x": 45.09583470038758,
-        "z": 72.75433594364378
+        "x": 45.93416437788728,
+        "z": 72.42685538550305
       },
       "placed": true,
-      "heading": 338.46094260809184,
-      "pitch": 4.660678249115388,
+      "heading": 338.1553781341113,
+      "pitch": 3.8385316823476074,
       "width": 4525,
       "height": 6787,
       "downloadBytes": 4831612,
@@ -13950,7 +13829,8 @@
         "depth": "media/22d53c9d-2ea8-420f-b661-aae48cebb10c/depth.webp"
       },
       "depthUpdatedAt": "236b3171-d2a9-4726-85ee-9e097317bae3",
-      "locationId": ""
+      "locationId": "",
+      "cameraHeight": 1.5
     },
     {
       "id": "46e69b88-c689-412a-8cc1-1e9df3836488",
@@ -14060,7 +13940,6 @@
           "absoluteAltitude": 29.85
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -14084,7 +13963,6 @@
         "depth": "media/c2c0a35f-299f-495e-8188-165af2662084/depth.webp"
       },
       "depthUpdatedAt": "6609631a-09fb-44c0-9e8d-9cec43604b8b",
-      "locationId": "",
       "altitude": {
         "meters": 61.9,
         "reference": "takeoff"
@@ -14112,7 +13990,6 @@
           "absoluteAltitude": 21.25
         }
       },
-      "buildingId": "",
       "floor": 0,
       "author": "",
       "copyright": "",
@@ -14136,7 +14013,6 @@
         "depth": "media/45cfda5b-2c0c-4bf3-b63c-e63763feb7cd/depth.webp"
       },
       "depthUpdatedAt": "7d0f181d-ff58-456e-aad6-7c729e9d41a2",
-      "locationId": "",
       "view": {
         "focalLength35Mm": 40
       },
@@ -14169,12 +14045,12 @@
       "uploadedAt": "2026-10-09T08:42:51.359Z",
       "captureType": "ground",
       "position": {
-        "x": 138.0070908849521,
-        "z": 71.94134196297362
+        "x": 131.9510929909113,
+        "z": 78.11344772254809
       },
       "placed": true,
-      "heading": 215.4012755662261,
-      "pitch": -1.420680336247625,
+      "heading": 217.61587159409555,
+      "pitch": -2.895213550090292,
       "width": 6960,
       "height": 4640,
       "downloadBytes": 4817683,
@@ -14217,8 +14093,8 @@
         "z": 47.22673230655365
       },
       "placed": true,
-      "heading": 244.53832324391908,
-      "pitch": -11.876385666355192,
+      "heading": 243.87663250793923,
+      "pitch": -12.090148619257963,
       "width": 4584,
       "height": 6876,
       "downloadBytes": 4841581,
@@ -14256,12 +14132,12 @@
       "uploadedAt": "2026-10-09T08:43:28.150Z",
       "captureType": "ground",
       "position": {
-        "x": 121.99797647939297,
-        "z": 6.616390171831005
+        "x": 116.41882196048078,
+        "z": 2.6417596700363464
       },
       "placed": true,
-      "heading": 203.674784128302,
-      "pitch": -0.23528837601037494,
+      "heading": 197.0842817567841,
+      "pitch": 2.285496238317927,
       "width": 4640,
       "height": 6960,
       "downloadBytes": 4782619,
@@ -14273,7 +14149,8 @@
         "depth": "media/15242e25-f7a0-4293-a35a-535b0368c8cc/depth.webp"
       },
       "depthUpdatedAt": "435d204c-7260-44ef-bdee-ca368b288960",
-      "locationId": ""
+      "locationId": "",
+      "cameraHeight": 1.1999999999999997
     },
     {
       "id": "54a0b52a-14ab-4753-b29d-88394a0ac6ea",
@@ -14299,12 +14176,12 @@
       "uploadedAt": "2026-10-09T08:43:44.747Z",
       "captureType": "ground",
       "position": {
-        "x": 122.46855095412688,
-        "z": 4.838891916428068
+        "x": 123.26492817149807,
+        "z": 6.735942955422409
       },
       "placed": true,
-      "heading": 203.0615836506446,
-      "pitch": 1.4645430876886292,
+      "heading": 204.50526659721618,
+      "pitch": -0.8450233707952773,
       "width": 4640,
       "height": 6960,
       "downloadBytes": 4782513,
@@ -14448,6 +14325,94 @@
       "depthUpdatedAt": "3423a312-5642-4ac6-a0ae-35c002a5a237",
       "locationId": "",
       "cameraHeight": 1.0999999999999996
+    },
+    {
+      "id": "78712b9d-f8a5-4457-94c7-032a21cfaebc",
+      "title": "_DSC1160",
+      "description": "",
+      "capturedAt": "2023-11-29T12:20:37",
+      "metadata": {
+        "recordedAt": "2023-11-29T12:20:37",
+        "utcOffset": "+08:00",
+        "cameraMake": "SONY",
+        "cameraModel": "ILCE-7CM2",
+        "lensModel": "FE 24-105mm F4 G OSS",
+        "focalLengthMm": 24,
+        "focalLength35Mm": 24,
+        "aperture": 9,
+        "exposureSeconds": 0.01,
+        "iso": 100
+      },
+      "buildingId": "",
+      "floor": 0,
+      "author": "",
+      "copyright": "",
+      "uploadedAt": "2026-10-13T04:13:08.279Z",
+      "captureType": "ground",
+      "position": {
+        "x": 27.674119567782903,
+        "z": 95.31438340514615
+      },
+      "placed": true,
+      "heading": 29.244960522826148,
+      "pitch": 8.69154375416111,
+      "width": 7008,
+      "height": 4672,
+      "downloadBytes": 4955425,
+      "files": {
+        "thumbnail": "media/78712b9d-f8a5-4457-94c7-032a21cfaebc/thumbnail.webp",
+        "preview": "media/78712b9d-f8a5-4457-94c7-032a21cfaebc/preview.webp",
+        "display": "media/78712b9d-f8a5-4457-94c7-032a21cfaebc/display.webp",
+        "download": "media/78712b9d-f8a5-4457-94c7-032a21cfaebc/download.jpg",
+        "depth": "media/78712b9d-f8a5-4457-94c7-032a21cfaebc/depth.webp"
+      },
+      "depthUpdatedAt": "40d10d6f-4d3e-4737-987f-ba9707aefecf",
+      "locationId": "",
+      "cameraHeight": 0.1
+    },
+    {
+      "id": "1be507eb-a71d-4280-96cc-ec1aa6e0fe6a",
+      "title": "IMG_9844-已增强-降噪",
+      "description": "",
+      "capturedAt": "2023-09-23T17:32:18",
+      "metadata": {
+        "recordedAt": "2023-09-23T17:32:18",
+        "utcOffset": "+08:00",
+        "cameraMake": "Canon",
+        "cameraModel": "Canon EOS 90D",
+        "lensModel": "EF-S18-200mm f/3.5-5.6 IS",
+        "focalLengthMm": 18,
+        "aperture": 3.5,
+        "exposureSeconds": 0.016666666666666666,
+        "iso": 800,
+        "author": "DGJ"
+      },
+      "buildingId": "way/855459420",
+      "floor": 1,
+      "author": "DGJ",
+      "copyright": "",
+      "uploadedAt": "2026-10-13T04:13:32.364Z",
+      "captureType": "ground",
+      "position": {
+        "x": 81.95661009847801,
+        "z": 71.69186582248012
+      },
+      "placed": true,
+      "heading": 200.76168818984308,
+      "pitch": 31.891157382573915,
+      "width": 4640,
+      "height": 6960,
+      "downloadBytes": 4727845,
+      "files": {
+        "thumbnail": "media/1be507eb-a71d-4280-96cc-ec1aa6e0fe6a/thumbnail.webp",
+        "preview": "media/1be507eb-a71d-4280-96cc-ec1aa6e0fe6a/preview.webp",
+        "display": "media/1be507eb-a71d-4280-96cc-ec1aa6e0fe6a/display.webp",
+        "download": "media/1be507eb-a71d-4280-96cc-ec1aa6e0fe6a/download.jpg",
+        "depth": "media/1be507eb-a71d-4280-96cc-ec1aa6e0fe6a/depth.webp"
+      },
+      "depthUpdatedAt": "e0627f38-eae9-47b6-9405-98f0430ad597",
+      "locationId": "way/855459420",
+      "cameraHeight": 1.3000000000000012
     }
   ],
   "buildingOverrides": {

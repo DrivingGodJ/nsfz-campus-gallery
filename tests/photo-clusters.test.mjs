@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { cameraPhotoClusters, clusterFocus, clusterReadyToPick, collagePhotos, permanentPhotoSpots, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, photoPointVisible, visiblePhotoPoints } from '../src/photo-clusters.ts';
+import { cameraPhotoClusters, clusterFocus, clusterReadyToPick, collagePhotos, permanentPhotoSpots, PHOTO_MARKER_LIFT, PHOTO_POINT_LIFT, photoPointVisible, visiblePhotoPoints, regionPhotoClusters, photoMarkerSize } from '../src/photo-clusters.ts';
 import { photoSeason, photosInSeason } from '../src/photo-season.ts';
 
 const photo = (id, x, z = 0, height = 1.6) => ({ id, position: { x, z, height }, capturedAt: '2025-04-18' });
@@ -72,6 +72,15 @@ test('groups still merged at the fixed focus distance open their photo menu inst
   assert.equal(clusterReadyToPick(permanent, camera), true);
 });
 
+test('minimal map markers open a merged photo choice directly while the default view still approaches first', () => {
+  const camera = cameraAt(600), shots = [photo('a', -10), photo('b', 10)];
+  const [cluster] = cameraPhotoClusters(permanentPhotoSpots(shots), camera, size, [], { minimal: true });
+  assert.equal(cluster.spots.length, 2);
+  assert.equal(clusterReadyToPick(cluster, camera, true), true);
+  assert.equal(clusterReadyToPick(cluster, camera), false);
+  assert.deepEqual(visiblePhotoPoints(shots, camera, size).map(shot => shot.id), ['a', 'b']);
+});
+
 test('merged thumbnails retain every original shooting point, including permanent two metre groups', () => {
   const photos = [photo('a', -10), photo('b', -9), photo('c', 10)];
   const before = JSON.stringify(photos), camera = cameraAt(600);
@@ -96,7 +105,7 @@ test('thumbnails only disappear after fully leaving each edge, including compact
   for (const size of [{ width: 900, height: 600 }, { width: 390, height: 776 }]) {
     const camera = new THREE.PerspectiveCamera(43, size.width / size.height, .08, 2000);
     camera.position.set(0, 3.4, 20); camera.lookAt(0, 3.4, 0); camera.updateMatrixWorld();
-    for (const [appearance, halfSize, grouped] of [[{}, [32.5, 24], false], [{ compact: true }, [22, 18], false], [{ compact: true }, [30, 24], true], [{ compact: true, selectedId: 'a' }, [43, 32], false]]) {
+    for (const [appearance, halfSize, grouped] of [[{}, [32.5, 24], false], [{ compact: true }, [22, 18], false], [{ compact: true }, [30, 24], true], [{ compact: true, selectedId: 'a' }, [43, 32], false], [{ minimal: true }, [22, 22], false], [{ minimal: true, selectedId: 'a' }, [22, 22], true]]) {
       for (const [axis, dimension] of [[0, size.width], [1, size.height]]) for (const sign of [-1, 1]) {
         for (const [distance, visible] of [[-1, true], [0, true], [halfSize[axis] - .5, true], [halfSize[axis] + .5, false]]) {
           const ndc = new THREE.Vector3();
@@ -158,4 +167,176 @@ test('merged thumbnail anchors stay on an actual shooting spot and are lifted le
   const [cluster] = cameraPhotoClusters(spots, cameraAt(600), size);
   assert.ok(spots.some(spot => spot.position.equals(cluster.position)));
   assert.ok(PHOTO_MARKER_LIFT > 0 && PHOTO_MARKER_LIFT < 2);
+});
+
+const rectangle = (x, z, width, depth) => ({ outer: [[x, z], [x + width, z], [x + width, z + depth], [x, z + depth], [x, z]], holes: [] });
+const regionBuilding = (id, x, z, width = 20, depth = 20) => ({ id, name: id, center: [x + width / 2, z + depth / 2], floors: 4, ...rectangle(x, z, width, depth) });
+const regionOptions = (buildings = [], features = []) => ({ campus: { buildings, features }, site: { buildingOverrides: {}, photos: [] } });
+
+test('the distant map keeps one collection per destination, anchored to a real unlifted photograph', () => {
+  const options = regionOptions([regionBuilding('west', -20, -10), regionBuilding('east', 0, -10)]);
+  const photos = [photo('west-a', -18), photo('west-b', -2), photo('east-a', 2), photo('east-b', 18)].map(shot => ({ ...shot, buildingId: shot.id.startsWith('west') ? 'west' : 'east', floor: 1 }));
+  const before = JSON.stringify(photos), clusters = regionPhotoClusters(photos, cameraAt(200), size, [], options);
+  assert.equal(clusters.length, 2);
+  for (const cluster of clusters) {
+    assert.equal(cluster.collapsed, true);
+    assert.equal(cluster.photos.length, 2);
+    assert.equal(cluster.opacity, 1);
+    assert.ok(cluster.photos.some(shot => cluster.position.equals(new THREE.Vector3(shot.position.x, shot.position.height, shot.position.z))));
+    assert.equal(cluster.regionName, cluster.regionId);
+  }
+  assert.equal(JSON.stringify(photos), before);
+});
+
+test('approaching any end of a long building expands its photos; selecting a far photo expands only its destination', () => {
+  const options = regionOptions([regionBuilding('long', -100, -10, 200, 20), regionBuilding('other', -10, -10)]);
+  const photos = [photo('a', -75), photo('b', 75)].map(shot => ({ ...shot, buildingId: 'long', floor: 1 }));
+  const camera = cameraAt(40); camera.position.set(-105, 30, 25); camera.lookAt(-75, 1.6, 0); camera.updateMatrixWorld();
+  const approached = regionPhotoClusters(photos, camera, size, [], options);
+  assert.ok(approached.length > 0 && approached.every(cluster => !cluster.collapsed));
+  const far = cameraAt(200), selected = { ...options, selectedId: 'a' };
+  const expanded = regionPhotoClusters([...photos, { ...photo('other', 0), buildingId: 'other', floor: 1 }], far, size, [], selected);
+  assert.equal(expanded.find(cluster => cluster.regionId === 'other').collapsed, true);
+  assert.ok(expanded.filter(cluster => cluster.regionId === 'long').every(cluster => !cluster.collapsed));
+  assert.ok(expanded.filter(cluster => cluster.regionId === 'long').length >= 2);
+});
+
+test('unassigned photos infer a mapped destination while unrelated outdoor areas remain separate', () => {
+  const options = regionOptions([regionBuilding('library', -20, -20, 40, 40)], [{ id: 'forest', name: '标本林', type: 'forest', ...rectangle(55, -20, 40, 40) }]);
+  const shots = [photo('library', 0), photo('forest', 75), photo('outside-a', -80), photo('outside-b', -160)];
+  const clusters = regionPhotoClusters(shots, cameraAt(400), size, [], options);
+  assert.equal(clusters.find(cluster => cluster.photos.some(shot => shot.id === 'library')).regionId, 'library');
+  assert.equal(clusters.find(cluster => cluster.photos.some(shot => shot.id === 'forest')).regionId, 'forest');
+  assert.notEqual(clusters.find(cluster => cluster.photos.some(shot => shot.id === 'outside-a')).regionId,
+    clusters.find(cluster => cluster.photos.some(shot => shot.id === 'outside-b')).regionId);
+  assert.match(clusters.find(cluster => cluster.photos.some(shot => shot.id === 'outside-a')).regionName, /^校园[东西南北]侧$/);
+  const nearby = regionPhotoClusters([photo('near-forest', 110)], cameraAt(400), size, [], options);
+  assert.equal(nearby[0].regionId, 'forest', 'Nearby outside photographs belong to the landscape, even beyond its exact footprint');
+  const classroomOnly = regionOptions([regionBuilding('classroom', -10, -10)]);
+  assert.notEqual(regionPhotoClusters([photo('outside-classroom', 20)], cameraAt(400), size, [], classroomOnly)[0].regionId, 'classroom', 'Being near a classroom does not make an outside photograph an indoor building photograph');
+});
+
+test('a far collection changes its fade identity when an offscreen representative is replaced by another real anchor', () => {
+  const options = regionOptions([regionBuilding('wide', -70, -10, 140, 20)]);
+  const shots = [-60, 60].map((x, i) => ({ ...photo(String(i), x), buildingId: 'wide', floor: 1 }));
+  const camera = new THREE.PerspectiveCamera(20, 1, .08, 2000);
+  camera.position.set(-60, 1.6, 140); camera.lookAt(-60, 1.6, 0); camera.updateMatrixWorld();
+  const [left] = regionPhotoClusters(shots, camera, size, [], options);
+  camera.position.x = 60; camera.lookAt(60, 1.6, 0); camera.updateMatrixWorld();
+  const [right] = regionPhotoClusters(shots, camera, size, [], options);
+  assert.equal(left.regionId, right.regionId);
+  assert.notEqual(left.id, right.id);
+  assert.equal(left.position.x, -60); assert.equal(right.position.x, 60);
+});
+
+test('close overlap merging keeps different storeys distinct rather than permanently fusing nearby heights', () => {
+  const options = regionOptions([regionBuilding('teaching', -10, -10)]);
+  const same = [photo('one', 0), photo('same-storey', .2)].map(shot => ({ ...shot, buildingId: 'teaching', floor: 1 }));
+  assert.equal(regionPhotoClusters(same, cameraAt(40), size, [], options).length, 1);
+  const different = { ...photo('two', .2, 0, 2.1), buildingId: 'teaching', floor: 2 };
+  assert.equal(regionPhotoClusters([same[0], different], cameraAt(40), size, [], options).length, 2);
+});
+
+test('approaching an aerial collection expands it at the actual shooting altitude, not only near the building ground', () => {
+  const options = regionOptions([regionBuilding('teaching', -10, -10)]);
+  const shots = [-5, 5].map((x, i) => ({ ...photo(String(i), x, 0, 180), buildingId: 'teaching', floor: 0, captureType: 'aerial' }));
+  const camera = cameraAt(300); camera.position.set(0, 180, 40); camera.lookAt(0, 180, 0); camera.updateMatrixWorld();
+  assert.ok(regionPhotoClusters(shots, camera, size, [], options).every(cluster => !cluster.collapsed));
+});
+
+test('an actual wall keeps overlapping near cards separate and dims the card behind it instead of removing it', () => {
+  const options = regionOptions([regionBuilding('teaching', -10, -10)]);
+  const shots = [photo('front', 0, 1), photo('back', 0, -1)].map(shot => ({ ...shot, buildingId: 'teaching', floor: 1 }));
+  const camera = new THREE.PerspectiveCamera(43, 1.5, .08, 2000);
+  camera.position.set(0, 1.6, 40); camera.lookAt(0, 1.6, 0); camera.updateMatrixWorld();
+  const scene = new THREE.Scene(), wall = new THREE.Mesh(new THREE.BoxGeometry(12, 10, .3), new THREE.MeshBasicMaterial());
+  wall.userData = { photoOccluder: true, buildingId: 'teaching' }; wall.position.y = 1.6; scene.add(wall); scene.updateMatrixWorld();
+  const clusters = regionPhotoClusters(shots, camera, size, [wall], options);
+  assert.equal(clusters.length, 2, 'A card cannot be merged through a physical separator even when screen positions overlap');
+  const front = clusters.find(cluster => cluster.photos.some(shot => shot.id === 'front'));
+  const back = clusters.find(cluster => cluster.photos.some(shot => shot.id === 'back'));
+  assert.equal(front.opacity, 1);
+  assert.ok(back.opacity > 0 && back.opacity < front.opacity);
+  wall.geometry.dispose(); wall.material.dispose();
+});
+
+test('public cards preserve partially clipped edges and bound distance scaling to usable tap sizes', () => {
+  const options = regionOptions(), camera = new THREE.PerspectiveCamera(43, 390 / 776, .08, 2000);
+  camera.position.set(0, 1.6, 20); camera.lookAt(0, 1.6, 0); camera.updateMatrixWorld();
+  const anchor = new THREE.Vector3(1.04, 0, 0).unproject(camera);
+  const edge = photo('edge', anchor.x, anchor.z, anchor.y);
+  const clusters = regionPhotoClusters([edge, photo('offscreen', 100), photo('behind', 0, 30)], camera, { width: 390, height: 776 }, [], options);
+  assert.deepEqual(clusters.flatMap(cluster => cluster.photos.map(shot => shot.id)), ['edge']);
+  let previous = Infinity;
+  for (const distance of [0, 1, 10, 40, 60, 100, 500, Infinity]) {
+    const { markerWidth, markerHeight } = photoMarkerSize(distance);
+    assert.ok(markerWidth <= previous && markerWidth >= 46 && markerWidth <= 88);
+    assert.ok(markerHeight >= 44 && markerHeight <= 66);
+    previous = markerWidth;
+  }
+  assert.deepEqual(photoMarkerSize(NaN), { markerWidth: 46, markerHeight: 44 });
+  assert.equal(regionPhotoClusters([{ ...edge, position: { ...edge.position, height: NaN } }], camera, size, [], options).length, 0);
+});
+
+test('card clipping includes the full region caption and overlapping-photo count', () => {
+  const viewport = { width: 390, height: 776 }, options = regionOptions();
+  const camera = new THREE.PerspectiveCamera(43, viewport.width / viewport.height, .08, 2000);
+  camera.position.set(0, 1.6, 300); camera.lookAt(0, 1.6, 0); camera.updateMatrixWorld();
+  for (const [distance, collapsed] of [[300, true], [40, false]]) {
+    const { markerWidth, markerHeight } = photoMarkerSize(distance);
+    const halfSize = [collapsed ? Math.max(markerWidth / 2 + 6, 55) : markerWidth / 2 + 6, markerHeight / 2 + (collapsed ? 21 : 6)];
+    for (const [axis, dimension] of [[0, viewport.width], [1, viewport.height]]) {
+      for (const [overflow, visible] of [[halfSize[axis] - .5, true], [halfSize[axis] + .5, false]]) {
+        const ndc = new THREE.Vector3(); ndc.setComponent(axis, 1 + overflow * 2 / dimension);
+        const anchor = ndc.unproject(camera).sub(camera.position).normalize().multiplyScalar(distance).add(camera.position);
+        const first = { ...photo('a', anchor.x, anchor.z, anchor.y), floor: 1 }, second = { ...first, id: 'b' };
+        assert.equal(regionPhotoClusters([first, second], camera, viewport, [], options).length > 0, visible,
+          `collapsed ${collapsed}, axis ${axis}, overflow ${overflow}`);
+      }
+    }
+  }
+});
+
+test('an expanded building keeps its nearest 10 visible cards and collects the rest at a real background anchor', () => {
+  const building = { ...regionBuilding('teaching', -10, -10), floors: 30 }, options = regionOptions([building]);
+  const shots = Array.from({ length: 28 }, (_, i) => ({ ...photo(String(i).padStart(2, '0'), 0, 0, 1.6 + i * 3.6), buildingId: building.id, floor: i + 1 }));
+  const camera = new THREE.PerspectiveCamera(100, 1.5, .08, 2000);
+  camera.position.set(0, 50, 50); camera.lookAt(0, 50, 0); camera.updateMatrixWorld();
+  const clusters = regionPhotoClusters(shots, camera, size, [], options);
+  const expected = [...shots].sort((a, b) => new THREE.Vector3(a.position.x, a.position.height, a.position.z).distanceTo(camera.position)
+    - new THREE.Vector3(b.position.x, b.position.height, b.position.z).distanceTo(camera.position));
+  const foreground = clusters.filter(cluster => !cluster.overflow), [overflow] = clusters.filter(cluster => cluster.overflow);
+  assert.equal(foreground.length, 10); assert.equal(clusters.length, 11);
+  assert.deepEqual(foreground.map(cluster => cluster.photos[0].id), expected.slice(0, 10).map(shot => shot.id));
+  assert.equal(overflow.collapsed, false); assert.equal(overflow.regionName, 'teaching');
+  assert.deepEqual(overflow.photos.map(shot => shot.id), expected.slice(10).map(shot => shot.id));
+  const anchor = expected[10];
+  assert.ok(overflow.position.equals(new THREE.Vector3(anchor.position.x, anchor.position.height, anchor.position.z)));
+  assert.equal(overflow.spots.length, 18);
+  assert.equal(new Set(clusters.flatMap(cluster => cluster.photos.map(shot => shot.id))).size, shots.length);
+  for (const cluster of clusters) {
+    assert.equal(cluster.occlusionLayers, 0);
+    assert.equal(cluster.cameraDistance, cluster.position.distanceTo(camera.position));
+  }
+  assert.equal(regionPhotoClusters(shots.slice(0, 10), camera, size, [], options).some(cluster => cluster.overflow), false);
+  assert.equal(regionPhotoClusters(shots.slice(0, 11), camera, size, [], options).filter(cluster => cluster.overflow).length, 1);
+  const selectedFar = regionPhotoClusters(shots, camera, size, [], { ...options, selectedId: expected.at(-1).id });
+  assert.deepEqual(selectedFar.filter(cluster => !cluster.overflow).map(cluster => cluster.photos[0].id), expected.slice(0, 10).map(shot => shot.id), 'Selection cannot displace a nearer eligible card from the nearest 10');
+  const far = regionPhotoClusters(shots, cameraAt(500), size, [], options);
+  assert.equal(far.length, 1); assert.equal(far[0].collapsed, true); assert.equal(far[0].overflow, false); assert.equal(far[0].photos.length, 28);
+});
+
+test('the building card limit counts merged cards rather than photographs and ignores offscreen records', () => {
+  const building = { ...regionBuilding('teaching', -10, -10), floors: 30 }, options = regionOptions([building]);
+  const camera = new THREE.PerspectiveCamera(100, 1.5, .08, 2000);
+  camera.position.set(0, 50, 50); camera.lookAt(0, 50, 0); camera.updateMatrixWorld();
+  const shots = Array.from({ length: 26 }, (_, i) => ({ ...photo(String(i).padStart(2, '0'), 0, 0, 1.6 + i * 3.6), buildingId: building.id, floor: i + 1 }));
+  const sameCard = { ...shots[12], id: 'same-card' };
+  const offscreen = { ...shots[0], id: 'offscreen', position: { x: 10000, z: 0, height: 1.6 } };
+  const clusters = regionPhotoClusters([...shots, sameCard, offscreen], camera, size, [], options);
+  assert.equal(clusters.length, 11);
+  assert.ok(clusters.some(cluster => !cluster.overflow && cluster.photos.length === 2));
+  assert.equal(clusters.filter(cluster => cluster.overflow).length, 1);
+  assert.equal(clusters.flatMap(cluster => cluster.photos).length, 27);
+  assert.equal(clusters.flatMap(cluster => cluster.photos).some(shot => shot.id === offscreen.id), false);
 });

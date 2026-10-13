@@ -7,6 +7,9 @@ import { dormitoryBodyGeometry, dormitoryObservatory, facadeGeometry, FACADE_BAS
 import { photoInteriorPlacements, photoInteriorGeometry, PHOTO_INTERIOR_EVIDENCE } from '../src/photo-interior-geometry.ts';
 import { photoMapHeight, photoCameraHeightRange } from '../src/locations.ts';
 import { mapLocationTarget } from '../src/location-geometry.ts';
+import { regionPhotoClusters } from '../src/photo-clusters.ts';
+import { markerOccluders } from '../src/photo-marker-occlusion.ts';
+import { buildingPhotosThroughFloor } from '../src/map-floor-filter.ts';
 
 const campus=JSON.parse(fs.readFileSync(new URL('../public/data/campus.json',import.meta.url)));
 const site=JSON.parse(fs.readFileSync(new URL('../public/data/site.json',import.meta.url)));
@@ -86,4 +89,35 @@ test('the unique photo and focus use the seventh-floor room floor rather than th
   assert.deepEqual([target.target[0],target.target[2]],o.center);
   assert.ok(target.bounds.max[0]-target.bounds.min[0]<8,'Selecting seven focuses the local globe instead of the whole wide dormitory');
   assert.ok(target.bounds.max[1]>=o.floorY+o.drumRise+o.domeRise,'The selected bounds retain the complete globe and telescope head');
+});
+
+test('observatory cards remain visible through their own globe, while rooftop exterior points and other buildings still occlude',()=>{
+  const info=buildingLevels(dorm,site.buildingOverrides[dorm.id]),o=dormitoryObservatory(dorm,info.floorHeight);
+  const source=site.photos.find(p=>p.id===PHOTO_INTERIOR_EVIDENCE[1].photoId);
+  const photo={...source,position:{...source.position,height:photoMapHeight(source,campus,site)}};
+  const scene=new THREE.Scene(),group=new THREE.Group(),m=material(),model=facadeGeometry(dorm,info.floors,info.floorHeight);
+  group.position.y=info.baseElevation;group.userData={photoOccluder:true,buildingId:dorm.id};scene.add(group);
+  for(const {geometry} of model.geometries)group.add(new THREE.Mesh(geometry,m));
+  const size={width:900,height:600},camera=new THREE.PerspectiveCamera(70,1.5,.08,2000);
+  const setView=(x,z)=>{camera.position.set(o.center[0]+x,info.baseElevation+o.floorY+14,o.center[1]+z);camera.lookAt(photo.position.x,photo.position.height,photo.position.z);camera.updateMatrixWorld();};
+  try {
+    const blockers=markerOccluders(scene);
+    for(const [x,z] of [[30,25],[-30,25],[30,-25],[-30,-25],[0,200]]) {
+      setView(x,z);
+      const clusters=regionPhotoClusters([photo],camera,size,blockers,{campus,site});
+      assert.deepEqual(clusters.flatMap(c=>c.photos.map(p=>p.id)),[photo.id]);
+      assert.ok(clusters.every(c=>c.collapsed?c.opacity===1:c.occlusionLayers>0&&c.opacity>0&&c.opacity<1));
+    }
+    setView(-30,0);
+    const outside={...photo,id:'outside-globe',position:{x:o.center[0]+o.radius+1,z:o.center[1],height:photo.position.height}};
+    assert.deepEqual(regionPhotoClusters([outside],camera,size,blockers,{campus,site}),[],'A building label never makes the surrounding roof into a room');
+    assert.deepEqual(buildingPhotosThroughFloor([photo],campus,site,dorm.id,6),[]);
+    assert.deepEqual(buildingPhotosThroughFloor([photo],campus,site,dorm.id,7),[photo]);
+    setView(30,25);
+    const other=new THREE.Group(),wall=new THREE.Mesh(new THREE.BoxGeometry(25,30,.5),m);
+    other.userData={photoOccluder:true,buildingId:'other'};scene.add(other);
+    wall.position.copy(camera.position).lerp(new THREE.Vector3(photo.position.x,photo.position.height,photo.position.z),.5);wall.lookAt(camera.position);other.add(wall);
+    try {assert.deepEqual(regionPhotoClusters([photo],camera,size,markerOccluders(scene),{campus,site}),[],'Another building still fully blocks the room photo');}
+    finally {wall.geometry.dispose();}
+  } finally {dispose(model);m.dispose();}
 });

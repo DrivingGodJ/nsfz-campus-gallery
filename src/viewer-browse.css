@@ -1,0 +1,83 @@
+.catalog-browse-controls{padding:0 23px 14px;display:grid;gap:12px}
+.catalog-filter-row{display:flex;align-items:flex-end;gap:10px}
+.catalog-filter-row>label{display:flex;flex-direction:column;gap:7px;flex:1;min-width:0;font-size:12px;color:var(--muted)}
+.catalog-filter-row select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:7px;background:var(--field);padding:0 10px;color:var(--ink);font:inherit;font-size:13px}
+.catalog-filter-toggle{display:none}
+.filter-results{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.filter-results .text-button{min-height:36px;font-size:12px}
+.photo-stepper{display:flex;align-items:center;flex-shrink:0;gap:2px}
+.photo-stepper>span{font-size:11px;color:var(--muted);white-space:nowrap;text-align:center;min-width:32px}
+.photo-stepper .icon-button{width:36px;height:40px}
+.viewer-mobile-nav{display:none}
+.on-this-day>summary{cursor:pointer;list-style:none;min-height:36px}
+.on-this-day>summary::-webkit-details-marker{display:none}
+.on-this-day>summary::after{content:'展开';font-size:11px;color:var(--muted)}
+.on-this-day[open]>summary::after{content:'收起'}
+.cluster-picker-filter{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);flex-shrink:0}
+.cluster-picker-filter select{flex:1;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:7px;padding:6px 10px;background:var(--field);color:var(--ink);font:inherit}
+
+@media(max-width:760px){
+  .viewer-app .app-header{height:60px;flex-basis:60px;gap:10px}
+  .viewer-app .app-header>.button{display:none}
+  .viewer-app .viewer-header-links{margin-left:auto}
+  .viewer-app .viewer-mobile-nav{position:absolute;z-index:36;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:8px;height:calc(68px + env(safe-area-inset-bottom));padding:8px 16px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--paper);transition:opacity .24s,transform .24s;box-sizing:border-box}
+  .viewer-mobile-nav>button{display:flex;align-items:center;justify-content:center;gap:8px;flex:1;min-height:48px;max-width:210px;border:0;border-radius:12px;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:550}
+  .viewer-mobile-nav>button.active{background:var(--active-surface);color:var(--ink)}
+  .viewer-mobile-nav small{font-size:11px;color:var(--muted);font-weight:400}
+  .viewer-mobile-nav>button:active{background:var(--active-surface)}
+  .viewer-app[class*="immersive-"] .viewer-mobile-nav{opacity:0;transform:translateY(12px);visibility:hidden;pointer-events:none;transition:opacity .24s,transform .24s,visibility 0s .24s}
+  .viewer-app .card-handle{height:24px}
+  .viewer-app .photo-comparison.is-overlay .comparison-photo,.viewer-app .viewer-main.viewer-cards>.viewer-panel{padding-bottom:0}
+  .viewer-app .panel-heading{padding:8px 16px 14px}
+  .viewer-app .panel-heading .eyebrow{display:none}
+  .viewer-app .panel-heading h1{font-size:18px}
+  .viewer-app .panel-heading .icon-button{width:44px;height:44px}
+  .viewer-app .catalog-browse-controls{padding:0 16px 12px;gap:10px}
+  .viewer-app .catalog-filter-toggle{display:flex;min-height:44px;gap:7px;font-size:13px}
+  .catalog-filter-toggle>span{font-size:11px;border-radius:20px;padding:2px 6px;background:var(--active-surface)}
+  .viewer-app .filters{padding:0 16px 12px;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .viewer-app .filters .season-filter,.viewer-app .filters .time-filter,.viewer-app .filters .sort-filter{grid-column:auto}
+  .viewer-app .filters select{min-height:44px;font-size:13px}
+  .viewer-app .catalog-filter-row select,.viewer-app .filters select,.viewer-app .cluster-picker-filter select{font-size:16px}
+  .viewer-app .filter-results{padding:0 16px 12px;font-size:12px}
+  .viewer-app .gallery-grid{padding:0 16px 20px;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}
+  .viewer-app .gallery-card strong{font-size:13px;margin-top:8px}
+  .viewer-app .gallery-card span{font-size:11px;line-height:1.5}
+  .viewer-app .on-this-day{padding:0 16px 14px}
+  .viewer-app .on-this-day .gallery-grid{display:flex;padding:3px 3px 8px}
+  .viewer-app .on-this-day .gallery-card{flex-basis:120px}
+  .viewer-app .comparison-photo{overflow-y:auto;overscroll-behavior:contain}
+  .viewer-app .comparison-heading{padding:8px 14px;min-height:52px;gap:8px}
+  .photo-context strong{font-size:14px}
+  .photo-context>span{display:block;margin-top:4px;font-size:11px;color:var(--muted)}
+  .viewer-app .comparison-image{min-height:120px;padding:10px;flex-shrink:0}
+  .viewer-app .comparison-information{min-height:40px;max-height:55%;flex-shrink:0}
+  .viewer-app .comparison-information-toggle.button{min-height:36px;margin:4px 14px;padding:6px 10px;font-size:12px}
+  .viewer-app .comparison-information-toggle>small{display:none}
+  .viewer-app .comparison-information.is-open{min-height:230px}
+  .viewer-app .comparison-actions{padding:6px 14px 8px}
+  .viewer-app .photo-browse-actions{gap:6px;flex-wrap:wrap}
+  .viewer-app .photo-browse-actions .button{font-size:12px;min-height:40px;padding:8px 10px}
+  .viewer-app .photo-stepper .icon-button{width:40px;height:44px}
+  .viewer-app .comparison-overlay-actions{padding:8px 14px 4px}
+  .viewer-app .comparison-overlay-actions>.button{font-size:13px;min-height:44px}
+  .viewer-app .comparison-overlay-actions .field-help{font-size:10px;margin:3px 0}
+  .viewer-app .viewer-cards .map-tools .icon-button{width:44px;height:44px}
+  .viewer-app .viewer-cards .photo-comparison.is-overlay .map-tools{max-height:calc(100% - var(--map-free-top,0%) - var(--map-free-bottom,0%) - 24px)}
+  .viewer-app .map-tools{border-radius:12px}
+  .viewer-app .map-level-switch{left:14px;right:auto;top:calc(var(--map-free-top,0%) + 56px);flex-direction:row;gap:4px;padding:4px;border-radius:10px}
+  .viewer-app .map-level-switch>button{min-width:48px;min-height:44px;padding:6px 9px;font-size:12px}
+  .viewer-app .map-caption{font-size:12px}
+  .viewer-app .north-mark{height:36px}
+  .viewer-app .map-caption small{font-size:9px}
+  .viewer-app .map-help{font-size:10px}
+  .viewer-app .photo-cluster-picker{bottom:calc(78px + env(safe-area-inset-bottom));max-height:min(62%,520px);border-radius:16px}
+  .viewer-app .viewer-main.panel-open .photo-cluster-picker{bottom:calc(78px + env(safe-area-inset-bottom));max-height:min(70%,540px)}
+  .viewer-app .cluster-picker-heading{padding:12px 14px}
+  .viewer-app .cluster-picker-heading .icon-button{width:44px;height:44px}
+  .viewer-app .cluster-picker-grid{padding:14px;gap:18px 12px}
+  .viewer-app .cluster-picker-photo strong{font-size:13px}
+  .viewer-app .cluster-picker-photo span{font-size:11px}
+}
+@media(max-width:360px){.viewer-app .photo-stepper{justify-content:center;width:100%}.viewer-app .comparison-image{min-height:130px}}
+@media(prefers-reduced-motion:reduce){.viewer-app .viewer-mobile-nav{transition:none}}

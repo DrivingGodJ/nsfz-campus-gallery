@@ -38,6 +38,25 @@ test('browser packages preserve the original and annotations and email links tar
     assert.ok(!new URL(submissionMailto(safe.manifest, safe.filename)).searchParams.get('subject').includes('\n'));
   } finally { await f.cleanup(); }
 });
+
+test('aerial email packages remove place association and retain coordinates, altitude and originals', async () => {
+  const f = await fixture();
+  try {
+    const aerial = { ...annotation, captureType: 'aerial', locationId: 'legacy-place', buildingId: 'old-building',
+      altitude: { meters: 80, reference: 'takeoff' } };
+    const pack = await createPhotoPackage(f.file, aerial);
+    const decoded = await readPhotoPackage(pack.bytes);
+    assert.equal(Object.hasOwn(decoded.annotation, 'locationId'), false);
+    assert.equal(Object.hasOwn(decoded.annotation, 'buildingId'), false);
+    assert.deepEqual(decoded.annotation.position, { x: 0, z: 0 });
+    assert.deepEqual(decoded.annotation.altitude, aerial.altitude);
+    assert.equal(decoded.annotation.heading, aerial.heading); assert.equal(decoded.annotation.pitch, aerial.pitch);
+    assert.deepEqual(Buffer.from(decoded.original), f.bytes);
+    const imported = await importPhotoPackage(f.store, pack.bytes);
+    assert.equal(Object.hasOwn(imported.photo, 'locationId'), false);
+    assert.equal(Object.hasOwn(imported.photo, 'buildingId'), false);
+  } finally { await f.cleanup(); }
+});
 test('email packages import into private drafts with their location, floor and view ready for review', async () => {
   const f = await fixture();
   try {

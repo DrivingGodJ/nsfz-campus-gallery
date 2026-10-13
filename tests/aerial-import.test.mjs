@@ -96,7 +96,7 @@ test('missing, invalid, and outside-campus coordinates or altitudes retain a rec
   assert.equal(automaticPhotoPlacement(invalid, campus).placed, false, 'Invalid GPS minutes must not become a plausible campus location');
 });
 
-test('aerial import, association, edits, restore and static export preserve location and height', async () => {
+test('aerial imports, edits, legacy restore and static export omit place association but preserve coordinates and height', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nsfz-aerial-'));
   try {
     await fs.mkdir(path.join(root, 'public/data'), { recursive: true });
@@ -105,15 +105,27 @@ test('aerial import, association, edits, restore and static export preserve loca
     const store = createStore(root), bytes = withXMP(await image(), 'drone-dji:RelativeAltitude="+80.20"');
     const draft = await store.importPhoto(bytes);
     assert.equal(draft.placed, true); assert.equal(draft.captureType, 'aerial');
+    assert.equal(Object.hasOwn(draft, 'locationId'), false); assert.equal(Object.hasOwn(draft, 'buildingId'), false);
     const associated = assignPhotoLocation(draft, campus.buildings[0].id, campus, site);
+    assert.equal(Object.hasOwn(associated, 'locationId'), false); assert.equal(Object.hasOwn(associated, 'buildingId'), false);
     assert.equal(associated.floor, 0); assert.deepEqual(associated.altitude, draft.altitude); assert.deepEqual(associated.position, draft.position);
     assert.match(photoLocationText(associated, campus, site), /航拍$/);
-    await store.updateDraft(draft.id, { ...associated, metadata: {} });
+    const edited = await store.updateDraft(draft.id, { ...associated, metadata: {}, locationId: 'removed-place', buildingId: 'other-place' });
+    assert.equal(Object.hasOwn(edited, 'locationId'), false); assert.equal(Object.hasOwn(edited, 'buildingId'), false);
     const published = await store.publish(draft.id, 0);
     assert.equal(published.metadata.aerial.relativeAltitude, 80.2, 'Source metadata is immutable');
     await store.updatePhoto(draft.id, { ...published, altitude: { meters: 85, reference: 'takeoff' } }, 1);
-    await store.removePhoto(draft.id, 2); await store.restorePhoto(draft.id, 3);
+    await store.removePhoto(draft.id, 2);
+    const removedPath = path.join(root, '.local/removed', draft.id + '.json');
+    const removed = JSON.parse(await fs.readFile(removedPath));
+    removed.photo.locationId = 'legacy-place'; removed.photo.buildingId = 'legacy-building';
+    await fs.writeFile(removedPath, JSON.stringify(removed));
+    await store.restorePhoto(draft.id, 3);
     const restored = (await store.state()).site.photos[0];
+    for (const photo of [published, restored]) {
+      assert.equal(Object.hasOwn(photo, 'locationId'), false); assert.equal(Object.hasOwn(photo, 'buildingId'), false);
+      assert.equal(photo.heading, draft.heading); assert.equal(photo.pitch, draft.pitch);
+    }
     assert.deepEqual(restored.altitude, { meters: 85, reference: 'takeoff' }); assert.deepEqual(restored.position, draft.position);
     await exportStaticContent(root, path.join(root, 'out'));
     const exported = JSON.parse(await fs.readFile(path.join(root, 'out/data/site.json')));
@@ -121,7 +133,7 @@ test('aerial import, association, edits, restore and static export preserve loca
     assert.equal((await sharp(path.join(root, 'out', restored.files.download)).metadata()).exif, undefined);
     assert.throws(() => validatePhoto({ ...restored, altitude: { meters: Infinity, reference: 'takeoff' } }, restored, campus), /高度/);
     assert.throws(() => validatePhoto({ ...restored, altitude: undefined }, restored, campus), /没有读取到/);
-    const ground = validatePhoto({ ...restored, captureType: 'ground', floor: 3, position: { ...restored.position, height: 99 } }, restored, campus);
+    const ground = validatePhoto({ ...restored, captureType: 'ground', buildingId: campus.buildings[0].id, locationId: campus.buildings[0].id, floor: 3, position: { ...restored.position, height: 99 } }, restored, campus);
     assert.equal(ground.altitude, undefined); assert.equal(ground.position.height, undefined); assert.equal(ground.floor, 3);
     assert.equal(photoMapHeight(ground, campus, site), 11.4, 'Ground photos include the gym\'s lowered 2.6 metre base');
     const changed = { ...site, buildingOverrides: { [ground.buildingId]: { floors: 4, floorHeight: 4.2 } } };

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ArrowLeft, Crosshair, ImagePlus, Mail, Columns2, Download, Share2, X } from 'lucide-react';
 import { Brand, Notice } from './components';
 import { loadContent, headingText, type Campus, type Site, type Photo } from './types';
-import { assignPhotoLocation, campusFilterLocations, photoLocationId, isAerialPhoto } from './locations';
+import { assignPhotoLocation, campusFilterLocations, photoLocationId, isAerialPhoto, withoutAerialLocation } from './locations';
 import LocationOptions from './LocationOptions';
 import PhotoPositionFields from './PhotoPositionFields';
 import PhotoComparison from './PhotoComparison';
@@ -33,7 +33,7 @@ function Submit() {
   useEffect(()=>{const handler=(e:BeforeUnloadEvent)=>{if(entries.length&&!downloaded){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',handler);return()=>window.removeEventListener('beforeunload',handler);},[entries.length,downloaded]);
   const clearPackage=()=>{setPack(null);setPackageURL('');setShareFile(null);setDownloaded(false);setMessage('');};
   const persist=(next:SubmissionEntry[])=>{try{localStorage.setItem(CACHE,JSON.stringify({entries:next.map(entry=>({photo:entry.photo,filename:entry.file.name,size:entry.file.size,lastModified:entry.file.lastModified}))}));}catch{setError('浏览器暂存空间不足。请及时生成并下载照片包，当前内容仍在页面中。');}};
-  const change=(update:Partial<Photo>)=>{if(!photo || busy)return;const next=entries.map(entry=>entry.photo.id===photo.id?{...entry,photo:{...photo,...update}}:entry);setEntries(next);clearPackage();persist(next);};
+  const change=(update:Partial<Photo>)=>{if(!photo || busy)return;const next=entries.map(entry=>entry.photo.id===photo.id?{...entry,photo:withoutAerialLocation({...photo,...update})}:entry);setEntries(next);clearPackage();persist(next);};
   const [halfOverlay,setHalfOverlay]=useState(false);
   useEffect(()=>{if(!perspective)setHalfOverlay(false);},[perspective]);
   const toggleHalfOverlay=()=>{if(busy)return;setHalfOverlay(value=>!value);setPlacing(false);setComparing(true);setPerspective(true);};
@@ -74,7 +74,7 @@ function Submit() {
       if(cached?.filename===source.name && cached.size===source.size && cached.lastModified===source.lastModified && cached.photo) {
         next={...next,...cached.photo,metadata,id:next.id,files:next.files,width:next.width,height:next.height};
       }
-      return {file:source,photo:next,image:sourceURL};
+      return {file:source,photo:withoutAerialLocation(next),image:sourceURL};
     }catch(e){URL.revokeObjectURL(sourceURL);throw e;}
   };
   const choose=async(sources:File[])=>{
@@ -113,7 +113,7 @@ function Submit() {
     {message && <Notice kind="success">{message}</Notice>}
     {busy && <div className="busy-bar" role="status">{busy}</div>}
     <main className={'submission-main'+(comparing?' comparing':'')}><div className="submission-map" ref={mapElement}><PhotoComparison photo={comparing?photo:null} imageSource={image} footerActions={photo && perspective && <PhotoHalfOverlayButton photo={photo} active={halfOverlay} disabled={!!busy} onClick={toggleHalfOverlay}/>} navigation={<button className="button secondary" onClick={()=>{setComparing(false);setPerspective(false);setHalfOverlay(false);}}>继续标注</button>} actions={photo && <PhotoPerspectiveButton photo={photo} active={perspective} compact editor disabled={!!busy} onClick={togglePerspective}/>}>
-      {content ? <React.Suspense fallback={<div className="page-loading">正在绘制校园…</div>}><MapView campus={content.campus} site={content.site} photos={[]} editPhoto={photo} selectedLocation={location || ''} floor={photo?.floor} selectableLocationIds={locationIds} featuresSelectable photoPreview={comparing} photoPerspective={perspective} onExitPhotoPerspective={()=>{setPerspective(false);setHalfOverlay(false);}} photoViewDisabled={!!busy} onPhotoOrientation={change} onHeading={heading=>change({heading})} placing={placing&&!busy} onPlace={position=>{change({position,placed:true});setPlacing(false);}} photoImageSource={image} photoDepthSource={current?.depthImage} photoOverlayMode={halfOverlay?'translucent':'off'} onLocation={id=>{if(photo && locationIds.includes(id))change(assignPhotoLocation(photo,id,content.campus,content.site));}}/></React.Suspense>:<div className="page-loading">正在打开校园…</div>}
+      {content ? <React.Suspense fallback={<div className="page-loading">正在绘制校园…</div>}><MapView campus={content.campus} site={content.site} photos={[]} editPhoto={photo} selectedLocation={location || ''} floor={photo?.floor} selectableLocationIds={locationIds} featuresSelectable photoPreview={comparing} photoPerspective={perspective} onExitPhotoPerspective={()=>{setPerspective(false);setHalfOverlay(false);}} photoViewDisabled={!!busy} onPhotoOrientation={change} onHeading={heading=>change({heading})} placing={placing&&!busy} onPlace={position=>{change({position,placed:true});setPlacing(false);}} photoImageSource={image} photoDepthSource={current?.depthImage} photoOverlayMode={halfOverlay?'translucent':'off'} onLocation={id=>{if(photo && !isAerialPhoto(photo) && locationIds.includes(id))change(assignPhotoLocation(photo,id,content.campus,content.site));}}/></React.Suspense>:<div className="page-loading">正在打开校园…</div>}
       {photo && !comparing && <button className={'button placement-button '+(placing?'primary':'secondary')} onClick={()=>setPlacing(!placing)} disabled={!!busy}><Crosshair size={15}/>{placing?'点击地图标记位置':photo.placed?'重新标记拍摄位置':'标记拍摄位置'}</button>}
     </PhotoComparison></div>
     <aside className="submission-form">
@@ -132,7 +132,7 @@ function Submit() {
       <PhotoDepthField attached={current?.depthFile?.name} disabled={!!busy} onChoose={file=>void chooseDepth(file)} onRemove={()=>void chooseDepth(null)}/><fieldset className="submission-fields" disabled={!!busy}><label>照片标题<input maxLength={160} value={photo.title} onChange={e=>change({title:e.target.value})}/></label><label>文字描述<textarea maxLength={10000} value={photo.description} onChange={e=>change({description:e.target.value})}/></label>
         <label>拍摄日期与时间<input type="datetime-local" step={1} value={photo.capturedAt.includes('T')?photo.capturedAt:photo.capturedAt?photo.capturedAt+'T00:00':''} onChange={e=>change({capturedAt:e.target.value})}/></label>
         <label>作者<input maxLength={200} value={photo.author || ''} placeholder="原片未提供，可留空" onChange={e=>change({author:e.target.value})}/></label><label>版权信息<textarea maxLength={3000} value={photo.copyright || ''} placeholder="原片未提供，可留空" onChange={e=>change({copyright:e.target.value})}/></label>
-        <label>拍摄地点<select aria-label="拍摄地点" value={location || ''} onChange={e=>change(assignPhotoLocation(photo,e.target.value,content.campus,content.site))}><option value="">校园室外（未指定地点）</option><LocationOptions campus={content.campus} site={content.site}/></select></label>
+        {!isAerialPhoto(photo) && <label>拍摄地点<select aria-label="拍摄地点" value={location || ''} onChange={e=>change(assignPhotoLocation(photo,e.target.value,content.campus,content.site))}><option value="">校园室外（未指定地点）</option><LocationOptions campus={content.campus} site={content.site}/></select></label>}
         <PhotoPositionFields photo={photo} campus={content.campus} site={content.site} onChange={change}/>
         <details className="precision"><summary>精确水平位置</summary><div className="field-pair"><label>东西 / m<input type="number" step={.1} value={Number(photo.position.x.toFixed(1))} onChange={e=>change({position:{...photo.position,x:Number(e.target.value)},placed:true})}/></label><label>南北 / m<input type="number" step={.1} value={Number(photo.position.z.toFixed(1))} onChange={e=>change({position:{...photo.position,z:Number(e.target.value)},placed:true})}/></label></div></details>
         <label>水平朝向<span className="range-value">{headingText(photo.heading)}</span><input type="range" min={0} max={359} value={photo.heading} onChange={e=>change({heading:Number(e.target.value)})}/></label><label>仰俯角<span className="range-value">{photo.pitch.toFixed(1)}°</span><input type="range" min={-90} max={90} value={photo.pitch} onChange={e=>change({pitch:Number(e.target.value)})}/></label>

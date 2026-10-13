@@ -35,7 +35,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
   groundHeight?: number;
   photoHeightRange?: { min: number; max: number };
   visibleViewport?: MapViewport;
-  onMoving: (value: boolean) => void; onCompact: (value: boolean) => void; onAzimuth: (value: number) => void;
+  onMoving: (value: boolean) => void; onCompact?: (value: boolean) => void; onAzimuth: (value: number) => void;
   onPhotoOrientation?: (orientation: PhotoViewAdjustment) => void;
   onSelectionOutOfView?: () => void;
 }) {
@@ -127,7 +127,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
 
   useEffect(() => {
     const surface = gl.domElement.closest?.('.map-stage') || gl.domElement;
-    const interrupt = () => { activateMapInput(); };
+    const interrupt = (event: Event) => { if (!(event.target as Element)?.closest?.('.map-floor-slider')) activateMapInput(); };
     surface.addEventListener('pointerdown', interrupt, true);
     surface.addEventListener('wheel', interrupt, true);
     return () => { surface.removeEventListener('pointerdown', interrupt, true); surface.removeEventListener('wheel', interrupt, true); };
@@ -223,7 +223,7 @@ export default function MapCameraRig({ command, selectedObjectTarget, selectedOb
     }
     const target = control.target;
     const compact = mapGroundViewDistance(camera, live.current.groundHeight) > 360;
-    if (compact !== lastCompact.current) { lastCompact.current = compact; onCompact(compact); }
+    if (compact !== lastCompact.current) { lastCompact.current = compact; onCompact?.(compact); }
     const center = target.clone().project(camera), north = target.clone().add(new THREE.Vector3(0, 0, -10)).project(camera);
     const angle = Math.round(Math.atan2((north.x - center.x) * size.width, (north.y - center.y) * size.height) * 180 / Math.PI);
     if (Number.isFinite(angle) && angle !== lastAzimuth.current) { lastAzimuth.current = angle; onAzimuth(angle); }

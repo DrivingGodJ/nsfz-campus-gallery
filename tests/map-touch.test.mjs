@@ -6,13 +6,14 @@ import { PerspectiveCamera, Vector3 } from 'three';
 
 const fixture = () => {
   const document = new EventTarget(), window = new EventTarget(), surface = new EventTarget();
-  const canvas = new EventTarget(), photo = new EventTarget(), location = new EventTarget(), image = new EventTarget(), button = new EventTarget(), outside = new EventTarget(), captures = new Set();
-  const mapNodes = new Set([canvas, photo, location, image, button]);
+  const canvas = new EventTarget(), photo = new EventTarget(), location = new EventTarget(), image = new EventTarget(), button = new EventTarget(), slider = new EventTarget(), outside = new EventTarget(), captures = new Set();
+  const mapNodes = new Set([canvas, photo, location, image, button, slider]);
+  Object.assign(slider, { closest: selector => selector === '.map-floor-slider' ? slider : null });
   for (const label of [photo, location]) Object.assign(label, { closest: selector => selector.includes('.map-photo') ? label : null });
   Object.assign(image, { closest: selector => selector.includes('.map-photo') ? photo : null });
   Object.assign(surface, { contains: node => mapNodes.has(node) });
   Object.assign(document, { defaultView: window });
-  Object.assign(canvas, { ownerDocument: document, closest: () => surface, clientHeight: 600,
+  Object.assign(canvas, { ownerDocument: document, closest: selector => selector === '.map-stage' ? surface : null, clientHeight: 600,
     setPointerCapture: id => captures.add(id), hasPointerCapture: id => captures.has(id), releasePointerCapture: id => captures.delete(id) });
   const send = (target, type, values = {}, receiver = document) => {
     const event = new Event(type, { cancelable: true });
@@ -25,7 +26,7 @@ const fixture = () => {
   const dispose = bindMapTouchControls(canvas, { enabled: () => enabled,
     travel: value => calls.travel.push(value), pan: (dx, dy) => calls.pan.push([dx, dy]), multiTouch: active => calls.lock.push(active),
     single: { start: event => calls.start.push(event.pointerId), move: event => calls.move.push(event.pointerId), finish: () => calls.finish++ } });
-  return { document, window, surface, canvas, photo, location, image, button, outside, captures, calls, send, pointer, dispose, enable: value => { enabled = value; } };
+  return { document, window, surface, canvas, photo, location, image, button, slider, outside, captures, calls, send, pointer, dispose, enable: value => { enabled = value; } };
 };
 
 test('photo and location labels drag the map while taps and slight finger jitter still select the label', () => {
@@ -50,6 +51,20 @@ test('photo and location labels drag the map while taps and slight finger jitter
     assert.equal(f.send(label,'click',{detail:1}).defaultPrevented,false,'The next tap is usable');
     f.dispose();
   }
+});
+
+test('floor slider contacts keep native input and never enter map orbit or pinch capture', () => {
+  const f = fixture();
+  f.pointer(f.slider, 'pointerdown', 1); f.pointer(f.slider, 'pointermove', 1, 100, 160);
+  f.pointer(f.slider, 'pointerdown', 2, 200);
+  assert.equal(f.send(f.slider, 'touchmove', { touches: [{ target: f.slider }, { target: f.slider }] }).defaultPrevented, false);
+  assert.equal(f.captures.size, 0);
+  assert.deepEqual(f.calls.start, []); assert.deepEqual(f.calls.move, []); assert.deepEqual(f.calls.lock, []);
+  assert.deepEqual(f.calls.travel, []);
+  f.pointer(f.slider, 'pointerup', 1); f.pointer(f.slider, 'pointerup', 2);
+  f.pointer(f.canvas, 'pointerdown', 3); f.pointer(f.canvas, 'pointermove', 3, 120); f.pointer(f.canvas, 'pointerup', 3);
+  assert.deepEqual(f.calls.start, [3]); assert.deepEqual(f.calls.move, [3]);
+  f.dispose();
 });
 
 test('pinches spanning the canvas, photos, controls and page boundary travel without single-finger rotation in either touch order', () => {
@@ -137,6 +152,9 @@ test('trackpad pinch on floating UI controls the map but normal wheel scrolling 
   assert.deepEqual(steps, [.2]);
   assert.equal(f.send(menu, 'wheel', { deltaY: 60, deltaMode: 0 }, f.surface).defaultPrevented, false);
   assert.deepEqual(steps, [.2]);
+  assert.equal(f.send(f.slider, 'wheel', { deltaY: 60, deltaMode: 0 }, f.surface).defaultPrevented, false);
+  assert.equal(f.send(f.slider, 'wheel', { deltaY: -20, deltaMode: 0, ctrlKey: true }, f.surface).defaultPrevented, false);
+  assert.deepEqual(steps, [.2], 'Floor controls do not travel the map or steal native slider input');
   enabled = false;
   assert.equal(f.send(f.photo, 'wheel', { deltaY: -20, deltaMode: 0, ctrlKey: true }, f.surface).defaultPrevented, true);
   assert.deepEqual(steps, [.2], 'Fixed photo perspective must not zoom the browser or move the camera');

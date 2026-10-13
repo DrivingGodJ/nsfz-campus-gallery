@@ -1,4 +1,5 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import { isAerialPhoto, withoutAerialLocation } from './photo-capture.mjs';
 
 export const SUBMISSION_EMAIL = 'drivinggodj@icloud.com';
 export const MAX_DEPTH_BYTES = 10 * 1024 * 1024;
@@ -15,7 +16,8 @@ export function packageAnnotation(photo) {
   if (photo.cameraHeight !== undefined && (!Number.isFinite(photo.cameraHeight) || photo.cameraHeight < .1 || photo.cameraHeight > 11.9)) throw new Error('拍摄高度需在 0.1 到 11.9 米之间。');
   const annotation = Object.fromEntries(annotationFields.filter(key => photo[key] !== undefined).map(key => [key, photo[key]]));
   annotation.position = { x: photo.position?.x, z: photo.position?.z };
-  return annotation;
+  if (isAerialPhoto(photo)) annotation.captureType = 'aerial';
+  return withoutAerialLocation(annotation);
 }
 async function sha256(bytes) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');

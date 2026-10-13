@@ -7,17 +7,17 @@ import PhotoImage from './PhotoImage';
 import PhotoInformation from './PhotoInformation';
 import CardHandle, { type CardSizing } from './CardHandle';
 
-export default function PhotoComparison({ children, photo, imageSource, highQuality = false, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions, sideBySide = false, card }: {
+export default function PhotoComparison({ children, photo, imageSource, highQuality = false, heading, navigation, actions, information, informationAfterImage = false, onOpen, openLabel, openHelp, openDisabled, footerActions, sideBySide = false, card }: {
   children: ReactNode; photo?: Photo | null; imageSource?: string;
   highQuality?: boolean;
-  navigation?: ReactNode; actions?: ReactNode; information?: ReactNode; onOpen?: () => void; openLabel?: string; openHelp?: string; openDisabled?: string; footerActions?: ReactNode;
+  heading?: ReactNode; navigation?: ReactNode; actions?: ReactNode; information?: ReactNode; informationAfterImage?: boolean; onOpen?: () => void; openLabel?: string; openHelp?: string; openDisabled?: string; footerActions?: ReactNode;
   sideBySide?: boolean;
   card?: { style: CSSProperties; sizing: CardSizing };
 }) {
   const presence = useAnimatedPresence(!!photo);
-  const retained = useRef({ photo, imageSource, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions });
-  if (photo) retained.current = { photo, imageSource, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions };
-  const displayed = photo ? { photo, imageSource, navigation, actions, information, onOpen, openLabel, openHelp, openDisabled, footerActions } : retained.current;
+  const retained = useRef({ photo, imageSource, heading, navigation, actions, information, informationAfterImage, onOpen, openLabel, openHelp, openDisabled, footerActions });
+  if (photo) retained.current = { photo, imageSource, heading, navigation, actions, information, informationAfterImage, onOpen, openLabel, openHelp, openDisabled, footerActions };
+  const displayed = photo ? { photo, imageSource, heading, navigation, actions, information, informationAfterImage, onOpen, openLabel, openHelp, openDisabled, footerActions } : retained.current;
   const displayedPhoto = photo || (presence.present ? displayed.photo : null);
   const container = useRef<HTMLDivElement>(null);
   const drag = useRef<{ start: number; share: number; length: number } | null>(null);
@@ -58,8 +58,8 @@ export default function PhotoComparison({ children, photo, imageSource, highQual
       }}><span aria-hidden="true" /></div>}
       <section className="comparison-photo" style={card?.style} aria-label="原照片" aria-hidden={!photo} inert={!photo}>
         {card && <CardHandle label="调整照片预览卡片大小" sizing={card.sizing} />}
-        <div className="comparison-heading"><div><span className="eyebrow">原照片</span><strong>{displayedPhoto.title}</strong></div>{displayed.navigation}</div>
-        {displayed.information && <PhotoInformation photoId={displayedPhoto.id}>{displayed.information}</PhotoInformation>}
+        <div className="comparison-heading"><div>{displayed.heading ?? <><span className="eyebrow">原照片</span><strong>{displayedPhoto.title}</strong></>}</div>{displayed.navigation}</div>
+        {displayed.information && !displayed.informationAfterImage && <PhotoInformation photoId={displayedPhoto.id}>{displayed.information}</PhotoInformation>}
         {displayed.onOpen ? <button className="comparison-image" onClick={displayed.onOpen} disabled={!!displayed.openDisabled} aria-label={(displayed.openLabel || '全屏查看照片') + '：' + displayedPhoto.title}>
           <PhotoImage src={displayed.imageSource || asset(photoDisplayFile(displayedPhoto))} managed={highQuality && !displayed.imageSource} fallbackSrc={displayed.imageSource ? undefined : asset(displayedPhoto.files.thumbnail)} alt={displayedPhoto.title} />
           {!displayed.openLabel && <span><Maximize2 size={15} />全屏照片</span>}
@@ -70,6 +70,7 @@ export default function PhotoComparison({ children, photo, imageSource, highQual
           {(displayed.openDisabled || displayed.openHelp) && <p className="field-help">{displayed.openDisabled || displayed.openHelp}</p>}
         </div>}
         {displayed.actions && <div className="comparison-actions">{displayed.actions}</div>}
+        {displayed.information && displayed.informationAfterImage && <PhotoInformation photoId={displayedPhoto.id}>{displayed.information}</PhotoInformation>}
       </section>
     </>}
   </div>;

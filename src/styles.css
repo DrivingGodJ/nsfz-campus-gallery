@@ -184,19 +184,11 @@ button.comparison-image{cursor:zoom-in}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 @media(max-width:760px){.photo-like-button{padding:9px 11px;min-height:40px;font-size:12px}.catalog-likes-status{padding-inline:20px}}
 .filter-results{padding:0 23px 14px;color:var(--muted);font-size:11px}
-.map-photo-point{display:block;width:6px;height:6px;border-radius:50%;border:1px solid var(--thumb-border,#faf9f4);box-shadow:0 1px 2px #0003;transition:opacity .15s;pointer-events:none}
-.map-photo-point.selected{width:8px;height:8px}
-.map-photo.aerial{border-color:var(--photo-accent)}
-.map-photo.aerial.selected{border-color:var(--photo-selected)}
-.map-photo.mixed:not(.selected){border-color:transparent;background-image:linear-gradient(135deg,var(--photo-accent) 50%,var(--thumb-border,#faf9f4) 50%)}
 .map-photo.aerial .cluster-count{background:var(--photo-accent)}
 /* Likes warm the photo frame without changing selection, grouping or image size. */
 .map-photo{--photo-frame-base:var(--thumb-border,#faf9f4)}
 .map-photo.selected{--photo-frame-base:var(--selected,#4a6a51)}
-.map-photo.aerial{--photo-frame-base:var(--photo-accent)}
-.map-photo.aerial.selected{--photo-frame-base:var(--photo-selected)}
 .map-photo,.map-photo.selected,.map-photo.aerial,.map-photo.aerial.selected{border-color:color-mix(in srgb,var(--photo-frame-base),#dc3e43 var(--photo-like-red,0%))}
-.map-photo.mixed:not(.selected){border-color:transparent;background-image:linear-gradient(135deg,color-mix(in srgb,var(--photo-accent),#dc3e43 var(--photo-like-red,0%)) 50%,color-mix(in srgb,var(--thumb-border,#faf9f4),#dc3e43 var(--photo-like-red,0%)) 50%)}
 .gallery-card img,.cluster-picker-photo img{box-shadow:0 0 0 2px color-mix(in srgb,transparent,#dc3e43 var(--photo-like-red,0%));transition:box-shadow .18s}
 .map-photo.compact{width:44px;height:36px}
 .map-photo.collage.compact{width:60px;height:48px}
@@ -217,6 +209,13 @@ button.comparison-image{cursor:zoom-in}
 .photo-cluster-picker.is-visible{opacity:1;transform:translateY(0);pointer-events:auto}
 .map-photo,.location-name,.building-label,.structure-label{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .map-photo{transition:width .18s,height .18s,border-color .18s,opacity .22s ease}
+.map-photo.spatial-photo{min-width:44px;min-height:44px;border-width:2px}
+.map-photo-layer{position:absolute;inset:0;z-index:10;isolation:isolate;pointer-events:none}
+.overflow-collection-label{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 2px 2px;background:var(--floating,#faf9f4ee);color:var(--ink);font-size:10px;line-height:16px;pointer-events:none}
+.map-photo.overflow-collection{border-style:dashed}
+.map-photo.spatial-photo::before{inset:0}
+.region-collection-label{position:absolute;left:50%;bottom:-21px;transform:translateX(-50%);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;padding:2px 5px;background:var(--floating,#faf9f4ee);color:var(--ink);font-size:10px;line-height:15px;pointer-events:none}
+.map-photo.spatial-photo .cluster-count{right:-6px;top:-6px;min-width:20px;height:20px;line-height:16px}
 @media(max-width:760px){
   .filters{grid-template-columns:1.4fr .9fr 1fr;gap:8px}
   .season-filter{grid-column:auto}
