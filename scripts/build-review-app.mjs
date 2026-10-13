@@ -13,19 +13,23 @@ const name = '附中影像审核.app', app = path.join(directory, name), content
 const version = '22.23.3', runtimeName = `node-v${version}-darwin-arm64`;
 const archive = path.join(directory, 'runtime-download/node.tar.gz');
 const expected = '23b25245dcfb9af7262f8ff142e9e2e0af025368117329e7a7458a51e5922f53';
-await fs.mkdir(path.dirname(archive), { recursive: true });
-try { await fs.access(archive); }
-catch { execFileSync('curl', ['-fsSL', '--max-time', '180', `https://nodejs.org/dist/v${version}/${runtimeName}.tar.gz`, '-o', archive], { stdio: 'inherit' }); }
-if (crypto.createHash('sha256').update(await fs.readFile(archive)).digest('hex') !== expected) throw new Error('Node 运行组件校验失败，请重新下载。');
-try { await fs.access(path.join(directory, runtimeName, 'bin/node')); }
-catch { execFileSync('/usr/bin/tar', ['-xzf', archive, '-C', directory]); }
+let runtime = path.resolve(path.dirname(process.execPath), '..');
+if (process.versions.node !== version || !await fs.access(path.join(runtime, 'lib/node_modules/npm/bin/npm-cli.js')).then(() => true).catch(() => false)) {
+  runtime = path.join(directory, runtimeName);
+  await fs.mkdir(path.dirname(archive), { recursive: true });
+  try { await fs.access(archive); }
+  catch { execFileSync('curl', ['-fsSL', '--max-time', '180', `https://nodejs.org/dist/v${version}/${runtimeName}.tar.gz`, '-o', archive], { stdio: 'inherit' }); }
+  if (crypto.createHash('sha256').update(await fs.readFile(archive)).digest('hex') !== expected) throw new Error('Node 运行组件校验失败，请重新下载。');
+  try { await fs.access(path.join(runtime, 'bin/node')); }
+  catch { execFileSync('/usr/bin/tar', ['-xzf', archive, '-C', directory]); }
+}
 // Only replace this script's own reproducible build, never the content library.
 await fs.rm(app, { recursive: true, force: true });
 await fs.mkdir(path.join(contents, 'MacOS'), { recursive: true });
 await fs.mkdir(resources, { recursive: true });
 await fs.mkdir(path.join(resources, 'runtime/bin'), { recursive: true });
-await fs.copyFile(path.join(directory, runtimeName, 'bin/node'), path.join(resources, 'runtime/bin/node'), constants.COPYFILE_FICLONE);
-await fs.cp(path.join(directory, runtimeName, 'lib/node_modules/npm'), path.join(resources, 'runtime/lib/node_modules/npm'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
+await fs.copyFile(path.join(runtime, 'bin/node'), path.join(resources, 'runtime/bin/node'), constants.COPYFILE_FICLONE);
+await fs.cp(await fs.realpath(path.join(runtime, 'lib/node_modules/npm')), path.join(resources, 'runtime/lib/node_modules/npm'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
 await fs.copyFile(path.join(root, 'desktop/bootstrap.mjs'), path.join(resources, 'bootstrap.mjs'));
 const project = path.join(resources, 'project');
 // A shallow committed snapshot excludes photos, private imports and build caches.
@@ -35,7 +39,7 @@ if (execFileSync('/usr/bin/git', ['status', '--porcelain', '--untracked-files=no
 if (execFileSync('/usr/bin/git', ['branch', '--show-current'], { cwd: root, encoding: 'utf8' }).trim() !== 'main') throw new Error('请从正式 main 分支生成审核应用。');
 execFileSync('/usr/bin/git', ['clone', '--depth', '50', '--branch', 'main', 'file://' + root, project], { stdio: 'inherit' });
 execFileSync('/usr/bin/git', ['remote', 'set-url', 'origin', remote], { cwd: project });
-await fs.cp(path.join(root, 'node_modules'), path.join(project, 'node_modules'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: source => !['.vite', '.vite-temp', '.cache', '.mf'].includes(path.basename(source)) });
+await fs.cp(await fs.realpath(path.join(root, 'node_modules')), path.join(project, 'node_modules'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: source => !['.vite', '.vite-temp', '.cache', '.mf'].includes(path.basename(source)) });
 for (const component of ['depth-tools', 'models']) {
   const source = path.join(root, '.local', component);
   if (await fs.access(source).then(() => true).catch(() => false)) await fs.cp(await fs.realpath(source), path.join(resources, 'depth-components', component), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: file => !['.vite', '.cache'].includes(path.basename(file)) });

@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 import sharp from 'sharp';
 import {getPlatformProxy} from 'wrangler';
 import {handleSubmissions,cleanupSubmissions,validateAnnotation,MAX_PHOTO_BYTES} from '../worker/src/submissions.mjs';
@@ -16,7 +17,7 @@ import {campusFilterLocations} from '../src/locations.ts';
 
 const origin='https://campus.example';
 async function fixture(){
-  const proxy=await getPlatformProxy({configPath:new URL('../worker/wrangler.jsonc',import.meta.url).pathname,persist:false,remoteBindings:false});
+  const proxy=await getPlatformProxy({configPath:fileURLToPath(new URL('../worker/wrangler.jsonc',import.meta.url)),persist:false,remoteBindings:false});
   for(const name of ['0001_likes.sql','0002_submissions.sql']) for(const sql of (await fs.readFile(new URL('../worker/migrations/'+name,import.meta.url),'utf8')).split(';').map(s=>s.trim()).filter(Boolean))await proxy.env.DB.prepare(sql).run();
   const campus=JSON.parse(await fs.readFile(new URL('../worker/src/submission-campus.json',import.meta.url),'utf8'));
   const env={...proxy.env,ALLOWED_ORIGINS:origin,SUBMISSIONS_OWNER_TOKEN:'a'.repeat(64),SUBMISSIONS_LIMITER:{limit:async()=>({success:true})}};
@@ -120,7 +121,7 @@ test('review pagination includes records sharing an identical timestamp',async()
 test('owner review retains drafts privately, publishes once, and recovers cloud acknowledgment failure',async()=>{
  const f=await fixture(),root=await fs.mkdtemp(path.join(os.tmpdir(),'nsfz-review-')),original=globalThis.fetch;try{
   await fs.mkdir(path.join(root,'public/data'),{recursive:true});await fs.copyFile(new URL('../public/data/campus.json',import.meta.url),path.join(root,'public/data/campus.json'));await fs.copyFile(new URL('../public/favicon.svg',import.meta.url),path.join(root,'public/favicon.svg'));
-  const store=createStore(root),review=createReviewService(store,new URL('..',import.meta.url).pathname);
+  const store=createStore(root),review=createReviewService(store,fileURLToPath(new URL('..',import.meta.url)));
   await review.configure({mode:'cloud',url:'https://service.example',ownerToken:f.env.SUBMISSIONS_OWNER_TOKEN});
   const bytes=await sharp({create:{width:60,height:40,channels:3,background:'#557755'}}).jpeg().toBuffer(),input={...f.input(),size:bytes.length};await f.call('start',input);await f.env.UPLOADS.put('pending/'+input.id+'/source',bytes);await f.call('complete',input);f.advance(300001);
   let failDecision=true;globalThis.fetch=async req=>{if(req.url.endsWith('/decision') && failDecision)return Response.json({error:'模拟连接中断'},{status:503});return handleSubmissions(req,f.env,f.campus,f.deps);};

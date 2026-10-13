@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { getPlatformProxy } from 'wrangler';
 import { handleLikes } from '../worker/src/likes.mjs';
 import { persistentVisitor, createLikesClient, VISITOR_KEY } from '../src/likes-api.ts';
@@ -9,7 +10,7 @@ import { sortPhotos } from '../src/photo-sort.ts';
 
 const origin = 'https://campus.example';
 async function fixture() {
-  const proxy = await getPlatformProxy({ configPath: new URL('../worker/wrangler.jsonc', import.meta.url).pathname, persist: false, remoteBindings: false });
+  const proxy = await getPlatformProxy({ configPath: fileURLToPath(new URL('../worker/wrangler.jsonc', import.meta.url)), persist: false, remoteBindings: false });
   await proxy.env.DB.prepare(await fs.readFile(new URL('../worker/migrations/0001_likes.sql', import.meta.url), 'utf8')).run();
   const ids = [crypto.randomUUID(), crypto.randomUUID()], visitorId = crypto.randomUUID();
   const env = { ...proxy.env, ALLOWED_ORIGINS: origin };

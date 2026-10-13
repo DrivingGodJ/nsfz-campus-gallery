@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { createNASCacheService } from '../server/nas-cache.mjs';
 
 const id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -35,7 +36,7 @@ async function fixture(t) {
 test('NAS download restores public and private photos; clear leaves metadata, source and software intact', async t => {
   const { root, gallery, service } = await fixture(t);
   await write(root, 'src/source.ts', 'keep software');
-  await write(root, '.local/vite/compiled.js', 'derived cache');
+  await write(root, '.local/vite/compiled.js', 'keep active program cache');
   await write(root, '.local/deployment/media-assets/' + picture.slice(7), 'disposable publication copy');
   const publication = '.local/publication/' + id;
   await write(root, publication + '/build/media/old.webp', 'old publication image');
@@ -54,7 +55,7 @@ test('NAS download restores public and private photos; clear leaves metadata, so
   const cleared = await service.clear();
   assert.equal(cleared.cached, false); assert.equal(cleared.deleted, 4);
   await assert.rejects(fs.access(path.join(root, picture)), { code: 'ENOENT' });
-  await assert.rejects(fs.access(path.join(root, '.local/vite')), { code: 'ENOENT' });
+  assert.equal(await fs.readFile(path.join(root, '.local/vite/compiled.js'), 'utf8'), 'keep active program cache');
   await assert.rejects(fs.access(path.join(root, '.local/deployment/media-assets')), { code: 'ENOENT' });
   await assert.rejects(fs.access(path.join(root, publication + '/build')), { code: 'ENOENT' });
   await assert.rejects(fs.access(path.join(root, partial)), { code: 'ENOENT' });
@@ -64,6 +65,31 @@ test('NAS download restores public and private photos; clear leaves metadata, so
   assert.equal(await fs.readFile(path.join(root, 'public/data/site.json'), 'utf8'), JSON.stringify(site));
   assert.equal(await fs.readFile(path.join(gallery, picture), 'utf8'), 'processed image');
   assert.equal((await service.download()).cached, true);
+});
+
+test('photo cleanup keeps an active Vite optimized module available after page reload', async t => {
+  const { root, service } = await fixture(t);
+  const { createServer } = await import('vite');
+  await fs.symlink(fileURLToPath(new URL('../node_modules', import.meta.url)), path.join(root, 'node_modules'));
+  await write(root, 'index.html', '<script type="module" src="/entry.js"></script>');
+  await write(root, 'entry.js', 'import { strToU8 } from "fflate"; console.log(strToU8("photo"));');
+  const server = await createServer({ root, configFile: false, cacheDir: path.join(root, '.local/vite'), optimizeDeps: { include: ['fflate'] }, server: { host: '127.0.0.1', port: 0 } });
+  try {
+    await server.listen();
+    const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
+    const entry = await (await fetch(origin + '/entry.js')).text();
+    const optimized = entry.match(/"([^"\n]*\/deps\/fflate\.js\?v=[^"\n]+)"/);
+    assert.ok(optimized, 'Vite transformed the entry to a real optimized dependency URL');
+    const before = await fetch(origin + optimized[1]);
+    assert.equal(before.status, 200);
+    const bytes = await before.text();
+    await service.download();
+    await service.clear();
+    const after = await fetch(origin + optimized[1]);
+    assert.equal(after.status, 200);
+    assert.equal(await after.text(), bytes);
+    await assert.rejects(fs.access(path.join(root, picture)), { code: 'ENOENT' });
+  } finally { await server.close(); }
 });
 
 test('download and clear refuse unsynced changes; sync verifies and preserves private originals', async t => {

@@ -14,7 +14,8 @@ export const PHOTO_CACHE_PATHS = ['public/media', '.local/originals', '.local/dr
 const PRIVATE_SETTINGS = '.local/submission-service.json';
 const METADATA_PATHS = ['public/data/site.json', 'public/data/campus.json', '.local/drafts.json', '.local/submission-reviews.json', PRIVATE_SETTINGS];
 const CONTENT_PATHS = [...PHOTO_CACHE_PATHS, ...METADATA_PATHS];
-const DERIVED_CACHE_PATHS = ['.local/vite', '.local/deployment/media-assets'];
+// The running Vite server still references its optimized modules after reload.
+const DERIVED_CACHE_PATHS = ['.local/deployment/media-assets'];
 const STAGED_COPY = /\.[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.nas-tmp$/;
 const exists = file => fs.lstat(file).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
 const digest = async file => {

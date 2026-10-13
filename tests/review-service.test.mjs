@@ -209,7 +209,8 @@ test('Mac window close preserves the editor and service; reopen reuses them; app
   await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
   const port = reservation.address().port;
   await new Promise(resolve => reservation.close(resolve));
-  const child = spawn(binary, [resources, String(port)], {
+  // Override an earlier test/app's saved library path in the argument domain.
+  const child = spawn(binary, [resources, String(port), '-contentRoot', root], {
     env: { ...process.env, CAMPUS_CONTENT_ROOT: directory }, stdio: ['ignore', 'pipe', 'pipe']
   });
   let output = '';
