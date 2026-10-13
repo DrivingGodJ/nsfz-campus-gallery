@@ -41,7 +41,7 @@ export async function collectMediaAssets(root) {
   return { assets, photoCount: site.photos.length, revision: site.revision };
 }
 
-export async function prepareMediaAssets(root, { destination = path.join(root, '.local/deployment/media-assets'), previousSite } = {}) {
+export async function prepareMediaAssets(root, { destination = path.join(root, '.local/deployment/media-assets'), previousSite, mediaRoot = process.env.CAMPUS_MEDIA_ROOT || path.resolve(root, '../nsfz-campus-media') } = {}) {
   const manifest = await collectMediaAssets(root);
   const publicRoot = await fs.realpath(path.join(root, 'public'));
   // Keep files that the current live site still needs until Pages switches.
@@ -71,7 +71,7 @@ export async function prepareMediaAssets(root, { destination = path.join(root, '
     for (const [key, downloadBytes] of retained) {
       let source = path.join(publicRoot, key);
       try { await fs.access(source); }
-      catch (error) { if (error.code !== 'ENOENT') throw error; source = path.join(await fs.realpath(path.resolve(root, '../nsfz-campus-media')), key); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; source = path.join(await fs.realpath(mediaRoot), key); }
       const stats = await fs.lstat(source);
       if (!stats.isFile() || await fs.realpath(source) !== source || stats.size <= 0 || stats.size > MAX_ASSET_BYTES
         || key.endsWith('/download.jpg') && (stats.size > PHOTO_DOWNLOAD_MAX_BYTES || stats.size !== downloadBytes)) throw new UserError('缺少有效的旧版公开图片，未更改图片托管：' + key);

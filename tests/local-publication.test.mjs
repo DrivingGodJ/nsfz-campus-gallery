@@ -15,6 +15,23 @@ test('publication includes only the public content library and approved renditio
   assert.deepEqual(photoChanges({ photos: [{ id: 'a', title: 'old' }, { id: 'removed' }], buildingOverrides: {} }, { photos: [{ id: 'a', title: 'new' }, { id: 'new' }], buildingOverrides: {} }), { added: 1, updated: 1, removed: 1, buildingChanged: false });
 });
 
+test('NAS availability is checked before publication and failed sync preserves the published result and local photos', async t => {
+  const unavailable = await fixture(t, { beforePublish: async () => { throw new Error('NAS 未连接'); } });
+  await unavailable.service.start();
+  const blocked = await finished(unavailable.service);
+  assert.equal(blocked.status, 'failed'); assert.match(blocked.message, /NAS 未连接/);
+  assert.ok(!unavailable.commands.some(row => row[0] === 'git' && row[1] === 'push'));
+  let call;
+  const published = await fixture(t, { afterPublish: async value => { call = value; throw new Error('NAS 同步中断'); } });
+  await published.service.start();
+  const partial = await finished(published.service);
+  assert.deepEqual(call, { commit: 'a'.repeat(40) });
+  assert.equal(partial.websiteVerified, true); assert.equal(partial.status, 'failed');
+  assert.match(partial.message, /网站已上线，但 NAS 同步尚未完成/);
+  assert.equal(JSON.parse(await fs.readFile(path.join(published.root, 'public/data/site.json'))).photos.length, 1);
+  assert.ok(published.commands.flat().includes('likes:deploy:only'));
+});
+
 async function fixture(t, options = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'campus-publication-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -83,7 +100,7 @@ async function fixture(t, options = {}) {
     const published = options.remoteLibrary || current;
     return new Response(JSON.stringify(published), { status: options.responseStatus || 200 });
   };
-  const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3, mediaRoot });
+  const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3, mediaRoot, beforePublish: options.beforePublish, afterPublish: options.afterPublish });
   return { root, mediaRoot, service, commands, commandOptions, requests };
 }
 async function finished(service) {
@@ -128,6 +145,24 @@ const separateMediaPhoto = {
   files: { thumbnail: 'media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/thumbnail.webp', depth: 'media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/depth.webp', download: 'media/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/download.jpg' }
 };
 const separateMediaLibrary = { photos: [separateMediaPhoto], buildingOverrides: {} };
+
+test('a NAS-backed publish can plan uncached photos and retrieves them under its publish lock before strict validation', async t => {
+  let context;
+  let retrieved = false;
+  context = await fixture(t, { media: true, mediaStored: true, current: separateMediaLibrary, beforePublish: async () => {
+    assert.equal(await context.service.publishing(), true);
+    for (const key of Object.values(separateMediaPhoto.files)) await fs.copyFile(path.join(context.mediaRoot, key), path.join(context.root, 'public', key));
+    retrieved = true;
+  } });
+  for (const key of Object.values(separateMediaPhoto.files)) await fs.unlink(path.join(context.root, 'public', key));
+  const status = await context.service.status();
+  assert.equal(status.problem, '');
+  assert.equal(status.plan.media.missingAssets.length, 3);
+  assert.equal(retrieved, false, 'showing a plan never downloads photos');
+  await context.service.start();
+  assert.equal((await finished(context.service)).status, 'completed');
+  assert.equal(retrieved, true);
+});
 
 test('separate media publication copies referenced assets and pushes them before the Pages site', async t => {
   const orphan = 'media/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/download.jpg';

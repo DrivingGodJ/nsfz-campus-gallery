@@ -132,6 +132,43 @@ test('quitting during service creation leaves no listener and never opens the ed
   assert.ok(!service.output().includes('REVIEW_APP_READY'));
 });
 
+test('bundled review project creates an independent workspace without copying private photos', { timeout: 30000 }, async t => {
+  const directory = await library(t), template = path.join(directory, 'bundled-project'), workspace = path.join(directory, 'workspace');
+  await fs.mkdir(path.join(template, 'server'), { recursive: true });
+  await fs.mkdir(path.join(template, 'worker/src'), { recursive: true });
+  await fs.mkdir(path.join(template, 'node_modules/vite/dist/node'), { recursive: true });
+  await fs.writeFile(path.join(template, 'server/local-editor.mjs'), '');
+  await fs.writeFile(path.join(template, 'node_modules/vite/package.json'), '{"type":"module"}');
+  await fs.writeFile(path.join(template, 'node_modules/vite/dist/node/index.js'), `
+    export async function createServer() {
+      return { listen() {}, close() {}, httpServer: { address() { return { port: 12345 }; } } };
+    }
+  `);
+  for (const name of ['photo-ids.json', 'submission-campus.json']) await fs.writeFile(path.join(template, 'worker/src', name), '[]');
+  await fs.writeFile(path.join(template, '.gitignore'), 'node_modules/\npublic/media/\n.local/\n');
+  const git = args => execFileSync('/usr/bin/git', args, { cwd: template, encoding: 'utf8' }).trim();
+  git(['init', '-b', 'main']); git(['config', 'user.name', 'Review Test']); git(['config', 'user.email', 'review@example.invalid']);
+  git(['remote', 'add', 'origin', 'https://github.com/DrivingGodJ/nsfz-campus-gallery.git']);
+  git(['add', '.']); git(['commit', '-m', 'Bundled project']);
+  await fs.mkdir(path.join(template, '.local/sources'), { recursive: true });
+  await fs.mkdir(path.join(template, 'public/media'), { recursive: true });
+  await fs.writeFile(path.join(template, '.local/sources/private.jpg'), 'private');
+  await fs.writeFile(path.join(template, 'public/media/photo.webp'), 'photo');
+  const components = path.join(directory, 'depth-components');
+  for (const name of ['depth-tools', 'models']) await fs.mkdir(path.join(components, name), { recursive: true });
+  const service = launch(t, [bootstrap, workspace], { CAMPUS_PROJECT_TEMPLATE: template, CAMPUS_CONTENT_ROOT: workspace, CAMPUS_DEPTH_COMPONENTS: components });
+  await ready(service);
+  assert.equal(execFileSync('/usr/bin/git', ['remote', 'get-url', 'origin'], { cwd: workspace, encoding: 'utf8' }).trim(), 'https://github.com/DrivingGodJ/nsfz-campus-gallery.git');
+  assert.equal(execFileSync('/usr/bin/git', ['rev-parse', 'HEAD'], { cwd: workspace, encoding: 'utf8' }).trim(), git(['rev-parse', 'HEAD']));
+  assert.equal(await fs.readlink(path.join(workspace, 'node_modules')), path.join(template, 'node_modules'));
+  for (const name of ['depth-tools', 'models']) assert.equal(await fs.readlink(path.join(workspace, '.local', name)), path.join(components, name));
+  assert.equal(execFileSync('/usr/bin/git', ['status', '--porcelain'], { cwd: workspace, encoding: 'utf8' }).trim(), '');
+  await assert.rejects(fs.access(path.join(workspace, '.local/sources/private.jpg')), { code: 'ENOENT' });
+  await assert.rejects(fs.access(path.join(workspace, 'public/media/photo.webp')), { code: 'ENOENT' });
+  service.child.stdin.end();
+  assert.deepEqual(await exitWithin(service), { code: 0, signal: null });
+});
+
 test('Mac window close preserves the editor and service; reopen reuses them; application quit cleans up', {
   // The app's publish checks must not open a second native window over the
   // user's ongoing review session. Standalone Mac test runs exercise it.
@@ -163,6 +200,7 @@ test('Mac window close preserves the editor and service; reopen reuses them; app
   assert.deepEqual(result, { code: 0, signal: null }, output);
   assert.match(output, /WINDOW_CLOSED_SERVICE_ALIVE/);
   assert.match(output, /REOPENED_SAME_EDITOR_AND_SERVICE/);
+  assert.match(output, /PHOTO_CACHE_CLEARED_EDITOR_DATA_PRESERVED/);
   const pid = Number(/SERVICE_PID (\d+)/.exec(output)?.[1]);
   assert.ok(pid, output);
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });

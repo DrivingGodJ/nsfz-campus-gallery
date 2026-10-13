@@ -39,6 +39,20 @@ struct ReviewAppLifecycle {
                 let marker = try await delegate.webView.evaluateJavaScript("window.reviewLifecycleMarker")
                 guard marker as? String == "preserved" else { throw LifecycleFailure.failed("reopen lost the editor state") }
                 print("REOPENED_SAME_EDITOR_AND_SERVICE"); fflush(stdout)
+                let previousView = delegate.webView
+                _ = try await previousView!.evaluateJavaScript("localStorage.setItem('reviewLifecycleCacheSentinel', 'preserved'); webkit.messageHandlers.reviewApp.postMessage({type:'clearPhotoCache'}); true")
+                while true {
+                    if delegate.webView !== previousView {
+                        let ready = try await delegate.webView.evaluateJavaScript("document.readyState === 'complete' && location.pathname === '/editor.html'")
+                        if ready as? Bool == true { break }
+                    }
+                    guard Date() < deadline else { throw LifecycleFailure.failed("cache clear did not reconnect the editor") }
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                }
+                let sentinel = try await delegate.webView.evaluateJavaScript("localStorage.getItem('reviewLifecycleCacheSentinel')")
+                guard sentinel as? String == "preserved", delegate.service === service, service.isRunning else { throw LifecycleFailure.failed("cache clear discarded editor data or replaced the service") }
+                _ = try await delegate.webView.evaluateJavaScript("localStorage.removeItem('reviewLifecycleCacheSentinel'); true")
+                print("PHOTO_CACHE_CLEARED_EDITOR_DATA_PRESERVED"); fflush(stdout)
                 delegate.unsaved = false
                 app.terminate(nil)
             } catch {

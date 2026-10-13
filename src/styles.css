@@ -416,3 +416,7 @@ img[data-load-state="loading"],img[data-load-state="error"]{visibility:hidden}
   .editor-map .map-level-switch{right:58px;top:10px}
   .editor-main.comparing .comparison-model .map-level-switch{top:8px;right:54px}
 }
+.local-photo-cache { display: flex; flex-direction: column; gap: .25rem; max-width: 24rem; }
+.local-photo-cache-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.local-photo-cache-status { display: flex; align-items: center; gap: .3rem; font-size: .72rem; color: var(--muted); }
+.local-photo-cache-error { font-size: .75rem; color: var(--danger-text, #aa493d); }

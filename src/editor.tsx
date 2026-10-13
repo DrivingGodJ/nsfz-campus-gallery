@@ -14,6 +14,7 @@ import PhotoDepthField from './PhotoDepthField';
 import { validateDepthUpload } from './photo-depth-upload';
 import ReviewInbox from './ReviewInbox';
 import PublishPanel from './PublishPanel';
+import LocalPhotoCache from './LocalPhotoCache';
 import type { Submission } from './submission-types';
 import './styles.css';
 
@@ -59,7 +60,8 @@ function Editor() {
   const [buildingDraft, setBuildingDraft] = useState<BuildingOverride | null>(null);
   const [operationBusy, setBusy] = useState('');
   const [publishing, setPublishing] = useState(false);
-  const busy = operationBusy || (publishing ? '正在上线，完成后可以继续编辑' : '');
+  const [cacheBusy, setCacheBusy] = useState('');
+  const busy = operationBusy || cacheBusy || (publishing ? '正在上线，完成后可以继续编辑' : '');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [removed, setRemoved] = useState('');
@@ -208,7 +210,7 @@ function Editor() {
   const draft = state?.drafts.some(p => p.id === photo?.id);
   const imageSource = (p: Photo, type: 'thumbnail' | 'display' | 'depth') => { const rendition = type === 'display' && !p.files.display ? 'thumbnail' : type; return state?.drafts.some(d => d.id === p.id) ? '/__local/draft-media/' + p.id + '/' + rendition + '.webp?v=' + encodeURIComponent(p.depthUpdatedAt || '1') : asset(type === 'depth' ? photoDepthFile(p)! : type === 'display' ? photoDisplayFile(p) : p.files.thumbnail); };
   return <div className={'app editor-app' + (comparing && mode === 'photos' && photo ? ' comparing' : '')}>
-    <header className="app-header"><Brand editor href={desktop ? './editor.html?desktop=1' : undefined} /><span className="local-badge">{desktop ? '本地审核' : '本地编辑'}</span><div className="header-actions"><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}<PublishPanel api={api} unsaved={dirty} onRunningChange={setPublishing} /></div></header>
+    <header className="app-header"><Brand editor href={desktop ? './editor.html?desktop=1' : undefined} /><span className="local-badge">{desktop ? '本地审核' : '本地编辑'}</span><div className="header-actions"><LocalPhotoCache disabled={!!operationBusy || publishing || dirty} onBusyChange={setCacheBusy} /><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}<PublishPanel api={api} unsaved={dirty || !!cacheBusy} onRunningChange={setPublishing} /></div></header>
     {error && <Notice kind="error">{error}<button className="text-button" onClick={() => setError('')}>关闭</button></Notice>}
     {message && <Notice kind="success">{message}{removed && <button className="text-button" onClick={undo} disabled={!!busy}><Undo2 size={14} />恢复照片</button>}</Notice>}
     {busy && <div className="busy-bar" role="status"><LoaderCircle size={15} className="spin" />{busy}</div>}

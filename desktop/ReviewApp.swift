@@ -13,6 +13,8 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     var publishing = false
     var unsaved = false
     var root = ""
+    var bundledProject: URL?
+    var managedRoot = ""
     var serviceURL: URL?
     var output = ""
     var launching = false
@@ -29,6 +31,7 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let project = resources?.appendingPathComponent("project"), FileManager.default.fileExists(atPath: project.appendingPathComponent("server/local-editor.mjs").path) { bundledProject = project }
         buildMenu()
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(self, name: "reviewApp")
@@ -45,10 +48,15 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        if let saved = UserDefaults.standard.string(forKey: "contentRoot") { root = saved }
+        if bundledProject != nil {
+            let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            managedRoot = support.appendingPathComponent("附中影像审核/workspace").path
+            root = managedRoot
+        }
+        else if let saved = UserDefaults.standard.string(forKey: "contentRoot") { root = saved }
         else if let file = resources?.appendingPathComponent("project.json"),
                 let data = try? Data(contentsOf: file), let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] { root = json["root"] ?? "" }
-        if FileManager.default.fileExists(atPath: root + "/server/local-editor.mjs") { startService() }
+        if bundledProject != nil || FileManager.default.fileExists(atPath: root + "/server/local-editor.mjs") { startService() }
         else { showStartup("请选择附中影像内容库", detail: "内容库保存你的照片、标注和网站文件。第一次使用时选择 nsfz-campus-gallery 文件夹。", failed: true) }
     }
 
@@ -64,8 +72,9 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         file.submenu?.addItem(withTitle: "导入照片或审核包…", action: #selector(importPhotos), keyEquivalent: "o")
         let publish = file.submenu!.addItem(withTitle: "上线…", action: #selector(openPublication), keyEquivalent: "p"); publish.keyEquivalentModifierMask = [.command, .shift]
         file.submenu?.addItem(.separator())
-        file.submenu?.addItem(withTitle: "打开内容库文件夹", action: #selector(revealRoot), keyEquivalent: "")
-        file.submenu?.addItem(withTitle: "选择内容库…", action: #selector(chooseRoot), keyEquivalent: "")
+        file.submenu?.addItem(withTitle: bundledProject == nil ? "打开内容库文件夹" : "打开本地工作区", action: #selector(revealRoot), keyEquivalent: "")
+        if bundledProject == nil { file.submenu?.addItem(withTitle: "选择内容库…", action: #selector(chooseRoot), keyEquivalent: "") }
+        else { file.submenu?.addItem(withTitle: "打开 NAS 归档", action: #selector(revealArchive), keyEquivalent: "") }
         let edit = NSMenuItem(); bar.addItem(edit); edit.submenu = NSMenu(title: "编辑")
         for (title, action, key) in [("撤销", "undo:", "z"), ("剪切", "cut:", "x"), ("拷贝", "copy:", "c"), ("粘贴", "paste:", "v"), ("全选", "selectAll:", "a")] { edit.submenu?.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }
         let view = NSMenuItem(); bar.addItem(view); view.submenu = NSMenu(title: "窗口")
@@ -76,8 +85,9 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
 
     func showStartup(_ title: String, detail: String, failed: Bool = false) {
         let escape: (String) -> String = { $0.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;") }
+        let choose = bundledProject == nil ? "<button onclick=\"webkit.messageHandlers.reviewApp.postMessage({type:'chooseRoot'})\">选择内容库</button>" : ""
         webView.loadHTMLString("""
-        <!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>body{background:#f8f8f2;color:#344f3e;font:15px -apple-system,BlinkMacSystemFont,sans-serif;display:grid;place-items:center;height:95vh;margin:0}main{max-width:520px;padding:36px}h1{font-size:25px}p{line-height:1.9;color:#6b755f;white-space:pre-wrap}button{padding:12px 18px;border:0;border-radius:8px;background:#344f3e;color:white;font:inherit;cursor:pointer;margin-right:10px}</style><main><h1>\(escape(title))</h1><p>\(escape(detail))</p>\(failed ? "<button onclick=\"webkit.messageHandlers.reviewApp.postMessage({type:'chooseRoot'})\">选择内容库</button><button onclick=\"webkit.messageHandlers.reviewApp.postMessage({type:'retry'})\">重试打开</button>" : "")</main></html>
+        <!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>body{background:#f8f8f2;color:#344f3e;font:15px -apple-system,BlinkMacSystemFont,sans-serif;display:grid;place-items:center;height:95vh;margin:0}main{max-width:520px;padding:36px}h1{font-size:25px}p{line-height:1.9;color:#6b755f;white-space:pre-wrap}button{padding:12px 18px;border:0;border-radius:8px;background:#344f3e;color:white;font:inherit;cursor:pointer;margin-right:10px}</style><main><h1>\(escape(title))</h1><p>\(escape(detail))</p>\(failed ? choose + "<button onclick=\"webkit.messageHandlers.reviewApp.postMessage({type:'retry'})\">重试打开</button>" : "")</main></html>
         """, baseURL: nil)
     }
 
@@ -90,17 +100,24 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
             return
         }
         launching = true; output = ""; serviceURL = nil
-        showStartup("正在打开附中影像审核", detail: "正在连接本地内容库…\n照片和审核记录保存在这台电脑。")
+        showStartup("正在打开附中影像审核", detail: "正在连接本地内容库…\n可从 NAS 下载照片，也可直接导入新照片。")
         let process = Process()
         guard let resources = resources else { launching = false; return }
         process.executableURL = resources.appendingPathComponent("runtime/bin/node")
         process.arguments = [resources.appendingPathComponent("bootstrap.mjs").path, root]
-        process.currentDirectoryURL = URL(fileURLWithPath: root)
+        process.currentDirectoryURL = FileManager.default.fileExists(atPath: root) ? URL(fileURLWithPath: root) : resources
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = resources.appendingPathComponent("runtime/bin").path + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         environment["CAMPUS_NPM_CLI"] = resources.appendingPathComponent("runtime/lib/node_modules/npm/bin/npm-cli.js").path
         environment["CAMPUS_DESKTOP_APP"] = "1"
         environment["CAMPUS_REVIEW_PORT"] = String(servicePort)
+        if let project = bundledProject, root == managedRoot {
+            environment["CAMPUS_PROJECT_TEMPLATE"] = project.path
+            environment["CAMPUS_DEPTH_COMPONENTS"] = resources.appendingPathComponent("depth-components").path
+            environment["CAMPUS_CONTENT_ROOT"] = root
+            environment["CAMPUS_MEDIA_ROOT"] = "/Volumes/工程/2026.10.13南师附中3D地图_归档/nsfz-campus-media"
+            environment["CAMPUS_NAS_CONFIG"] = resources.appendingPathComponent("nas.json").path
+        }
         process.environment = environment
         // EOF also stops the service if the app crashes or is force-quit.
         let lifetime = Pipe(); process.standardInput = lifetime
@@ -182,7 +199,7 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         launching = false; service = nil; serviceGroup = nil; serviceURL = nil
         if quitting { NSApp.reply(toApplicationShouldTerminate: true); return }
         if restartRequested { restartRequested = false; startService(); return }
-        if process.terminationStatus != 0 { showStartup("审核器未能打开", detail: output.suffix(1800).description + "\n\n请确认内容库仍在原位置，或重新选择内容库。", failed: true) }
+        if process.terminationStatus != 0 { showStartup("审核器未能打开", detail: output.suffix(1800).description + "\n\n请点击重试，重新连接本地内容库。", failed: true) }
     }
 
     func afterServiceDelay(_ interval: TimeInterval, _ action: @escaping @MainActor () -> Void) {
@@ -206,6 +223,12 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     @objc func importPhotos() { webView.evaluateJavaScript("document.querySelector('input[type=file]')?.click()") }
     @objc func openPublication() { webView.evaluateJavaScript("window.dispatchEvent(new Event('review-app-publish'))") }
     @objc func revealRoot() { NSWorkspace.shared.open(URL(fileURLWithPath: root)) }
+    @objc func revealArchive() {
+        guard let file = resources?.appendingPathComponent("nas.json"), let data = try? Data(contentsOf: file), let json = try? JSONSerialization.jsonObject(with: data) as? [String: String], let archive = json["archiveRoot"], FileManager.default.fileExists(atPath: archive) else {
+            let alert = NSAlert(); alert.messageText = "NAS 未连接"; alert.informativeText = "请先连接“工程”共享，再打开归档文件夹。"; alert.runModal(); return
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: archive))
+    }
     @objc func openWebsite() { NSWorkspace.shared.open(URL(string: "https://drivinggodj.github.io/nsfz-campus-gallery/")!) }
     @objc func reload() {
         guard !quitting else { return }
@@ -228,9 +251,9 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         guard webView === self.webView, !quitting, (error as NSError).code != NSURLErrorCancelled else { return }
         showStartup("页面未能打开", detail: error.localizedDescription + "\n\n点击重试重新连接本地编辑器。", failed: true)
     }
-    @objc func about() { let alert = NSAlert(); alert.messageText = "附中影像审核"; alert.informativeText = "导入照片和投稿包，核对位置与视角，再发布到附中影像网站。\n原片和待审核草稿保留在本地内容库。"; alert.runModal() }
+    @objc func about() { let alert = NSAlert(); alert.messageText = "附中影像审核"; alert.informativeText = "导入照片和投稿包，核对位置与视角，再发布到附中影像网站。\n连接 NAS 后可下载照片到本地，上线后自动同步归档。"; alert.runModal() }
     @objc func chooseRoot() {
-        guard !publishing else { return }
+        guard bundledProject == nil, !publishing else { return }
         let panel = NSOpenPanel(); panel.title = "选择附中影像内容库"; panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
         panel.beginSheetModal(for: window) { [weak self] result in
             guard let self = self, result == .OK, let url = panel.url else { return }
@@ -245,6 +268,11 @@ final class ReviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         else if type == "unsaved" { unsaved = value["value"] as? Bool ?? false }
         else if type == "chooseRoot" { chooseRoot() }
         else if type == "retry" { reload() }
+        else if type == "clearPhotoCache" {
+            webView.configuration.websiteDataStore.removeData(ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache], modifiedSince: .distantPast) { [weak self] in
+                DispatchQueue.main.async { self?.reload() }
+            }
+        }
     }
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
         let panel = NSOpenPanel(); panel.title = "导入自己的照片或投稿审核包"; panel.prompt = "导入"; panel.canChooseDirectories = false; panel.allowsMultipleSelection = parameters.allowsMultipleSelection

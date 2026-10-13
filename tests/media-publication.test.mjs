@@ -185,6 +185,15 @@ test('previously published libraries cannot inject cross-photo or private paths 
   }
 });
 
+test('retained media uses the explicitly configured NAS media repository instead of a local sibling', async t => {
+  const f = await fixture(t);
+  const key = `media/${otherId}/depth.webp`, mediaRoot = path.join(f.root, '.local/nas-media');
+  await fs.mkdir(path.dirname(path.join(mediaRoot, key)), { recursive: true });
+  await fs.writeFile(path.join(mediaRoot, key), 'previously published depth');
+  const snapshot = await prepareMediaAssets(f.root, { mediaRoot, previousSite: { schemaVersion: 1, photos: [{ id: otherId, files: { depth: key } }] } });
+  assert.equal(await fs.readFile(path.join(snapshot.directory, key), 'utf8'), 'previously published depth');
+});
+
 test('missing retained files in both public sources stop packaging and preserve the previous snapshot', async t => {
   const f = await fixture(t), destination = path.join(f.root, '.local/snapshot');
   const before = await prepareMediaAssets(f.root, { destination });

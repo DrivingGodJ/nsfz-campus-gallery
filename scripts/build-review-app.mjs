@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -22,19 +23,36 @@ catch { execFileSync('/usr/bin/tar', ['-xzf', archive, '-C', directory]); }
 await fs.rm(app, { recursive: true, force: true });
 await fs.mkdir(path.join(contents, 'MacOS'), { recursive: true });
 await fs.mkdir(resources, { recursive: true });
-await fs.cp(path.join(directory, runtimeName), path.join(resources, 'runtime'), { recursive: true, verbatimSymlinks: true });
+await fs.mkdir(path.join(resources, 'runtime/bin'), { recursive: true });
+await fs.copyFile(path.join(directory, runtimeName, 'bin/node'), path.join(resources, 'runtime/bin/node'), constants.COPYFILE_FICLONE);
+await fs.cp(path.join(directory, runtimeName, 'lib/node_modules/npm'), path.join(resources, 'runtime/lib/node_modules/npm'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
 await fs.copyFile(path.join(root, 'desktop/bootstrap.mjs'), path.join(resources, 'bootstrap.mjs'));
-await fs.writeFile(path.join(resources, 'project.json'), JSON.stringify({ root }) + '\n');
+const project = path.join(resources, 'project');
+// A shallow committed snapshot excludes photos, private imports and build caches.
+const remote = execFileSync('/usr/bin/git', ['remote', 'get-url', 'origin'], { cwd: root, encoding: 'utf8' }).trim();
+if (remote !== 'https://github.com/DrivingGodJ/nsfz-campus-gallery.git') throw new Error('审核应用只能打包已连接正式仓库的工程。');
+if (execFileSync('/usr/bin/git', ['status', '--porcelain', '--untracked-files=no'], { cwd: root, encoding: 'utf8' }).trim()) throw new Error('请先提交工程改动，再生成独立审核应用，避免打包旧程序。');
+if (execFileSync('/usr/bin/git', ['branch', '--show-current'], { cwd: root, encoding: 'utf8' }).trim() !== 'main') throw new Error('请从正式 main 分支生成审核应用。');
+execFileSync('/usr/bin/git', ['clone', '--depth', '50', '--branch', 'main', 'file://' + root, project], { stdio: 'inherit' });
+execFileSync('/usr/bin/git', ['remote', 'set-url', 'origin', remote], { cwd: project });
+await fs.cp(path.join(root, 'node_modules'), path.join(project, 'node_modules'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: source => !['.vite', '.vite-temp', '.cache'].includes(path.basename(source)) });
+for (const component of ['depth-tools', 'models']) {
+  const source = path.join(root, '.local', component);
+  if (await fs.access(source).then(() => true).catch(() => false)) await fs.cp(await fs.realpath(source), path.join(resources, 'depth-components', component), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: file => !['.vite', '.cache'].includes(path.basename(file)) });
+}
+for (const script of ['likes-manifest.mjs', 'submissions-manifest.mjs']) execFileSync(process.execPath, [path.join(project, 'scripts', script)], { cwd: project, stdio: 'inherit' });
+await fs.writeFile(path.join(resources, 'nas.json'), JSON.stringify({ archiveRoot: '/Volumes/工程/2026.10.13南师附中3D地图_归档' }) + '\n');
 await fs.writeFile(path.join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleName</key><string>附中影像审核</string><key>CFBundleDisplayName</key><string>附中影像审核</string>
 <key>CFBundleIdentifier</key><string>com.drivinggodj.nsfz-review</string><key>CFBundleExecutable</key><string>CampusReview</string>
-<key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.0.2</string><key>CFBundleVersion</key><string>3</string>
+<key>CFBundlePackageType</key><string>APPL</string><key>CFBundleShortVersionString</key><string>1.1.0</string><key>CFBundleVersion</key><string>4</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string><key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string><key>CFBundleIconFile</key><string>AppIcon</string>
 <key>NSDocumentsFolderUsageDescription</key><string>读取并保存附中影像的照片、审核记录和网站内容库。</string>
 <key>NSDownloadsFolderUsageDescription</key><string>导入下载的照片和投稿审核包。</string>
+<key>NSNetworkVolumesUsageDescription</key><string>从 NAS 下载照片、同步上线内容并保存工程归档。</string>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>\n`);
 const iconset = path.join(directory, 'AppIcon.iconset'); await fs.mkdir(iconset, { recursive: true });

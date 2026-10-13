@@ -71,7 +71,7 @@ async function fileHash(file) {
   for await (const chunk of createReadStream(file)) hash.update(chunk);
   return hash.digest('hex');
 }
-export function createPublicationService(root, { run = runCommand, fetcher = fetch, wait = delay, pollMs = 6000, maxPolls = 150, mediaRoot = path.resolve(root, '../nsfz-campus-media') } = {}) {
+export function createPublicationService(root, { run = runCommand, fetcher = fetch, wait = delay, pollMs = 6000, maxPolls = 150, mediaRoot = process.env.CAMPUS_MEDIA_ROOT || path.resolve(root, '../nsfz-campus-media'), beforePublish, afterPublish } = {}) {
   const directory = path.join(root, '.local/publication'), lockFile = path.join(directory, 'lock.json');
   const hashes = new Map();
   let active = null, latestPlan = null;
@@ -107,7 +107,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       return saved;
     } catch { return { running: false, status: 'idle', message: '' }; }
   }
-  async function plan(fresh = false) {
+  async function plan(fresh = false, allowMissingMedia = false) {
     const paths = changedPaths(await git('status', '--porcelain=v1', '-z', '--untracked-files=all'));
     const branch = (await git('branch', '--show-current')).trim();
     const remote = (await git('remote', 'get-url', 'origin')).trim();
@@ -152,20 +152,30 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       const mediaPaths = changedPaths(mediaStatus);
       const unrelated = mediaPaths.filter(file => !ASSET_PATTERN.test(file) && file !== 'README.md');
       if (unrelated.length) throw new UserError('图片内容库还有其他修改，请先处理：' + unrelated.slice(0, 5).join('、'));
-      const files = [], manifest = [];
+      const files = [], manifest = [], missingAssets = [];
       fingerprint.update(mediaHead).update(mediaStatus);
       for (const file of assets) {
-        let localHash, bytes;
+        let localHash, bytes, missing = false;
         try {
           const localFile = path.join(root, 'public', file);
           localHash = await hash(localFile, fresh);
           bytes = hashes.get(localFile).bytes;
           if (file.endsWith('/download.jpg') && bytes > PHOTO_DOWNLOAD_MAX_BYTES) throw new UserError('下载图片超过 5 MB，请先压缩后发布。');
         }
-        catch (error) { if (error.code !== 'ENOENT') throw error; throw new UserError('缺少已审核的照片文件：' + file); }
+        catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          if (!allowMissingMedia) throw new UserError('缺少已审核的照片文件：' + file);
+          missing = true;
+        }
         let storedHash = 'missing';
         try { storedHash = await hash(path.join(mediaRoot, file), fresh); }
         catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (missing) {
+          if (storedHash === 'missing') throw new UserError('照片尚未在 NAS 归档中找到，请先恢复照片：' + file);
+          localHash = storedHash;
+          bytes = hashes.get(path.join(mediaRoot, file)).bytes;
+          missingAssets.push(file);
+        }
         if (mediaPaths.includes(file) && localHash !== storedHash) throw new UserError('图片库中的照片文件有未同步的修改，未覆盖。请先核对：' + file);
         // Ignored public/media files must still participate in the publication check.
         fingerprint.update(file).update(localHash).update(storedHash);
@@ -177,7 +187,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
         try { fingerprint.update(await hash(path.join(mediaRoot, 'README.md'), fresh)); files.push('README.md'); }
         catch (error) { if (error.code !== 'ENOENT') throw error; throw new UserError('图片内容库的说明文件已删除，请先恢复后再上线。'); }
       }
-      media = { assets, manifest, files, ahead: mediaAhead, baseURL: MEDIA_BASE_URL };
+      media = { assets, manifest, files, missingAssets, ahead: mediaAhead, baseURL: MEDIA_BASE_URL };
     }
     latestPlan = { ...photoChanges(JSON.parse(previousText), current), files: media ? paths.filter(file => !file.startsWith('public/media/')) : paths, media, fingerprint: fingerprint.digest('hex'), sourceFingerprint: sourceFingerprint.digest('hex'), saved: current.photos.length, drafts: drafts.length, ahead, siteURL: PUBLIC_SITE };
     return latestPlan;
@@ -185,7 +195,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
   async function status() {
     const publication = await snapshot();
     if (publication.running && latestPlan) return { publication, plan: latestPlan, problem: '' };
-    try { return { publication, plan: await plan(), problem: '' }; }
+    try { return { publication, plan: await plan(false, !!beforePublish), problem: '' }; }
     catch (error) { return { publication, plan: null, problem: error.message }; }
   }
   async function update(patch) {
@@ -265,6 +275,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     try {
       await cleanPublicationBuilds(directory);
       await update({ step: 0, message: '正在核对 GitHub、登录状态与最新内容…' });
+      await beforePublish?.();
       await gh('auth', 'status', '--hostname', 'github.com');
       await git('fetch', 'origin', 'main');
       if (await externalMedia()) await mediaGit('fetch', 'origin', 'main');
@@ -330,6 +341,11 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       try { await npm('likes:deploy:only'); }
       catch (error) { throw new UserError('网站已发布，但点赞服务同步失败。照片已保留，可以重试上线。\n' + publicationError(error.message)); }
       await verifyLikes();
+      if (afterPublish) {
+        await update({ step: 4, message: '网站已更新，正在同步工程和照片到 NAS…' });
+        try { await afterPublish({ commit }); }
+        catch (error) { throw new UserError('网站已上线，但 NAS 同步尚未完成。本地照片和修改已保留，请连接 NAS 后重试。\n' + publicationError(error.message)); }
+      }
       result = { step: 5, status: 'completed', message: '上线完成。网站已更新，照片可以正常点赞。', finishedAt: new Date().toISOString() };
     } catch (error) {
       result = { status: 'failed', message: publicationError(error.message), finishedAt: new Date().toISOString() };
@@ -340,7 +356,9 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     }
   }
   async function start() {
-    await plan(true);
+    // NAS-backed apps can show a plan with remote-only pictures. The publish
+    // hook retrieves those first; execute() then validates a full local copy.
+    await plan(true, !!beforePublish);
     await acquire();
     active = { id: crypto.randomUUID(), running: true, status: 'running', step: 0, message: '正在准备上线…', startedAt: new Date().toISOString(), siteURL: PUBLIC_SITE };
     await update({});

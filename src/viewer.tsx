@@ -26,6 +26,7 @@ import './styles.css';
 import './photo-on-this-day.css';
 import './viewer-browse.css';
 import { adjacentPhoto } from './photo-browse';
+import LocalPhotoCache from './LocalPhotoCache';
 
 const MapView = React.lazy(() => import('./MapView'));
 const GITHUB_MASK = `url(${JSON.stringify(githubMark)})`;
@@ -157,6 +158,7 @@ function App() {
   return <div className={'app viewer-app' + (immersiveActive ? ' photo-immersive' : '') + (immersive ? ' immersive-' + immersive : '')}>
     <header className="app-header">
       <Brand />
+      <LocalPhotoCache />
       <nav className="viewer-header-links" aria-label="项目链接">
         <a className="button secondary github-link" href="https://github.com/DrivingGodJ/nsfz-campus-gallery" target="_blank" rel="noopener noreferrer" aria-label="GitHub 开源项目" title="查看 GitHub 开源项目">
           <span className="github-mark" aria-hidden="true" style={{ maskImage: GITHUB_MASK, WebkitMaskImage: GITHUB_MASK }} /><span className="github-label">GitHub</span>
