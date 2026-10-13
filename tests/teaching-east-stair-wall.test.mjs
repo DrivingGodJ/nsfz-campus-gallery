@@ -39,10 +39,11 @@ test('the teaching east stair side joins the outer wall as opaque masonry on eve
   const saved = corrections.buildings.find(b => b.id === building.id);
   assert.deepEqual(saved.solidCores, building.solidCores, 'Refreshes retain the same joined masonry');
   assert.deepEqual(saved.classroomWindows, building.classroomWindows, 'Refreshes retain the same opaque facade');
+  assert.deepEqual(saved.floorCorridors, building.floorCorridors, 'Refreshes retain the front guard without changing the long corridor');
   for (const [selectedFloor, floorHeight] of [[undefined, 3.6], [1, 3.6], [3, 3.6], [5, 3.6], [undefined, 4.2]]) {
     const current = model(selectedFloor, floorHeight);
     for (let floor = 0; floor < current.shown; floor++) {
-      for (const u of [-2.5, -.01, .01, 1.4, 3, 4.8, 6.1, 6.4]) for (const rise of [.55, 1.6, 3.3]) {
+      for (const u of [.01, 1.4, 3, 4.8, 6.1, 6.4]) for (const rise of [.55, 1.6, 3.3]) {
         const y = .12 + floor * floorHeight + rise;
         const outside = new THREE.Raycaster(point(u, 3.6, y), across.clone().negate(), 0, .9);
         const hit = outside.intersectObject(current.objects.body)[0];
@@ -52,13 +53,25 @@ test('the teaching east stair side joins the outer wall as opaque masonry on eve
         const inside = new THREE.Raycaster(point(u, 2.2, y), across, 0, .9).intersectObject(current.objects.body)[0];
         if (u <= 6.1) assert.ok(inside && Math.abs(inside.distance - .25) < 1e-4, `The former narrow gap becomes one solid wall, continuous with the stair enclosure: ${selectedFloor}/${floor}/${u}/${rise}, hit ${inside?.distance}`);
       }
+      for (const u of [-2.8, -1.5, -.2]) {
+        for (const rise of [.55, 1.6, 3.3]) {
+          const ray = new THREE.Raycaster(point(u, 3.6, .12 + floor * floorHeight + rise), across.clone().negate(), 0, .9);
+          assert.equal(ray.intersectObject(current.objects.body).length, 0, 'The marked three-metre front return is open rather than an extension of the stair side wall');
+          assert.equal(ray.intersectObjects([current.objects.glass, current.objects.frames]).length, 0, 'No pane or frame seals the reopened return');
+        }
+        for (const rise of [.5, 1.05]) {
+          const guard = new THREE.Raycaster(point(u, 3.6, .12 + floor * floorHeight + .25 + rise), across.clone().negate(), 0, .9).intersectObject(current.objects.rails)[0];
+          assert.ok(guard, 'The short front return has both guard bars on every occupied floor, including the ground floor');
+          assert.equal(current.objects.rails.geometry.userData.photoOcclusionMask[guard.faceIndex], 0, 'The restored guard does not hide photos');
+        }
+      }
       const y = .12 + floor * floorHeight + 1.6;
       for (const u of [-2.8, -1.5, -.2, .7]) {
         const landing = new THREE.Raycaster(point(u, 0, y), new THREE.Vector3(0, -1, 0)).intersectObject(current.objects.body)[0];
         assert.ok(landing && Math.abs(landing.point.y - (.12 + floor * floorHeight + .25)) < 1e-4, 'The new wall leaves a fully triangulated floor through the corridor and stair landing');
       }
-      const seam = new THREE.Raycaster(point(-2.5, 2.6, y), along, 0, 8.9);
-      assert.equal(seam.intersectObject(current.objects.body).length, 0, 'The joined corridor and stair wall has no internal cap or seam');
+      const seam = new THREE.Raycaster(point(.5, 2.2, y), along, 0, 5.5);
+      assert.equal(seam.intersectObject(current.objects.body).length, 0, 'The retained side wall does not intrude into the stair landing');
       const entry = new THREE.Raycaster(point(-1.5, 0, y), along, 0, 2.5);
       assert.equal(entry.intersectObject(current.objects.body).length, 0, 'The stair entry stays open onto the three-metre corridor');
       const aisle = new THREE.Raycaster(point(-1.5, -4, y), across, 0, 6.4);

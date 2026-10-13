@@ -74,8 +74,10 @@ test('walkway guard rails follow both courtyard rings, respect floor cutaways, a
     const vertices = geometry.getAttribute('position');
     assert.equal(geometry.userData.photoOcclusionMask.length, vertices.count / 3);
     assert.ok(geometry.userData.photoOcclusionMask.every(value => value === 0));
-    if (floor === 1) assert.equal(vertices.count, 0, 'No floating upper-floor rails remain when only the ground floor is shown');
-    else {
+    if (floor === 1) {
+      geometry.computeBoundingBox();
+      assert.ok(geometry.boundingBox.max.y < 1.5, 'Only the marked ground-floor return guard remains, with no floating upper-floor rails');
+    } else {
       geometry.computeBoundingBox();
       assert.ok(geometry.boundingBox.max.y < (floor || 6) * info.floorHeight, 'Rails stay below the selected ceiling');
       for (const section of info.sections) {
@@ -88,29 +90,30 @@ test('walkway guard rails follow both courtyard rings, respect floor cutaways, a
           assert.equal(geometry.userData.photoOcclusionMask[hit.faceIndex], 0);
         }
       }
-      const corridor = teaching.floorCorridors.find(c => c.partId === 'main' && c.edge === 19);
-      assert.equal(corridor.railEdges[0].length, 3, 'The saved continuous guard route retains its original long edge');
-      const [a, b] = corridor.railEdges[0], along = vector(b).sub(vector(a)).normalize();
-      const normal = new THREE.Vector3(-along.z, 0, along.x), guard = mesh(geometry);
-      const section = info.sections.find(s => s.id === 'main');
-      const bodyGeometry = buildingGeometry(section, Math.min(section.height, (floor || Infinity) * info.floorHeight), info.floorHeight,
-        teaching.groundPassages, teaching.floorCorridors.filter(c => c.partId === section.id), teaching.stairwells.filter(s => s.partId === section.id),
-        teaching.classroomWindows, teaching.solidCores.filter(c => c.partId === section.id), teaching.cutouts.filter(c => c.partId === section.id), !!floor);
-      const body = mesh(bodyGeometry, true); body.material.side = THREE.DoubleSide;
-      const storeys = Math.min(section.floors, floor || Infinity);
-      for (let level = 0; level < storeys; level++) for (const t of [.2, .5, .8]) {
-        const origin = vector(a).lerp(vector(b), t).addScaledVector(normal, -.4);
-        origin.y = .12 + level * info.floorHeight + .25 + 1.05;
-        const ray = new THREE.Raycaster(origin, normal, 0, .8);
-        assert.equal(ray.intersectObject(guard).length, 0, 'The east stair side has no old return guard on any floor');
-        assert.ok(ray.intersectObject(body).length, 'The side return is a joined masonry wall on every occupied floor');
-        const [from, to] = corridor.railEdges[0].slice(1), direction = vector(to).sub(vector(from)).normalize();
-        const longNormal = new THREE.Vector3(-direction.z, 0, direction.x);
-        const longOrigin = vector(from).lerp(vector(to), t).addScaledVector(longNormal, -.4); longOrigin.y = origin.y;
-        assert.equal(new THREE.Raycaster(longOrigin, longNormal, 0, .8).intersectObject(guard).length > 0, level > 0, 'The unmarked long corridor guard remains on every upper floor');
-      }
-      guard.material.dispose(); bodyGeometry.dispose(); body.material.dispose();
     }
+    const corridor = teaching.floorCorridors.find(c => c.partId === 'main' && c.edge === 19 && c.startFloor === undefined);
+    const front = teaching.floorCorridors.find(c => c.partId === 'main' && c.edge === 19 && c.startFloor === 1);
+    assert.equal(corridor.railEdges[0].length, 2, 'The unmarked long guard keeps its existing route and starts on floor two');
+    const [a, b] = front.railEdges[0], along = vector(b).sub(vector(a)).normalize();
+    const normal = new THREE.Vector3(-along.z, 0, along.x), guard = mesh(geometry);
+    const section = info.sections.find(s => s.id === 'main');
+    const bodyGeometry = buildingGeometry(section, Math.min(section.height, (floor || Infinity) * info.floorHeight), info.floorHeight,
+      teaching.groundPassages, teaching.floorCorridors.filter(c => c.partId === section.id), teaching.stairwells.filter(s => s.partId === section.id),
+      teaching.classroomWindows, teaching.solidCores.filter(c => c.partId === section.id), teaching.cutouts.filter(c => c.partId === section.id), !!floor);
+    const body = mesh(bodyGeometry, true); body.material.side = THREE.DoubleSide;
+    const storeys = Math.min(section.floors, floor || Infinity);
+    for (let level = 0; level < storeys; level++) for (const t of [.2, .5, .8]) {
+      const origin = vector(a).lerp(vector(b), t).addScaledVector(normal, -.4);
+      origin.y = .12 + level * info.floorHeight + .25 + 1.05;
+      const ray = new THREE.Raycaster(origin, normal, 0, .8);
+      assert.ok(ray.intersectObject(guard).length, 'The marked front return has a guard on every occupied floor');
+      assert.equal(ray.intersectObject(body).length, 0, 'The marked front return has no full-height masonry wall');
+      const [from, to] = corridor.railEdges[0], direction = vector(to).sub(vector(from)).normalize();
+      const longNormal = new THREE.Vector3(-direction.z, 0, direction.x);
+      const longOrigin = vector(from).lerp(vector(to), t).addScaledVector(longNormal, -.4); longOrigin.y = origin.y;
+      assert.equal(new THREE.Raycaster(longOrigin, longNormal, 0, .8).intersectObject(guard).length > 0, level > 0, 'The unmarked long corridor guard remains on every upper floor');
+    }
+    guard.material.dispose(); bodyGeometry.dispose(); body.material.dispose();
     assert.ok(vertices.count / 3 < 14000, 'Rail detail stays modest even with every floor visible');
     geometry.dispose();
   }
