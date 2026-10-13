@@ -91,7 +91,8 @@ export function standsArchitecture(building: Building, height: number, floorHeig
   // _DSC1046: the office-side end is an open passage, with a rear parapet
   // and a right turn beneath the seats, rather than another glazed room.
   const entrance = opening(length - 3.85, 6.3), entranceLeft = length - 7;
-  const rearCenter = length - 3.85 - width * .57;
+  // The rear window opening sits directly opposite the broad field entrance.
+  const rearCenter = length - 3.85;
   const rearEntrance = { ...entrance, points: [at(rearCenter, width - 1), at(rearCenter, width + 1)] };
   const windows = Array.from({ length: 9 }, (_, i) => opening(length * (.065 + i * .105), 3.7))
     .filter(window => doors.every(door => Math.abs(Number(window.id.slice(6)) - Number(door.id.slice(6))) > (window.width + door.width) / 2 + .2));

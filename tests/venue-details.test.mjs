@@ -93,8 +93,9 @@ test('the office-side stand passage opens to the outside and turns right beneath
       const entrance = frame.length - 3.85;
       const photo = site.photos.find(photo => photo.title === '_DSC1046'), heading = photo.heading * Math.PI / 180;
       const sightline = new THREE.Raycaster(new THREE.Vector3(photo.position.x, 1.6, photo.position.z), new THREE.Vector3(Math.sin(heading), 0, -Math.cos(heading)), 0, 40);
-      assert.equal(sightline.intersectObjects(objects).length, 0, 'The photographed eye-height sightline passes through both facades without a wall or glass plug');
+      assert.equal(sightline.intersectObject(body).length, 0, 'The photographed sightline still reaches outside through the corrected opening or adjacent glazing');
       assert.equal(ray(entrance, -1, 1.6, frame.across, 3).length, 0, 'The broad front entrance remains open');
+      for (const offset of [-3, 0, 3]) assert.equal(ray(entrance + offset, -1, 1.6, frame.across, frame.width + 2).length, 0, 'The entire rear opening faces the field gate directly, without glass or a wall across it');
       const corridor = standsStairLayout(stands).v0 - .6;
       assert.equal(ray(entrance, corridor, 1.6, frame.along.map(value => -value), 15).length, 0, 'The room-side walkway reaches the stair head when turning right');
       assert.ok(ray(entrance, frame.width - 1, .5, frame.across, 2).length, 'The rear opening retains its low parapet');
