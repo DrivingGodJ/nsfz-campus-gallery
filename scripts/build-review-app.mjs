@@ -35,7 +35,7 @@ if (execFileSync('/usr/bin/git', ['status', '--porcelain', '--untracked-files=no
 if (execFileSync('/usr/bin/git', ['branch', '--show-current'], { cwd: root, encoding: 'utf8' }).trim() !== 'main') throw new Error('请从正式 main 分支生成审核应用。');
 execFileSync('/usr/bin/git', ['clone', '--depth', '50', '--branch', 'main', 'file://' + root, project], { stdio: 'inherit' });
 execFileSync('/usr/bin/git', ['remote', 'set-url', 'origin', remote], { cwd: project });
-await fs.cp(path.join(root, 'node_modules'), path.join(project, 'node_modules'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: source => !['.vite', '.vite-temp', '.cache'].includes(path.basename(source)) });
+await fs.cp(path.join(root, 'node_modules'), path.join(project, 'node_modules'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: source => !['.vite', '.vite-temp', '.cache', '.mf'].includes(path.basename(source)) });
 for (const component of ['depth-tools', 'models']) {
   const source = path.join(root, '.local', component);
   if (await fs.access(source).then(() => true).catch(() => false)) await fs.cp(await fs.realpath(source), path.join(resources, 'depth-components', component), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE, filter: file => !['.vite', '.cache'].includes(path.basename(file)) });
@@ -71,11 +71,11 @@ if (process.argv.includes('--install')) {
     if (identifier !== 'com.drivinggodj.nsfz-review') throw new Error('目标位置有另一个应用，不覆盖。');
     const backup = path.join(directory, 'previous', new Date().toISOString().replaceAll(':', '-'), name);
     await fs.mkdir(path.dirname(backup), { recursive: true });
-    await fs.cp(installed, backup, { recursive: true, verbatimSymlinks: true });
+    await fs.cp(installed, backup, { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
     await fs.rm(installed, { recursive: true });
     console.log('上一版应用已备份：' + backup);
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  await fs.cp(app, installed, { recursive: true, verbatimSymlinks: true });
+  await fs.cp(app, installed, { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
   execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', installed]);
   console.log('已安装到应用程序：' + installed);
 }

@@ -28,9 +28,9 @@ async function library(t) {
   return directory;
 }
 
-function launch(t, args, environment = {}) {
+function launch(t, args, environment = {}, cwd = root) {
   const child = spawn(process.execPath, args, {
-    cwd: root, env: { ...process.env, CAMPUS_DESKTOP_APP: '1', CAMPUS_REVIEW_PORT: '0', ...environment },
+    cwd, env: { ...process.env, CAMPUS_DESKTOP_APP: '1', CAMPUS_REVIEW_PORT: '0', ...environment },
     stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32'
   });
   let output = '';
@@ -165,6 +165,27 @@ test('bundled review project creates an independent workspace without copying pr
   assert.equal(execFileSync('/usr/bin/git', ['status', '--porcelain'], { cwd: workspace, encoding: 'utf8' }).trim(), '');
   await assert.rejects(fs.access(path.join(workspace, '.local/sources/private.jpg')), { code: 'ENOENT' });
   await assert.rejects(fs.access(path.join(workspace, 'public/media/photo.webp')), { code: 'ENOENT' });
+  service.child.stdin.end();
+  assert.deepEqual(await exitWithin(service), { code: 0, signal: null });
+});
+
+test('first bundled launch runs the real likes worker from its newly created workspace', { timeout: 40000 }, async t => {
+  const directory = await library(t), resources = path.join(directory, 'Resources'), template = path.join(resources, 'project'), workspace = path.join(directory, 'new-workspace');
+  await fs.mkdir(resources);
+  execFileSync('/usr/bin/git', ['clone', '--quiet', '--depth', '1', '--branch', 'main', 'file://' + root, template]);
+  execFileSync('/usr/bin/git', ['remote', 'set-url', 'origin', 'https://github.com/DrivingGodJ/nsfz-campus-gallery.git'], { cwd: template });
+  await fs.symlink(path.join(root, 'node_modules'), path.join(template, 'node_modules'), 'dir');
+  for (const name of ['photo-ids.json', 'submission-campus.json']) await fs.copyFile(path.join(root, 'worker/src', name), path.join(template, 'worker/src', name));
+  await assert.rejects(fs.access(workspace), { code: 'ENOENT' });
+  const before = await fs.readdir(resources);
+  const service = launch(t, [bootstrap, workspace], { CAMPUS_PROJECT_TEMPLATE: template, CAMPUS_CONTENT_ROOT: workspace }, resources);
+  const url = await ready(service);
+  const response = await fetch(new URL('/api/likes/read', url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoIds: [] }) });
+  assert.equal(response.status, 200, service.output());
+  assert.deepEqual(await response.json(), { likes: {} });
+  assert.deepEqual(await fs.readdir(resources), before, 'worker cache must not change the application resources');
+  await assert.rejects(fs.access(path.join(resources, '.wrangler')), { code: 'ENOENT' });
+  await fs.access(path.join(workspace, '.local/miniflare-cache/cf.json'));
   service.child.stdin.end();
   assert.deepEqual(await exitWithin(service), { code: 0, signal: null });
 });

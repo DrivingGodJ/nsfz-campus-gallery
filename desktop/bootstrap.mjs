@@ -70,6 +70,8 @@ starting = (async () => {
     }
   }
   await fs.access(path.join(root, 'server/local-editor.mjs'));
+  process.chdir(root);
+  process.env.MINIFLARE_CACHE_DIR = path.join(root, '.local/miniflare-cache');
   const { createServer } = await import(pathToFileURL(path.join(root, 'node_modules/vite/dist/node/index.js')).href);
   server = await createServer({ root, cacheDir: path.join(root, '.local/vite'), configFile: path.join(root, 'vite.config.ts'), configLoader: 'runner', server: { host: '127.0.0.1', port, strictPort: true }, clearScreen: false });
   if (stopping) return;
