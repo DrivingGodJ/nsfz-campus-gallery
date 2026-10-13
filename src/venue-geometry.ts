@@ -89,7 +89,7 @@ export function standsBasementStairLayout(building: Building, floor = -3.8) {
   const turnRing = [upper.at(middle, v0), upper.at(turnEnd, v0), upper.at(turnEnd, returnCenter + width / 2), upper.at(middle, returnCenter + width / 2)];
   const turn: Shape = { outer: [...turnRing, turnRing[0]], holes: [] };
   const stairs: PassageStair[] = [{ from: upper.at(head, center), to: upper.at(middle, center), width, steps: 11,
-    topHeight: BASE, bottomHeight: midHeight, doorHeight: 2.35,
+    topHeight: BASE, bottomHeight: midHeight, doorHeight: 2.35, openUnderneath: true,
     landing: { footprint: turn, railEdges: [[turnRing[0], turnRing[1], turnRing[2], turnRing[3]]] } },
     { from: upper.at(middle, returnCenter), to: upper.at(head, returnCenter), width, steps: 11,
       topHeight: midHeight, bottomHeight: floor + .045, doorHeight: 2.35 }];

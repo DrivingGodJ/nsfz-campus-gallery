@@ -101,7 +101,8 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
   };
   for (const shape of footprints) {
     const platform = rise ? passageFootprint([rise.to, rise.at(rise.length + 20)], feature.width || rise.width) : null;
-    const cuts = [...stairs.map(stair => [stair.footprint.outer]), ...stairs.flatMap(stair => stair.landing ? [[stair.landing.footprint.outer]] : []), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
+    const cuts = [...stairs.filter(stair => !stair.openUnderneath).flatMap(stair => [[stair.footprint.outer],
+      ...(stair.landing ? [[stair.landing.footprint.outer]] : [])]), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
     const floors = cuts.length ? polygonClipping.difference([shape.outer, ...shape.holes], ...cuts) : [[shape.outer, ...shape.holes]];
     for (const [outer, ...holes] of floors) flat({ outer, holes }, floor + .045, feature.type === 'undergroundRoom' && feature.roomUse !== 'garage' ? 'green' : 'floor');
     if (platform) for (const [outer, ...holes] of polygonClipping.intersection([shape.outer, ...shape.holes], [platform.outer]))
@@ -156,7 +157,14 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
     }
   }
   for (const stair of stairs) {
-    for (const tread of stair.treads) segment(tread.from, tread.to, floor, tread.height - floor, stair.width, 'floor');
+    for (const tread of stair.treads) {
+      const bottom = stair.openUnderneath ? tread.height - .14 : floor;
+      segment(tread.from, tread.to, bottom, tread.height - bottom, stair.width, 'floor');
+    }
+    if (stair.openUnderneath) for (const side of [-1, 1]) {
+      const offset = side * (stair.width / 2 - .08);
+      bar(point(stair.at(0, offset), stair.topHeight - .23), point(stair.at(stair.length, offset), stair.bottomHeight - .23), .06, 'metal');
+    }
     if (stair.landing) {
       flat(stair.landing.footprint, stair.bottomHeight - .12, 'floor', .12);
       parts.rails.push(undergroundRailGeometry(stair.landing.railEdges.map(edge => edge.map(p => point(p, stair.bottomHeight))), 1.045));

@@ -5408,7 +5408,8 @@
                 ]
               ]
             ]
-          }
+          },
+          "openUnderneath": true
         },
         {
           "from": [

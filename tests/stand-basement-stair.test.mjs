@@ -19,6 +19,7 @@ test('the stand stair descends halfway, turns back on a clear landing, then reac
   assert.deepEqual(corridor.feature.ceilingCutouts[0], { footprint: lower.roofFootprint, height: lower.landingRoofHeight });
   const flights = undergroundEntranceStairs(corridor.feature).slice(1);
   assert.deepEqual(flights.map(flight => flight.steps), [11, 11]);
+  assert.equal(flights[0].openUnderneath, true, 'The upper half has an open underside');
   assert.equal(flights[0].bottomHeight, flights[1].topHeight);
   assert.ok(Math.abs(flights[0].bottomHeight - (flights[0].topHeight + flights[1].bottomHeight) / 2) < 1e-8, 'The turn happens halfway down');
   const axes = flights.map(flight => [(flight.to[0] - flight.from[0]) / flight.length, (flight.to[1] - flight.from[1]) / flight.length]);
@@ -74,6 +75,16 @@ test('the stand stair descends halfway, turns back on a clear landing, then reac
     sample(end, corridor.feature.height + .045);
     const forward = new THREE.Vector3(flight.to[0] - flight.from[0], 0, flight.to[1] - flight.from[1]).normalize();
     assert.equal(ray(flight.at(flight.length - .1), flight.bottomHeight + 1.6, forward, .3).length, 0, 'The bottom step opens directly onto the existing corridor');
+    const lowerFloor = corridor.feature.height + .045;
+    const below = [upper.at(lower.head, lower.returnCenter), upper.at(lower.head + .4, lower.returnCenter),
+      upper.at(lower.head + .4, lower.center), upper.at(lower.head - .5, lower.center),
+      upper.at(lower.head - .5, lower.center + .85), upper.at(lower.head - .5, lower.center - .85)];
+    for (const p of below) sample(p, lowerFloor);
+    for (let i = 1; i < below.length; i++) {
+      const from = below[i - 1], to = below[i], distance = Math.hypot(to[0] - from[0], to[1] - from[1]);
+      const dir = new THREE.Vector3(to[0] - from[0], 0, to[1] - from[1]).normalize();
+      assert.equal(ray(from, lowerFloor + 1.6, dir, distance).length, 0, 'The corridor can pass beneath the thin upper treads without a solid stair wedge');
+    }
   } finally {
     [...Object.values(standModel), ...Object.values(corridorModel)].forEach(g => g.dispose()); material.dispose();
   }
