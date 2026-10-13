@@ -6036,7 +6036,11 @@
           ]
         ]
       ],
-      "railHeight": 3.8
+      "railHeight": 3.8,
+      "railHeights": [
+        3.8,
+        1.9
+      ]
     },
     {
       "id": "way/1277839757",

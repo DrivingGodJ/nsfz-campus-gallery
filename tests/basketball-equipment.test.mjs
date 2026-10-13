@@ -111,7 +111,7 @@ test('basket bases remain outside playable courts and keep both fences, entrance
   } finally { ['metal', 'bases', 'glass', 'rims', 'nets'].forEach(name => equipment[name].dispose()); }
 });
 
-test('the side mesh fence follows the marked grass margin, leaving the southern fence and northern entrance separate', () => {
+test('the single-panel side fence follows the marked grass margin, leaving the tall southern fence and northern entrance separate', () => {
   assert.deepEqual(feature.railEdges[0], [feature.outer[4], feature.outer[5]], 'The original southern fence stays in place');
   assert.equal(feature.railEdges.length, 2, 'Only the two requested sides have fences');
   const originalSide = feature.outer.slice(3, 5), [a, b] = originalSide;
@@ -132,10 +132,24 @@ test('the side mesh fence follows the marked grass margin, leaving the southern 
   const stairOpening = curvedStairTreads({ ...entrance.curvedStair, steps: 1 })[0].ring;
   assert.equal(clip.intersection(polygon(footprint), [stairOpening]).length, 0, 'The northern post leaves the curved entrance stairs clear');
   assert.equal(feature.railHeight, 3.8);
+  assert.deepEqual(feature.railHeights, [3.8, 1.9], 'Only the moved side fence is lowered to one 1.9 m panel');
+  const heights = feature.railHeights;
+  const tallFence = basketballFenceGeometry({ ...feature, railHeights: [3.8, 3.8] });
+  try {
+    for (const railHeights of [undefined, [3.8]]) {
+      const fallback = basketballFenceGeometry({ ...feature, railHeights });
+      try {
+        for (const part of ['frame', 'wire']) {
+          assert.deepEqual(fallback[part].getAttribute('position').array, tallFence[part].getAttribute('position').array, 'Absent edge heights retain the scalar 3.8 m fence on both sides');
+        }
+      } finally { Object.values(fallback).forEach(part => part.dispose()); }
+    }
+  } finally { Object.values(tallFence).forEach(part => part.dispose()); }
   const fence = basketballFenceGeometry(feature), material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
   try {
     for (const part of Object.values(fence)) finite(part);
     const vertices = fence.wire.getAttribute('position'), wireSides = [], wireCoverage = [0, 0];
+    const wireBounds = [[Infinity, -Infinity], [Infinity, -Infinity]];
     const courtsSpan = layout.count * layout.width + (layout.count - 1) * layout.gap;
     assert.ok(vertices.count > 500 && vertices.count % 2 === 0 && vertices.count / 2 < 1600, 'Both diamond nets share one inexpensive line-segment batch');
     for (let i = 0; i < vertices.count; i++) {
@@ -148,30 +162,42 @@ test('the side mesh fence follows the marked grass margin, leaving the southern 
         wireSides.push(across);
       } else assert.ok(across < -courtsSpan / 2 - .5, 'The eastern fence stays beyond the outermost playing sideline');
       wireCoverage[side]++;
-      assert.ok(vertices.getY(i) > .16 && vertices.getY(i) < .16 + feature.railHeight);
+      const y = vertices.getY(i);
+      wireBounds[side][0] = Math.min(wireBounds[side][0], y);
+      wireBounds[side][1] = Math.max(wireBounds[side][1], y);
+      assert.ok(y > .16 && y < .16 + heights[side], 'Each net keeps its own selected height');
     }
     assert.ok(wireCoverage.every(count => count > 300), 'Each requested side has a complete visible mesh');
     assert.ok(Math.max(...wireSides) - Math.min(...wireSides) > courtsSpan, 'The mesh spans all four courts rather than one bay');
     fence.wire.computeBoundingBox(); fence.frame.computeBoundingBox();
     assert.ok(Math.abs(fence.frame.boundingBox.min.y - .16) < .001);
     assert.ok(Math.abs(fence.frame.boundingBox.max.y - (.16 + feature.railHeight)) < .05);
-    assert.ok(fence.wire.boundingBox.min.y - .16 < .15 && .16 + feature.railHeight - fence.wire.boundingBox.max.y < .15, 'Mesh reaches close to both the ground frame and the top rail');
+    for (const [index, [bottom, top]] of wireBounds.entries()) {
+      assert.ok(bottom - .16 < .15 && .16 + heights[index] - top < .15, 'Both nets reach close to their own ground and top rails');
+    }
     const frameVertices = fence.frame.getAttribute('position'), frameCoverage = [0, 0];
     for (let i = 0; i < frameVertices.count; i++) {
       const point = [frameVertices.getX(i), frameVertices.getZ(i)];
       const distances = feature.railEdges.map(([a, b]) => distanceToSegment(point, a, b));
       const side = distances[0] <= distances[1] ? 0 : 1;
       assert.ok(distances[side] < .06, 'No frame wraps around unrequested sides or seals the entrance');
+      assert.ok(frameVertices.getY(i) < .16 + heights[side] + .04, 'No posts or rails remain above either fence height');
+      if (side === 1) assert.ok(frameVertices.getY(i) < 2.10, 'The side fence has no second tier above the single panel');
       frameCoverage[side]++;
     }
     assert.ok(frameCoverage.every(count => count > 100), 'Both requested sides have physical posts and rails');
     assert.ok(triangles(fence.frame) < 700, 'All posts and horizontal rails share one small opaque mesh');
     const frame = mesh(fence.frame, material);
-    for (const [a, b] of feature.railEdges) {
+    for (const [index, [a, b]] of feature.railEdges.entries()) {
       const middle = a.map((n, i) => (n + b[i]) / 2), normal = vector([a[1] - b[1], b[0] - a[0]]).normalize();
-      const eye = vector(middle, .16 + feature.railHeight).addScaledVector(normal, 1);
+      const eye = vector(middle, .16 + heights[index]).addScaledVector(normal, 1);
       const hit = new THREE.Raycaster(eye, normal.clone().negate(), 0, 2).intersectObject(frame)[0];
       assert.ok(hit && Math.abs(hit.distance - 1) < .06, 'Each real top rail sits on its selected outer line');
+      const count = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 3.4);
+      const firstBay = a.map((n, i) => n + (b[i] - n) * .5 / count);
+      const midEye = vector(firstBay, .16 + heights[index] / 2).addScaledVector(normal, 1);
+      const midHits = new THREE.Raycaster(midEye, normal.clone().negate(), 0, 2).intersectObject(frame);
+      assert.equal(midHits.length > 0, index === 0, 'The southern fence retains its middle rail; the single side panel has no horizontal seam');
     }
     const extendedSouth = b.map((n, i) => n + 5.5 * outward[i]);
     for (const [edge, description] of [
