@@ -6,7 +6,7 @@ import { gymFrame, gymStairLayout } from './gym-interior.ts';
 import { theatreEntranceLayout } from './theatre-exterior-geometry.ts';
 import { buildingGeometry } from './building-geometry.ts';
 import { straightStairTreads } from './structure-geometry.ts';
-import type { Building, GroundPassage, Point, Shape } from './types';
+import type { Building, GroundPassage, PassageStair, Point, Shape } from './types';
 
 export const STANDS_ID = 'way/855459409';
 export const THEATRE_ID = 'local/theatre';
@@ -77,12 +77,27 @@ export function standsStairLayout(building: Building) {
     footprint: { outer: [...ring, ring[0]], holes: [] } as Shape };
 }
 
+// The lower stand landing turns into a return flight beside the first stair.
+// It lands on the existing badminton approach corridor, not inside a court.
+export function standsBasementStairLayout(building: Building, floor = -3.8) {
+  const upper = standsStairLayout(building), head = upper.u1 + .2, lowerEnd = head - 6.2;
+  const width = 1.5, center = upper.width - 4, v0 = center - width / 2;
+  const ring = [upper.at(head, v0), upper.at(upper.end - .2, v0), upper.at(upper.end - .2, upper.v0 + .02), upper.at(head, upper.v0 + .02)];
+  const landing = { outer: [...ring, ring[0]], holes: [] } as Shape;
+  const [outer, ...holes] = polygonClipping.union([upper.footprint.outer], [landing.outer])[0];
+  const stair: PassageStair = { from: upper.at(head, center), to: upper.at(lowerEnd, center), width, steps: 22,
+    topHeight: BASE, bottomHeight: floor + .045, doorHeight: 2.35 };
+  return { stair, head, lowerEnd, v0, landing, roofFootprint: { outer, holes } as Shape,
+    landingRoofHeight: BASE - .08 - floor };
+}
+
 export function standsArchitecture(building: Building, height: number, floorHeight: number, cutawayHeight?: number) {
   const frame = standsFrame(building), { at, length, width } = frame, shown = Math.min(height, cutawayHeight ?? height);
   const bodyParts: THREE.BufferGeometry[] = [], blue: THREE.BufferGeometry[] = [], green: THREE.BufferGeometry[] = [], red: THREE.BufferGeometry[] = [];
   const canopy: THREE.BufferGeometry[] = [], frames: THREE.BufferGeometry[] = [], rails: THREE.BufferGeometry[] = [], glass: THREE.BufferGeometry[] = [];
   const stairTreads: THREE.BufferGeometry[] = [], stairFrames: THREE.BufferGeometry[] = [];
   const stair = standsStairLayout(building);
+  const basement = standsBasementStairLayout(building);
   const point = (u: number, v: number, y: number): Vector => { const p = at(u, v); return [p[0], BASE + y, p[1]]; };
   const inner = [at(.35, .35), at(length - .35, .35), at(length - .35, width - .35), at(.35, width - .35)];
   const shell: Shape = { outer: building.outer, holes: [[...inner, inner[0]]] };
@@ -136,10 +151,15 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     const geometry = buildingGeometry({ outer: [...ring, ring[0]], holes: [] }, top - bottom, floorHeight);
     geometry.translate(0, 0, bottom); bodyParts.push(geometry);
   };
-  prism(stair.u0, stair.end, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
+  const doorStart = stair.u1 + .2, doorEnd = stair.end - .2;
+  prism(stair.u0, doorStart, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
+  prism(doorEnd, stair.end, stair.v0 - .2, stair.v0, stair.bottom - .12, .2);
+  prism(doorStart, doorEnd, stair.v0 - .2, stair.v0, stair.bottom - .12, stair.bottom);
+  prism(doorStart, doorEnd, stair.v0 - .2, stair.v0, stair.bottom + 2.35, .2);
   prism(stair.u0 - .2, stair.u0, stair.v0, width, stair.bottom - .12, .2);
   prism(stair.end, stair.end + .2, stair.v0, width, stair.bottom - .12, .2);
-  prism(stair.u1, stair.end, stair.v0, width + .02, stair.bottom - .12, stair.bottom);
+  prism(stair.u1, stair.end, stair.v0, width + .02, stair.bottom - .12, stair.bottom + BASE);
+  prism(basement.head, doorEnd, basement.v0, stair.v0, stair.bottom - .12, stair.bottom + BASE);
   const flight = straightStairTreads(at(stair.u0, stair.center), at(stair.u1, stair.center), stair.top, stair.bottom);
   for (const step of flight) {
     const u = ((step.from[0] + step.to[0]) / 2 - building.outer[0][0]) * frame.along[0]
@@ -148,12 +168,12 @@ export function standsArchitecture(building: Building, height: number, floorHeig
     add(stairTreads, box(frame, u, stair.center, Math.max(stair.bottom - .12, step.height - .16), step.height, run, stair.v1 - stair.v0, shown));
     for (const offset of [run / 2 - .025, run / 2 - .055]) add(stairFrames, box(frame, u + offset, stair.center, step.height, step.height + .008, .012, stair.v1 - stair.v0, shown));
   }
-  const doorStart = stair.u1 + .2, doorEnd = stair.end - .2;
   prism(stair.u0, doorStart, width - .35, width, stair.bottom, stair.bottom + .38);
   prism(stair.u0, stair.end, width - .35, width, stair.bottom + 2.35, 0);
   prism(stair.end - .2, stair.end, width - .35, width, stair.bottom, 0);
   const blackBar = (u0: number, v0: number, y0: number, u1: number, v1: number, y1: number, thickness = .055) =>
     add(stairFrames, bar(point(u0, v0, y0), point(u1, v1, y1), thickness, shown));
+  blackBar(doorEnd, basement.v0, stair.bottom + 1.045, doorEnd, stair.v0, stair.bottom + 1.045);
   // Lower rear glazing and an open door leaf let the landing actually reach outside.
   add(glass, box(frame, (stair.u0 + doorStart) / 2, width - .16, stair.bottom + .38, stair.bottom + 2.35, doorStart - stair.u0, .035, shown));
   for (const y of [stair.bottom + .38, stair.bottom + 2.35]) blackBar(stair.u0, width - .16, y, doorStart, width - .16, y);

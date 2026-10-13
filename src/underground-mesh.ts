@@ -50,7 +50,9 @@ export function undergroundWallPanels(shape: Shape, height: number, openings: Pa
     const along = (p: Point) => ((p[0] - from[0]) * dx + (p[1] - from[1]) * dz) / length;
     const across = (p: Point) => Math.abs((p[0] - from[0]) * dz - (p[1] - from[1]) * dx) / length;
     const doors = openings.flatMap(opening => {
-      if (across(opening[0]) > 1e-5 || across(opening[1]) > 1e-5) return [];
+      // Surveyed stand axes differ by fractions of a millimetre. A door in
+      // that wall must survive this rounding rather than becoming a wall plug.
+      if (across(opening[0]) > .001 || across(opening[1]) > .001) return [];
       const start = Math.max(0, Math.min(...opening.map(along))), end = Math.min(length, Math.max(...opening.map(along)));
       return end - start > 1e-5 ? [{ start, end, bottom: Math.max(0, opening.bottom ?? 0), top: Math.min(height, opening.height ?? height) }] : [];
     });

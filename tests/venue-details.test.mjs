@@ -138,7 +138,7 @@ test('the built stand stair shaft clears the actual podium and underground sport
   const layout = standsStairLayout(stands), track = campus.features.find(feature => feature.type === 'runningTrack');
   const areas = undergroundLayout(campus.features).areas;
   const room = areas.get('local/underground-badminton'), corridor = areas.get('local/underground-corridor');
-  assert.deepEqual(corridor.feature.ceilingCutouts[0].footprint, layout.footprint, 'The extended passage roof leaves the fixed stand shaft open');
+  assert.deepEqual(polygonClipping.difference([layout.footprint.outer], [corridor.feature.ceilingCutouts[0].footprint.outer]), [], 'The enlarged turning landing retains the entire fixed stand shaft');
   const sideHall = [layout.at(layout.u0 - .2, layout.v0 - .2), layout.at(layout.end + .2, layout.v0 - .2),
     layout.at(layout.end + .2, layout.width + .02), layout.at(layout.u0 - .2, layout.width + .02)];
   assert.deepEqual(polygonClipping.intersection([room.feature.outer], [[...sideHall, sideHall[0]]]), [], 'The stair and its sidewalls do not invade the moved badminton hall');

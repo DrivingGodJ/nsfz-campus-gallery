@@ -102,7 +102,7 @@ test('all underground model batches stay within their floors and ceilings and ad
     if(area.feature.type==='undergroundCorridor') for(const kind of ['glass','walls','lights','tiles','pipes']) assert.ok(model[kind].attributes.position.count,kind);
     Object.values(model).forEach(geometry=>geometry.dispose());
   }
-  assert.ok(triangles<42000,'Structure, sports details and the new picketed stair guards remain material-batched within a fixed geometry budget');
+  assert.ok(triangles<46000,'Structure, sports details and both descending entrance flights with picketed guards stay within the bounded material-batch budget');
 });
 
 test('partial doors keep their jambs, and overhead inspections remove the volume ceiling', () => {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as THREE from 'three';
 import { curvedStairPoint } from '../src/structure-geometry.ts';
-import { undergroundEntranceStair } from '../src/underground-geometry.ts';
+import { undergroundEntranceStair, undergroundEntranceStairs } from '../src/underground-geometry.ts';
 import { undergroundDetailGeometry } from '../src/underground-details.ts';
 import { undergroundRailGeometry } from '../src/underground-rail-geometry.ts';
 
@@ -50,13 +50,20 @@ test('the actual curved entrance retains both rail routes and height envelopes w
 
 test('the corridor exit uses the same metal style at its original stair height, leaving the door and central treads clear', () => {
   const feature = campus.features.find(item => item.id === 'local/underground-corridor'), before = JSON.stringify(feature), stair = undergroundEntranceStair(feature);
-  const model = undergroundDetailGeometry(feature), guard = mesh(model.rails);
+  const stairs = undergroundEntranceStairs(feature), model = undergroundDetailGeometry(feature), guard = mesh(model.rails);
   try {
     model.rails.computeBoundingBox();
-    assert.ok(Math.abs(model.rails.boundingBox.max.y - stair.topHeight - 1.045) < 1e-6);
-    assert.ok(Math.abs(model.rails.boundingBox.min.y - stair.bottomHeight) < 1e-6);
-    for (const t of [.02, .25, .5, .75, .98]) {
-      const p = stair.at(stair.length * t), y = stair.topHeight + (stair.bottomHeight - stair.topHeight) * t;
+    assert.ok(Math.abs(model.rails.boundingBox.max.y - Math.max(...stairs.map(item => item.topHeight)) - 1.045) < 1e-6);
+    assert.ok(Math.abs(model.rails.boundingBox.min.y - Math.min(...stairs.map(item => item.bottomHeight))) < 1e-6);
+    const vertices = model.rails.attributes.position, heights = [], dx = (stair.to[0] - stair.from[0]) / stair.length, dz = (stair.to[1] - stair.from[1]) / stair.length;
+    for (let i = 0; i < vertices.count; i++) {
+      const x = vertices.getX(i) - stair.from[0], z = vertices.getZ(i) - stair.from[1], along = x * dx + z * dz;
+      if (along >= -.25 && along <= stair.length + .25 && Math.abs(x * dz - z * dx) <= stair.width / 2 + .25) heights.push(vertices.getY(i));
+    }
+    assert.ok(Math.abs(Math.max(...heights) - stair.topHeight - 1.045) < 1e-6, 'The original exit guard keeps its height');
+    assert.ok(Math.abs(Math.min(...heights) - stair.bottomHeight) < 1e-6, 'The original exit posts still reach the same floor');
+    for (const flight of stairs) for (const t of [.02, .25, .5, .75, .98]) {
+      const p = flight.at(flight.length * t), y = flight.topHeight + (flight.bottomHeight - flight.topHeight) * t;
       assert.equal(new THREE.Raycaster(new THREE.Vector3(p[0], y + .6, p[1]), new THREE.Vector3(0, 1, 0), 0, 1).intersectObject(guard).length, 0);
     }
     assert.equal(JSON.stringify(feature), before, 'No entrance, passage or step coordinates move');

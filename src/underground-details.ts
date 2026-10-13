@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { passageFootprint, undergroundFootprints, undergroundEntranceStair, undergroundRiseStair, undergroundFloorElevation, undergroundSkylights, undergroundCeilingSections, type PassageOpening } from './underground-geometry.ts';
+import { passageFootprint, undergroundFootprints, undergroundEntranceStairs, undergroundRiseStair, undergroundFloorElevation, undergroundSkylights, undergroundCeilingSections, type PassageOpening } from './underground-geometry.ts';
 import { undergroundWallPanels } from './underground-mesh.ts';
 import { undergroundRailGeometry } from './underground-rail-geometry.ts';
 import { pointOnStairTread } from './structure-geometry.ts';
@@ -37,7 +37,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
   const hallWindowEdges = feature.id === 'local/underground-badminton' && feature.outer
     ? feature.outer.slice(1).map((to, i) => ({ from: feature.outer![i], to })) : null;
   const sections = undergroundCeilingSections(feature, footprints, openings, connections);
-  const stair = undergroundEntranceStair(feature);
+  const stairs = undergroundEntranceStairs(feature);
   const rise = undergroundRiseStair(feature);
   const floorAt = (p: Point) => undergroundFloorElevation(feature, p);
   const walkingSegments = (from: Point, to: Point) => {
@@ -98,7 +98,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
   };
   for (const shape of footprints) {
     const platform = rise ? passageFootprint([rise.to, rise.at(rise.length + 20)], feature.width || rise.width) : null;
-    const cuts = [...(stair ? [[stair.footprint.outer]] : []), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
+    const cuts = [...stairs.map(stair => [stair.footprint.outer]), ...(rise ? [[rise.footprint.outer], [platform!.outer]] : [])];
     const floors = cuts.length ? polygonClipping.difference([shape.outer, ...shape.holes], ...cuts) : [[shape.outer, ...shape.holes]];
     for (const [outer, ...holes] of floors) flat({ outer, holes }, floor + .045, feature.type === 'undergroundRoom' && feature.roomUse !== 'garage' ? 'green' : 'floor');
     if (platform) for (const [outer, ...holes] of polygonClipping.intersection([shape.outer, ...shape.holes], [platform.outer]))
@@ -134,8 +134,8 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
           }
         }
       } else {
-        const entranceFace = stair && [panel.from, panel.to].every(p => Math.abs(
-          (p[0] - stair.from[0]) * (stair.to[0] - stair.from[0]) + (p[1] - stair.from[1]) * (stair.to[1] - stair.from[1])) / stair.length < 1e-5);
+        const entranceFace = stairs.some(stair => [panel.from, panel.to].every(p => Math.abs(
+          (p[0] - stair.from[0]) * (stair.to[0] - stair.from[0]) + (p[1] - stair.from[1]) * (stair.to[1] - stair.from[1])) / stair.length < 1e-5));
         segment(panel.from, panel.to, floor + panel.bottom, panel.top - panel.bottom, .2, entranceFace ? 'podium' : 'walls');
       }
       const trimHeight = feature.roomUse === 'garage' ? 0 : feature.type === 'undergroundTrack' ? 1.55 : feature.type === 'undergroundCorridor' ? 1.1 : clear - 1;
@@ -152,7 +152,7 @@ export function undergroundDetailGeometry(feature: Feature, footprints = undergr
       }
     }
   }
-  if (stair) {
+  for (const stair of stairs) {
     for (const tread of stair.treads) segment(tread.from, tread.to, floor, tread.height - floor, stair.width, 'floor');
     for (const side of [-1, 1]) {
       const offset = side * (stair.width / 2 - .09);

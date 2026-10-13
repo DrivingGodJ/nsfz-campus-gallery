@@ -1,4 +1,5 @@
 import polygonClipping from 'polygon-clipping';
+import { stairSurfaceHeight } from './terrain-height.ts';
 import type { Feature, Point, Shape } from './types';
 
 // Offset both sides of a route so adjacent segments share one mitered corner.
@@ -50,8 +51,7 @@ export type UndergroundAreaLayout = { feature: Feature; connections: Feature[]; 
 
 // An entrance belongs to its existing passage: the same footprint locates the
 // facade opening, descending treads and guards without adding a map location.
-export function undergroundEntranceStair(feature: Feature) {
-  const stair = feature.entranceStair;
+export function undergroundEntranceStair(feature: Feature, stair = feature.entranceStair) {
   if (!stair) return null;
   const length = Math.hypot(stair.to[0] - stair.from[0], stair.to[1] - stair.from[1]);
   const axis: Point = [(stair.to[0] - stair.from[0]) / length, (stair.to[1] - stair.from[1]) / length];
@@ -65,6 +65,11 @@ export function undergroundEntranceStair(feature: Feature) {
     height: stair.topHeight + (stair.bottomHeight - stair.topHeight) * (i + 1) / stair.steps,
   }));
   return { ...stair, at, length, opening, treads, footprint: passageFootprint([stair.from, stair.to], stair.width) };
+}
+
+export function undergroundEntranceStairs(feature: Feature) {
+  return [feature.entranceStair, ...(feature.entranceStairs || [])].filter(stair => stair !== undefined)
+    .map(stair => undergroundEntranceStair(feature, stair)!);
 }
 
 // The exit flight rises inside the straight tunnel, then meets the unchanged
@@ -84,6 +89,10 @@ export function undergroundRiseStair(feature: Feature) {
 }
 
 export function undergroundFloorElevation(feature: Feature, point: Point) {
+  for (const stair of feature.entranceStairs || []) {
+    const height = stairSurfaceHeight({ ...feature, riseStair: stair }, point);
+    if (height !== undefined) return height - .045;
+  }
   const floor = feature.height ?? -3, stair = feature.riseStair;
   if (!stair) return floor;
   const dx = stair.to[0] - stair.from[0], dz = stair.to[1] - stair.from[1], length = Math.hypot(dx, dz);
@@ -269,10 +278,10 @@ export function undergroundLayout(features: Feature[]) {
     locations.set(feature.id, undergroundFootprints(feature, [], aligned));
     if (merged.has(feature.id)) continue;
     const joined = connections.get(feature.id) || [];
-    const stair = undergroundEntranceStair(feature);
+    const stairs = undergroundEntranceStairs(feature);
     areas.set(feature.id, { feature, connections: joined, footprints: undergroundFootprints(feature, joined, aligned),
       openings: [...[feature, ...joined].flatMap(item => openings.get(item.id) || []),
-        ...(stair ? [stair.opening] : [])] });
+        ...stairs.map(stair => stair.opening)] });
   }
   // A garage's driveway notch ends at the basement floor. Retain its narrow
   // sidewalls but open the end cap so the slope actually reaches the room.
