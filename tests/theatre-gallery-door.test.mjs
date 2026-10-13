@@ -43,10 +43,13 @@ test('the marked short-return fifth-floor doorway is a real local opening with a
   }
 });
 
-test('the crossed vestibule walls disappear only on five, its floor stays continuous and the old long-wall door is closed',()=>{
+test('the vestibule ends at the open fifth-floor walk, without a floating sixth-floor box or fifth-floor ceiling',()=>{
   const vestibule=theatre.parts.find(p=>p.id==='theatre-entry-vestibule'),main=theatre.parts.find(p=>p.id==='main');
-  assert.deepEqual(vestibule.openEdges,[0,1,2,3]);assert.equal(vestibule.openEdgesStartFloor,5);assert.equal(vestibule.openEdgesEndFloor,5);
-  const previous={...theatre,parts:theatre.parts.map(part=>{if(part.id!==vestibule.id)return part;const copy={...part};delete copy.openEdges;delete copy.openEdgesStartFloor;delete copy.openEdgesEndFloor;return copy;})};
+  assert.equal(vestibule.floors,4);assert.deepEqual(vestibule.roofTerrace,{railEdges:[]});
+  assert.equal(vestibule.openEdges,undefined);assert.equal(vestibule.classroomWindows.endFloor,4);
+  const saved=JSON.parse(fs.readFileSync(new URL('../data/campus-corrections.json',import.meta.url))).buildings.find(b=>b.id===theatre.id);
+  assert.deepEqual(saved.parts,theatre.parts,'Map refresh retains the shortened vestibule and open roof walk');
+  const previous={...theatre,parts:theatre.parts.map(part=>{if(part.id!==vestibule.id)return part;const copy={...part,floors:6};delete copy.roofTerrace;return copy;})};
   for(const fh of [3.6,4.2]) {
     const body=bodies(theatre,fh),before=bodies(previous,fh),entry=theatreEntranceGeometry(theatre,fh),glass=mesh(entry.glass);
     try {
@@ -56,11 +59,28 @@ test('the crossed vestibule walls disappear only on five, its floor stays contin
         const ray=floor=>new THREE.Raycaster(new THREE.Vector3(start[0],.12+floor*fh+1.5,start[1]),new THREE.Vector3(normal[0],0,normal[1]),0,.8);
         assert.equal(ray(4).intersectObject(body.group).length,0,'All four walls of the crossed small block are absent on floor five');
         assert.ok(ray(4).intersectObject(before.group).length,'The removed walls are measured at the actual former block');
-        for(const floor of [0,1,2,3,5])assert.deepEqual(ray(floor).intersectObject(body.group).map(hit=>Math.round(hit.distance*1e5)),ray(floor).intersectObject(before.group).map(hit=>Math.round(hit.distance*1e5)),'Every other floor, including the existing 2F vestibule openings, stays exact');
+        assert.equal(ray(5).intersectObject(body.group).length,0,'No sixth-floor wall remains above the exposed walk');
+        assert.ok(ray(5).intersectObject(before.group).length,'The former suspended sixth-floor block is measured at its exact footprint');
+        for(const floor of [0,1,2,3])assert.deepEqual(ray(floor).intersectObject(body.group).map(hit=>Math.round(hit.distance*1e5)),ray(floor).intersectObject(before.group).map(hit=>Math.round(hit.distance*1e5)),'The four lower floors, including the existing 2F vestibule openings, stay exact');
       }
       const center=vestibule.outer.slice(0,4).reduce((sum,p)=>[sum[0]+p[0]/4,sum[1]+p[1]/4],[0,0]);
       const floor=new THREE.Raycaster(new THREE.Vector3(center[0],.12+4*fh+.5,center[1]),new THREE.Vector3(0,-1,0),0,.5).intersectObject(body.group)[0];
       assert.ok(floor&&Math.abs(floor.point.y-(.12+4*fh+.25))<1e-4,'The roof walk retains its supporting slab beneath the removed block');
+      const fromRoof=new THREE.Raycaster(new THREE.Vector3(center[0],.12+6*fh+.5,center[1]),new THREE.Vector3(0,-1,0),0,2*fh+.5).intersectObject(body.group)[0];
+      assert.ok(fromRoof&&Math.abs(fromRoof.point.y-floor.point.y)<1e-4,'The first surface below the former roof is the fifth-floor walk: neither upper slab floats above it');
+      for(const selected of [5,6]) {
+        const cut=bodies(theatre,fh,selected*fh);
+        try {
+          const hit=new THREE.Raycaster(new THREE.Vector3(center[0],.12+selected*fh+.5,center[1]),new THREE.Vector3(0,-1,0),0,2*fh+.5).intersectObject(cut.group)[0];
+          assert.ok(hit&&Math.abs(hit.point.y-floor.point.y)<1e-4,'Selecting upper photos keeps the same exposed walk without resurrecting the removed box');
+        } finally {cut.dispose();}
+      }
+      const info=buildingLevels(theatre,{floorHeight:fh}),beforeInfo=buildingLevels(previous,{floorHeight:fh});
+      assert.equal(info.sections.find(p=>p.id===vestibule.id).height,info.sections.find(p=>p.id==='curved-terrace').height,'The former block plate aligns with the adjacent fifth-floor terrace');
+      info.sections.forEach((part,index)=>{if(part.id!==vestibule.id) {
+        assert.equal(part.height,beforeInfo.sections[index].height,'The main six-storey theatre and other parts retain their height');
+        assert.deepEqual(body.geometries[index].attributes.position.array,before.geometries[index].attributes.position.array,'Every other theatre part retains its exact body vertices');
+      }});
       const a=main.outer[5],b=main.outer[6],t=(-31.5-a[1])/(b[1]-a[1]),old=[a[0]+(b[0]-a[0])*t,-31.5],length=Math.hypot(b[0]-a[0],b[1]-a[1]),normal=[(b[1]-a[1])/length,-(b[0]-a[0])/length];
       const ray=new THREE.Raycaster(new THREE.Vector3(old[0]-normal[0]*.5,.12+4*fh+1.5,old[1]-normal[1]*.5),new THREE.Vector3(normal[0],0,normal[1]),0,1);
       assert.ok(ray.intersectObject(body.group).length,'The former incorrect long-wall opening is restored to solid wall');
