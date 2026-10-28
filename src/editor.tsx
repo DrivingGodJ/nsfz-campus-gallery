@@ -147,7 +147,7 @@ function Editor() {
       else if (draft) { await api('draft/' + photo.id, 'PUT', { photo }); await api('publish/' + photo.id, 'POST', { revision: state.site.revision }); }
       else await api('photo/' + photo.id, 'PUT', { photo, revision: state.site.revision });
       const next = await refresh(); setPhoto(next.site.photos.find(p => p.id === photo.id)!); setDirty(false); setPlacing(false);
-      localStorage.removeItem('nsfz:edit:' + photo.id); setMessage('已保存到内容库。核对完成后，点击右上角“上线”发布。');
+      localStorage.removeItem('nsfz:edit:' + photo.id); setMessage(state?.storage === 'nas' ? '已保存到 NAS，已下载的本地副本也会一起更新。点击“上线”发布到网站。' : '已保存到内容库。核对完成后，点击右上角“上线”发布。');
     } catch (e) { setError((e as Error).message); await refresh(); }
     finally { setBusy(''); }
   };
@@ -198,7 +198,7 @@ function Editor() {
     catch(e) { setError((e as Error).message); } finally { setBusy(''); }
   };
   const reviewPhoto = !!activeReviewID;
-  const saveLabel = reviewPhoto ? '通过审核并入库' : '保存到内容库';
+  const saveLabel = reviewPhoto ? '通过审核并入库' : state?.storage === 'nas' ? '保存到 NAS' : '保存到内容库';
   const togglePerspective = () => {
     if (busy) return;
     if (previewing) exitPreview();
@@ -210,7 +210,7 @@ function Editor() {
   const draft = state?.drafts.some(p => p.id === photo?.id);
   const imageSource = (p: Photo, type: 'thumbnail' | 'display' | 'depth') => { const rendition = type === 'display' && !p.files.display ? 'thumbnail' : type; return state?.drafts.some(d => d.id === p.id) ? '/__local/draft-media/' + p.id + '/' + rendition + '.webp?v=' + encodeURIComponent(p.depthUpdatedAt || '1') : asset(type === 'depth' ? photoDepthFile(p)! : type === 'display' ? photoDisplayFile(p) : p.files.thumbnail); };
   return <div className={'app editor-app' + (comparing && mode === 'photos' && photo ? ' comparing' : '')}>
-    <header className="app-header"><Brand editor href={desktop ? './editor.html?desktop=1' : undefined} /><span className="local-badge">{desktop ? '本地审核' : '本地编辑'}</span><div className="header-actions"><LocalPhotoCache disabled={!!operationBusy || publishing || dirty} onBusyChange={setCacheBusy} /><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}<PublishPanel api={api} unsaved={dirty || !!cacheBusy} onRunningChange={setPublishing} /></div></header>
+    <header className="app-header"><Brand editor href={desktop ? './editor.html?desktop=1' : undefined} /><span className="local-badge">{state?.storage === 'nas' ? 'NAS 内容库' : desktop ? '本地审核' : '本地编辑'}</span><div className="header-actions"><LocalPhotoCache disabled={!!operationBusy || publishing || dirty} onBusyChange={setCacheBusy} /><a className="button secondary" href="./" target="_blank" rel="noreferrer">浏览预览<ArrowUpRight size={15} /></a>{photo && mode === 'photos' && <button className="button primary" onClick={save} disabled={!!busy || !locationAllowed || !photo.placed || (isAerialPhoto(photo) && !photo.altitude)}><Save size={16} />{saveLabel}</button>}<PublishPanel api={api} unsaved={dirty || !!cacheBusy} onRunningChange={setPublishing} /></div></header>
     {error && <Notice kind="error">{error}<button className="text-button" onClick={() => setError('')}>关闭</button></Notice>}
     {message && <Notice kind="success">{message}{removed && <button className="text-button" onClick={undo} disabled={!!busy}><Undo2 size={14} />恢复照片</button>}</Notice>}
     {busy && <div className="busy-bar" role="status"><LoaderCircle size={15} className="spin" />{busy}</div>}

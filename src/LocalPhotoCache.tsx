@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Download, LoaderCircle, Trash2 } from 'lucide-react';
 
-type CacheState = { configured: boolean; connected: boolean; cached: boolean; busy: boolean; operation?: string; message?: string };
+type CacheState = { configured: boolean; connected: boolean; cached: boolean; busy: boolean; operation?: string; message?: string; storage?: 'nas' };
 const token = document.querySelector<HTMLMetaElement>('meta[name="local-editor-token"]')?.content;
 
 export default function LocalPhotoCache({ disabled = false, onBusyChange }: { disabled?: boolean; onBusyChange?: (message: string) => void }) {
@@ -45,10 +45,10 @@ export default function LocalPhotoCache({ disabled = false, onBusyChange }: { di
   if (!token || !state?.configured) return null;
   return <div className="local-photo-cache" aria-label="本地照片缓存">
     <div className="local-photo-cache-actions">
-      {state.connected && <button className="button secondary" disabled={disabled || !!busy} onClick={() => void run('download')}><Download size={15} />下载照片</button>}
+      {state.connected && <button className="button secondary" disabled={disabled || !!busy} onClick={() => void run('download')} title={state.storage === 'nas' ? '主动下载一份本地副本；以后保存修改时一起更新' : undefined}><Download size={15} />{state.cached ? '更新本地副本' : '下载照片'}</button>}
       {state.cached && <button className="button secondary" disabled={disabled || !!busy || !state.connected} onClick={() => void run('clear')} title="核对 NAS 备份后，仅清理本机照片和预览"><Trash2 size={15} />清理本地照片</button>}
     </div>
-    <span className="local-photo-cache-status" role="status">{busy ? <><LoaderCircle size={13} className="spin" />{state.busy ? state.message : busy}</> : !state.connected ? 'NAS 未连接' : state.cached ? 'NAS 已连接 · 有本地照片' : 'NAS 已连接 · 可在线预览'}</span>
+    <span className="local-photo-cache-status" role="status">{busy ? <><LoaderCircle size={13} className="spin" />{state.busy ? state.message : busy}</> : !state.connected ? 'NAS 未连接 · 请连接后保存' : state.storage === 'nas' ? state.cached ? 'NAS 主存储 · 本地副本自动更新' : '直接使用 NAS · 本机不存照片' : state.cached ? 'NAS 已连接 · 有本地照片' : 'NAS 已连接 · 可在线预览'}</span>
     {error && <span className="local-photo-cache-error" role="alert">{error}</span>}
   </div>;
 }

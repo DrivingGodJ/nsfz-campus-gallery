@@ -62,7 +62,7 @@ export type Photo = {
 };
 export type BuildingOverride = { name: string; floors: number; floorHeight: number; partFloors?: Record<string, number> };
 export type Site = { schemaVersion: number; revision: number; photos: Photo[]; buildingOverrides: Record<string, BuildingOverride> };
-export type EditorState = { reviewImports?: {id:string;photoId:string;published:boolean;synced?:boolean;rejected?:boolean}[]; site: Site; drafts: Photo[]; map: Campus };
+export type EditorState = { storage?: 'nas'; reviewImports?: {id:string;photoId:string;published:boolean;synced?:boolean;rejected?:boolean}[]; site: Site; drafts: Photo[]; map: Campus };
 export const asset = (file: string) => assetURL(file, import.meta.env.BASE_URL, import.meta.env.VITE_MEDIA_BASE_URL, import.meta.env.DEV);
 export function buildingInfo(building: Building, site: Site, index = 0) {
   const override = site.buildingOverrides[building.id];

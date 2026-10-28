@@ -178,6 +178,35 @@ test('empty cache folders do not claim that photos have been downloaded', async 
   assert.equal((await service.status()).cached, true);
 });
 
+test('NAS primary mode saves metadata without downloading photos; explicit copies follow later edits', async t => {
+  const { root, gallery, service, disconnect } = await fixture(t);
+  await write(root, '.local/nas-library.json', '{"version":1,"downloaded":false}');
+  assert.equal(await service.primaryRoot(), gallery);
+  await service.mirror();
+  await assert.rejects(fs.access(path.join(root, picture)), { code: 'ENOENT' });
+  assert.equal((await service.status()).storage, 'nas');
+  await service.download();
+  const next = { ...site, revision: 2, photos: [{ ...site.photos[0], title: 'NAS update', depthUpdatedAt: 'new-media' }] };
+  await write(gallery, 'public/data/site.json', JSON.stringify(next));
+  await write(gallery, picture, 'updated NAS image');
+  await service.mirror();
+  assert.equal(await fs.readFile(path.join(root, picture), 'utf8'), 'updated NAS image');
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'))), next);
+  disconnect();
+  await assert.rejects(service.mirror(), /NAS 未连接/);
+  assert.equal(await fs.readFile(path.join(root, picture), 'utf8'), 'updated NAS image');
+});
+
+test('NAS metadata-only saves do not read image files or create local photos', async t => {
+  const { root, gallery, service } = await fixture(t);
+  await write(root, '.local/nas-library.json', '{"version":1,"downloaded":false}');
+  await fs.rm(path.join(gallery, picture));
+  await write(gallery, 'public/data/site.json', JSON.stringify({ ...site, revision: 2 }));
+  await service.mirror();
+  assert.equal(JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'))).revision, 2);
+  await assert.rejects(fs.access(path.join(root, 'public/media')), { code: 'ENOENT' });
+});
+
 test('private review settings sync and restore with owner-only permissions and survive photo cleanup', async t => {
   const { root, gallery, service } = await fixture(t);
   const file = '.local/submission-service.json';

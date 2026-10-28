@@ -99,6 +99,12 @@ async function mountedArchive(archiveRoot) {
 
 export function createNASCacheService(root, { archiveRoot, configFile = process.env.CAMPUS_NAS_CONFIG || path.join(root, '.local/nas-archive.json'), isConnected = mountedArchive, run = async (tool, args, options) => (await execute(tool, args, { ...options, maxBuffer: 1024 * 1024 })).stdout } = {}) {
   const manifestFile = path.join(root, '.local/nas-cache.json');
+  const modeFile = path.join(root, '.local/nas-library.json');
+  const mode = async () => {
+    try { return JSON.parse(await fs.readFile(modeFile, 'utf8')); }
+    catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  };
+  const setDownloaded = async downloaded => { const value = await mode(); if (value?.version === 1) await writeJSON(modeFile, { ...value, downloaded }); };
   let operation = '', progress = '';
   async function location() {
     let configured = archiveRoot;
@@ -126,7 +132,56 @@ export function createNASCacheService(root, { archiveRoot, configFile = process.
     const connected = !!target && await isConnected(target.archiveRoot);
     const cached = (await Promise.all(PHOTO_CACHE_PATHS.map(file => hasFiles(path.join(root, file))))).some(Boolean);
     const saved = await manifest();
-    return { configured: !!target, connected, cached, busy: !!operation, operation, message: progress || (!target ? '' : connected ? cached ? '照片已下载到本地。' : 'NAS 已连接，可以下载照片。' : 'NAS 未连接。'), syncedAt: saved?.syncedAt, downloadedAt: saved?.downloadedAt };
+    const primary = (await mode())?.version === 1;
+    return { configured: !!target, connected, cached, busy: !!operation, operation, message: progress || (!target ? '' : connected ? primary ? cached ? '直接使用 NAS · 本地副本随修改更新。' : '直接使用 NAS，不保留本地照片。' : cached ? '照片已下载到本地。' : 'NAS 已连接，可以下载照片。' : 'NAS 未连接。'), syncedAt: saved?.syncedAt, downloadedAt: saved?.downloadedAt, ...(primary ? { storage: 'nas' } : {}) };
+  }
+  async function primaryRoot() { return (await mode())?.version === 1 ? (await location())?.gallery : null; }
+
+  // NAS owns photos and annotations. Only small metadata is mirrored for Git;
+  // photo bytes are copied to this machine solely after an explicit download.
+  async function mirror() {
+    return lock('mirror', async () => {
+      const target = await requireConnected(), settings = await mode();
+      if (settings?.version !== 1) return;
+      const read = async (base, file, fallback) => {
+        try { return JSON.parse(await fs.readFile(path.join(base, file), 'utf8')); }
+        catch (error) { if (error.code === 'ENOENT') return fallback; throw error; }
+      };
+      const photoState = async base => [...(await read(base, 'public/data/site.json', { photos: [] })).photos.map(photo => ({ ...photo, _draft: false })), ...(await read(base, '.local/drafts.json', [])).map(photo => ({ ...photo, _draft: true }))];
+      const previous = new Map((await photoState(root)).map(photo => [photo.id, photo]));
+      const current = await photoState(target.gallery);
+      const next = new Map(current.map(photo => [photo.id, photo]));
+      if (settings.downloaded) {
+        const ids = new Set([...previous.keys(), ...current.map(photo => photo.id)]);
+        for (const id of ids) {
+          const before = previous.get(id), after = next.get(id);
+          if (before && after && JSON.stringify(before.files) === JSON.stringify(after.files) && before.depthUpdatedAt === after.depthUpdatedAt
+            && before._draft === after._draft) continue;
+          if (!/^[a-f0-9-]{36}$/.test(id)) throw new UserError('照片编号无效，未更新本地副本。');
+          const paths = ['public/media/' + id, '.local/draft-media/' + id, '.local/originals/' + id, '.local/removed/' + id + '.json'];
+          const rows = await inventory(target.gallery, paths), keys = new Set(rows.map(row => row.path));
+          await transfer(target.gallery, root, rows, requireConnected);
+          for (const row of await inventory(root, paths)) if (!keys.has(row.path) && /\/(thumbnail\.webp|preview\.webp|display\.webp|download\.jpg|depth\.webp|source\.[a-z0-9]+|[a-f0-9-]{36}\.json)$/.test(row.path)) {
+            await requireConnected(); await fs.unlink(path.join(root, row.path));
+          }
+        }
+      }
+      const rows = await inventory(target.gallery, METADATA_PATHS);
+      await transfer(target.gallery, root, rows, requireConnected);
+    });
+  }
+  async function finishPublication({ commit }) {
+    const target = await requireConnected();
+    const local = await fs.readFile(path.join(root, 'public/data/site.json'));
+    if (!(await fs.readFile(path.join(target.gallery, 'public/data/site.json'))).equals(local)) throw new UserError('NAS 内容刚刚发生变化，未更新归档版本。', 409);
+    const status = (await run('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: target.gallery })).trim();
+    if (status.split('\n').some(line => line && line.trim().slice(2).trim() !== 'public/data/site.json')) throw new UserError('NAS 工程还有程序修改，未覆盖归档。', 409);
+    if (!/^[a-f0-9]{40}$/.test(commit)) throw new UserError('上线提交编号无效。');
+    await run('git', ['fetch', 'origin', 'main'], { cwd: target.gallery });
+    // Staging the identical published file permits a safe fast-forward without
+    // temporarily replacing NAS annotations with the previous version.
+    await run('git', ['add', '--', 'public/data/site.json'], { cwd: target.gallery });
+    await run('git', ['merge', '--ff-only', '--no-edit', commit], { cwd: target.gallery });
   }
   async function lock(name, action) {
     if (operation) throw new UserError('照片缓存正在处理，请稍后再试。', 423);
@@ -240,6 +295,15 @@ export function createNASCacheService(root, { archiveRoot, configFile = process.
   async function download() {
     return lock('download', async () => {
       const target = await requireConnected();
+      if ((await mode())?.version === 1) {
+        progress = '正在下载 NAS 照片，后续修改会同步更新这份本地副本…';
+        const rows = await inventory(target.gallery);
+        await transfer(target.gallery, root, rows, requireConnected);
+        for (const row of rows) if (!await same(root, row)) throw new UserError('本地副本校验尚未完成，已下载文件保留，请重试。');
+        await record(target, rows, { downloadedAt: new Date().toISOString() });
+        await setDownloaded(true);
+        return { ...await status(), busy: false, operation: '' };
+      }
       await cleanStagedCopies(root, requireConnected);
       await compareLibraryVersion(target);
       await checkPublishedFiles(target);
@@ -251,6 +315,7 @@ export function createNASCacheService(root, { archiveRoot, configFile = process.
       await transfer(target.gallery, root, rows.filter(row => METADATA_PATHS.includes(row.path)), requireConnected, { onlyMissing: true });
       for (const row of rows) if (!await same(root, row)) throw new UserError('下载校验尚未完成，已下载文件保留，请重试。');
       await record(target, rows, { downloadedAt: new Date().toISOString() });
+      await setDownloaded(true);
       return { ...await status(), busy: false, operation: '' };
     });
   }
@@ -285,6 +350,7 @@ export function createNASCacheService(root, { archiveRoot, configFile = process.
       await cleanPublicationBuilds(path.join(root, '.local/publication'));
       const previous = await manifest();
       await record(target, rows.filter(row => METADATA_PATHS.includes(row.path)), { syncedAt: previous?.syncedAt, clearedAt: new Date().toISOString() });
+      await setDownloaded(false);
       return { ...await status(), busy: false, operation: '', deleted: deleted.length };
     });
   }
@@ -312,5 +378,5 @@ export function createNASCacheService(root, { archiveRoot, configFile = process.
       return { ...await status(), busy: false, operation: '' };
     });
   }
-  return { status, download, hydrateMissing, clear: remove, remove, sync, requireConnected, isBusy: () => !!operation };
+  return { status, download, hydrateMissing, clear: remove, remove, sync, requireConnected, primaryRoot, mirror, finishPublication, isBusy: () => !!operation };
 }

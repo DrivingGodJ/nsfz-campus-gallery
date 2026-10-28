@@ -71,17 +71,17 @@ async function fileHash(file) {
   for await (const chunk of createReadStream(file)) hash.update(chunk);
   return hash.digest('hex');
 }
-export function createPublicationService(root, { run = runCommand, fetcher = fetch, wait = delay, pollMs = 6000, maxPolls = 150, mediaRoot = process.env.CAMPUS_MEDIA_ROOT || path.resolve(root, '../nsfz-campus-media'), beforePublish, afterPublish } = {}) {
+export function createPublicationService(root, { run = runCommand, fetcher = fetch, wait = delay, pollMs = 6000, maxPolls = 150, mediaRoot = process.env.CAMPUS_MEDIA_ROOT || path.resolve(root, '../nsfz-campus-media'), beforePublish, afterPublish, sourceRoot = root, incremental = false } = {}) {
   const directory = path.join(root, '.local/publication'), lockFile = path.join(directory, 'lock.json');
   const hashes = new Map();
-  let active = null, latestPlan = null;
+  let active = null, latestPlan = null, planning;
   const command = (tool, args, options = {}) => run(tool, args, { cwd: root, ...options });
   const git = (...args) => command('git', args);
   const mediaGit = (...args) => command('git', args, { cwd: mediaRoot });
   const gh = (...args) => command('gh', args);
   const externalMedia = () => fs.access(path.join(mediaRoot, '.git')).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
   async function hash(file, fresh) {
-    const stat = await fs.stat(file), key = [stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs].join(':');
+    const stat = await fs.stat(file), key = [stat.size, stat.mtimeMs, stat.ctimeMs].join(':');
     const cached = hashes.get(file);
     if (!fresh && cached?.key === key) return cached.value;
     const value = await fileHash(file);
@@ -121,8 +121,8 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     const other = paths.filter(file => !contentPath(file));
     if (other.length) throw new UserError('项目还有未完成的程序修改，暂时不能自动上线。照片已保留。需要先处理：' + other.slice(0, 5).join('、'));
     const [current, drafts, previousText, counts] = await Promise.all([
-      fs.readFile(path.join(root, 'public/data/site.json'), 'utf8').then(JSON.parse),
-      fs.readFile(path.join(root, '.local/drafts.json'), 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return []; throw error; }),
+      fs.readFile(path.join(sourceRoot, 'public/data/site.json'), 'utf8').then(JSON.parse),
+      fs.readFile(path.join(sourceRoot, '.local/drafts.json'), 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return []; throw error; }),
       command('git', ['show', 'origin/main:public/data/site.json'], { maxOutputChars: Infinity }),
       git('rev-list', '--left-right', '--count', 'HEAD...origin/main')
     ]);
@@ -138,6 +138,10 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     // covers only the source that must stay unchanged while images upload.
     const sourceFingerprint = fingerprint.copy().update(JSON.stringify(current));
     let media;
+    if (incremental && !fresh) {
+      latestPlan = { ...photoChanges(JSON.parse(previousText), current), files: paths, saved: current.photos.length, drafts: drafts.length, ahead, siteURL: PUBLIC_SITE };
+      return latestPlan;
+    }
     const useExternalMedia = await externalMedia();
     if (!useExternalMedia) {
       const ignored = await fs.readFile(path.join(root, '.gitignore'), 'utf8').catch(error => { if (error.code === 'ENOENT') return ''; throw error; });
@@ -153,7 +157,12 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       const [mediaAhead, mediaBehind] = mediaCounts.trim().split(/\s+/).map(Number);
       if (mediaBehind) throw new UserError('GitHub 图片库已有更新，请先同步图片库后再上线。');
       if (current.photos.some(photo => !Number.isInteger(photo.downloadBytes) || photo.downloadBytes <= 0 || photo.downloadBytes > PHOTO_DOWNLOAD_MAX_BYTES || !ASSET_PATTERN.test(photo.files?.download))) throw new UserError('下载图片资料超过 5 MB 或路径无效，请先压缩后发布。');
-      const assets = [...new Set(current.photos.flatMap(photo => Object.values(photo.files ?? {})))].sort();
+      const previous = new Map(JSON.parse(previousText).photos.map(photo => [photo.id, photo]));
+      const changedMedia = new Set(changedPaths(mediaStatus));
+      const assets = [...new Set(current.photos.flatMap(photo => Object.entries(photo.files ?? {}).filter(([kind, file]) => {
+        const old = previous.get(photo.id);
+        return !incremental || !old || old.files?.[kind] !== file || kind === 'depth' && old.depthUpdatedAt !== photo.depthUpdatedAt || changedMedia.has(file);
+      }).map(([, file]) => file)))].sort();
       if (assets.some(file => !ASSET_PATTERN.test(file))) throw new UserError('照片文件路径不正确，未上传任何私人原片。');
       const mediaPaths = changedPaths(mediaStatus);
       const unrelated = mediaPaths.filter(file => !ASSET_PATTERN.test(file) && file !== 'README.md');
@@ -163,7 +172,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       for (const file of assets) {
         let localHash, bytes, missing = false;
         try {
-          const localFile = path.join(root, 'public', file);
+          const localFile = path.join(sourceRoot, 'public', file);
           localHash = await hash(localFile, fresh);
           bytes = hashes.get(localFile).bytes;
           if (file.endsWith('/download.jpg') && bytes > PHOTO_DOWNLOAD_MAX_BYTES) throw new UserError('下载图片超过 5 MB，请先压缩后发布。');
@@ -201,7 +210,10 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
   async function status() {
     const publication = await snapshot();
     if (publication.running && latestPlan) return { publication, plan: latestPlan, problem: '' };
-    try { return { publication, plan: await plan(false, !!beforePublish), problem: '' }; }
+    try {
+      planning ||= plan(false, !!beforePublish).finally(() => { planning = null; });
+      return { publication, plan: await planning, problem: '' };
+    }
     catch (error) { return { publication, plan: null, problem: error.message }; }
   }
   async function update(patch) {
@@ -282,6 +294,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       await cleanPublicationBuilds(directory);
       await update({ step: 0, message: '正在核对 GitHub、登录状态与最新内容…' });
       await beforePublish?.();
+      if (incremental) await npm('media:deploy', ['--', '--auth-check']);
       await gh('auth', 'status', '--hostname', 'github.com');
       await git('fetch', 'origin', 'main');
       if (await externalMedia()) await mediaGit('fetch', 'origin', 'main');
@@ -292,7 +305,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       }
       await command(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'whoami', '--config', 'worker/wrangler.jsonc']);
       await update({ step: 1, message: '正在检查照片、模型与网站功能…' });
-      await npm('test');
+      if (!incremental) await npm('test');
       await npm('likes:check');
       await npm('build', ['--', '--outDir', path.join(directory, active.id, 'build')], { PAGES_BASE_PATH: '/nsfz-campus-gallery/', VITE_LIKES_API_URL: 'https://likes.drivinggodj.dpdns.org/api/likes', ...(prepared.media ? { VITE_MEDIA_BASE_URL: prepared.media.baseURL } : {}) });
       // Check again before staging, including edits made outside this window.
@@ -303,7 +316,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
         for (const file of prepared.media.files.filter(file => ASSET_PATTERN.test(file))) {
           const destination = path.join(mediaRoot, file);
           await fs.mkdir(path.dirname(destination), { recursive: true });
-          await fs.copyFile(path.join(root, 'public', file), destination);
+          await fs.copyFile(path.join(sourceRoot, 'public', file), destination);
         }
         if (prepared.media.files.length) {
           await mediaGit('add', '--', ...prepared.media.files);
@@ -312,7 +325,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
         // A previous failed push may have already committed the matching files.
         if (prepared.media.files.length || prepared.media.ahead) await mediaGit('push', 'origin', 'main');
         await update({ step: 2, message: '图片已备份，正在上传照片托管并检查公开图片…' });
-        try { await npm('media:deploy'); }
+        try { await npm('media:deploy', [], incremental ? { CAMPUS_MEDIA_SOURCE_ROOT: sourceRoot, CAMPUS_MEDIA_CHANGED: JSON.stringify(prepared.media.assets) } : {}); }
         catch (error) { throw new UserError('照片托管上传失败，尚未提交本次网站更新。照片与 GitHub 图片备份已保留，可以重试。\n' + publicationError(error.message)); }
         await verifyAssets(active.id, prepared);
         if ((await plan(true)).sourceFingerprint !== prepared.sourceFingerprint) throw new UserError('上传过程中内容库发生变化，尚未提交本次网站更新。请重新核对后上线。');
@@ -362,9 +375,9 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     }
   }
   async function start() {
-    // NAS-backed apps can show a plan with remote-only pictures. The publish
-    // hook retrieves those first; execute() then validates a full local copy.
-    await plan(true, !!beforePublish);
+    // NAS mode accepts immediately; planning and checks run under the publish
+    // lock without downloading the library onto this machine.
+    if (!incremental) await plan(true, !!beforePublish);
     await acquire();
     active = { id: crypto.randomUUID(), running: true, status: 'running', step: 0, message: '正在准备上线…', startedAt: new Date().toISOString(), siteURL: PUBLIC_SITE };
     await update({});

@@ -37,7 +37,7 @@ async function fixture(t, options = {}) {
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, 'public/data'), { recursive: true });
   await fs.mkdir(path.join(root, '.local'), { recursive: true });
-  const previous = { photos: [], buildingOverrides: {} }, current = options.current || { photos: [{ id: 'approved', title: '校园照片' }], buildingOverrides: {} };
+  const previous = options.previous || { photos: [], buildingOverrides: {} }, current = options.current || { photos: [{ id: 'approved', title: '校园照片' }], buildingOverrides: {} };
   const bytes = Buffer.from(JSON.stringify(current) + '\n');
   await fs.writeFile(path.join(root, 'public/data/site.json'), bytes);
   await fs.writeFile(path.join(root, '.local/drafts.json'), JSON.stringify([{ id: 'private-draft' }]));
@@ -100,7 +100,7 @@ async function fixture(t, options = {}) {
     const published = options.remoteLibrary || current;
     return new Response(JSON.stringify(published), { status: options.responseStatus || 200 });
   };
-  const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3, mediaRoot, beforePublish: options.beforePublish, afterPublish: options.afterPublish });
+  const service = createPublicationService(root, { run, fetcher, wait: () => new Promise(resolve => setImmediate(resolve)), maxPolls: 3, mediaRoot, beforePublish: options.beforePublish, afterPublish: options.afterPublish, incremental: options.incremental });
   return { root, mediaRoot, service, commands, commandOptions, requests };
 }
 async function finished(service) {
@@ -367,6 +367,25 @@ test('unrelated program changes and wrong branches cannot be committed by the re
     await assert.rejects(service.start());
     assert.ok(!commands.some(row => ['add', 'commit', 'push'].includes(row[1])));
   }
+});
+
+test('incremental publication opens without media scans and publishes additions without reading old images', async t => {
+  const newId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  const added = { ...separateMediaPhoto, id: newId, files: Object.fromEntries(Object.entries(separateMediaPhoto.files).map(([kind, key]) => [kind, key.replace(separateMediaPhoto.id, newId)])) };
+  const { root, service, commands, commandOptions, requests, mediaRoot } = await fixture(t, { incremental: true, media: true, mediaStored: true,
+    previous: separateMediaLibrary, current: { ...separateMediaLibrary, photos: [separateMediaPhoto, added] } });
+  for (const key of Object.values(separateMediaPhoto.files)) {
+    await fs.rm(path.join(root, 'public', key));
+    await fs.rm(path.join(mediaRoot, key));
+  }
+  const state = await service.status();
+  assert.equal(state.plan.added, 1);
+  assert.equal(state.problem, '');
+  assert.ok(!commandOptions.some(options => options.cwd === mediaRoot));
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.ok(!commands.some(row => row[2] === 'run' && row[3] === 'test'));
+  assert.ok(requests.filter(([, method]) => method === 'HEAD').every(([url]) => url.includes(newId)));
 });
 
 test('same-path content edits made during checking prevent the publish, without losing changes', async t => {

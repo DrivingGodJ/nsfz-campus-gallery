@@ -106,14 +106,14 @@ export function validateOverrides(input, map) {
   }
   return result;
 }
-export function createStore(root, { generateDepth } = {}) {
+export function createStore(root, { generateDepth, beforeWrite } = {}) {
   const publicRoot = path.join(root, 'public');
   const localRoot = path.join(root, '.local');
   const siteFile = path.join(publicRoot, 'data/site.json');
   const draftsFile = path.join(localRoot, 'drafts.json');
   const mapFile = path.join(publicRoot, 'data/campus.json');
   let chain = Promise.resolve();
-  const serial = action => { const result = chain.then(action); chain = result.catch(() => {}); return result; };
+  const serial = action => { const result = chain.then(async () => { await beforeWrite?.(); return action(); }); chain = result.catch(() => {}); return result; };
   async function state() {
     return { site: await readJSON(siteFile, emptySite()), drafts: await readJSON(draftsFile, []), map: await readJSON(mapFile) };
   }

@@ -13,10 +13,14 @@ export default function PublishPanel({ api, unsaved, onRunningChange }: {
 }) {
   const [open, setOpen] = useState(false), [state, setState] = useState<State | null>(null), [error, setError] = useState(''), [starting, setStarting] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
+  const refreshing = useRef(false);
   const running = starting || state?.publication.running || false;
   const refresh = useCallback(async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
     try { setState(await api('release/status') as State); setError(''); }
     catch (error) { setError((error as Error).message); }
+    finally { refreshing.current = false; }
   }, [api]);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
@@ -49,7 +53,7 @@ export default function PublishPanel({ api, unsaved, onRunningChange }: {
     <button className="button secondary publish-open" onClick={() => { setOpen(true); void refresh(); }}><UploadCloud size={16} />{running ? '正在上线…' : '上线'}</button>
     <dialog ref={dialog} className="publish-dialog" aria-labelledby="publish-title" onCancel={() => setOpen(false)} onClick={event => { if (event.target === dialog.current) setOpen(false); }}>
       <div className="publish-heading"><div><p className="eyebrow">附中影像 · 内容发布</p><h1 id="publish-title">{publication?.status === 'completed' && !running ? '上线完成' : '发布审核后的照片'}</h1></div><button className="icon-button" aria-label="关闭上线面板" onClick={() => setOpen(false)}><X size={20} /></button></div>
-      <p className="publish-description">保存到内容库的照片会公开展示；待审核草稿和私有原片只保存在本地与 NAS 归档，不上传到公开网站。</p>
+      <p className="publish-description">只有保存到内容库的照片会公开展示。NAS 模式下直接从 NAS 发布；草稿与私有原片不会上传，已有照片无需下载到本机。</p>
       {plan && <><div className="publish-counts"><span><strong>{plan.added}</strong>新增照片</span><span><strong>{plan.updated}</strong>资料更新</span><span><strong>{plan.removed}</strong>移出展示</span></div><p className="field-help publish-summary">内容库共 {plan.saved} 张照片 · {plan.drafts} 张草稿暂不上线{plan.buildingChanged ? ' · 包含建筑资料更新' : ''}</p></>}
       {unsaved && <p className="publish-warning">当前照片还有未保存的修改。请先关闭此面板，保存到内容库后再上线。</p>}
       {(state?.problem || error) && <p className="publish-warning" role="alert">{error || state?.problem}</p>}
