@@ -447,15 +447,16 @@ test('publication tests isolate desktop paths while build commands retain their 
     }
   });
   Object.assign(process.env, inherited);
-  const { service, commands, commandOptions } = await fixture(t);
+  const { root, service, commands, commandOptions } = await fixture(t);
   await service.start();
   assert.equal((await finished(service)).status, 'completed');
   const tests = commands.findIndex(row => row[2] === 'run' && row[3] === 'test');
   const build = commands.findIndex(row => row[2] === 'run' && row[3] === 'build');
   assert.ok(tests >= 0 && build >= 0);
   assert.equal(commandOptions[tests].env.CAMPUS_DESKTOP_APP, '1');
+  assert.equal(commandOptions[tests].env.MINIFLARE_CACHE_DIR, path.join(root, '.local/miniflare-cache'));
   for (const [key, value] of Object.entries(inherited)) {
-    if (key !== 'CAMPUS_DESKTOP_APP') assert.equal(commandOptions[tests].env[key], undefined, key);
+    if (key.startsWith('CAMPUS_') && key !== 'CAMPUS_DESKTOP_APP') assert.equal(commandOptions[tests].env[key], undefined, key);
     assert.equal(commandOptions[build].env[key], value, key);
   }
 });
