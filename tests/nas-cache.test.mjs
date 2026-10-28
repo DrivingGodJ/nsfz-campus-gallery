@@ -229,10 +229,11 @@ test('NAS publication stages only identical annotations and refuses unrelated or
   const { root, gallery, archiveRoot } = await fixture(t), commands = [];
   let status = ' M public/data/site.json\n';
   const service = createNASCacheService(root, { archiveRoot, isConnected: async () => true,
-    run: async (_tool, args) => { commands.push(args); return args[0] === 'status' ? status : ''; } });
+    run: async (_tool, args) => { commands.push(args); return args[0] === 'status' ? status : args[0] === 'ls-tree' ? '100755 blob ' + 'a'.repeat(40) + '\tpublic/data/site.json' : ''; } });
   await service.finishPublication({ commit: 'a'.repeat(40) });
-  assert.deepEqual(commands.map(args => args[0]), ['status', 'fetch', 'add', 'merge']);
-  assert.deepEqual(commands[2], ['add', '--', 'public/data/site.json']);
+  assert.deepEqual(commands.map(args => args[0]), ['status', 'fetch', 'ls-tree', 'add', 'update-index', 'merge']);
+  assert.deepEqual(commands[3], ['add', '--', 'public/data/site.json']);
+  assert.deepEqual(commands[4], ['update-index', '--chmod=+x', '--', 'public/data/site.json']);
   status = ' M src/scene.ts\n'; commands.length = 0;
   await assert.rejects(service.finishPublication({ commit: 'a'.repeat(40) }), /程序修改/);
   assert.deepEqual(commands.map(args => args[0]), ['status']);
@@ -240,6 +241,27 @@ test('NAS publication stages only identical annotations and refuses unrelated or
   commands.length = 0;
   await assert.rejects(service.finishPublication({ commit: 'a'.repeat(40) }), /内容刚刚发生变化/);
   assert.equal(commands.length, 0);
+});
+
+test('NAS archive fast-forwards real Git history when content matches but the index mode differs', async t => {
+  const { root, gallery, service } = await fixture(t);
+  const git = async (cwd, args) => (await execute('git', args, { cwd })).stdout.trim();
+  await git(root, ['init', '--quiet', '-b', 'main']);
+  await git(root, ['config', 'user.name', 'NAS Test']); await git(root, ['config', 'user.email', 'test@example.invalid']);
+  await git(root, ['add', '--', 'public/data/site.json']); await git(root, ['commit', '--quiet', '-m', 'Initial library']);
+  await fs.rm(path.join(gallery, '.git'), { recursive: true, force: true });
+  await git(gallery, ['init', '--quiet', '-b', 'main']); await git(gallery, ['remote', 'add', 'origin', root]);
+  await git(gallery, ['config', 'core.filemode', 'false']); await git(gallery, ['fetch', '--quiet', 'origin', 'main']);
+  await git(gallery, ['reset', '--mixed', 'origin/main']);
+  const bytes = JSON.stringify({ ...site, revision: 2 });
+  await write(root, 'public/data/site.json', bytes); await fs.chmod(path.join(root, 'public/data/site.json'), 0o755);
+  await git(root, ['add', '--', 'public/data/site.json']); await git(root, ['commit', '--quiet', '-m', 'Published library']);
+  const commit = await git(root, ['rev-parse', 'HEAD']);
+  await write(gallery, 'public/data/site.json', bytes);
+  await service.finishPublication({ commit });
+  assert.equal(await git(gallery, ['rev-parse', 'HEAD']), commit);
+  assert.equal(await fs.readFile(path.join(gallery, 'public/data/site.json'), 'utf8'), bytes);
+  assert.equal(await git(gallery, ['status', '--porcelain', '--untracked-files=no']), '');
 });
 
 test('private review settings sync and restore with owner-only permissions and survive photo cleanup', async t => {

@@ -178,9 +178,14 @@ export function createNASCacheService(root, { archiveRoot, configFile = process.
     if (status.split('\n').some(line => line && line.trim().slice(2).trim() !== 'public/data/site.json')) throw new UserError('NAS 工程还有程序修改，未覆盖归档。', 409);
     if (!/^[a-f0-9]{40}$/.test(commit)) throw new UserError('上线提交编号无效。');
     await run('git', ['fetch', 'origin', 'main'], { cwd: target.gallery });
+    const mode = (await run('git', ['ls-tree', commit, '--', 'public/data/site.json'], { cwd: target.gallery })).trim().split(/\s+/)[0];
+    if (!['100644', '100755'].includes(mode)) throw new UserError('上线版本的内容索引无效，未更新 NAS 归档。');
     // Staging the identical published file permits a safe fast-forward without
     // temporarily replacing NAS annotations with the previous version.
     await run('git', ['add', '--', 'public/data/site.json'], { cwd: target.gallery });
+    // SMB repositories often ignore execute bits. Match the published index
+    // mode as well as its identical content before the fast-forward.
+    await run('git', ['update-index', mode === '100755' ? '--chmod=+x' : '--chmod=-x', '--', 'public/data/site.json'], { cwd: target.gallery });
     await run('git', ['merge', '--ff-only', '--no-edit', commit], { cwd: target.gallery });
   }
   async function lock(name, action) {
