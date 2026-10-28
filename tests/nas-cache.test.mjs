@@ -207,6 +207,41 @@ test('NAS metadata-only saves do not read image files or create local photos', a
   await assert.rejects(fs.access(path.join(root, 'public/media')), { code: 'ENOENT' });
 });
 
+test('a downloaded draft follows its unchanged file paths into the saved NAS library', async t => {
+  const { root, gallery, service } = await fixture(t);
+  await write(root, '.local/nas-library.json', '{"version":1,"downloaded":false}');
+  await service.download();
+  const draftId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  const draft = { id: draftId, files: { thumbnail: 'media/' + draftId + '/thumbnail.webp' } };
+  await write(gallery, '.local/drafts.json', JSON.stringify([draft]));
+  await write(gallery, '.local/draft-media/' + draftId + '/thumbnail.webp', 'new draft');
+  await service.mirror();
+  assert.equal(await fs.readFile(path.join(root, '.local/draft-media', draftId, 'thumbnail.webp'), 'utf8'), 'new draft');
+  await write(gallery, 'public/data/site.json', JSON.stringify({ ...site, photos: [...site.photos, draft] }));
+  await write(gallery, '.local/drafts.json', '[]');
+  await write(gallery, 'public/' + draft.files.thumbnail, 'new draft');
+  await service.mirror();
+  assert.equal(await fs.readFile(path.join(root, 'public', draft.files.thumbnail), 'utf8'), 'new draft');
+  assert.equal(JSON.parse(await fs.readFile(path.join(root, '.local/drafts.json'))).length, 0);
+});
+
+test('NAS publication stages only identical annotations and refuses unrelated or newer NAS edits', async t => {
+  const { root, gallery, archiveRoot } = await fixture(t), commands = [];
+  let status = ' M public/data/site.json\n';
+  const service = createNASCacheService(root, { archiveRoot, isConnected: async () => true,
+    run: async (_tool, args) => { commands.push(args); return args[0] === 'status' ? status : ''; } });
+  await service.finishPublication({ commit: 'a'.repeat(40) });
+  assert.deepEqual(commands.map(args => args[0]), ['status', 'fetch', 'add', 'merge']);
+  assert.deepEqual(commands[2], ['add', '--', 'public/data/site.json']);
+  status = ' M src/scene.ts\n'; commands.length = 0;
+  await assert.rejects(service.finishPublication({ commit: 'a'.repeat(40) }), /程序修改/);
+  assert.deepEqual(commands.map(args => args[0]), ['status']);
+  await write(gallery, 'public/data/site.json', JSON.stringify({ ...site, revision: 2 }));
+  commands.length = 0;
+  await assert.rejects(service.finishPublication({ commit: 'a'.repeat(40) }), /内容刚刚发生变化/);
+  assert.equal(commands.length, 0);
+});
+
 test('private review settings sync and restore with owner-only permissions and survive photo cleanup', async t => {
   const { root, gallery, service } = await fixture(t);
   const file = '.local/submission-service.json';
