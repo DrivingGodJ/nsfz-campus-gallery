@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 1019,
+  "revision": 1025,
   "photos": [
     {
       "id": "8cf1e176-fe09-4c3b-9e04-a84286f36f4e",
@@ -14413,6 +14413,108 @@
       "depthUpdatedAt": "e0627f38-eae9-47b6-9405-98f0430ad597",
       "locationId": "way/855459420",
       "cameraHeight": 1.3000000000000012
+    },
+    {
+      "id": "f39b7eeb-1bd4-45ea-a9cb-8735fb674101",
+      "title": "dji_fly_20260501_162212_177_1777625269472_photo_o",
+      "description": "",
+      "capturedAt": "",
+      "metadata": {},
+      "floor": 0,
+      "author": "",
+      "copyright": "",
+      "uploadedAt": "2026-10-28T08:15:51.407Z",
+      "captureType": "aerial",
+      "position": {
+        "x": 18.497854399637145,
+        "z": 41.308038383811464
+      },
+      "placed": true,
+      "heading": 115.96515944924965,
+      "pitch": -41.23523143315503,
+      "width": 4000,
+      "height": 2250,
+      "downloadBytes": 3801177,
+      "files": {
+        "thumbnail": "media/f39b7eeb-1bd4-45ea-a9cb-8735fb674101/thumbnail.webp",
+        "preview": "media/f39b7eeb-1bd4-45ea-a9cb-8735fb674101/preview.webp",
+        "display": "media/f39b7eeb-1bd4-45ea-a9cb-8735fb674101/display.webp",
+        "download": "media/f39b7eeb-1bd4-45ea-a9cb-8735fb674101/download.jpg",
+        "depth": "media/f39b7eeb-1bd4-45ea-a9cb-8735fb674101/depth.webp"
+      },
+      "depthUpdatedAt": "2acc061e-cdb5-4f0a-a0f1-aeb2bd84379c",
+      "altitude": {
+        "meters": 80,
+        "reference": "takeoff"
+      }
+    },
+    {
+      "id": "ce54dced-dbde-4227-9d1a-5ce5f16cf11b",
+      "title": "dji_fly_20260501_162524_181_1777625266157_photo_o",
+      "description": "",
+      "capturedAt": "",
+      "metadata": {},
+      "floor": 0,
+      "author": "",
+      "copyright": "",
+      "uploadedAt": "2026-10-28T08:15:59.301Z",
+      "captureType": "aerial",
+      "position": {
+        "x": 8.305914720583102,
+        "z": 30.290472527377666
+      },
+      "placed": true,
+      "heading": 277.6302839551047,
+      "pitch": -90,
+      "width": 4000,
+      "height": 2250,
+      "downloadBytes": 3846534,
+      "files": {
+        "thumbnail": "media/ce54dced-dbde-4227-9d1a-5ce5f16cf11b/thumbnail.webp",
+        "preview": "media/ce54dced-dbde-4227-9d1a-5ce5f16cf11b/preview.webp",
+        "display": "media/ce54dced-dbde-4227-9d1a-5ce5f16cf11b/display.webp",
+        "download": "media/ce54dced-dbde-4227-9d1a-5ce5f16cf11b/download.jpg",
+        "depth": "media/ce54dced-dbde-4227-9d1a-5ce5f16cf11b/depth.webp"
+      },
+      "depthUpdatedAt": "919de3ac-c450-4016-a74a-9eba57d20651",
+      "altitude": {
+        "meters": 80,
+        "reference": "takeoff"
+      }
+    },
+    {
+      "id": "cdc4a296-5871-4298-abaa-8736211740c4",
+      "title": "dji_fly_20260501_162340_178_1777625268659_photo_o",
+      "description": "",
+      "capturedAt": "",
+      "metadata": {},
+      "floor": 0,
+      "author": "",
+      "copyright": "",
+      "uploadedAt": "2026-10-28T08:16:04.941Z",
+      "captureType": "aerial",
+      "position": {
+        "x": -8.76803737784909,
+        "z": 92.96947635135416
+      },
+      "placed": true,
+      "heading": 139.94555810291752,
+      "pitch": -90,
+      "width": 4000,
+      "height": 2250,
+      "downloadBytes": 3549714,
+      "files": {
+        "thumbnail": "media/cdc4a296-5871-4298-abaa-8736211740c4/thumbnail.webp",
+        "preview": "media/cdc4a296-5871-4298-abaa-8736211740c4/preview.webp",
+        "display": "media/cdc4a296-5871-4298-abaa-8736211740c4/display.webp",
+        "download": "media/cdc4a296-5871-4298-abaa-8736211740c4/download.jpg",
+        "depth": "media/cdc4a296-5871-4298-abaa-8736211740c4/depth.webp"
+      },
+      "depthUpdatedAt": "4f013314-59ad-4052-83ae-3353cf5ce735",
+      "altitude": {
+        "meters": 150,
+        "reference": "takeoff"
+      }
     }
   ],
   "buildingOverrides": {
