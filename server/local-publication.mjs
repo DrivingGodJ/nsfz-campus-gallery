@@ -90,7 +90,12 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
   }
   const npm = async (script, args = [], env = {}) => {
     const cli = process.env.CAMPUS_NPM_CLI || path.resolve(path.dirname(process.execPath), '../lib/node_modules/npm/bin/npm-cli.js');
-    return command(process.execPath, [cli, 'run', script, ...args], { timeout: 600000, env: { ...process.env, ...env }, onOutput: text => { if (active) fs.appendFile(path.join(directory, active.id + '.log'), text).catch(() => {}); } });
+    const environment = { ...process.env, ...env };
+    // Tests own their temporary libraries; retain only the marker that skips native UI tests.
+    if (script === 'test') for (const key of Object.keys(environment)) {
+      if (key.startsWith('CAMPUS_') && key !== 'CAMPUS_DESKTOP_APP' || key === 'MINIFLARE_CACHE_DIR') delete environment[key];
+    }
+    return command(process.execPath, [cli, 'run', script, ...args], { timeout: 600000, env: environment, onOutput: text => { if (active) fs.appendFile(path.join(directory, active.id + '.log'), text).catch(() => {}); } });
   };
   async function publishing() {
     if (active?.running) return true;

@@ -429,6 +429,37 @@ test('subprocesses use literal arguments and redact credentials from errors and 
   assert.match(output, /\$\(do-not-execute\)/); assert.ok(!output.includes('gho_dummy123')); assert.ok(!output.includes('secret123'));
 });
 
+test('publication tests isolate desktop paths while build commands retain their configuration', async t => {
+  const inherited = {
+    CAMPUS_PROJECT_TEMPLATE: '/unused/bundled-project',
+    CAMPUS_CONTENT_ROOT: '/unused/review-library',
+    CAMPUS_MEDIA_ROOT: '/unused/nas-media',
+    CAMPUS_NAS_CONFIG: '/unused/nas.json',
+    CAMPUS_DEPTH_COMPONENTS: '/unused/depth-components',
+    CAMPUS_NPM_CLI: '/unused/npm-cli.js',
+    CAMPUS_DESKTOP_APP: '1',
+    MINIFLARE_CACHE_DIR: '/unused/worker-cache'
+  };
+  const previous = Object.fromEntries(Object.keys(inherited).map(key => [key, process.env[key]]));
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  });
+  Object.assign(process.env, inherited);
+  const { service, commands, commandOptions } = await fixture(t);
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  const tests = commands.findIndex(row => row[2] === 'run' && row[3] === 'test');
+  const build = commands.findIndex(row => row[2] === 'run' && row[3] === 'build');
+  assert.ok(tests >= 0 && build >= 0);
+  assert.equal(commandOptions[tests].env.CAMPUS_DESKTOP_APP, '1');
+  for (const [key, value] of Object.entries(inherited)) {
+    if (key !== 'CAMPUS_DESKTOP_APP') assert.equal(commandOptions[tests].env[key], undefined, key);
+    assert.equal(commandOptions[build].env[key], value, key);
+  }
+});
+
 test('subprocess logs stay bounded while structured output can be captured in full', async () => {
   const args = ['-e', 'process.stdout.write(JSON.stringify({ value: "x".repeat(300000) }))'];
   const bounded = await runCommand(process.execPath, args);
