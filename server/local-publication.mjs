@@ -45,6 +45,7 @@ export async function cleanPublicationBuilds(directory) {
   }
 }
 export function publicationError(message) {
+  if (String(message).includes('图片托管尚未登录')) return '图片托管尚未登录。请先完成 Cloudflare 登录授权，再重试上线。照片已保存在 NAS。';
   if (/ENOSPC|no space left on device/i.test(String(message))) return '磁盘空间不足，未完成上线。照片与审核记录已保留，临时构建文件会自动清理；释放空间后可重试。';
   return redact(message);
 }
@@ -110,7 +111,7 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
     try {
       const saved = JSON.parse(await fs.readFile(path.join(directory, 'latest.json'), 'utf8'));
       if (saved.running && !(await publishing())) return { ...saved, running: false, status: 'failed', message: '上次上线被中断。内容已保留，可以重新上线。' };
-      return saved;
+      return saved.status === 'failed' ? { ...saved, message: publicationError(saved.message) } : saved;
     } catch { return { running: false, status: 'idle', message: '' }; }
   }
   async function plan(fresh = false, allowMissingMedia = false) {

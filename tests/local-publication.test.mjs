@@ -448,6 +448,13 @@ test('subprocesses use literal arguments and redact credentials from errors and 
   assert.match(output, /\$\(do-not-execute\)/); assert.ok(!output.includes('gho_dummy123')); assert.ok(!output.includes('secret123'));
 });
 
+test('hosting login errors explain the recovery without exposing the process stack', () => {
+  const message = publicationError('node scripts/media-deploy.mjs\nError: 图片托管尚未登录，请先运行 Wrangler 登录\n at credentials (file:///private/workspace/script.mjs:17)');
+  assert.match(message, /完成 Cloudflare 登录授权/);
+  assert.match(message, /照片已保存在 NAS/);
+  assert.ok(!message.includes('file:///') && !message.includes(' at credentials'));
+});
+
 test('publication tests isolate desktop paths while build commands retain their configuration', async t => {
   const inherited = {
     CAMPUS_PROJECT_TEMPLATE: '/unused/bundled-project',
