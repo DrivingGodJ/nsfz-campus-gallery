@@ -461,6 +461,17 @@ test('failed GitHub deployment retains the committed content and does not report
   assert.ok(!commands.flat().includes('likes:deploy:only'));
 });
 
+test('a transient GitHub status EOF is retried without pushing or uploading photos again', async t => {
+  let polls = 0;
+  const { service, commands } = await fixture(t, { onCommand: async (tool, args) => {
+    if (tool === 'gh' && args[0] === 'api' && args[1].includes('/workflows/pages.yml/runs') && ++polls === 1) throw new Error('Get "https://api.github.com/": EOF');
+  } });
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.equal(polls, 2);
+  assert.equal(commands.filter(row => row[0] === 'git' && row[1] === 'push').length, 1);
+});
+
 test('publishing requires a matching live library even after a successful GitHub run', async t => {
   const { service } = await fixture(t, { responseStatus: 503 });
   await service.start();

@@ -385,7 +385,13 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
       await update({ step: 3, message: '已提交，等待 GitHub 检查并发布网站…' });
       let completed = false;
       for (let attempt = 0; attempt < maxPolls; attempt++) {
-        const data = JSON.parse(await gh('api', `repos/${REPOSITORY}/actions/workflows/pages.yml/runs?head_sha=${commit}&per_page=10`));
+        let data;
+        try { data = JSON.parse(await gh('api', `repos/${REPOSITORY}/actions/workflows/pages.yml/runs?head_sha=${commit}&per_page=10`)); }
+        catch (error) {
+          if (attempt === maxPolls - 1 || !/\bEOF\b|ECONNRESET|ETIMEDOUT|TLS handshake|connection.*(?:reset|timed out)|HTTP (?:429|50\d)/i.test(error.message)) throw error;
+          await update({ message: 'GitHub 连接暂时中断，正在继续确认发布结果；无需重新上传照片…' });
+          await wait(pollMs); continue;
+        }
         const current = data.workflow_runs.find(row => row.head_sha === commit && new Date(row.created_at).getTime() >= began.getTime() - 5000);
         if (current) {
           await update({ runURL: current.html_url });
