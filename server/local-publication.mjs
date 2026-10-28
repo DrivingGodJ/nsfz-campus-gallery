@@ -79,6 +79,26 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
   const command = (tool, args, options = {}) => run(tool, args, { cwd: root, ...options });
   const git = (...args) => command('git', args);
   const mediaGit = (...args) => command('git', args, { cwd: mediaRoot });
+  async function commitMedia(files) {
+    const message = 'Publish reviewed campus photos';
+    const args = ['commit', '-m', message, '--', ...files];
+    try { return await mediaGit(...args); }
+    catch (error) {
+      if (!error.message.includes('a NUL byte in commit log message')) throw error;
+      const file = path.resolve(mediaRoot, (await mediaGit('rev-parse', '--git-path', 'COMMIT_EDITMSG')).trim());
+      const bytes = await fs.readFile(file);
+      // SMB can retain the previous length after Git truncates this disposable
+      // file. Repair only our exact message plus trailing padding, never edits.
+      if (!bytes.includes(0) || bytes.toString().replace(/\0+$/, '') !== message + '\n') throw error;
+      if (await fs.access(path.join(path.dirname(file), 'index.lock')).then(() => true, () => false)) throw error;
+      const temporary = file + '.' + crypto.randomUUID() + '.tmp';
+      try {
+        await fs.writeFile(temporary, message + '\n', { flag: 'wx' });
+        await fs.rename(temporary, file);
+        return await mediaGit(...args);
+      } finally { await fs.rm(temporary, { force: true }); }
+    }
+  }
   const gh = (...args) => command('gh', args);
   const externalMedia = () => fs.access(path.join(mediaRoot, '.git')).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
   async function hash(file, fresh) {
@@ -317,11 +337,16 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
         for (const file of prepared.media.files.filter(file => ASSET_PATTERN.test(file))) {
           const destination = path.join(mediaRoot, file);
           await fs.mkdir(path.dirname(destination), { recursive: true });
-          await fs.copyFile(path.join(sourceRoot, 'public', file), destination);
+          const temporary = destination + '.' + crypto.randomUUID() + '.tmp';
+          try {
+            await fs.copyFile(path.join(sourceRoot, 'public', file), temporary);
+            if (await fileHash(temporary) !== prepared.media.manifest.find(asset => asset.key === file).sha256) throw new UserError('照片在备份过程中发生变化，原有备份已保留，请重试。');
+            await fs.rename(temporary, destination);
+          } finally { await fs.rm(temporary, { force: true }); }
         }
         if (prepared.media.files.length) {
           await mediaGit('add', '--', ...prepared.media.files);
-          await mediaGit('commit', '-m', 'Publish reviewed campus photos', '--', ...prepared.media.files);
+          await commitMedia(prepared.media.files);
         }
         // A previous failed push may have already committed the matching files.
         if (prepared.media.files.length || prepared.media.ahead) await mediaGit('push', 'origin', 'main');

@@ -65,7 +65,7 @@ async function fixture(t, options = {}) {
         if (args[0] === 'branch') return 'main\n';
         if (args[0] === 'remote') return 'https://github.com/DrivingGodJ/nsfz-campus-media.git\n';
         if (args[0] === 'rev-list') return (options.mediaAhead || 0) + '\t0\n';
-        if (args[0] === 'rev-parse') return (options.mediaHead?.() || 'b'.repeat(40)) + '\n';
+        if (args[0] === 'rev-parse') return args[1] === '--git-path' ? '.git/' + args[2] : (options.mediaHead?.() || 'b'.repeat(40)) + '\n';
         return '';
       }
       if (args[0] === 'status') return options.dirty ?? ' M public/data/site.json\0';
@@ -213,6 +213,40 @@ test('failed media pushes stop the main publication and matching committed media
   assert.ok(retry.commands.some((row, index) => row[0] === 'git' && row[1] === 'push' && retry.commandOptions[index].cwd === retry.mediaRoot));
   assert.ok(!retry.commands.some((row, index) => row[0] === 'git' && row[1] === 'commit' && retry.commandOptions[index].cwd === retry.mediaRoot));
   assert.equal(retry.requests.filter(([, method]) => method === 'HEAD').length, 6);
+});
+
+test('SMB NUL padding in the generated commit message is repaired once without changing the message', async t => {
+  let commits = 0;
+  const { service, mediaRoot } = await fixture(t, { media: true, current: separateMediaLibrary,
+    onCommand: async (tool, args, _root, settings) => {
+      if (tool !== 'git' || args[0] !== 'commit' || !settings.cwd.endsWith('/media-repo')) return;
+      const file = path.join(settings.cwd, '.git/COMMIT_EDITMSG');
+      commits++;
+      if (commits === 1) {
+        await fs.writeFile(file, args[2] + '\n' + '\0'.repeat(30));
+        throw new Error('error: a NUL byte in commit log message not allowed.');
+      }
+      assert.equal(await fs.readFile(file, 'utf8'), args[2] + '\n');
+    }
+  });
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.equal(commits, 2);
+  assert.equal((await fs.readdir(path.join(mediaRoot, '.git'))).filter(name => name.endsWith('.tmp')).length, 0);
+});
+
+test('a changed commit message is preserved and never retried as an SMB padding repair', async t => {
+  let commits = 0;
+  const { service, mediaRoot } = await fixture(t, { media: true, current: separateMediaLibrary,
+    onCommand: async (tool, args, _root, settings) => {
+      if (tool !== 'git' || args[0] !== 'commit' || !settings.cwd.endsWith('/media-repo')) return;
+      commits++; await fs.writeFile(path.join(settings.cwd, '.git/COMMIT_EDITMSG'), 'another author message\n\0');
+      throw new Error('error: a NUL byte in commit log message not allowed.');
+    }
+  });
+  await service.start(); assert.equal((await finished(service)).status, 'failed');
+  assert.equal(commits, 1);
+  assert.equal(await fs.readFile(path.join(mediaRoot, '.git/COMMIT_EDITMSG'), 'utf8'), 'another author message\n\0');
 });
 
 test('conflicting media checkout edits are preserved while matching dirty copies can publish', async t => {
