@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { contentPath, changedPaths, photoChanges, createPublicationService, runCommand, cleanPublicationBuilds, publicationError, LIKES_API } from '../server/local-publication.mjs';
 
 test('publication includes only the public content library and approved renditions', () => {
@@ -86,12 +87,14 @@ async function fixture(t, options = {}) {
     if (options.onRequest) await options.onRequest(url, settings);
     if (settings?.method === 'HEAD') {
       const key = new URL(url).pathname.replace(/^\//, '');
+      const status = typeof options.assetStatus === 'function' ? options.assetStatus(url) : options.assetStatus || 200;
       const headers = {
         'access-control-allow-origin': '*', 'content-type': key.endsWith('.webp') ? 'image/webp' : 'image/jpeg',
-        'content-length': String(Buffer.byteLength(key)), ...options.assetHeaders
+        'content-length': String(Buffer.byteLength(key)), etag: '"' + crypto.createHash('sha256').update(key).digest('hex').slice(0, 32) + '"',
+        ...(typeof options.assetHeaders === 'function' ? options.assetHeaders(url) : options.assetHeaders)
       };
       for (const [name, value] of Object.entries(headers)) if (value === null) delete headers[name];
-      return new Response(null, { status: options.assetStatus || 200, headers });
+      return new Response(null, { status, headers });
     }
     if (url.startsWith(LIKES_API)) {
       const { photoIds } = JSON.parse(settings.body);
@@ -420,6 +423,24 @@ test('incremental publication opens without media scans and publishes additions 
   assert.equal((await finished(service)).status, 'completed');
   assert.ok(!commands.some(row => row[2] === 'run' && row[3] === 'test'));
   assert.ok(requests.filter(([, method]) => method === 'HEAD').every(([url]) => url.includes(newId)));
+});
+
+test('new photo URLs can become available after the hosting deployment response', async t => {
+  const seen = new Map();
+  const { service } = await fixture(t, { incremental: true, media: true, mediaStored: true, current: separateMediaLibrary,
+    assetStatus: url => { const key = new URL(url).pathname, count = (seen.get(key) || 0) + 1; seen.set(key, count); return count === 1 ? 404 : 200; } });
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.ok([...seen.values()].every(count => count >= 3));
+});
+
+test('same-path photo updates wait for the new content hash rather than accepting a stale edge response', async t => {
+  const seen = new Set();
+  const { service } = await fixture(t, { incremental: true, media: true, mediaStored: true, current: separateMediaLibrary,
+    assetHeaders: url => { const key = new URL(url).pathname; if (!seen.has(key)) { seen.add(key); return { etag: '"' + '0'.repeat(32) + '"' }; } return {}; } });
+  await service.start();
+  assert.equal((await finished(service)).status, 'completed');
+  assert.equal(seen.size, Object.keys(separateMediaPhoto.files).length);
 });
 
 test('same-path content edits made during checking prevent the publish, without losing changes', async t => {

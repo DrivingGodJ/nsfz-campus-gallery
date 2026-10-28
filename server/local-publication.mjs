@@ -258,23 +258,40 @@ export function createPublicationService(root, { run = runCommand, fetcher = fet
   async function verifyAssets(expected, prepared) {
     const assets = prepared.media ? prepared.media.assets : prepared.files.filter(file => file.startsWith('public/media/')).map(file => file.slice(7));
     const manifest = new Map(prepared.media?.manifest.map(asset => [asset.key, asset]) || []);
-    let next = 0;
-    await Promise.all(Array.from({ length: Math.min(6, assets.length) }, async () => {
-      while (next < assets.length) {
-        const file = assets[next++], origin = new URL(PUBLIC_SITE).origin;
-        const asset = await fetcher((prepared.media?.baseURL || PUBLIC_SITE) + file + '?review=' + expected, { method: 'HEAD', cache: 'no-store', headers: { Origin: origin }, signal: AbortSignal.timeout(25000) });
-        if (!asset.ok) throw new UserError('照片托管未通过检查，有照片文件尚未加载成功。照片和上线记录已保留，可以稍后重试。');
-        if (prepared.media) {
-          const cors = asset.headers.get('access-control-allow-origin');
-          const mime = file.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-          const length = asset.headers.get('content-length');
-          // Native Static Assets can return only its content-hash ETag on HEAD.
-          const validMetadata = length === null ? Boolean(asset.headers.get('etag')?.trim()) : Number(length) === manifest.get(file).bytes;
-          if (![origin, '*'].includes(cors) || asset.headers.get('content-type')?.split(';')[0].trim() !== mime
-            || !validMetadata) throw new UserError('照片托管的跨域、图片类型或文件大小检查未通过。照片和备份已保留，请检查托管配置后重试。');
+    let pending = assets;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      let next = 0;
+      const retry = [];
+      await Promise.all(Array.from({ length: Math.min(6, pending.length) }, async () => {
+        while (next < pending.length) {
+          const file = pending[next++], origin = new URL(PUBLIC_SITE).origin;
+          let asset;
+          try { asset = await fetcher((prepared.media?.baseURL || PUBLIC_SITE) + file + '?review=' + expected, { method: 'HEAD', cache: 'no-store', headers: { Origin: origin }, signal: AbortSignal.timeout(25000) }); }
+          catch { retry.push(file); continue; }
+          if (!asset.ok) {
+            if ([404, 429, 500, 502, 503, 504].includes(asset.status)) { retry.push(file); continue; }
+            throw new UserError('照片托管未通过检查，有照片文件尚未加载成功。照片和上线记录已保留，可以稍后重试。');
+          }
+          // A deployment response can arrive before every edge serves the new
+          // version. Wait for the expected bytes, including same-path updates.
+          if (incremental && asset.headers.get('etag')?.replace(/^W\//, '').replaceAll('"', '') !== manifest.get(file)?.sha256.slice(0, 32)) { retry.push(file); continue; }
+          if (prepared.media) {
+            const cors = asset.headers.get('access-control-allow-origin');
+            const mime = file.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+            const length = asset.headers.get('content-length');
+            // Native Static Assets can return only its content-hash ETag on HEAD.
+            const validMetadata = length === null ? Boolean(asset.headers.get('etag')?.trim()) : Number(length) === manifest.get(file).bytes;
+            if (![origin, '*'].includes(cors) || asset.headers.get('content-type')?.split(';')[0].trim() !== mime
+              || !validMetadata) throw new UserError('照片托管的跨域、图片类型或文件大小检查未通过。照片和备份已保留，请检查托管配置后重试。');
+          }
         }
-      }
-    }));
+      }));
+      if (!retry.length) return;
+      if (attempt === 9) throw new UserError('照片托管未通过检查，有照片文件尚未加载成功。照片和上线记录已保留，可以稍后重试。');
+      await update({ message: '照片已上传，正在等待公开图片生效…' });
+      await wait(pollMs);
+      pending = retry;
+    }
   }
   async function verifyWebsite(expected, prepared) {
     const local = JSON.parse(await fs.readFile(path.join(root, 'public/data/site.json'), 'utf8'));
