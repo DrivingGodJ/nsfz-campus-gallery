@@ -2,69 +2,45 @@
 
 # 附中影像
 
-照片留住片刻，地图记住位置。围绕南师附中察哈尔路校区制作的校园照片档案，把影像放回它们的拍摄位置。
+照片留住片刻，地图记住位置。把南师附中察哈尔路校区的照片放回拍摄地点，沿着熟悉的建筑、湖泊与走廊，重新走进校园。
 
-[走进校园](https://drivinggodj.github.io/nsfz-campus-gallery/) · [投稿照片](https://drivinggodj.github.io/nsfz-campus-gallery/submit.html) · [开发与维护](docs/MAINTENANCE.md)
+[走进校园](https://drivinggodj.github.io/nsfz-campus-gallery/)
 
-![校园全景与照片目录](docs/images/campus-overview.webp)
+![校园全景：照片沿着建筑和公共空间分布，目录与地图同屏浏览](docs/images/campus-overview.webp)
 
-## 功能特性
+## 从一张照片，走进它发生的地方
 
-- **在三维地图中找照片**：按建筑、地点、楼层、航拍和地下空间浏览。
-- **进入拍摄视角**：对照照片与模型，开启半透明叠加，或进入深度转场的沉浸浏览。
-- **查看四季与晨昏**：按季节和拍摄时段筛选，地图光线随照片变化。
-- **收藏校园片刻**：匿名点赞、分享照片链接和按需下载高清 JPEG。
-- **共同补充档案**：批量标注照片并生成投稿包，经审核后公开。
+在目录里翻看照片，也可以直接点地图上的建筑与照片集合。照片不只按时间排列，还能按地点、楼层、季节和时段寻找：一段楼梯上的光、湖边的秋天，或某年熟悉的教室。
 
-## 快速开始
+选中照片后进入拍摄者的视角，用半透明叠加对照模型与画面，看清树木、墙面和走廊之间的关系。
 
-无需注册，在电脑、平板或手机打开网站即可。手机底部切换“地图 / 照片”，在“筛选”中选择季节、时段与排序；选中照片后可查看上一张、下一张或进入照片视角。
+![照片与校园模型同屏对照，回到拍摄者的观察位置](docs/images/photo-comparison.webp)
 
-| 操作 | 键鼠 | 触屏 |
-| --- | --- | --- |
-| 环绕 | 左键拖动 | 单指拖动 |
-| 前进/后退 | 滚轮或箭头按钮 | 双指开合或箭头按钮 |
-| 平移 | 右键拖动 | 双指同向移动 |
-| 回到起点 | “校园全景”按钮 | “校园全景”按钮 |
+## 让校园慢慢变回照片里的样子
 
-## 使用说明
+点击“沉浸看照片”，界面收起，模型退去，照片沿远近层次展开；退出时再回到地图。横幅与竖幅照片都能完整查看。
 
-![照片与校园模型同屏对照](docs/images/photo-comparison.webp)
+![沉浸浏览动图：从楼梯模型进入照片，再平滑返回地图](docs/images/immersive-landscape.gif)
 
-照片目录默认按点赞数排序，也支持上传顺序和拍摄时间。照片资料中可以查看地点、楼层、拍摄参数、作者与版权。浏览使用缩略图和次高清图，只有点击“下载原图”才下载高清文件。该文件是控制在 5 MB 内的 JPEG，可能经过压缩，不是未经处理的相机源文件。
+## 看见不同季节的同一个校园
 
-**投稿流程：**在投稿页选择照片，逐张标记位置、楼层和镜头方向，确认准则后生成 ZIP；再在邮件中手动添加该 ZIP，发送至 [drivinggodj@icloud.com](mailto:drivinggodj@icloud.com)。每包最多 20 张、原片合计 100 MB，单张最多 40 MB。生成投稿包不代表邮件已发送。
+春夏秋冬、清晨白天、傍晚夜间，都能成为重新寻找照片的线索。选中照片时，天空与光线随拍摄时段变化；照片保留自己的色彩。
 
-请只提交本人拍摄或获授权的校园景观、建筑和公共空间照片。禁止同学大头照、面部特写及侵犯隐私或肖像权益的内容；所有投稿均需审核。可附深度图，没有深度图也可投稿。
+![秋季清晨的校园外观与照片筛选](docs/images/season-view.webp)
 
-网站由 GitHub Pages 提供入口，公开图片由 Cloudflare 静态托管提供；[独立图片仓库](https://github.com/DrivingGodJ/nsfz-campus-media)保留备份。私有原片不随公开站点分发。
+## 留下你的校园片刻
 
-## 开发与验证
+无需注册即可浏览、点赞和分享照片链接。想补充一段自己的校园记忆，可以批量选择照片、标记位置与镜头方向，生成投稿包后通过邮件提交。
 
-需要 Node.js **22.12+**，在仓库根目录运行：
+[打开网站](https://drivinggodj.github.io/nsfz-campus-gallery/) · [投稿照片](https://drivinggodj.github.io/nsfz-campus-gallery/submit.html)
 
-```bash
-npm ci
-npm run dev
-```
+## 进一步了解
 
-本地浏览地址为 `http://127.0.0.1:5178/`；编辑器为 `/editor.html`，投稿页为 `/submit.html`。编辑接口仅用于本地，公开构建不包含编辑器、草稿、私有原片和凭据。
+| 想了解什么 | 去哪里看 |
+| --- | --- |
+| 地图操作、下载与投稿规则 | [使用指南](docs/GUIDE.zh-CN.md) |
+| 完整浏览体验 | [功能参考](docs/readme-reference.zh-CN.md) |
+| 本地开发、照片审核与发布 | [维护文档](docs/MAINTENANCE.md) |
+| 位置或模型问题 | [Issues](https://github.com/DrivingGodJ/nsfz-campus-gallery/issues) |
 
-```bash
-npm test
-npm run build
-```
-
-Mac 审核应用、NAS 同步、图片生成、点赞服务和发布步骤见维护文档；部署需要自己的服务配置与凭据。
-
-## 文档与支持
-
-- [完整浏览与投稿参考](docs/readme-reference.zh-CN.md)
-- [维护、审核与部署](docs/MAINTENANCE.md)
-- [位置、模型或功能问题反馈](https://github.com/DrivingGodJ/nsfz-campus-gallery/issues)
-
-## 许可与致谢
-
-地图以 OpenStreetMap 轮廓为基础，参考照片与校友标注修正；高度及部分细节为示意。地图数据 © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)，遵循 ODbL。
-
-照片版权属于各自权利人，下载不代表获得转载许可。仓库未声明整仓软件许可证，请分别确认代码、地图和照片的适用权利。
+照片版权属于各自权利人，下载不代表获得转载许可。地图数据 © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)，遵循 ODbL；[项目与权利说明](docs/GUIDE.zh-CN.md#许可与致谢)。

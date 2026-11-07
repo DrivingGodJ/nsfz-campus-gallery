@@ -2,69 +2,45 @@
 
 # NSFZ Campus Gallery
 
-Photos preserve moments; the map preserves their places. A photographic archive of Nanjing Normal University Affiliated High School's Chahar Road campus, placing images back where they were taken.
+Photos preserve moments; the map preserves their places. Put images of Nanjing Normal University Affiliated High School's Chahar Road campus back where they were taken, and revisit its buildings, lake and corridors.
 
-[Explore the campus](https://drivinggodj.github.io/nsfz-campus-gallery/) · [Submit photos](https://drivinggodj.github.io/nsfz-campus-gallery/submit.html) · [Maintenance](docs/MAINTENANCE.md)
+[Explore the campus](https://drivinggodj.github.io/nsfz-campus-gallery/)
 
-![Campus overview and photo catalogue](docs/images/campus-overview.webp)
+![Campus overview with photos placed around buildings and public spaces beside the catalogue](docs/images/campus-overview.webp)
 
-## Features
+## Step into the place behind a photo
 
-- **Find photos on a 3D map** by building, location, floor, aerial view and underground space.
-- **Enter the camera viewpoint** to compare the photo and model, use a translucent overlay or enjoy an immersive depth transition.
-- **Explore seasons and times of day**, with filters and lighting that follow a photo's context.
-- **Keep campus moments** through anonymous likes, shareable photo links and on-demand high-resolution JPEG downloads.
-- **Contribute to the archive** by annotating batches and submitting a package for review.
+Browse the catalogue or select buildings and photo clusters on the map. Find images by location, floor, season and time of day: light on a staircase, autumn by the lake or a familiar classroom from another year.
 
-## Quick start
+Enter the photographer's viewpoint and overlay the image on the model to see how trees, walls and corridors line up.
 
-Open the site on a computer, tablet or phone; no registration is required. On mobile, switch Map / Photos at the bottom and use Filters for season, time and sorting. Select a photo to navigate neighboring images or enter its viewpoint.
+![Photo and model compared from the photographer's viewpoint](docs/images/photo-comparison.webp)
 
-| Action | Mouse/keyboard | Touch |
-| --- | --- | --- |
-| Orbit | Left drag | One-finger drag |
-| Move closer/farther | Wheel or arrow buttons | Pinch or arrow buttons |
-| Pan | Right drag | Two-finger drag |
-| Reset | Campus overview button | Campus overview button |
+## Watch the campus become a photograph
 
-## Usage
+Open immersive viewing and the interface recedes, the model fades away and the photograph unfolds through layers of depth. Return to the map when you finish. Both landscape and portrait photographs remain fully visible.
 
-![Photo and campus model side by side](docs/images/photo-comparison.webp)
+![Immersive transition from a staircase model into its photograph and back](docs/images/immersive-landscape.gif)
 
-The catalogue defaults to most-liked order; upload and capture-time sorting are also available. Photo details include location, floor, camera parameters, author and copyright. Browsing uses thumbnails and display previews; the high-resolution file is fetched only when Download original is selected. That download is a JPEG capped at 5 MB and may be compressed; it is not the untouched camera source.
+## Rediscover the same campus across seasons
 
-**To submit:** choose photos, annotate location, floor and camera direction, accept the guidelines and generate a ZIP. Manually attach it to an email to [drivinggodj@icloud.com](mailto:drivinggodj@icloud.com). Each package supports up to 20 photos and 100 MB of originals, with a 40 MB per-photo limit. Creating a package does not send the email.
+Spring, summer, autumn and winter, from morning to night, provide different ways into the archive. Selecting a photo changes the sky and lighting to its capture time while preserving the photograph's own colors.
 
-Submit only your own or authorized photos of campus scenery, buildings and public spaces. Student headshots, facial close-ups and privacy/portrait-rights violations are prohibited. All submissions require review. Depth maps are optional.
+![Autumn morning campus appearance and photo filters](docs/images/season-view.webp)
 
-GitHub Pages hosts the website entry point, Cloudflare static hosting serves public images, and a [separate media repository](https://github.com/DrivingGodJ/nsfz-campus-media) keeps backups. Private originals are not distributed with the public site.
+## Add your own campus moment
 
-## Development and checks
+Browse, like and share photo links without registering. To contribute a memory, select photos in a batch, annotate their positions and camera directions, then generate a package to submit by email.
 
-Requires Node.js **22.12+**. From the repository root:
+[Open the website](https://drivinggodj.github.io/nsfz-campus-gallery/) · [Submit photos](https://drivinggodj.github.io/nsfz-campus-gallery/submit.html)
 
-```bash
-npm ci
-npm run dev
-```
+## Explore further
 
-Browse at `http://127.0.0.1:5178/`, use `/editor.html` for editing and `/submit.html` for submissions. Editing APIs are local only. Public builds exclude the editor, drafts, private originals and credentials.
+| Topic | Documentation |
+| --- | --- |
+| Map controls, downloads and submission rules | [User guide](docs/GUIDE.en.md) |
+| Complete browsing experience | [Feature reference (Chinese)](docs/readme-reference.zh-CN.md) |
+| Local development, review and publishing | [Maintenance (Chinese)](docs/MAINTENANCE.md) |
+| Location or model corrections | [Issues](https://github.com/DrivingGodJ/nsfz-campus-gallery/issues) |
 
-```bash
-npm test
-npm run build
-```
-
-See the maintenance guide for the Mac review app, NAS synchronization, image generation, likes service and publishing. Deployment requires your own service configuration and credentials.
-
-## Documentation and support
-
-- [Detailed browsing and submission reference (Chinese)](docs/readme-reference.zh-CN.md)
-- [Maintenance, review and deployment (Chinese)](docs/MAINTENANCE.md)
-- [Report location, model or feature issues](https://github.com/DrivingGodJ/nsfz-campus-gallery/issues)
-
-## License and credits
-
-The map starts from OpenStreetMap outlines and is refined with photos and alumni annotations. Heights and some details are illustrative. Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), under ODbL.
-
-Photos belong to their respective rights holders; downloading does not grant republication rights. No repository-wide software license is declared. Check code, map and photo rights separately.
+Photos belong to their rights holders; downloading does not grant republication rights. Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), under ODbL. See [project and rights details](docs/GUIDE.en.md#license-and-credits).
